@@ -1,0 +1,626 @@
+//---------------------------------------------------------------------------
+//
+//	Copyright (C) Geoworks 1998.  All rights reserved.
+//	GEOWORKS CONFIDENTIAL
+//
+// PROJECT:	Geos-SC WWW Library
+// MODULE:	HTML Image
+// FILE:	htmap.cpp
+//
+// AUTHOR:	Mingzhe Zhu: May 13, 1998
+//
+// REVISION HISTORY:
+//	Name		Date		Description
+//	----		----		-----------
+//	mzhu    	5/13/98  	Initial version
+//
+// DESCRIPTION:
+//
+//	HTML area, map handling.
+//      //depot/liberty/project/ellery/980805/library/www/html/htmap.cpp#1
+//
+//	$Id: htmap.goc,v 1.2 98/09/03 03:54:46 allen Exp $
+//
+//---------------------------------------------------------------------------
+
+@include <Ansi/stdlib.h>
+@include <Ansi/string.h>
+@include "WWW2/WW2Core/ww2string.goh"
+@include "WWW2/Conv/htframe.goh"
+@include "WWW2/Conv/htmap.goh"
+@include "WWW2/wwMacro.h"
+
+
+@classdecl HTAreaClass, neverSaved;
+@classdecl HTMapItemClass, neverSaved;
+@classdecl HTMapListClass, neverSaved;
+
+@define FRAME_NOT_DEFINED_YET 0
+
+#define _hrefH         (pself->__hrefH)
+#define _coordsH       (pself->__coordsH)
+#define _altH          (pself->__altH)
+#define _state         (pself->__state)
+#define _nameH         (pself->__nameH)
+#define _areas         (pself->__areas)
+
+
+@if FRAME_NOT_DEFINED_YET
+@extern method HTFrameClass, CreateArea;
+@extern method HTFrameClass, StartMap;
+@extern method HTFrameClass, EndMap;
+@endif
+
+@method HTAreaClass, HTArea
+{
+    _hrefH = 0;
+    _coordsH = 0;
+    _altH = 0;
+    _state.shape = AREA_RECT;
+    _state.nohref = 0;
+}
+
+@method HTAreaClass, MSG_META_OBJ_FREE //    ~HTArea()
+{
+    if (_hrefH)
+	WWMemFree(_hrefH);
+    if (_coordsH)
+	WWMemFree(_coordsH);
+    if (_altH)
+	WWMemFree(_altH);
+    @callsuper();
+}
+
+
+@method // Boolean
+HTAreaClass, ParseAttrs // (const SGMLEntity entity[])
+{
+    Boolean done = FALSE;
+    byte i = 0;
+
+    while (!done) {
+        switch (entity[i].SGMLE_token) {
+         case HTML_ATTR_HREF:
+            if (_hrefH) {
+                WWMemFree(_hrefH);
+            }
+            _hrefH = WWStrAllocCopy((const char *)entity[i].SGMLE_value);
+            if(!_hrefH) return FALSE;
+            break;
+         case HTML_ATTR_COORDS:
+            if (_coordsH) {
+                WWMemFree(_coordsH);
+            }
+            _coordsH = WWStrAllocCopy((const char *)entity[i].SGMLE_value);
+            if(!_coordsH) return FALSE;
+            break;
+         case HTML_ATTR_ALT:
+            if (_altH) {
+                WWMemFree(_altH);
+            }
+            _altH = WWStrAllocCopy((const char *)entity[i].SGMLE_value);
+            if(!_altH) return FALSE;
+            break;
+         case HTML_ATTR_SHAPE:
+
+             if(!WWStrCaseCmp((char*)entity[i].SGMLE_value, "rect"))
+                 _state.shape = AREA_RECT;
+             else if(!WWStrCaseCmp((char*)entity[i].SGMLE_value, "circle"))
+                 _state.shape = AREA_CIRCLE;
+             else if(!WWStrCaseCmp((char*)entity[i].SGMLE_value, "poly")
+                    ||!WWStrCaseCmp((char*)entity[i].SGMLE_value, "polygon"))
+                 _state.shape = AREA_POLY;
+
+            break;
+         case HTML_ATTR_NOHREF:
+             _state.nohref = 1;
+            break;
+         case HTML_ATTR_XXX_INVALID:
+            done = TRUE;
+            break;
+         default:
+            break;
+        }
+        i++;
+    }
+
+    return TRUE;
+}
+
+
+//---------------------------------------------------------------------------
+//		IsLocatedInPloy()
+//---------------------------------------------------------------------------
+// 
+// SYNOPSIS: 	Detect if the passed point inside the ploygon 
+//              passed.
+// SCOPE:	static
+// RETURN:	Boolean
+// STRATEGY:	
+// 
+// REVISION HISTORY: 
+//	Name		Date		Description 
+//	----		----		----------- 
+//	mzhu    	5/14/98 	Initial version 
+//	
+//---------------------------------------------------------------------------
+static Boolean
+IsLocatedInPolygon(int x, int y, int* coords, word num)
+{
+    word totalv, totalc;
+    int intersects = 0;
+    int wherex = x;
+    int wherey = y;
+    int xval, yval;
+    int *pointer, *end;
+
+    totalv = num;
+    totalc = totalv * 2;
+
+    xval = coords[totalc - 2];
+    yval = coords[totalc - 1];
+    end = &coords[totalc];
+
+    pointer = coords + 1;
+
+    if ((yval >= wherey) != (*pointer >= wherey)) 
+        if ((xval >= wherex) == (*coords >= wherex)) 
+	    intersects += (xval >= wherex);
+        else 
+            intersects += (xval - (yval - wherey) * 
+                          (*coords - xval) /
+                          (*pointer - yval)) >= wherex;
+
+    while(pointer < end)  {
+        yval = *pointer;
+        pointer += 2;
+
+        if(yval >= wherey)  {
+	   while((pointer < end) && (*pointer >= wherey))
+		pointer+=2;
+	   if (pointer >= end)
+		break;
+           if( (*(pointer-3) >= wherex) == (*(pointer-1) >= wherex) )
+	        intersects += (*(pointer-3) >= wherex);
+ 	    else
+		intersects += (*(pointer-3) - (*(pointer-2) - wherey) *
+                              (*(pointer-1) - *(pointer-3)) /
+                              (*pointer - *(pointer - 2))) >= wherex;
+
+        }  else  {
+	   while((pointer < end) && (*pointer < wherey))
+		pointer+=2;
+	   if (pointer >= end)
+		break;
+           if( (*(pointer-3) >= wherex) == (*(pointer-1) >= wherex) )
+		intersects += (*(pointer-3) >= wherex);
+ 	   else
+	        intersects += (*(pointer-3) - (*(pointer-2) - wherey) *
+                              (*(pointer-1) - *(pointer-3)) /
+                              (*pointer - *(pointer - 2))) >= wherex;
+        }  
+    }
+    if (intersects & 1)
+        return (TRUE);
+    else
+        return (FALSE);
+
+}
+
+//---------------------------------------------------------------------------
+//		GetNextInteger()
+//---------------------------------------------------------------------------
+// 
+// SYNOPSIS: 	Read the next integer from a string
+// SCOPE:	static
+// RETURN:	Boolean    FALSE - no data read
+// STRATEGY:	
+// 
+// REVISION HISTORY: 
+//	Name		Date		Description 
+//	----		----		----------- 
+//	mzhu    	5/14/98 	Initial version 
+//	
+//---------------------------------------------------------------------------
+static Boolean
+GetNextInteger(char **str, word *ret)
+{
+    //remember: we do not handle percentage now!!
+    while(**str && (**str < '0' || **str > '9')) (*str)++;
+    if(!**str) return FALSE;
+
+    *ret = 0;
+
+    while(**str && **str >= '0' && **str <= '9')
+    {
+        *ret = *ret * 10 + **str - '0';
+        (*str) ++;
+    }
+
+    return TRUE;
+}	/* End of GetNextInteger() */
+
+
+//---------------------------------------------------------------------------
+//		HTArea::Hit()
+//---------------------------------------------------------------------------
+// 
+// SYNOPSIS: 	Check if a point inside this area
+// SCOPE:	public
+// RETURN:	Boolean   TRUE - the point is inside this area
+// STRATEGY:	
+// 
+// REVISION HISTORY: 
+//	Name		Date		Description 
+//	----		----		----------- 
+//	mzhu    	5/14/98 	Initial version 
+//	
+//---------------------------------------------------------------------------
+@method // Boolean
+HTAreaClass, Hit // (HTPoint point)
+{
+    if(!_coordsH) return FALSE;
+
+    Boolean ret = FALSE;
+
+    char *coords = (char *)WWMemLock(_coordsH);
+
+    switch(_state.shape)
+    {
+    case AREA_RECT:
+        {
+        word i;
+        if(!GetNextInteger(&coords, &i)) break;
+        if(point.x < i) break;
+        if(!GetNextInteger(&coords, &i)) break;
+        if(point.y < i) break;
+        if(!GetNextInteger(&coords, &i)) break;
+        if(point.x > i) break;
+        if(!GetNextInteger(&coords, &i)) break;
+        if(point.y > i) break;
+        ret = TRUE;
+        break;
+        }
+    case AREA_CIRCLE:
+        {
+        word x, y, r;
+        if(!GetNextInteger(&coords, &x)) break;
+        if(!GetNextInteger(&coords, &y)) break;
+        if(!GetNextInteger(&coords, &r)) break;
+        if(!r) break;
+        //roughly use a rectangle here
+        if(point.x + r < x 
+            || point.y + r < y
+            || x + r < point.x
+            || y + r < point.y) 
+            break;
+
+        sdword dx, dy, dist, r2;
+        dx = (int)x - (int)point.x;
+        dy = (int)y - (int)point.y;
+        dist = dx * dx + dy * dy;
+        r2 = (int)r * (int)r;
+
+        if(dist <= r2)
+            ret = TRUE;
+
+        break;
+        }
+    case AREA_POLY:
+        {
+        word x, y, len = strlen(coords);
+        int *p, *xys = (int*)malloc(len*sizeof(int));
+        if(!xys) break;
+        len = 0; p = xys;
+
+        while(GetNextInteger(&coords, &x) &&
+            GetNextInteger(&coords, &y))
+        {
+            len ++;
+            *p = x; p++;
+            *p = y; p++;
+        }
+
+        if(len>2)
+            ret = IsLocatedInPolygon(point.x, point.y,
+                                xys, len);
+    
+        free(xys);
+        break;
+        }
+    }
+
+    WWMemUnlock(_coordsH);
+    return ret;
+}	/* End of HTArea::Hit() */
+
+
+@method // WWMemHandle
+HTAreaClass, HTAreaGetHref // ()
+{
+    return _hrefH;
+}
+
+
+@method // WWMemHandle
+HTAreaClass, GetAlt // ()
+{
+    return _altH;
+}
+
+
+@method 
+HTMapItemClass, HTMapItem // ()
+{
+    _nameH = 0;
+    _areas = ObjInstantiate(HandleOf(oself), &WWListClass);
+    @call _areas::WWList();
+}
+
+
+//---------------------------------------------------------------------------
+//		HTMapItem::~HTMapItem()
+//---------------------------------------------------------------------------
+// 
+// SYNOPSIS: 	
+// SCOPE:	
+// RETURN:	
+// STRATEGY:	
+// 
+// REVISION HISTORY: 
+//	Name		Date		Description 
+//	----		----		----------- 
+//	mzhu    	5/14/98 	Initial version 
+//	
+//---------------------------------------------------------------------------
+@method HTMapItemClass, MSG_META_OBJ_FREE // ~HTMapItem()
+{
+    if(_nameH) WWMemFree(_nameH);
+
+    optr /* HTArea * */ item;
+    while ((item = /* (HTArea *) */ @call _areas::Get()) != NULL) {
+        @call item::MSG_META_OBJ_FREE();
+    }
+    @callsuper();
+}	/* End of HTMapItem::~HTMapItem() */
+
+
+
+//---------------------------------------------------------------------------
+//		HTMapItem::SetName()
+//---------------------------------------------------------------------------
+// 
+// SYNOPSIS: 	
+// SCOPE:	
+// RETURN:	
+// STRATEGY:	
+// 
+// REVISION HISTORY: 
+//	Name		Date		Description 
+//	----		----		----------- 
+//	mzhu    	5/14/98 	Initial version 
+//	
+//---------------------------------------------------------------------------
+@method // Boolean 
+HTMapItemClass, SetName // (const char* name)
+{
+    if(_nameH) WWMemFree(_nameH);
+    _nameH = WWStrAllocCopy(name);
+    if(!_nameH) return FALSE;
+    return TRUE;
+}	/* End of HTMapItem::SetName() */
+
+
+@method //    WWMemHandle 
+HTMapItemClass, MapItemGetName // ()
+{
+    return _nameH;
+}
+
+
+@method //    void 
+HTMapItemClass, AppendArea // (HTArea* area)
+{
+    @call _areas::Append(area);
+}
+
+
+
+//---------------------------------------------------------------------------
+//		HTMapItem::GetHrefAt()
+//---------------------------------------------------------------------------
+// 
+// SYNOPSIS: 	Check if the point hit an area in this map, if so
+//              return the href from the area.
+// SCOPE:	public
+// RETURN:	WWMemhandle - href
+// STRATEGY:	
+// 
+// REVISION HISTORY: 
+//	Name		Date		Description 
+//	----		----		----------- 
+//	mzhu    	5/14/98 	Initial version 
+//	
+//---------------------------------------------------------------------------
+@method // WWMemHandle
+HTMapItemClass, GetHrefAt // (HTPoint point)
+{
+    optr /* HTArea * */ next = /* (HTArea*) */ @call _areas::Head();
+    while(next)
+    {
+        if(@call next::Hit(point))
+            return @call next::HTAreaGetHref();
+        next = /* (HTArea*) */ @call next::GetNext();
+    }
+
+    // didn't hit any area
+    return 0;
+}	/* End of HTMapItem::GetHrefAt() */
+
+
+
+//---------------------------------------------------------------------------
+//		HTMapList::~HTMapList()
+//---------------------------------------------------------------------------
+// 
+// SYNOPSIS: 	
+// SCOPE:	
+// RETURN:	
+// STRATEGY:	
+// 
+// REVISION HISTORY: 
+//	Name		Date		Description 
+//	----		----		----------- 
+//	mzhu    	5/14/98 	Initial version 
+//	
+//---------------------------------------------------------------------------
+@method HTMapListClass, MSG_META_OBJ_FREE // ~HTMapList()
+{
+    optr /* HTMapItem * */ item;
+    while ((item = /* (HTMapItem *)*/ @call self::Get()) != NULL) {
+        @call item::MSG_META_OBJ_FREE();
+    }
+    @callsuper();
+}	/* End of HTMapList::~HTMapList() */
+
+
+
+//---------------------------------------------------------------------------
+//		HTMapList::GetHrefFromMapAt()
+//---------------------------------------------------------------------------
+// 
+// SYNOPSIS: 	Find the map which the point is inside and get the href.
+// SCOPE:	public
+// RETURN:	href - WWMemHandle
+// STRATEGY:	
+// 
+// REVISION HISTORY: 
+//	Name		Date		Description 
+//	----		----		----------- 
+//	mzhu    	5/14/98 	Initial version 
+//	
+//---------------------------------------------------------------------------
+@method // WWMemHandle 
+HTMapListClass, GetHrefFromMapAt // (const char* name, HTPoint point)
+{
+    PARAM_ASSERT(name);
+    while(*name == '#' || *name == ' ') name ++;
+
+    optr /* HTMapItem * */ next = /* (HTMapItem*) */ @call self::Head();
+
+    while(next)
+    {
+        WWMemHandle nameH = @call next::MapItemGetName();
+        if(nameH && !WWStrCaseCmp(name, (char*)WWMemLock(nameH)))
+        { 
+            WWMemUnlock(nameH);
+            return @call next::GetHrefAt(point);
+        }
+        if(nameH) WWMemUnlock(nameH);
+        next = /* (HTMapItem*) */ @call next::GetNext();
+    }
+
+    // the map is not in the list, the name must be wrong
+    return 0;
+}	/* End of HTMapList::GetHrefFromMapAt() */
+
+
+@if FRAME_NOT_DEFINED_YET
+//---------------------------------------------------------------------------
+//		HTFrame::CreateArea()
+//---------------------------------------------------------------------------
+// 
+// SYNOPSIS: 	<area ...>
+// SCOPE:	public
+// RETURN:	Boolean
+// STRATEGY:	
+// 
+// REVISION HISTORY: 
+//	Name		Date		Description 
+//	----		----		----------- 
+//	mzhu    	5/14/98 	Initial version 
+//	
+//---------------------------------------------------------------------------
+@extern method // Boolean
+HTFrameClass, CreateArea // (const SGMLEntity entity[])
+{
+    //get the last HTMapItem created
+    optr /* HTMapItem * */ map = /* (HTMapItem*) */ @call _mapList::Head();
+    if(map)
+    {
+        optr /* HTArea * */ area = ObjInstantiate(HandleOf(oself),
+						  &HTAreaClass);
+	@call area::HTArea();
+
+        if(!area) return FALSE;
+
+        @call map::AppendArea(area);
+
+        return (@call area::ParseAttrs(entity));
+    }
+    return TRUE;
+}	/* End of HTFrame::CreateArea() */
+
+
+//---------------------------------------------------------------------------
+//		HTFrame::StartMap()
+//---------------------------------------------------------------------------
+// 
+// SYNOPSIS: 	<map...>
+// SCOPE:	public
+// RETURN:	Boolean
+// STRATEGY:	
+// 
+// REVISION HISTORY: 
+//	Name		Date		Description 
+//	----		----		----------- 
+//	mzhu    	5/14/98 	Initial version 
+//	
+//---------------------------------------------------------------------------
+@extern method // Boolean
+HTFrameClass, StartMap // (const SGMLEntity entity[])
+{
+    optr /* HTMapItem * */ map = ObjInstantiate(HandleOf(oself), 
+						&HTMapItemClass);
+    @call map::HTMapItem();
+
+    if(!map) return FALSE;
+
+    @call _mapList::Prepend(map);
+
+    byte i = 0;
+
+    while(1)
+    {
+        if(entity[i].SGMLE_token == HTML_ATTR_NAME) 
+            return (@call map::SetName((const char *)entity[i].SGMLE_value));
+        else if(entity[i].SGMLE_token == HTML_ATTR_XXX_INVALID)
+            return TRUE;
+        i++;
+    }
+    return TRUE;    
+}	/* End of HTFrame::StartMap() */
+
+
+//---------------------------------------------------------------------------
+//		HTFrame::EndMap()
+//---------------------------------------------------------------------------
+// 
+// SYNOPSIS: 	
+// SCOPE:	
+// RETURN:	
+// STRATEGY:	
+// 
+// REVISION HISTORY: 
+//	Name		Date		Description 
+//	----		----		----------- 
+//	mzhu    	5/14/98 	Initial version 
+//	
+//---------------------------------------------------------------------------
+@extern method // Boolean
+HTFrameClass, EndMap // ()
+{
+    return TRUE;
+}	/* End of HTFrame::EndMap() */
+
+@endif

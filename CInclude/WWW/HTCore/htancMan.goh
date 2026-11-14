@@ -1,0 +1,90 @@
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Geoworks 1996.  All rights reserved.
+	GEOWORKS CONFIDENTIAL
+
+PROJECT:	Geos WWW Library
+MODULE:		htancMan
+FILE:		htancMan.goh
+
+AUTHOR:		Kok Kin Kee, Oct 11, 1996
+
+ROUTINES:
+	Name			Description
+	----			-----------
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	kkee	10/11/96   	Initial version.
+
+DESCRIPTION:
+
+	Data structure for the Anchor Manager.
+
+	$Id: htancMan.goh,v 1.10.1.3 97/10/22 17:06:31 kkee Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+
+@ifndef __HT_ANCMAN_GOH__
+@define __HT_ANCMAN_GOH__
+
+@include <WWW/HTCore/htreq.goh>
+@include <WWW/HTCore/htlist.goh>
+#include <WWW/htmem.h>
+@include <WWW/HTCore/htanchor.goh>
+@include <WWW/HTCore/htstring.goh>
+#include <timedate.h>
+
+
+/*
+ * Anchor for a parent object. 
+ * Parent anchors point to the whole content of a data object. The parent
+ * anchor of a parent anchor is itself. The parent anchor contains all 
+ * meta information about the data object. This is largely the entity
+ * headers in the HTTP specification. 
+ *
+ * HTDocument is the most problematic. A document belongs to a client
+ * and so is the MemHandle of the document. If the Library keeps a copy
+ * of the MemHandle, it will crash if client deleted the document
+ * before the Library is done with it. Who is responsible for deleting
+ * a HTDocument? For now, let's ignore HTDocument since it is a 
+ * memory cache problem, not disk cache.
+ */
+typedef struct {
+    HTDocument HTPA_document;    /* The document within this anchor */
+    HTMemHandle HTPA_memCache;   /* Memory cache */
+    word       HTPA_inUseCount;  /* We can't garbage collect an anchor
+				    where in inUseCount > 0 */
+    HTMemHandle HTPA_url;        /* URL address of this node */
+    HTMemHandle HTPA_physical;   /* Physical URL address after going through
+				    cache */
+    Boolean HTPA_cacheHit;       /* TRUE if found in cache */
+    Boolean HTPA_headerDone;     /* TRUE if done parsing all headers */
+
+    /* Entity header fields */
+    HTStringHandle HTPA_content_transfer_encoding;
+    HTStringHandle HTPA_content_encoding;
+    HTStringHandle HTPA_content_language;   /* @@@ SHOULD BE A LIST? @@@ */
+    HTStringHandle HTPA_content_type;
+    HTStringHandle HTPA_charset;           /* Parameter to content type */
+    HTStringHandle HTPA_level;             /* Parameter to content type */
+    dword HTPA_content_length;
+
+//    TimerDateAndTime HTPA_date;  /* When was the request issued */
+//    TimerDateAndTime HTPA_expires; /* When does the copy expire */
+    HTMemHandle HTPA_date;          /* Unparsed format */
+    HTMemHandle HTPA_expires;       /* Unparsed format */
+    HTMemHandle HTPA_lastModified;  /* Unparsed format */
+
+    HTListHandle HTPA_extraHeaders; /* Unknown headers coming in from 
+				       the network. Useful for testing and
+				       extending headers to tailor to 
+				       our partners */
+    word HTPA_xImageXScale; /* Response for HTRequest->HTR_xImageSize */
+    word HTPA_xImageYScale; /* Response for HTRequest->HTR_xImageSize */
+} HTParentAnchor;
+
+@endif
+

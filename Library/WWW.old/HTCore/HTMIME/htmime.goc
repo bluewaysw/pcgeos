@@ -1,0 +1,587 @@
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Geoworks 1996 -- All Rights Reserved
+
+PROJECT:	Geos WWW Library.
+MODULE:		MIME
+FILE:		htmime.goc
+
+AUTHOR:		Kok Kin Kee, Jun 17, 1996
+
+ROUTINES:
+	Name			Description
+	----			-----------
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	kkee	6/17/96   	Initial version.
+
+DESCRIPTION:
+	MIME parser.
+
+	$Id: htmime.goc,v 1.1 97/04/07 11:48:26 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+@include <stdapp.goh>
+@include <Ansi/string.h>
+@include <WWW/HTCore/htreq.goh>
+@include <WWW/HTCore/htmime.goh>
+@include <WWW/HTCore/hterror.goh>
+@include <WWW/HTCore/htutils.goh>
+@include <WWW/HTCore/htpolicy.goh>
+@include <WWW/HTCore/htanchor.goh>
+@include <WWW/HTCore/htstring.goh>
+@include <WWW/HTCore/htaautil.goh>
+@include <sem.h>
+
+@include "HTNet/htnetMan.goh"
+@include "htfatals.goh"
+
+/* --------------------------------------------------------------------------
+ * 		PRIVATE DATA
+ * --------------------------------------------------------------------------*/
+
+#define PUTBLOCK(target, data, len)  \
+        @call target::MSG_HT_STREAM_PUT_BLOCK(data, len)
+
+/*
+ * HTTP/1.1 assumes content-type as application/octet-stream if one is not
+ * provided.
+ */
+#define DEFAULT_CONTENT_TYPE  HT_CONTENT_TYPE_APPLICATION_OCTET_STREAM
+
+/***********************************************************************
+		Private Functions
+***********************************************************************/
+
+
+
+/***********************************************************************
+ *		HTParseAuthenticate
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Parse WWW-Authenticate header.
+ * CALLED BY:	HTParseHeader
+ * RETURN:	TRUE if successfully parsed, FALSE if bad authentication.
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:    auth-scheme 1*SP realm *( "," auth-param )
+ *              realm = "realm" "=" realm-value
+ *              realm-value = quoted-string
+ * 
+ *              e.g., basic realm="Public Access"
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	kkee	12/ 9/96   	Initial Revision
+ *
+ ***********************************************************************/
+static Boolean _pascal
+HTParseAuthenticate (HTScanner *sptr, HTRequest *req)
+{
+    HTMemHandle value = NULL;
+
+    /* The next token must be a valid authentication scheme */
+
+    HTScanGobbleSym(sptr);
+
+    switch (sptr->HTS_thisSym) {
+
+    case HTST_BASIC_SCHEME:
+	req->HTR_aa.HTA_wwwScheme = HTAA_BASIC;
+	break;
+
+    default:
+	/* Other schemes and invalid schemes */
+EC(     EC_WARNING(NOT_IMPLEMENTED);                                      )
+	return FALSE;
+    }
+
+    /* 
+     * Scheme specific params. For Basic, there in only one 
+     * realm value.
+     */
+    HTScanGobbleSym(sptr);
+
+    /* Realm keyword for Basic */
+    if (sptr->HTS_thisSym == HTST_UNKNOWN) {
+	HTScanGobbleSym(sptr);
+	if (sptr->HTS_thisSym != HTST_EQUAL) 
+	    return FALSE;
+	    
+	/* Realm name */
+	HTScanGobbleSym(sptr);
+	if (sptr->HTS_thisSym == HTST_UNKNOWN ||
+	    sptr->HTS_thisSym == HTST_QUOTED_STRING) {
+	    /*
+	     * It seems I don't need to save the realmname. 
+	     * I can just use protection template. See htaabrow.goc
+	     */
+	    /* value = HTStrAllocCopy(sptr->HTS_thisWord); */
+	    /* req->HTR_aa.HTA_realmname = value; */
+	}
+
+	return TRUE;
+    }
+
+    return FALSE;
+}	/* End of HTParseAuthenticate.	*/
+
+
+
+
+/***********************************************************************
+ *		HTParseHeader
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Parse MIME headers.
+ * CALLED BY:	HTMimePutBlock
+ * RETURN:	int
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:    Store all headers about a data object in its anchor,
+ *              or other header info holders:
+ *                  - Access Authentication.
+ *
+ *              This is a tolerant MIME parser as the headers can be
+ *              full of syntax errors and we synchronize at the end of
+ *              line.
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	kkee	11/ 7/96   	Initial Revision
+ *
+ ***********************************************************************/
+static int _far _pascal
+HTParseHeader (HTScanner *sptr)
+{
+    HTRequest *rptr;
+
+    rptr = (HTRequest *) MemThreadGrab(sptr->HTS_request);
+
+    sptr->HTS_index = 0;   /* index into buffer */
+    
+    HTScanGobbleSym(sptr);
+
+    do {
+	switch (sptr->HTS_thisSym) {
+
+	case HTST_CACHE_CONTROL:
+	    /* 
+	     * HTTP/1.0 and below must not implement cache control and
+	     * cache only implement Pragma: no-cache. Cache control is
+	     * only for HTTP/1.1.
+	     */
+	    sptr->HTS_thisSym = HTST_XXX_EOL;     /* Junk line */
+	    break;
+
+	case HTST_CONTENT_ENCODING:
+	    sptr->HTS_thisSym = HTST_XXX_EOL;     /* Junk line */
+	    break;
+	    
+	case HTST_CONTENT_LENGTH:
+	    HTScanGobbleSym(sptr);
+	    if (sptr->HTS_thisSym != HTST_COLON)
+		sptr->HTS_thisSym = HTST_XXX_EOL;  /* Junk line */
+	    
+	    HTScanGobbleSym(sptr);
+	    if (sptr->HTS_thisSym != HTST_NUMBER)
+		sptr->HTS_thisSym = HTST_XXX_EOL;  /* Junk line */
+	    
+	    HTAnchorSetContentLength(rptr->HTR_anchor,
+				     sptr->HTS_thisNum);
+
+	    sptr->HTS_thisSym = HTST_XXX_EOL;      /* Done! */
+	    break;
+	    
+	case HTST_CONTENT_RANGE:
+	    sptr->HTS_thisSym = HTST_XXX_EOL;     /* Junk line */
+	    break;
+
+	case HTST_CONTENT_TYPE:
+	    HTScanGobbleSym(sptr);
+	    if (sptr->HTS_thisSym != HTST_COLON)
+		sptr->HTS_thisSym = HTST_XXX_EOL;   /* Junk line */
+
+	    HTScanGobbleSym(sptr);
+	    if (sptr->HTS_thisSym != HTST_UNKNOWN)  /* The content type */
+		sptr->HTS_thisSym = HTST_XXX_EOL;
+
+	    HTAnchorSetContentType(rptr->HTR_anchor,
+				   HTStringFor(sptr->HTS_thisWord));
+
+	    /* 
+	     * For now, done with this line. We may want to 
+	     * parse other content-type information later... 
+	     */
+	    sptr->HTS_thisSym = HTST_XXX_EOL;
+	    break;
+
+	case HTST_EXPIRES:
+	    /* 
+	     * The remaining data in sptr->HTS_HTS_buffer as the date
+	     * and time.
+	     */
+	    {
+		TimerDateAndTime dateTime;
+
+		if (HTParseTime(sptr->HTS_buffer+sptr->HTS_index, &dateTime))
+		    HTAnchorSetExpires(rptr->HTR_anchor, &dateTime);
+	    }
+			   
+	    sptr->HTS_thisSym = HTST_XXX_EOL;     /* Junk line */
+	    break;
+
+	case HTST_LAST_MODIFIED:
+	    /* 
+	     * The remaining data in sptr->HTS_HTS_buffer as the date
+	     * and time.
+	     */
+	    {
+		TimerDateAndTime dateTime;
+
+		if (HTParseTime(sptr->HTS_buffer+sptr->HTS_index, &dateTime))
+		    HTAnchorSetLastModified(rptr->HTR_anchor, &dateTime);
+	    }
+			   
+	    sptr->HTS_thisSym = HTST_XXX_EOL;     /* Junk line */
+	    break;
+
+	case HTST_LOCATION:
+	    HTScanGobbleSym(sptr);
+	    if (sptr->HTS_thisSym != HTST_COLON)
+		sptr->HTS_thisSym = HTST_XXX_EOL;  /* Junk line */
+
+	    /*
+	     * Change the request URL to this location in case the
+	     * client fire away the request again.
+	     */
+	    {
+		char *p1, *p2;
+
+		p2 = sptr->HTS_buffer+sptr->HTS_index;
+		while (isspace(*p2)) p2++;
+
+		MemReAlloc(rptr->HTR_uriString, strlen(p2)+1,
+			   HAF_ZERO_INIT | HAF_LOCK);
+
+		p1 = (char *) MemDeref(rptr->HTR_uriString);
+		strcpy(p1, p2);
+		MemUnlock(rptr->HTR_uriString);
+	    }
+	    
+	    sptr->HTS_thisSym = HTST_XXX_EOL;
+	    break;
+
+	case HTST_WWW_AUTHENTICATE:
+	    HTScanGobbleSym(sptr);
+	    if (sptr->HTS_thisSym != HTST_COLON) 
+		sptr->HTS_thisSym = HTST_XXX_EOL;  /* Junk line */
+
+	    /* 
+	     * Save the WWW-Authenticate scheme and its parameters since
+	     * client may reissue the request after it has been 
+	     * challenged by the server (when client receives status
+	     * HT_UNAUTHORIZED).
+	     */
+	    if (HTParseAuthenticate(sptr, rptr)) {
+		/*
+		 * If we are able to compose a valid authentication,
+		 * we don't need to kill the request and return it to
+		 * client. We can revive the request and reservice it.
+		 * But where and how do I revive the request????
+		 */
+		/* @@@ */
+	    }
+	    
+	    sptr->HTS_thisSym = HTST_XXX_EOL;  /* Done with line */
+	    break;
+	    
+	default:
+	    sptr->HTS_thisSym = HTST_XXX_EOL;  /* Junk line */
+	    break;
+	}
+    } while (sptr->HTS_thisSym != HTST_XXX_EOL);
+
+    /* Reset buffer length as we synch at newline */
+    sptr->HTS_numOfUngotten = 0;
+    sptr->HTS_length = 0;
+    sptr->HTS_buffer[0] = '\0';
+
+    MemThreadRelease(sptr->HTS_request);
+    return HT_OK;
+}	/* End of HTParseHeader.	*/
+
+
+
+
+
+/***********************************************************************
+ *		HTMimePutBlock
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Header is terminated by CRCR, LFLF, CRLFLF, CRLFCRLF.
+ *              Folding is either of CF LWS, LF LWS, CRLF LWS.
+ * CALLED BY:	MSG_HT_STREAM_PUT_BLOCK.
+ * RETURN:	int, from pushing data to target.
+ *              leftover, number of bytes left after we have become
+ *              transparent (i.e., finished parsing headers)
+ * SIDE EFFECTS:Nothing.
+ *	
+ * STRATEGY:    Ported from W3C HTMIME.c HTMIME_put_block. Optimized by
+ *              kkee. We parse at every newline to avoid running out
+ *              of buffer space.
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	kkee	11/ 7/96   	Initial Revision
+ *
+ ***********************************************************************/
+static int _pascal
+HTMimePutBlock (HTScanner *sptr, const char *b, word l, int *leftover)
+{
+    const char * start = b;
+    const char * end = start;
+    *leftover = -1;
+
+    while (!sptr->HTS_transparent && l-- > 0) {
+	if (sptr->HTS_state == HTSS_EOL_FCR) {
+	    if (*b == CR) {				    /* End of header */
+		int status;
+		HTScanPutBlock(sptr, start, end-start);
+		status = HTParseHeader(sptr);
+		sptr->HTS_transparent = TRUE;
+		*leftover = l;
+		return status;                               /* Done! */
+	    } else if (*b == LF)			   	     /* CRLF */
+		sptr->HTS_state = HTSS_EOL_FLF;
+	    else if (isspace(*b)) {			   /* Folding: CR SP */
+		sptr->HTS_state = HTSS_EOL_BEGIN;
+		HTScanPutBlock(sptr, start, end-start);
+		HTScanPutChar(sptr, ' ');
+		start=b, end=b+1;
+	    } else {						 /* New line */
+		sptr->HTS_state = HTSS_EOL_BEGIN;
+		HTScanPutBlock(sptr, start, end-start);
+		HTParseHeader(sptr);
+		start=b, end=b+1;
+	    }
+	} else if (sptr->HTS_state == HTSS_EOL_FLF) {
+	    if (*b == CR)				/* LF CR or CR LF CR */
+		sptr->HTS_state = HTSS_EOL_SCR;
+	    else if (*b == LF) {			    /* End of header */
+		int status;
+		HTScanPutBlock(sptr, start, end-start);
+		status = HTParseHeader(sptr);
+		sptr->HTS_transparent = TRUE;
+		*leftover = l;
+		return status;                               /* Done! */
+	    } else if (isspace(*b)) {	       /* Folding: LF SP or CR LF SP */
+		sptr->HTS_state = HTSS_EOL_BEGIN;
+		HTScanPutBlock(sptr, start, end-start);
+		HTScanPutChar(sptr, ' ');
+		start=b, end=b+1;
+	    } else {						/* New line */
+		sptr->HTS_state = HTSS_EOL_BEGIN;
+		HTScanPutBlock(sptr, start, end-start);
+		HTParseHeader(sptr);
+		start=b, end=b+1;
+	    }
+	} else if (sptr->HTS_state == HTSS_EOL_SCR) {
+	    if (*b==CR || *b==LF) {			    /* End of header */
+		int status;
+		HTScanPutBlock(sptr, start, end-start);
+		status = HTParseHeader(sptr);
+		sptr->HTS_transparent = TRUE;
+		*leftover = l;
+		return status;                               /* Done! */
+	    } else if (isspace(*b)) {	 /* Folding: LF CR SP or CR LF CR SP */
+		sptr->HTS_state = HTSS_EOL_BEGIN;
+		HTScanPutBlock(sptr, start, end-start);
+		HTScanPutChar(sptr, ' ');
+		start=b, end=b+1;
+	    } else {						/* New line */
+		sptr->HTS_state = HTSS_EOL_BEGIN;
+		HTScanPutBlock(sptr, start, end-start);
+		HTParseHeader(sptr);
+		start=b, end=b+1;
+	    }
+	} else if (*b == CR) {
+	    sptr->HTS_state = HTSS_EOL_FCR;
+	} else if (*b == LF) {
+	    sptr->HTS_state = HTSS_EOL_FLF;		       /* Line found */
+	} else
+	    end++;
+	b++;
+    }
+
+    return HT_OK;
+}	/* End of HTMimePutBlock.	*/
+
+
+
+/***********************************************************************
+		Class Declaration
+***********************************************************************/
+
+@classdecl	HTMIMEClass;
+
+/***********************************************************************
+		Message Handlers
+***********************************************************************/
+
+
+/***********************************************************************
+ *		MSG_HT_STREAM_PUT_BLOCK for HTMIMEClass
+ ***********************************************************************
+ * SYNOPSIS:	    Parse MIME messages.
+ * PARAMETERS:	    int (const byte *data, word len)
+ *                  - return HT_OUT_OF_MEMORY if not enough memory.
+ *                  - return value from target stream. If all is ok,
+ *                    its HT_OK.
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:        State-based implementation, which means we must 
+ *                  remember where we are in the parsing process as
+ *                  input data comes in discrete blocks. This FSM MIME
+ *                  parser is tolerant as the data can be full of 
+ *                  syntax errors. The parser ignores field names it
+ *                  does not understand, and resynchronizes on line
+ *                  beginnings.
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	kkee	6/27/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method HTMIMEClass, MSG_HT_STREAM_PUT_BLOCK
+{
+    HTRequest *rptr;
+    int leftover;
+    int ret = HT_OK;
+
+    if (!data || !len) return HT_OK;
+
+    /* 
+     * Always the first thing to check.
+     */
+    if (@self->HTSI_transparent) {
+
+	/*
+	 * We must keep track of amount of data once we've become
+	 * transparent for content-length.
+	 */
+	ret = PUTBLOCK(@self->HTSI_target, data, len);
+
+	if (len > 0) {
+	    rptr = (HTRequest *) MemThreadGrab(@self->HTSI_request);
+	    rptr->HTR_bytesRead += len;
+	    MemThreadRelease(@self->HTSI_request);
+	}
+
+	return ret;
+    }
+
+    /* Not transparent, so must process data */
+    if (!@self->HTMI_scanner) {
+	/* 
+	 * Create a scanner if we don't have one.
+	 */
+	@self->HTMI_scannerHandle = HTScanNew(@self->HTSI_request,
+					      @self->HTSI_target);
+
+	if (@self->HTMI_scannerHandle)
+	    /* 
+	     * Unlock when we become transparent or when we abort.
+	     */
+	    @self->HTMI_scanner = (HTScanner *)
+		MemLock(@self->HTMI_scannerHandle);
+	else 
+	    return HT_OUT_OF_MEMORY;
+
+    }
+
+    /* Continue parsing */
+    ret = HTMimePutBlock(@self->HTMI_scanner, (char *)data, len, 
+			 &leftover);
+
+    if (@self->HTMI_scanner->HTS_transparent) {
+	/* 
+	 * Put the rest down the stream without touching the data but 
+	 * make sure that we get the correct content length of data.
+	 */
+	if (!@self->HTSI_target) {
+	    HTStringHandle contentType;
+
+	    rptr = (HTRequest *) MemThreadGrab(@self->HTSI_request);
+	    contentType = HTAnchorContentType(rptr->HTR_anchor);
+	    if (!contentType)
+		@self->HTSI_target = 
+		    HTPolicyStreamStack(DEFAULT_CONTENT_TYPE,
+					NULL,
+					@self->HTSI_target,
+					@self->HTSI_request,
+					FALSE);
+	    else 
+		@self->HTSI_target = 
+		    HTPolicyStreamStack(contentType,
+					NULL,
+					@self->HTSI_target,
+					@self->HTSI_request,
+					FALSE);
+	
+	    MemThreadRelease(@self->HTSI_request);
+            if (!@self->HTSI_target) return HT_OUT_OF_MEMORY;
+
+	}
+	    
+	if (leftover) {
+	    PUTBLOCK(@self->HTSI_target, data+len-leftover, leftover);
+
+	    rptr = (HTRequest *) MemThreadGrab(@self->HTSI_request);
+	    rptr->HTR_bytesRead += leftover;
+	    MemThreadRelease(@self->HTSI_request);
+	}
+
+	@self->HTSI_transparent = TRUE;
+    }
+
+    return ret;
+}	/* End of MSG_HT_STREAM_PUT_BLOCK.	*/
+
+
+
+
+/***********************************************************************
+ *		MSG_HT_STREAM_ABORT for HTMIMEClass
+ ***********************************************************************
+ * SYNOPSIS:	    Delete scanner and abort self.
+ * PARAMETERS:	    void (void)
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:        Wait for parser thread to terminate, push leftover
+ *                  data to target (if any) and then we can free the
+ *                  scanner without losing data.
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	kkee	7/21/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method HTMIMEClass, MSG_HT_STREAM_ABORT
+{
+    if (@self->HTMI_scannerHandle)
+	HTScanDelete(@self->HTMI_scannerHandle);
+
+    return @callsuper();
+}	/* End of MSG_HT_STREAM_ABORT.	*/
+
+
+

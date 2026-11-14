@@ -1,0 +1,419 @@
+//---------------------------------------------------------------------------
+//                
+//	Copyright (C) Geoworks 1998.  All rights reserved.
+//	GEOWORKS CONFIDENTIAL
+//
+// PROJECT:	Geos-SC WWW Library
+// MODULE:	ctlist
+// FILE:	ctlist.cpp
+//
+// AUTHOR:	Kok Kin Kee: Jun 23, 1998
+//
+// REVISION HISTORY:
+//	Name		Date		Description
+//	----		----		-----------
+//	kkee    	6/23/98  	Initial version
+//
+// DESCRIPTION:
+//
+//	Composite target list.
+//      //depot/liberty/project/ellery/980805/library/www/html/ctlist.cpp#1
+//
+//	$Id: ctlist.goc,v 1.1 98/08/24 11:53:27 edwin Exp $
+//
+//---------------------------------------------------------------------------
+/*
+#include <system.h>
+#include <www/wwcore/wwliter.h>
+#include "ctlist.h"
+#include "htglyph.h"
+#include "htframe.h"
+*/
+
+@include "WWW2/WW2Core/ww2liter.goh"
+@include "WWW2/wwMacro.h"
+@include "WWW2/Conv/htglyph.goh"
+@include "WWW2/Conv/ctlist.goh"
+
+#define _target  (pself->__target)
+#define _frame   (pself->__frame)
+#define _frame   (pself->__frame)
+#define _list    (pself->__list)
+
+
+#define FRAME_NOT_DEFINED_YET 0
+
+
+@classdecl CompositeTargetElementClass, neverSaved;
+@classdecl CompositeTargetListClass, neverSaved;
+
+@method 
+CompositeTargetElementClass, CompositeTargetElement // (HTComposite *target)
+{
+    PARAM_ASSERT(target);
+    _target = target;
+}
+
+
+@method 
+CompositeTargetElementClass, CompositeTargetGetTarget
+{
+    return _target;
+}
+
+//---------------------------------------------------------------------------
+//		CompositeTargetList::~CompositeTargetList()
+//---------------------------------------------------------------------------
+// 
+// SYNOPSIS: 	EC remove all items in WWList to avoid tripping memory
+//              leaks check.
+// SCOPE:	Public
+// RETURN:	Nothing
+// STRATEGY:	
+// 
+// REVISION HISTORY: 
+//	Name		Date		Description 
+//	----		----		----------- 
+//	kkee    	6/23/98 	Initial version 
+//	
+//---------------------------------------------------------------------------
+@method 
+CompositeTargetListClass, MSG_META_FINAL_OBJ_FREE // ::~CompositeTargetList()
+{	
+    optr /* CompositeTargetElement * */ element;
+    
+    while (@call _list::Size()) {
+        element = /* (CompositeTargetElement *) */ @call _list::Get();
+        @call element::MSG_META_OBJ_FREE();
+    }
+}	/* End of CompositeTargetList::~CompositeTargetList() */
+
+
+@method 
+CompositeTargetListClass, CompositeTargetList // (HTFrame *frame)
+{
+    PARAM_ASSERT(frame);
+    _frame = frame;
+}
+
+//---------------------------------------------------------------------------
+//		CompositeTargetList::SetCurrentCompositeTarget()
+//---------------------------------------------------------------------------
+// 
+// SYNOPSIS: 	Set the current composite target.
+// SCOPE:	Public
+// RETURN:	TRUE if ok, FALSE if not enough memory.
+// STRATEGY:	The current composite target is the head of _list.
+// 
+// REVISION HISTORY: 
+//	Name		Date		Description 
+//	----		----		----------- 
+//	kkee    	6/23/98 	Initial version 
+//	
+//---------------------------------------------------------------------------
+@method // Boolean
+CompositeTargetListClass, SetCurrentCompositeTarget // (HTComposite *target)
+{
+    PARAM_ASSERT(target);
+//    CompositeTargetElement *element = 
+//        new CompositeTargetElement(target);
+    optr element = ObjInstantiate(HandleOf(oself), &CompositeTargetElementClass);
+
+    if (!element) {
+        return FALSE;
+    }
+    @call element::CompositeTargetElement(target);
+    @call _list::PrependElt(element);
+    return TRUE;
+}	/* End of CompositeTargetList::SetCurrentCompositeTarget() */
+
+
+//---------------------------------------------------------------------------
+//		CompositeTargetList::GetCurrentCompositeTarget()
+//---------------------------------------------------------------------------
+// 
+// SYNOPSIS: 	Get the current composite target, NULL if there is none.
+// SCOPE:	Public
+// RETURN:	HTComposite* or NULL
+// STRATEGY:	Does not remove the composite target from list.
+// 
+// REVISION HISTORY: 
+//	Name		Date		Description 
+//	----		----		----------- 
+//	kkee    	6/23/98 	Initial version 
+//	
+//---------------------------------------------------------------------------
+// inlined
+@method // inline HTComposite*
+CompositeTargetListClass, GetCurrentCompositeTarget // ()
+{
+    if (!@call _list::Size()) {
+        return NULL;
+    } else {
+	optr head = @call _list::Head();
+        return (@call head::CompositeTargetGetTarget());
+    }
+}       /* End of CompositeTargetList::GetCurrentCompositeTarget() */
+
+
+//---------------------------------------------------------------------------
+//		CompositeTargetList::MoveCurrentCompositeTargetTo()
+//---------------------------------------------------------------------------
+// 
+// SYNOPSIS: 	Move current composite target to a composite given its
+//              token identity. EC death if not found.
+// SCOPE:	Public
+// RETURN:	Nothing
+// STRATEGY:	
+// 
+// REVISION HISTORY: 
+//	Name		Date		Description 
+//	----		----		----------- 
+//	kkee    	6/23/98 	Initial version 
+//	
+//---------------------------------------------------------------------------
+@method // void
+CompositeTargetListClass, MoveCurrentCompositeTargetTo // (HTMLToken compositeToken)
+{
+    optr /* CompositeTargetElement * */ element, target;
+    
+    do {
+        element = @call _list::Head();
+
+        ASSERTS(element != NULL,
+        "MoveCurrentCompositeTargetTo() composite not found");
+
+	target = @call element::CompositeTargetGetTarget();
+        if (@call target::GetIdentity() == compositeToken) {
+            // Found
+            break;
+        } else {
+            // Remove and delete.
+            @call _list::Get();
+            @call element::MSG_META_OBJ_FREE();
+        }
+    } while (1);
+}	/* End of CompositeTargetList::MoveCurrentCompositeTargetTo() */
+
+
+
+//---------------------------------------------------------------------------
+//		CompositeTargetList::MoveCurrentCompositeTargetToBefore()
+//---------------------------------------------------------------------------
+// 
+// SYNOPSIS: 	Move current composite target to before a composite. EC
+//              death if not found.
+// SCOPE:	Public
+// RETURN:	Nothing
+// STRATEGY:	
+// 
+// REVISION HISTORY: 
+//	Name		Date		Description 
+//	----		----		----------- 
+//	kkee    	6/23/98 	Initial version 
+//	
+//---------------------------------------------------------------------------
+@method // void
+CompositeTargetListClass, MoveCurrentCompositeTargetToBefore // (HTMLToken 
+                                                        // compositeToken)
+{
+    optr /* CompositeTargetElement * */ element, target;
+    
+    do {
+        element = /* (CompositeTargetElement*) */ @call _list::Get();
+        ASSERTS(element != NULL,
+        "MoveCurrentCompositeTargetToBefore() composite not found");
+
+	target = @call element::CompositeTargetGetTarget();
+        if (@call target::GetIdentity() == compositeToken) {
+            // We want the composite before this one.
+            @call element::MSG_META_OBJ_FREE();
+            ASSERTS(@call _list::Head() != NULL,
+                    "MoveCurrentCompositeTargetToBefore() composite not found");
+            break;
+        } else {
+            @call element::MSG_META_OBJ_FREE();
+        }
+    } while (1);
+}	/* End of CompositeTargetList::MoveCurrentCompositeTargetToBefore() */
+
+
+//---------------------------------------------------------------------------
+//		CompositeTargetList::FindCompositeTarget()
+//---------------------------------------------------------------------------
+// 
+// SYNOPSIS: 	Find the latest composite target given is token identity.
+// SCOPE:	Public
+// RETURN:	HTComposite* or NULL.
+// STRATEGY:	
+// 
+// REVISION HISTORY: 
+//	Name		Date		Description 
+//	----		----		----------- 
+//	kkee    	6/23/98 	Initial version 
+//	
+//---------------------------------------------------------------------------
+@method // HTComposite*
+CompositeTargetListClass, FindCompositeTarget // (HTMLToken compositeToken)
+{
+    optr /* CompositeTargetElement * */ element, iter, target;
+
+    iter = ObjInstantiate(HandleOf(oself), &WWListIteratorClass);
+    @call iter::WWListIterator(_list);
+
+    // Searching from head of list to tail of list.
+    for (@call iter::First(); !(@call iter::IsDone()); @call iter::Next()) {
+        element = /* (CompositeTargetElement*) */ @call iter::CurrentElement();
+	target = @call element::CompositeTargetGetTarget();
+        if (@call target::GetIdentity() == compositeToken) {
+	    @call iter::MSG_META_OBJ_FREE();
+            return target;
+        }
+    }
+    @call iter::MSG_META_OBJ_FREE();
+    return NULL;
+}	/* End of CompositeTargetList::FindCompositeTarget() */
+
+
+
+//---------------------------------------------------------------------------
+//		CompositeTargetList::FindCompositeTarget()
+//---------------------------------------------------------------------------
+// 
+// SYNOPSIS: 	Find the latest composite target given is token identity.
+// SCOPE:	Public
+// RETURN:	HTComposite* or NULL.
+// STRATEGY:	
+// 
+// REVISION HISTORY: 
+//	Name		Date		Description 
+//	----		----		----------- 
+//	kkee    	6/23/98 	Initial version 
+//	
+//---------------------------------------------------------------------------
+@method // HTComposite*
+CompositeTargetListClass, FindCompositeTargetWithToken // (HTMLToken compositeToken,
+                                         // HTMLToken searchUntilToken)
+{
+    optr /* CompositeTargetElement * */ element, iter, target;
+    HTMLToken token;
+
+    iter = ObjInstantiate(HandleOf(oself), &WWListIteratorClass);
+    @call iter::WWListIterator(_list);
+
+    // Searching from head of list to tail of list.
+    for (@call iter::First(); !(@call iter::IsDone()); @call iter::Next()) {
+        element = /* (CompositeTargetElement*) */ @call iter::CurrentElement();
+	target = @call element::CompositeTargetGetTarget();
+	token = @call target::GetIdentity();
+        if (token == compositeToken) {
+	    @call iter::MSG_META_OBJ_FREE();
+            return target;
+        } else if (token == searchUntilToken) {
+	    break;
+        }
+    }
+    @call iter::MSG_META_OBJ_FREE();
+    return NULL;
+}	/* End of CompositeTargetList::FindCompositeTarget() */
+
+
+//---------------------------------------------------------------------------
+//		CompositeTargetList::AppendToCurrentCompositeTarget()
+//---------------------------------------------------------------------------
+// 
+// SYNOPSIS: 	Append a glyph to the current composite target.
+// SCOPE:	Public
+// RETURN:	TRUE if appended, FALSE if out of memory.
+// STRATEGY:	
+// 
+// REVISION HISTORY: 
+//	Name		Date		Description 
+//	----		----		----------- 
+//	kkee    	6/23/98 	Initial version 
+//	
+//---------------------------------------------------------------------------
+@method // Boolean
+CompositeTargetListClass, AppendToCurrentCompositeTarget // (HTGlyph *glyph)
+{
+    optr target;
+    PARAM_ASSERT(glyph);
+    ASSERTS(@call _list::Size() > 0,
+            "AppendToCurrentCompositeTarget() no composite target");
+    
+    optr /* HTComposite * */ currentCompositeTarget = 
+	@call self::GetCurrentCompositeTarget();
+    HTMLToken compIdentity = @call currentCompositeTarget::GetIdentity();
+    HTMLToken glyphIdentity = @call glyph::GetIdentity();
+
+    if (compIdentity == HTMLT_TABLE) {
+        if (glyphIdentity == HTMLT_TR) {
+            return (@call currentCompositeTarget::Append(glyph));
+        } else if (glyphIdentity == HTMLT_TD) {
+            // Generate a TR.
+            SGMLEntity entity = {HTML_ATTR_XXX_INVALID, ""};
+
+@if FRAME_NOT_DEFINED_YET
+            if (!(@call _frame::StartTR(&entity))) {
+                return FALSE;
+            }
+@endif
+            return @call self::AppendToCurrentCompositeTarget(glyph);
+        } else {
+            // Move it out of table.
+            return @call self::AppendToBeforeTable(glyph);
+        }
+    } else if (compIdentity == HTMLT_TR) {
+        if (glyphIdentity == HTMLT_TD) {
+            return (@call currentCompositeTarget::Append(glyph));
+        } else {
+            // Don't generate a TD, as this will most likely screw up the
+            // table format. We move it to before the start of table.
+            return @call self::AppendToBeforeTable(glyph);
+        }
+    } else if (glyphIdentity == HTMLT_TD) {
+        // End previous TD if there is one.
+        @call self::MoveCurrentCompositeTargetTo(HTMLT_TR);
+        currentCompositeTarget = @call self::GetCurrentCompositeTarget();
+    }
+
+    return (@call currentCompositeTarget::Append(glyph));
+}	/* End of CompositeTargetList::AppendToCurrentCompositeTarget() */
+
+
+//---------------------------------------------------------------------------
+//		CompositeTargetList::AppendToBeforeTable()
+//---------------------------------------------------------------------------
+// 
+// SYNOPSIS: 	Append a glyph to before table.
+// SCOPE:	Private
+// RETURN:	TRUE if appended, FALSE otherwise.
+// STRATEGY:	
+// 
+// REVISION HISTORY: 
+//	Name		Date		Description 
+//	----		----		----------- 
+//	kkee    	6/23/98 	Initial version 
+//	
+//---------------------------------------------------------------------------
+@method // Boolean
+CompositeTargetListClass, AppendToBeforeTable // (HTGlyph* glyph)
+{
+    PARAM_ASSERT(glyph);
+    optr /* HTComposite * */ table = @call self::FindCompositeTarget(HTMLT_TABLE);
+    optr /* HTComposite * */ parent = /* (HTComposite*) */ @call table::GetParent();
+
+    ASSERT(table && parent);
+#if ERROR_CHECK
+    ASSERT(@call parent::Remove(table) == table);
+#else
+    @call parent::Remove(table);
+#endif
+
+    Boolean ret = @call parent::Append(glyph);
+
+    if (!(@call parent::Append(table))) {
+        @call table::MSG_META_OBJ_FREE();
+    }
+    return ret;
+}	/* End of CompositeTargetList::AppendToBeforeTable() */

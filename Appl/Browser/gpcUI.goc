@@ -1,0 +1,1668 @@
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Geoworks 1996.  All rights reserved.
+	GEOWORKS CONFIDENTIAL
+
+PROJECT:	
+MODULE:		
+FILE:		
+
+AUTHOR:		Edwin Yu, Aug 13, 1998
+
+ROUTINES:
+	Name			Description
+	----			-----------
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	edwin	8/13/98   	Initial version.
+
+DESCRIPTION:
+
+	
+	$Id: gpcUI.goc,v 1.2 98/08/17 16:00:40 edwin Exp $
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+@include "gpcDecl.goh"
+@include <Objects/Text/tCtrlC.goh>  /* SearchReplaceControlClass */
+
+/*
+ ***************************************************************************
+ *		UI Objects
+ ***************************************************************************
+ */
+
+@start	AppResource;
+
+/* help contexts for NIKE */
+#define GPC_OPEN_LOCATION              "Open Location"
+#define GPC_OPEN_FILE                  "Open File"
+#define GPC_SAVE_FILE                  "Save File"
+#define GPC_SAVE_IMAGE                 "Save Image"
+#define GPC_PAGE_SETUP                 "Change Page Setup"
+#define GPC_SHOW_BOOKMARKS             "Show Bookmarks"
+#define GPC_SHOW_HISTORY_LIST          "Show History"
+#define GPC_SET_HOME_PAGE              "Set Home Page"
+#define GPC_SET_PROXY_SERVER           "Set Proxy Server"
+#define GPC_SET_CACHE_SIZE             "Set Cache Size"
+#define GPC_CONFIG_TOOLBAR             "Configure Toolbar"
+
+
+@object GPCAppClass GPCApp = {
+    GI_visMoniker = list {
+	@ISTextMoniker
+    }
+    GI_comp = 
+	@ISDocumentPrimary,
+	@ISReplaceBookmarkDialog,
+	@ISUsernameDialog,
+	@ISHistoryDialog,
+	@ISLocalPreferenceDialog,
+	@ISOpenLocationDialog;
+
+
+    gcnList(MANUFACTURER_ID_GEOWORKS,GAGCNLT_WINDOWS) = 
+		@ISDocumentPrimary;
+
+    gcnList(MANUFACTURER_ID_GEOWORKS,MGCNLT_ACTIVE_LIST) =
+		@ISLIPrintButton,@ISPageSizeControl;
+    gcnList(MANUFACTURER_ID_GEOWORKS,GAGCNLT_SELF_LOAD_OPTIONS) =
+	@ISLIPrintButton,
+	@ISLIFindControl,
+	@ISPageSizeControl,
+	@ISEditController;
+    ATTR_GEN_APPLICATION_PRINT_CONTROL = @ISLIPrintButton;
+}
+
+@visMoniker ISTextMoniker = "Global Internet";
+
+@end	AppResource;
+
+@start GenericUI ;
+
+
+@object GenPrimaryClass ISDocumentPrimary = {
+    GI_comp = 
+	@ISFileMenu,
+	@ISEditMenu,
+	@ISViewMenu,
+	@ISNavigateMenu,
+	@ISBookmarkMenu,
+	@ISOptionsMenu,
+	@ISButtonBar,
+	@ISUrlBarGroup,
+	@ISLIFindControl,
+	@ISDocuInfoDialog, 
+	@GPCGenView,
+	@ISDialogBoxes;
+
+    HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+    HINT_PRIMARY_NO_FILE_MENU; 
+    HINT_CUSTOM_CHILD_SPACING = { SST_PIXELS | 0 };
+    HINT_DRAW_IN_BOX;
+    HINT_DEFAULT_TARGET ;
+    ATTR_GEN_HELP_CONTEXT = "TOC";
+}
+
+
+@object GenInteractionClass ISFileMenu = {
+    GI_comp =
+	@ISLIOpenLocationButton2,
+	@ISOpenLocalFileTrigger,
+	@ISSavePageAs,
+	@ISSaveImage,
+	@ISLIPrintButton,
+	@ISPageSetupTrigger;
+
+    GI_attrs = @default | GA_KBD_SEARCH_PATH;
+    GII_visibility = GIV_POPUP;
+    ATTR_GEN_INTERACTION_GROUP_TYPE = (GIGT_FILE_MENU);
+}
+
+@object GenTriggerClass ISSaveImage = {
+    GI_visMoniker = 'I', "Save Image" ;
+    GI_states = @default & ~GS_ENABLED ;
+    GTI_actionMsg = MSG_GPC_INITIALIZE_SAVE_IMAGE_BOX ;
+    GTI_destination = process ;
+}
+
+@object GenInteractionClass ISSaveImageSelectorDialog = {
+    GI_visMoniker = "Save Image" ;
+    GI_comp = @ISSaveImageSelector, @ISSaveImageTextBar, 
+		@ISSaveImageSelectorSave, @ISSaveImageSelectorHelp ;
+    GII_visibility = GIV_DIALOG;
+    GII_type = GIT_COMMAND;
+    GII_attrs = @default | GIA_MODAL | GIA_NOT_USER_INITIATABLE;
+    ATTR_GEN_HELP_CONTEXT = GPC_SAVE_IMAGE;
+}
+
+@object GenFileSelectorClass ISSaveImageSelector = {
+    ATTR_GEN_PATH_DATA = {SP_DOCUMENT, ""} ;
+    ATTR_GEN_FILE_SELECTOR_NAME_MASK = {"*.HTM"} ;
+}
+
+@object ISTextClass ISSaveImageTextBar = {
+    GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT;
+    ATTR_GEN_TEXT_LEGAL_FILENAMES;
+    HINT_DEFAULT_FOCUS ;
+}
+
+@object GenTriggerClass ISSaveImageSelectorSave = {
+    GI_visMoniker = "Save" ;
+    GTI_actionMsg = MSG_GPC_SAVE_IMAGE;
+    GTI_destination = process;
+    ATTR_GEN_TRIGGER_INTERACTION_COMMAND = {IC_OK};
+    HINT_DEFAULT_DEFAULT_ACTION;
+    HINT_SEEK_REPLY_BAR ;
+}
+
+@object GenTriggerClass ISSaveImageSelectorHelp = {
+    ATTR_GEN_TRIGGER_INTERACTION_COMMAND = {IC_HELP};
+    ATTR_GEN_DEFAULT_MONIKER = GDMT_HELP;
+    HINT_SEEK_REPLY_BAR;
+}
+
+@object GenTriggerClass ISSavePageAs = {
+    GI_visMoniker = 'A', "Save As" ;
+    GI_states = @default & ~GS_ENABLED ;
+    GTI_actionMsg = MSG_GEN_INTERACTION_INITIATE ;
+    GTI_destination = ISSavePageSelectorDialog ;
+}
+
+@object GenInteractionClass ISSavePageSelectorDialog = {
+    GI_visMoniker = "Save Page" ;
+    GI_comp = @ISSavePageFileSelector, @ISSaveFileTextBar, 
+    @ISSaveFileSelectorSave, @ISSaveFileSelectorHelp ;
+    GII_visibility = GIV_DIALOG;
+    GII_type = GIT_COMMAND;
+    GII_attrs = @default | GIA_MODAL | GIA_NOT_USER_INITIATABLE;
+    ATTR_GEN_HELP_CONTEXT = GPC_SAVE_FILE;
+}
+
+
+@object GenFileSelectorClass ISSavePageFileSelector = {
+    ATTR_GEN_PATH_DATA = {SP_DOCUMENT, ""} ;
+    ATTR_GEN_FILE_SELECTOR_NAME_MASK = {"*.HTM"} ;
+}
+
+@object ISTextClass ISSaveFileTextBar = {
+    GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT;
+    ATTR_GEN_TEXT_LEGAL_FILENAMES;
+    HINT_DEFAULT_FOCUS ;
+}
+
+@object GenTriggerClass ISSaveFileSelectorSave = {
+    GI_visMoniker = "Save" ;
+    GTI_actionMsg = MSG_GPC_SAVE_LOCAL_FILE;
+    GTI_destination = process;
+    HINT_DEFAULT_DEFAULT_ACTION ;
+    HINT_SEEK_REPLY_BAR ;
+}
+
+@object GenTriggerClass ISSaveFileSelectorHelp = {
+    ATTR_GEN_TRIGGER_INTERACTION_COMMAND = {IC_HELP};
+    ATTR_GEN_DEFAULT_MONIKER = GDMT_HELP;
+    HINT_SEEK_REPLY_BAR;
+}
+
+@object GenTriggerClass ISOpenLocalFileTrigger = {
+    GI_visMoniker = 'l',"Open File";
+    GTI_destination = ISOpenFileSelectorDialog;
+    GTI_actionMsg = MSG_GEN_INTERACTION_INITIATE;
+    HINT_TRIGGER_BRINGS_UP_WINDOW;
+}
+
+@object GenInteractionClass ISOpenFileSelectorDialog = {
+    GI_visMoniker = "Open Local File";
+    GI_comp =
+	@ISLocalFileSelector,
+	@ISLocalFileSelectorOK,
+	@ISLocalFileSelectorHelp;
+    GII_visibility = GIV_DIALOG;
+    GII_type = GIT_COMMAND;
+    GII_attrs = @default | GIA_MODAL | GIA_NOT_USER_INITIATABLE;
+    ATTR_GEN_HELP_CONTEXT = GPC_OPEN_FILE;
+}
+
+@object GenFileSelectorClass ISLocalFileSelector = {
+    GFSI_destination = process;
+    GFSI_notificationMsg = MSG_GPC_OPEN_LOCAL_FILE ;
+    ATTR_GEN_PATH_DATA = {SP_DOCUMENT, ""} ;
+    ATTR_GEN_FILE_SELECTOR_NAME_MASK = {"*.HTM"} ;
+}
+
+@object GenTriggerClass ISLocalFileSelectorOK = {
+    GI_visMoniker = "Open" ;
+    GTI_actionMsg = MSG_GPC_LOCAL_FILE_OPEN ;
+    GTI_destination =  process ;
+    ATTR_GEN_TRIGGER_INTERACTION_COMMAND = {IC_OK};
+    HINT_DEFAULT_DEFAULT_ACTION;
+    HINT_SEEK_REPLY_BAR ;
+}
+
+@object GenTriggerClass ISLocalFileSelectorClose = {
+    GI_visMoniker = "Close" ;
+    GI_attrs = GA_SIGNAL_INTERACTION_COMPLETE;
+    ATTR_GEN_TRIGGER_INTERACTION_COMMAND = {IC_DISMISS};
+    HINT_SEEK_REPLY_BAR ;
+}
+
+@object GenTriggerClass ISLocalFileSelectorHelp = {
+    ATTR_GEN_TRIGGER_INTERACTION_COMMAND = {IC_HELP};
+    ATTR_GEN_DEFAULT_MONIKER = GDMT_HELP;
+    HINT_SEEK_REPLY_BAR;
+}
+
+@object GenTriggerClass ISLIPrintTrigger = {
+    GI_visMoniker = 'P',"Print";
+    GTI_destination = ISLIPrintButton;
+    GTI_actionMsg = MSG_PRINT_CONTROL_INITIATE_PRINT;
+}
+
+@object GenTriggerClass ISPageSetupTrigger = {
+    GI_visMoniker = 'g',"Page Setup" ;
+    GTI_destination = @ISPageSetupDialog ;
+    GTI_actionMsg = MSG_ISPSGI_BEFORE ;
+    HINT_TRIGGER_BRINGS_UP_WINDOW;
+    ATTR_GEN_HELP_CONTEXT = GPC_PAGE_SETUP;
+}
+
+@object GenInteractionClass ISEditMenu = {
+    GI_comp =
+	@ISEditController,
+	@ISLICopyAllButton,
+	@ISEditMenuSearchGroup;
+
+    GI_attrs = @default | GA_KBD_SEARCH_PATH;
+    GII_visibility = GIV_POPUP;
+    ATTR_GEN_INTERACTION_GROUP_TYPE = (GIGT_EDIT_MENU);
+}
+
+@object GenTriggerClass ISLICopyAllButton = {
+    GI_visMoniker = "Copy All Text" ;
+    GI_kbdAccelerator = control 'c';
+    GTI_actionMsg = MSG_GPC_COPY_ALL_TEXT ;
+    GTI_destination = process; 
+}
+
+@object GenEditControlClass ISEditController = {
+    ATTR_GEN_CONTROL_REQUIRE_UI = { GECF_COPY } ;
+    ATTR_GEN_CONTROL_PROHIBIT_UI = {GECF_SELECT_ALL | GECF_UNDO |
+					GECF_PASTE | GECF_CUT |
+					GECF_DELETE } ;
+}
+
+@object GenInteractionClass ISOptionsMenu = {
+    GI_comp =
+	@ISOptionsImagesSubmenu, 
+	@ISSetHomePageTrigger,
+	@ISSetProxyTrigger,
+	@ISSetCacheSizeTrigger,
+	@ISConfigureToolbarTrigger,
+	@ISClearCacheButton;
+
+    GII_visibility = GIV_POPUP;
+    ATTR_GEN_INTERACTION_GROUP_TYPE = (GIGT_OPTIONS_MENU);
+}
+
+@object GenInteractionClass ISOptionsImagesSubmenu = {
+    GI_visMoniker = 'I',"Images";
+    GI_comp = @ISOptionsImagesGroup;
+    GII_type = GIT_ORGANIZATIONAL;
+    GII_visibility = GIV_POPUP;
+}
+
+@object GenItemGroupClass ISOptionsImagesGroup = {
+    GI_comp = @ISOptionsImagesON,@ISOptionsImagesOFF;
+    GIGI_selection = 0;
+    GIGI_destination = process;
+    GIGI_applyMsg = MSG_GPC_SET_IMAGES_PREFS_FROM_MENUS;
+}
+
+@object GenItemClass ISOptionsImagesON = {
+    GI_visMoniker = 'n',"Images On";
+    GII_identifier = 1;
+}
+
+@object GenItemClass ISOptionsImagesOFF = {
+    GI_visMoniker = 'f',"Images Off";
+    GII_identifier = 0;
+}
+
+@object GenTriggerClass ISConfigureToolbarTrigger = {
+    GI_visMoniker = 'C', "Configure Toolbar...";
+    GTI_actionMsg = MSG_ISCTGI_BEFORE;
+    GTI_destination = @ISConfigureToolbarDialogBox;
+}
+
+@object GenTriggerClass ISSetProxyTrigger = {
+    GI_visMoniker = 'P', "Set Proxy Server...";
+    GTI_actionMsg = MSG_GPC_SET_PROXY_SERVER_BEFORE ;
+    GTI_destination = process;
+}
+
+@object GenTriggerClass ISSetCacheSizeTrigger = {
+    GI_visMoniker = 'a', "Set Cache Size";
+    GTI_destination = process;
+    GTI_actionMsg = MSG_GPC_SET_CACHE_SIZE_BEFORE;
+}
+
+@object GenInteractionClass ISSetProxyDialogBox = {
+    GI_visMoniker = "Set Proxy Server" ;
+    GII_visibility = GIV_DIALOG;
+    GII_type = GIT_COMMAND;
+    GII_attrs = @default | GIA_MODAL | GIA_NOT_USER_INITIATABLE;
+    GI_comp =
+	@ISProxyUseProxyBooleanGroup,
+	@ISProxyAddressText,
+	@ISProxyPortNum,
+	@ISProxyOKButton,
+	@ISProxyHelpTrigger;
+    HINT_FIXED_SIZE = { SST_PIXELS | 220, SST_PIXELS | 100 };
+    ATTR_GEN_HELP_CONTEXT = GPC_SET_PROXY_SERVER;
+}
+
+@object GenTextClass ISProxyAddressText = {
+    GI_visMoniker = 'N',"IP Addr/Name:";
+    GI_attrs = @default | GA_TARGETABLE;
+    GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT;
+    GTXI_maxLength = 64; 
+    HINT_PLACE_MONIKER_TO_LEFT;
+    ATTR_GEN_TEXT_NO_SPACES;
+    HINT_TEXT_SELECT_TEXT;
+    HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+    HINT_DEFAULT_FOCUS;
+}
+
+@object GenValueClass ISProxyPortNum = {
+    GI_visMoniker = 'P',"Port #:";
+    GI_attrs = @default | GA_TARGETABLE;
+    GVLI_value = MakeWWFixed(0);
+    GVLI_maximum = MakeWWFixed(9999);
+    GVLI_minimum = MakeWWFixed(0);
+    GVLI_displayFormat = GVDF_INTEGER;
+    HINT_VALUE_NOT_INCREMENTABLE;
+}
+
+@object GenBooleanGroupClass ISProxyUseProxyBooleanGroup = {
+    GI_comp = @ISProxyUseProxyCheckBox;
+    GBGI_destination = process;
+    GBGI_applyMsg = MSG_GPC_SET_PROXY_SERVER_UPDATE;
+    HINT_BOOLEAN_GROUP_CHECKBOX_STYLE;
+}
+
+@object GenBooleanClass ISProxyUseProxyCheckBox = {
+    GI_visMoniker = 'U',"Use Proxy Server";
+    GBI_identifier = 1;
+}
+
+@object GenTriggerClass ISProxyOKButton = {
+    GI_visMoniker = "OK" ;
+    GI_states = @default;
+    GTI_destination = process;
+    GTI_actionMsg = MSG_GPC_SET_PROXY_SERVER_CLOSE;
+
+    HINT_SEEK_REPLY_BAR;
+    HINT_DEFAULT_DEFAULT_ACTION;
+}
+
+@object GenTriggerClass ISProxyHelpTrigger = {
+    ATTR_GEN_TRIGGER_INTERACTION_COMMAND = {IC_HELP};
+    ATTR_GEN_DEFAULT_MONIKER = GDMT_HELP;
+    HINT_SEEK_REPLY_BAR;
+}
+
+@object GenTriggerClass ISClearCacheButton = {
+    GI_visMoniker = 'l', "Clear Cache";
+    GTI_destination = process;
+    GTI_actionMsg = MSG_GPC_CLEAR_CACHE;
+}
+
+@object GenTriggerClass ISSetHomePageTrigger = {
+    GI_visMoniker = 'm', "Set Home Page...";
+    GTI_destination = process;
+    GTI_actionMsg = MSG_GPC_SET_HOME_PAGE_BEFORE;
+}
+
+
+@object ISConfigToolbarGenInteractionClass ISConfigureToolbarDialogBox = {
+    GI_visMoniker = "Configure Toolbar";
+    GI_comp =
+	@ISConfigureOptionsBox,
+	@ISConfigureToolbarApply,
+	@ISConfigureToolbarAll,
+	@ISConfigureToolbarNone,
+	@ISConfigureToolbarHelp;
+    GII_visibility = GIV_DIALOG;
+    GII_type = GIT_COMMAND;
+    GII_attrs = @default | GIA_MODAL | GIA_NOT_USER_INITIATABLE;
+    ATTR_GEN_HELP_CONTEXT = GPC_CONFIG_TOOLBAR;
+}
+
+@object GenInteractionClass ISConfigureOptionsBox = {
+    /* this object just serves to center the list of GenBooleans */
+    GI_comp = @ISConfigureOptionsGroup;
+    HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+    HINT_CENTER_CHILDREN_HORIZONTALLY;
+}
+
+@object GenTriggerClass ISConfigureToolbarApply = {
+    GI_visMoniker = "Apply";
+    GI_attrs =  @default | GA_SIGNAL_INTERACTION_COMPLETE;
+    GTI_destination = @ISConfigureToolbarDialogBox;
+    GTI_actionMsg = MSG_ISCTGI_CLOSE;
+    HINT_SEEK_REPLY_BAR;
+    HINT_DEFAULT_DEFAULT_ACTION;
+}
+
+@object GenTriggerClass ISConfigureToolbarAll = {
+    GI_visMoniker = 'l',"All";
+    GTI_destination = @ISConfigureToolbarDialogBox;
+    GTI_actionMsg = MSG_ISCTGI_SELECT_ALL;
+    HINT_SEEK_REPLY_BAR;
+}
+
+@object GenTriggerClass ISConfigureToolbarNone = {
+    GI_visMoniker = 'N',"None";
+    GTI_destination = @ISConfigureToolbarDialogBox;
+    GTI_actionMsg = MSG_ISCTGI_SELECT_NONE;
+    HINT_SEEK_REPLY_BAR;
+}
+
+@object GenTriggerClass ISConfigureToolbarHelp = {
+    ATTR_GEN_TRIGGER_INTERACTION_COMMAND = {IC_HELP};
+    ATTR_GEN_DEFAULT_MONIKER = GDMT_HELP;
+    HINT_SEEK_REPLY_BAR;
+}
+
+@object GenBooleanGroupClass ISConfigureOptionsGroup = {
+    GI_comp =
+	@ISAllowOpenButton,
+	@ISAllowStopButton,
+	@ISAllowReloadButton,
+	@ISAllowBackButton,
+	@ISAllowForwardButton,
+	@ISAllowAddButton,
+	@ISAllowBookmarksButton,
+	@ISAllowHistoryButton;
+
+    GBGI_selectedBooleans = 0xFFFF;
+    HINT_ORIENT_CHILDREN_VERTICALLY ;
+}
+
+@object GenBooleanClass ISAllowOpenButton = {
+    GI_visMoniker = 'O',"Open" ;
+    GBI_identifier = ISOPEN_ALLOWED;
+}
+
+@object GenBooleanClass ISAllowStopButton = {
+    GI_visMoniker = 'S',"Stop" ;
+    GBI_identifier = ISSTOP_ALLOWED;
+}
+
+@object GenBooleanClass ISAllowReloadButton = {
+    GI_visMoniker = 'R',"Reload" ;
+    GBI_identifier = ISRELOAD_ALLOWED;
+}
+
+@object GenBooleanClass ISAllowBackButton = {
+    GI_visMoniker = 'B',"Back" ;
+    GBI_identifier = ISBACK_ALLOWED;
+}
+
+@object GenBooleanClass ISAllowForwardButton = {
+    GI_visMoniker = 'F',"Forward" ;
+    GBI_identifier = ISFORWARD_ALLOWED;
+}
+
+@object GenBooleanClass ISAllowAddButton = {
+    GI_visMoniker = 'A',"Add" ;
+    GBI_identifier = ISADD_ALLOWED;
+}
+
+@object GenBooleanClass ISAllowBookmarksButton = {
+    GI_visMoniker = 'm',"Bookmarks" ;
+    GBI_identifier = ISBOOKMARKS_ALLOWED;
+}
+
+@object GenBooleanClass ISAllowHistoryButton = {
+    GI_visMoniker = 'H',"History" ;
+    GBI_identifier = ISHISTORY_ALLOWED;
+}
+
+
+@object GenInteractionClass ISSetHomePageDialogBox = {
+    GI_visMoniker = "Set Home Page" ;
+    GII_visibility = GIV_DIALOG ;
+    GII_type = GIT_COMMAND;
+    GII_attrs = @default | GIA_MODAL | GIA_NOT_USER_INITIATABLE;
+    GI_comp =
+	@ISHomePageLocationField,
+	@ISHomePageOKButton,
+	@ISHomePageClearTrigger,
+	@ISHomePageHelpTrigger;
+    ATTR_GEN_HELP_CONTEXT = GPC_SET_HOME_PAGE;
+}
+
+@object ISTextClass ISHomePageLocationField = {
+    GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT;
+    HINT_DRAW_IN_BOX;
+    ATTR_GEN_TEXT_NO_SPACES;
+    HINT_DEFAULT_TARGET;
+}
+
+@object GenTriggerClass ISHomePageOKButton = {
+    GI_visMoniker = "OK" ;
+    GI_states = @default;
+    GI_attrs =  @default | GA_SIGNAL_INTERACTION_COMPLETE;
+    GTI_destination = process;
+    GTI_actionMsg = MSG_GPC_SET_HOME_PAGE_CLOSE;
+
+    ATTR_GEN_TRIGGER_INTERACTION_COMMAND = {IC_OK};
+    HINT_SEEK_REPLY_BAR;
+    HINT_DEFAULT_DEFAULT_ACTION;
+}
+
+@object GenTriggerClass ISHomePageClearTrigger = {
+    GI_visMoniker = 'C',"Clear";
+    GTI_destination = @ISHomePageLocationField;
+    GTI_actionMsg = MSG_VIS_TEXT_DELETE_ALL;
+    HINT_SEEK_REPLY_BAR;
+}
+
+@object GenTriggerClass ISHomePageHelpTrigger = {
+    ATTR_GEN_TRIGGER_INTERACTION_COMMAND = {IC_HELP};
+    ATTR_GEN_DEFAULT_MONIKER = GDMT_HELP;
+    HINT_SEEK_REPLY_BAR;
+}
+
+@object GenInteractionClass ISSetCacheSizeDialogBox = {
+    GI_visMoniker = "Set Cache Size..." ;
+    GII_visibility = GIV_DIALOG ;
+    GII_type = GIT_COMMAND;
+    GII_attrs = @default | GIA_MODAL | GIA_NOT_USER_INITIATABLE;
+    GI_comp =
+	@ISCacheSizeValueField,
+	@ISCacheSizeOKButton,
+	@ISCacheSizeHelpTrigger;
+    ATTR_GEN_HELP_CONTEXT = GPC_SET_CACHE_SIZE;
+
+}
+
+@object GenValueClass ISCacheSizeValueField = {
+    GI_visMoniker = "Cache Size (Kb):";
+    GVLI_value = MakeWWFixed(100);
+    GVLI_maximum = MakeWWFixed(500);
+    GVLI_minimum = MakeWWFixed(0);
+    GVLI_increment = MakeWWFixed(10);
+    GVLI_displayFormat = GVDF_INTEGER;
+}
+
+@object GenTriggerClass ISCacheSizeOKButton = {
+    GI_visMoniker = "OK" ;
+    GI_states = @default;
+    GI_attrs =  @default | GA_SIGNAL_INTERACTION_COMPLETE;
+    GTI_destination = process;
+    GTI_actionMsg = MSG_GPC_SET_CACHE_SIZE_CLOSE;
+
+    ATTR_GEN_TRIGGER_INTERACTION_COMMAND = {IC_OK};
+    HINT_SEEK_REPLY_BAR;
+    HINT_DEFAULT_DEFAULT_ACTION;
+}
+
+@object GenTriggerClass ISCacheSizeHelpTrigger = {
+    ATTR_GEN_TRIGGER_INTERACTION_COMMAND = {IC_HELP};
+    ATTR_GEN_DEFAULT_MONIKER = GDMT_HELP;
+    HINT_SEEK_REPLY_BAR;
+}
+
+@object GenInteractionClass ISEditMenuSearchGroup = {
+    GI_comp = @ISFindDialogTrigger, @ISFindNextTrigger;
+    GI_attrs = @default | GA_KBD_SEARCH_PATH;
+}
+
+@object GenTriggerClass ISFindDialogTrigger = {
+    GI_visMoniker = 'F', "Find" ;
+    GI_kbdAccelerator = control 'f';
+    GTI_destination = ISLIFindControl;
+    GTI_actionMsg = MSG_GEN_INTERACTION_INITIATE;
+}
+
+@object GenTriggerClass ISFindNextTrigger = {
+    GI_visMoniker = 'g', "Find Again";
+    GI_kbdAccelerator = control 'g';
+    GTI_actionMsg = MSG_GPC_FIND_NEXT ;
+    GTI_destination = process ;
+}
+
+@object GenInteractionClass ISBookmarkMenu = {
+    GI_visMoniker = 'B', "Bookmarks";
+    GI_comp =
+	@ISBookmarkMenuGroup,
+	@ISLIHistoryButton2 ;
+    GI_attrs = @default | GA_KBD_SEARCH_PATH;
+    GII_visibility = GIV_POPUP ;
+}
+
+@object GenInteractionClass ISBookmarkMenuGroup = {
+    GII_type = GIT_ORGANIZATIONAL;
+    GI_comp =
+	@ISBookmarksTrigger,
+	@ISLICreateBookmarkButton;
+    GI_attrs = @default | GA_KBD_SEARCH_PATH;
+}
+
+@object GenTriggerClass ISBookmarksTrigger = {
+    GI_visMoniker = 'B', "Show Bookmarks...";
+    GTI_destination = process;
+    GTI_actionMsg =  MSG_GPC_BRING_UP_BOOKMARKS;
+}
+
+@object ISAlternateTriggerClass ISLICreateBookmarkButton = {
+    GI_visMoniker = 'A', "Add to Bookmarks";
+    GI_attrs = @default | GA_KBD_SEARCH_PATH;
+    GI_kbdAccelerator = control 'a';
+    GI_states = @default & ~GS_ENABLED;
+    GTI_destination = process;
+    GTI_actionMsg = MSG_GPC_CREATE_BOOKMARK_BEFORE;
+    ISNTI_alternateTrigger = @ISButtonBarAddBookmarkTrigger;
+}
+
+@object GenInteractionClass ISViewMenu = {
+    GI_visMoniker = 'V', "View";
+    GI_comp =
+	@ISLIStopButton2,
+	@ISRefreshPageTrigger,
+	@ISReloadPageTrigger,
+	@ISLILoadAllImagesButton;
+    GI_attrs = @default | GA_KBD_SEARCH_PATH;
+    GII_visibility = GIV_POPUP ;
+}
+
+@object GenTriggerClass ISRefreshPageTrigger = {
+    GI_visMoniker = 'f', "Refresh";
+    GI_states = @default & ~GS_ENABLED;
+    GTI_destination = @GPCGenView;
+    GTI_actionMsg = MSG_GEN_VIEW_REDRAW_CONTENT;
+}
+
+@object GenTriggerClass ISReloadPageTrigger = {
+    GI_visMoniker = 'R', "Reload";
+    GI_attrs = @default | GA_KBD_SEARCH_PATH;
+    GI_kbdAccelerator = control 'r';
+    GI_states = @default & ~GS_ENABLED;
+    GTI_destination = process;
+    GTI_actionMsg = MSG_GPC_FORCE_RELOAD;
+}
+
+@object GenInteractionClass ISNavigateMenu = {
+    GI_visMoniker = 'G', "Go";
+    GI_comp =
+	@ISBackTrigger,
+	@ISForwardTrigger,
+	@ISReturnToHomeTrigger;
+    GI_attrs = @default | GA_KBD_SEARCH_PATH;
+    GII_visibility = GIV_POPUP ;
+}
+
+@object GenTriggerClass ISBackTrigger = {
+    GI_visMoniker = 'B', "Back";
+    GI_attrs = @default | GA_KBD_SEARCH_PATH;
+    GI_kbdAccelerator = control 'b';
+    GI_states = @default & ~GS_ENABLED;
+    GTI_destination = process;
+    GTI_actionMsg = MSG_GPC_BACK;
+}
+
+@object GenTriggerClass ISForwardTrigger = {
+    GI_visMoniker = 'F', "Forward";
+    GI_attrs = @default | GA_KBD_SEARCH_PATH;
+    GI_kbdAccelerator = control 'n';
+    GI_states = @default & ~GS_ENABLED;
+    GTI_destination = process;
+    GTI_actionMsg = MSG_GPC_FORWARD;
+}
+
+@object GenTriggerClass ISReturnToHomeTrigger = {
+    GI_visMoniker = 'H', "Home";
+    GI_attrs = @default | GA_KBD_SEARCH_PATH;
+    GI_kbdAccelerator = control 'h';
+    GTI_destination = process;
+    GTI_actionMsg = MSG_GPC_GOTO_HOME_PAGE;
+}
+
+@object GenInteractionClass ISUrlBarGroup = {
+    GI_comp = @ISUrlBar, @ISAnimateIcon ;
+
+    HINT_EXPAND_WIDTH_TO_FIT_PARENT ;
+    HINT_RIGHT_JUSTIFY_CHILDREN ;
+    HINT_ORIENT_CHILDREN_HORIZONTALLY ;
+    HINT_CENTER_CHILDREN_VERTICALLY ;
+}
+
+@object GenInteractionClass ISUrlBar = {
+    GI_comp =
+	@LocationFieldInToolbar,
+	@ISPercentage;
+    HINT_FULL_JUSTIFY_CHILDREN_HORIZONTALLY;
+    HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+    HINT_ORIENT_CHILDREN_HORIZONTALLY;
+}
+
+
+@object GenTextClass LocationFieldInToolbar = {
+    GI_visMoniker = "Location:";
+    GI_attrs = @default | GA_TARGETABLE | GA_INITIATES_BUSY_STATE;
+    GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT;
+    GTXI_destination = process;
+    GTXI_applyMsg = MSG_GPC_OPEN_URL_FROM_URLBAR;
+    HINT_PLACE_MONIKER_TO_LEFT;
+    ATTR_GEN_TEXT_NO_SPACES;
+    HINT_TEXT_SELECT_TEXT;
+    HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+}
+
+@object GenInteractionClass ISButtonBar = {
+    GI_comp =
+	@ISButtonBarGroup;
+    HINT_FULL_JUSTIFY_CHILDREN_HORIZONTALLY;
+    HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+    HINT_ORIENT_CHILDREN_HORIZONTALLY;
+    HINT_INCLUDE_ENDS_IN_CHILD_SPACING;
+}
+
+
+@object GenInteractionClass ISButtonBarGroup = {
+    GI_comp = 
+	@ISButtonBarOpenLocationTrigger,
+	@ISButtonBarStopTrigger,
+	@ISLIReloadButton,
+	@ISLIBackButton,
+	@ISLIForwardButton,
+	@ISButtonBarAddBookmarkTrigger,
+	@ISLIBookmarkButton,
+	@ISButtonBarHistoryTrigger;
+
+    HINT_ORIENT_CHILDREN_HORIZONTALLY;
+}    
+
+@end GenericUI ;
+
+@start BInterface ;
+
+@include "Art/history.goh"
+@include "Art/home.goh"
+@include "Art/marks.goh"
+@include "Art/open.goh"
+@include "Art/addmark.goh"
+@include "Art/stop.goh"
+
+@include "Art/globe1.goh"
+@include "Art/globe4.goh"
+@include "Art/globe7.goh"
+@include "Art/globe9.goh"
+
+@object GenInteractionClass ISAnimateIcon = {
+    GI_visMoniker = @globeMoniker0 ;
+}
+
+@object GenInteractionClass ISDialogBoxes = {
+    GI_comp = 
+	@ISSetHomePageDialogBox, 
+	@ISSetCacheSizeDialogBox,
+	@ISSetProxyDialogBox,
+	@ISBookmarkBox, 
+	@ISConfigureToolbarDialogBox,
+	@ISOpenFileSelectorDialog, 
+	@ISSavePageSelectorDialog,
+	@ISSaveImageSelectorDialog,
+	@ISPageSetupDialog, 
+	@ISSearchNotFoundDialog,
+	@ISSaveFTPFileDialog;
+}
+
+@object GenInteractionClass ISSaveFTPFileDialog = {
+    GI_visMoniker = "Save Location" ;
+    GI_comp = 
+	@ISFTPFileSelector, @ISFTPTextBar, 
+	@ISFTPSelectorSave;
+    GII_visibility = GIV_DIALOG;
+    GII_type = GIT_COMMAND;
+    GII_attrs = @default | GIA_MODAL | GIA_NOT_USER_INITIATABLE;
+}
+
+@object GenFileSelectorClass ISFTPFileSelector = {
+    ATTR_GEN_PATH_DATA = {SP_DOCUMENT, ""} ;
+}
+
+@object ISTextClass ISFTPTextBar = {
+    GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT;
+    ATTR_GEN_TEXT_LEGAL_FILENAMES;
+    HINT_DEFAULT_FOCUS ;
+}
+
+@object GenTriggerClass ISFTPSelectorSave = {
+    GI_visMoniker = "Save" ;
+    GTI_actionMsg = MSG_GPC_SAVE_FTP_FILE;
+    GTI_destination = process;
+    HINT_DEFAULT_DEFAULT_ACTION ;
+    HINT_SEEK_REPLY_BAR ;
+}
+
+@object GenTriggerClass ISButtonBarOpenLocationTrigger = {
+    GI_visMoniker = @openMoniker ;
+    GTI_destination = process;
+    GTI_actionMsg = MSG_GPC_OPEN_LOCATION_BEFORE;
+}
+
+@object GenTriggerClass ISButtonBarStopTrigger = {
+    GI_visMoniker = @stopMoniker ;
+    GI_states = @default & ~GS_ENABLED;
+    GTI_destination = process;
+    GTI_actionMsg = MSG_GPC_STOP;
+}
+
+@object GenTriggerClass ISButtonBarAddBookmarkTrigger = {
+    GI_visMoniker = @addmarkMoniker;
+    GI_states = @default & ~GS_ENABLED;
+    GTI_destination = process;
+    GTI_actionMsg = MSG_GPC_CREATE_BOOKMARK_BEFORE;
+}
+
+@object GenTriggerClass ISButtonBarHistoryTrigger = {
+    GI_visMoniker = @historyMoniker ;
+    GI_states = @default & ~GS_ENABLED;
+    GTI_destination = process;
+    GTI_actionMsg = MSG_GPC_HISTORY_BEFORE;
+}
+
+
+@visMoniker BookmarkMoniker = "Bookmarks";
+
+@object GenTriggerClass ISLIBookmarkButton = {
+    GI_visMoniker = @marksMoniker ;
+    GTI_destination = process;
+    GTI_actionMsg =  MSG_GPC_BRING_UP_BOOKMARKS;
+}
+
+@object GenInteractionClass ISBookmarkBox = {
+    GI_comp =
+	@ISBookmarkList,
+	@ISGotoBookmarkButton,
+	@ISLIDeleteButton,
+	@ISBookmarkListHelpTrigger;
+
+    GI_visMoniker = "Bookmarks";
+    GII_visibility = GIV_DIALOG;
+    GII_type = GIT_COMMAND;
+    GII_attrs = @default | GIA_MODAL | GIA_NOT_USER_INITIATABLE;
+    HINT_SIZE_WINDOW_AS_RATIO_OF_PARENT =  {
+	SWSS_RATIO | PCT_60,
+	SWSS_RATIO | PCT_50 };
+    ATTR_GEN_HELP_CONTEXT = GPC_SHOW_BOOKMARKS;
+}
+
+@object ISDynamicListClass ISBookmarkList = {
+    GIGI_destination = process;
+    GIGI_behaviorType = GIGBT_EXCLUSIVE;
+    GDLI_queryMsg = MSG_GPC_DISPLAY_BOOKMARKS;
+    HINT_PLACE_MONIKER_ABOVE;
+    HINT_ITEM_GROUP_SCROLLABLE;
+    HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
+    HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+    HINT_DEFAULT_FOCUS;
+}
+
+@object GenTriggerClass ISGotoBookmarkButton = {
+    GI_visMoniker = 'O',"Open Location" ;
+    GTI_destination = process ;
+    GTI_actionMsg = MSG_GPC_GOTO_BOOKMARK ;
+    GI_attrs = @default | GA_SIGNAL_INTERACTION_COMPLETE;
+    ATTR_GEN_TRIGGER_INTERACTION_COMMAND = {IC_OK};
+    HINT_DEFAULT_DEFAULT_ACTION ;
+    HINT_SEEK_REPLY_BAR ;
+}
+
+@object GenTriggerClass ISLIDeleteButton = {
+    GI_visMoniker = 'D',"Delete";
+    GI_states = @default & ~GS_ENABLED;
+    GTI_destination = process;
+    GTI_actionMsg = MSG_GPC_DELETE_BOOKMARK;
+    HINT_SEEK_REPLY_BAR;
+}
+
+@object GenTriggerClass ISBookmarkListHelpTrigger = {
+    ATTR_GEN_TRIGGER_INTERACTION_COMMAND = {IC_HELP};
+    ATTR_GEN_DEFAULT_MONIKER = GDMT_HELP;
+    HINT_SEEK_REPLY_BAR;
+}
+
+
+
+@object ISGenViewClass GPCGenView = {
+    GVI_horizAttrs = @default | GVDA_SCROLLABLE;
+    GVI_vertAttrs  = @default | GVDA_SCROLLABLE;
+    GVI_attrs      = @default | GVA_SEND_ALL_KBD_CHARS ;
+
+    HINT_DEFAULT_TARGET;
+    HINT_DEFAULT_FOCUS;
+}
+
+
+@object GenGlyphClass ISPercentage = {
+    HINT_CENTER_MONIKER;
+    HINT_SEEK_TITLE_BAR_RIGHT;
+}
+
+@end 	BInterface;
+
+@start PageMenuResource;
+
+@include "Art/back.goh"
+@include "Art/forward.goh"
+@include "Art/reload.goh"
+
+@object GenTriggerClass ISLIOpenLocationButton2 = {
+    GI_visMoniker = 'O',"Open Location";
+    GI_attrs = @default | GA_KBD_SEARCH_PATH;
+    GI_kbdAccelerator = control 'o';
+
+    GTI_destination = process;
+    GTI_actionMsg = MSG_GPC_OPEN_LOCATION_BEFORE;
+    HINT_TRIGGER_BRINGS_UP_WINDOW;
+}
+
+@object ISAlternateTriggerClass ISLIStopButton2 = {
+    ISNTI_alternateTrigger = @ISButtonBarStopTrigger;
+
+    GI_visMoniker = 'S', "Stop";
+    GI_attrs = @default | GA_KBD_SEARCH_PATH;
+    GI_kbdAccelerator = control 's';
+    GI_states = @default & ~GS_ENABLED;
+    GTI_destination = process;
+    GTI_actionMsg = MSG_GPC_STOP;
+    HINT_SEEK_MENU_BAR;
+}
+
+@object ISAlternateTriggerClass ISLIBackButton = {
+    ISNTI_alternateTrigger = @ISBackTrigger;
+
+    GI_visMoniker = @backMoniker ;
+    GI_states = @default & ~GS_ENABLED;
+
+    GTI_destination = process;
+    GTI_actionMsg = MSG_GPC_BACK;
+    HINT_SEEK_MENU_BAR;
+}
+
+@object ISAlternateTriggerClass ISLIForwardButton = {
+    ISNTI_alternateTrigger = @ISForwardTrigger;
+
+    GI_visMoniker = @forwardMoniker ;
+    GI_states = @default & ~GS_ENABLED;
+
+    GTI_destination = process;
+    GTI_actionMsg = MSG_GPC_FORWARD;
+    HINT_SEEK_MENU_BAR;
+}
+
+
+
+@object GenTriggerClass ISLIDocuInfoButton = {
+    GI_visMoniker = 'I',"Document Info";
+    GTI_destination = process;
+    GTI_actionMsg = MSG_GPC_DOCUMENT_INFORMATION;
+    HINT_SEEK_MENU_BAR;
+}
+
+
+@object GenTriggerClass ISLIFindButton = {
+    GI_visMoniker = "Find";
+    GI_states = @default & ~GS_USABLE;
+    GTI_destination = ISLIFindControl;
+    GTI_actionMsg = MSG_GEN_INTERACTION_INITIATE;
+    HINT_SEEK_MENU_BAR;
+}
+
+@object GenTriggerClass ISLICopyButton = {
+    GI_visMoniker = 'C',"Copy";
+    GI_states = @default & ~GS_ENABLED & ~GS_USABLE;
+    GTI_destination = process;
+    GTI_actionMsg = MSG_META_CLIPBOARD_COPY;
+    HINT_SEEK_MENU_BAR;
+}
+
+
+@object GenTriggerClass ISLILoadImageButton = {
+    GI_visMoniker = "Load Image";
+    GI_states = @default & ~GS_USABLE; 
+    GTI_destination = process;
+    GTI_actionMsg = MSG_GPC_LOAD_IMAGE;
+    HINT_SEEK_MENU_BAR;
+}
+
+@object GenTriggerClass ISLILoadAllImagesButton = {
+    GI_visMoniker = 'I', "Load All Images";
+    GI_attrs = @default | GA_KBD_SEARCH_PATH;
+    GI_kbdAccelerator = control 'i';
+    GI_states = @default & ~GS_ENABLED;
+    GTI_destination = process;
+    GTI_actionMsg = MSG_GPC_LOAD_ALL_IMAGE;
+    HINT_SEEK_MENU_BAR;
+}
+
+@object ISAlternateTriggerClass ISLIReloadButton = {
+    GI_states = @default & ~GS_ENABLED;
+    ISNTI_alternateTrigger = @ISReloadPageTrigger;
+    GI_visMoniker = @reloadMoniker ;
+    GTI_destination = process;
+    GTI_actionMsg = MSG_GPC_FORCE_RELOAD;
+
+    HINT_SEEK_MENU_BAR;
+}
+
+@object ISPrintCtrClass ISLIPrintButton = {
+    GI_visMoniker = "Print";
+    GI_states = @default & ~GS_ENABLED;
+    PCI_attrs = @default & ~(PCA_PAGE_CONTROLS | PCA_TEXT_MODE)
+	| PCA_SHOW_PROGRESS | PCA_PROGRESS_PERCENT;
+    PCI_output = process;
+    PCI_docNameOutput = process;
+    ATTR_GEN_CONTROL_PROHIBIT_UI = {PRINTCF_FAX_TRIGGER} ;
+}
+
+
+@object ISPageSetupGenInteractionClass ISPageSetupDialog = {
+    GI_visMoniker = "Page Setup";
+    GI_comp =
+	@ISPageSizeControl,
+	@ISPageSetupOkayTrigger,
+	@ISPageSetupHelpTrigger;
+    GII_visibility = GIV_DIALOG;
+    GII_type = GIT_COMMAND;
+    GII_attrs = @default | GIA_MODAL | GIA_NOT_USER_INITIATABLE;
+    HINT_CENTER_CHILDREN_HORIZONTALLY;
+    HINT_ORIENT_CHILDREN_VERTICALLY;
+    ATTR_GEN_HELP_CONTEXT = GPC_PAGE_SETUP ;
+}
+
+@object GenTriggerClass ISPageSetupOkayTrigger = {
+    GI_visMoniker = "OK";
+    GI_attrs = GA_SIGNAL_INTERACTION_COMPLETE;
+    GTI_destination = @ISPageSetupDialog;
+    GTI_actionMsg = MSG_ISPSGI_CLOSE;
+    ATTR_GEN_TRIGGER_INTERACTION_COMMAND = {IC_OK};
+    HINT_SEEK_REPLY_BAR;
+}
+
+@object GenTriggerClass ISPageSetupHelpTrigger = {
+    ATTR_GEN_TRIGGER_INTERACTION_COMMAND = {IC_HELP};
+    ATTR_GEN_DEFAULT_MONIKER = GDMT_HELP;
+    HINT_SEEK_REPLY_BAR;
+}
+
+@object PageSizeControlClass ISPageSizeControl = {
+    GI_states = @default | GS_ENABLED ;
+    GII_visibility = GIV_SUB_GROUP;
+    GII_type = GIT_ORGANIZATIONAL;
+    PZCI_attrs = @default | PZCA_ACT_LIKE_GADGET | PZCA_INITIALIZE;
+    ATTR_GEN_CONTROL_REQUIRE_UI = PSIZECF_MARGINS;
+    ATTR_GEN_CONTROL_PROHIBIT_UI = PSIZECF_PAGE_TYPE | PSIZECF_LAYOUT;
+    HINT_DRAW_IN_BOX;
+}
+
+
+@object ISAlternateTriggerClass ISLIHistoryButton2 = {
+    ISNTI_alternateTrigger = @ISButtonBarHistoryTrigger;
+    GI_visMoniker = 'H',"Show History List...";
+    GI_states = @default & ~GS_ENABLED;
+    GTI_destination = process;
+    GTI_actionMsg = MSG_GPC_HISTORY_BEFORE;
+    HINT_SEEK_MENU_BAR;
+}
+
+@object GenTriggerClass ISLILocalPreferenceButton2 = {
+    GI_visMoniker = 'P', "Preferences...";
+    GTI_destination = process;
+    GTI_actionMsg = MSG_GPC_LOCAL_PREFERENCE_BEFORE;
+    HINT_SEEK_MENU_BAR;
+}
+
+
+@end PageMenuResource;
+
+
+
+@start IconsResource ;
+
+
+
+/**************************************************************************
+ * Replace Bookmark
+ **************************************************************************/
+@object GenInteractionClass ISReplaceBookmarkDialog = {
+    GI_visMoniker = "Edit Bookmark";
+    GI_comp = @ISRBGroup, @ISRBCancelButton, @ISRBOKButton;
+    GII_visibility = GIV_DIALOG;
+    GII_attrs = @default | GIA_INITIATED_VIA_USER_DO_DIALOG | GIA_MODAL;
+    
+    HINT_DRAW_IN_BOX;
+    HINT_DRAW_STYLE_3D_LOWERED;
+}
+
+@object GenInteractionClass ISRBGroup = {
+    GI_comp = @ISRBText;
+    HINT_DRAW_IN_BOX;
+    HINT_DRAW_STYLE_3D_LOWERED; 
+    HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+    HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
+    HINT_CENTER_CHILDREN_HORIZONTALLY;
+    HINT_CENTER_CHILDREN_VERTICALLY;
+}
+
+@object GenTextClass ISRBText = {
+    GTXI_text = "Bookmark already \rexists.\rReplace existing\rbookmark?";
+    GI_attrs = @default | GA_READ_ONLY;
+    ATTR_GEN_TEXT_DEFAULT_PARA_ATTR = {DEF_PARA_ATTR_CENTER};
+    HINT_FIXED_SIZE = {SST_PIXELS|140, 0};
+}
+
+@object GenTriggerClass ISRBOKButton = {
+    GI_states = @default;
+    GI_attrs =  @default | GA_SIGNAL_INTERACTION_COMPLETE;
+    ATTR_GEN_TRIGGER_INTERACTION_COMMAND = {IC_OK};
+    HINT_SEEK_REPLY_BAR;
+    HINT_DEFAULT_DEFAULT_ACTION;
+}
+
+@object GenTriggerClass ISRBCancelButton = {
+    GI_attrs =  @default | GA_SIGNAL_INTERACTION_COMPLETE;
+    ATTR_GEN_TRIGGER_INTERACTION_COMMAND = {IC_DISMISS};
+    HINT_SEEK_REPLY_BAR;
+}
+
+
+/***************************************************************************/
+/* Objects for Open Location 						   */
+/***************************************************************************/
+
+
+
+@object GenInteractionClass ISOpenLocationDialog = {
+    GI_visMoniker = "Location";
+    GII_visibility = GIV_DIALOG;
+    GII_attrs = @default | GIA_MODAL | GIA_NOT_USER_INITIATABLE;
+    GII_type = GIT_COMMAND;
+    GI_comp = 
+	@LocationField,
+	@ISOLOKButton,
+	@GBOpenLocHelpTrigger;
+    ATTR_GEN_HELP_CONTEXT = GPC_OPEN_LOCATION;
+
+}
+
+@object GenTriggerClass GBOpenLocHelpTrigger = {
+    ATTR_GEN_TRIGGER_INTERACTION_COMMAND = {IC_HELP};
+    ATTR_GEN_DEFAULT_MONIKER = GDMT_HELP;
+    HINT_SEEK_REPLY_BAR;
+}
+
+
+@object ISTextClass LocationField = {
+    GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT;
+    ISTC_target = @ISOLOKButton;
+    HINT_DRAW_IN_BOX;
+    ATTR_GEN_TEXT_NO_SPACES;
+}
+
+@object GenTriggerClass ISOLOKButton = {
+    GI_attrs =  @default | GA_SIGNAL_INTERACTION_COMPLETE;
+    GTI_destination = process;
+    GTI_actionMsg = MSG_GPC_OPEN_LOCATION_CLOSE;
+    ATTR_GEN_TRIGGER_INTERACTION_COMMAND = {IC_OK};
+    HINT_SEEK_REPLY_BAR;
+    HINT_DEFAULT_DEFAULT_ACTION;
+}
+
+
+/*************************************************************************/
+/* Objects for username and password                		         */
+/*************************************************************************/
+@object GenInteractionClass ISUsernameDialog = {
+    GI_comp = @NamePswdGroup, @ISUOKButton, @ISUCancelButton;
+    GII_visibility = GIV_DIALOG;
+    GII_attrs = @default | GIA_INITIATED_VIA_USER_DO_DIALOG |
+	GIA_NOT_USER_INITIATABLE | GIA_MODAL;
+    HINT_INTERACTION_MODAL;
+    HINT_ORIENT_CHILDREN_VERTICALLY;
+}
+
+@object GenTriggerClass ISUCancelButton = {
+    GI_visMoniker = "Cancel" ;
+    GI_attrs = GA_SIGNAL_INTERACTION_COMPLETE;
+    ATTR_GEN_TRIGGER_INTERACTION_COMMAND = {IC_DISMISS};
+    HINT_SEEK_REPLY_BAR;
+}
+
+@object GenInteractionClass NamePswdGroup = {
+    GI_comp = 
+	@ISUsernameEntry,
+	@ISPasswordEntry;
+
+    HINT_DRAW_IN_BOX;
+    HINT_CENTER_CHILDREN_ON_MONIKERS;
+    HINT_FIXED_SIZE = {SST_PIXELS|160, 0};
+}
+
+@object ISTextClass ISUsernameEntry = {
+    GI_visMoniker = "User I.D.";
+    GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT;
+    GTXI_maxLength = 36;
+    ISTC_target = @ISUOKButton;
+    HINT_PLACE_MONIKER_TO_LEFT;
+    ATTR_GEN_TEXT_NO_SPACES;
+    HINT_DEFAULT_FOCUS;
+    HINT_TEXT_WASH_COLOR = {C_WHITE};
+    HINT_FIXED_SIZE = {SST_PIXELS|120, SST_LINES_OF_TEXT|1};
+}
+
+@chunk	VisTextCharAttr ISPasswordStyle = 
+    CHAR_ATTR_FONT_SIZE(FID_BISON, 13);
+
+@object GenTextClass ISPasswordEntry = {
+    GI_visMoniker = "Password";
+    GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT;
+    GTXI_maxLength = 20;
+    HINT_PLACE_MONIKER_TO_LEFT;
+    ATTR_GEN_TEXT_NO_SPACES;
+    /* To hide the password with asteriks */
+    ATTR_GEN_TEXT_CHAR_ATTR = (ChunkHandle) @ISPasswordStyle;
+    HINT_TEXT_WASH_COLOR = {C_WHITE};
+    HINT_FIXED_SIZE = {SST_PIXELS|120, SST_LINES_OF_TEXT|1};
+}
+
+@object GenTriggerClass ISUOKButton = {
+    GI_states = @default & ~GS_ENABLED;
+    GI_attrs =  @default | GA_SIGNAL_INTERACTION_COMPLETE;
+    ATTR_GEN_TRIGGER_INTERACTION_COMMAND = {IC_OK};
+    HINT_SEEK_REPLY_BAR;
+    HINT_DEFAULT_DEFAULT_ACTION;
+}
+
+/*************************************************************************/
+/* Objects for History 						         */
+/*************************************************************************/
+
+@object GenInteractionClass ISHistoryDialog = {
+    GI_visMoniker = "History";
+    GI_comp =
+	@HistoryList,
+	@ISGotoHistoryItemButton,
+	@ISHistoryHelpTrigger;
+    GII_type = GIT_COMMAND;
+    GII_visibility = GIV_DIALOG;
+    GII_attrs = @default | GIA_MODAL | GIA_NOT_USER_INITIATABLE;
+    HINT_DRAW_STYLE_3D_LOWERED; 
+
+    HINT_SIZE_WINDOW_AS_RATIO_OF_PARENT =  {
+	SWSS_RATIO | PCT_60,
+	SWSS_RATIO | PCT_50 };
+    ATTR_GEN_HELP_CONTEXT = GPC_SHOW_HISTORY_LIST;
+}
+
+@object ISDynamicListClass HistoryList = {
+    GIGI_behaviorType = GIGBT_EXCLUSIVE;
+    GIGI_destination = process;
+    GDLI_queryMsg = MSG_GPC_HISTORY_LIST_MONIKER_QUERY;
+    HINT_PLACE_MONIKER_ABOVE;
+    HINT_ITEM_GROUP_SCROLLABLE;
+    HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
+    HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+}
+
+@object GenTriggerClass ISGotoHistoryItemButton = {
+    GI_visMoniker = 'O',"Open Location" ;
+    GI_attrs =  @default | GA_SIGNAL_INTERACTION_COMPLETE;
+    GTI_destination = process;
+    GTI_actionMsg = MSG_GPC_HISTORY_CLOSE;
+    ATTR_GEN_TRIGGER_INTERACTION_COMMAND = {IC_OK};
+    HINT_DEFAULT_DEFAULT_ACTION;
+    HINT_SEEK_REPLY_BAR ;
+}
+
+@object GenTriggerClass ISHistoryHelpTrigger = {
+    ATTR_GEN_TRIGGER_INTERACTION_COMMAND = {IC_HELP};
+    ATTR_GEN_DEFAULT_MONIKER = GDMT_HELP;
+    HINT_SEEK_REPLY_BAR;
+}
+
+
+@object GenTriggerClass ISHDOKButton = {
+    GI_attrs =  @default | GA_SIGNAL_INTERACTION_COMPLETE;
+    GTI_destination = process;
+    GTI_actionMsg = MSG_GPC_HISTORY_CLOSE;
+    ATTR_GEN_TRIGGER_INTERACTION_COMMAND = {IC_OK};
+    HINT_SEEK_REPLY_BAR;
+    HINT_DEFAULT_DEFAULT_ACTION;
+}
+
+
+/*************************************************************************/
+/* Objects for Document Info 						 */
+/*************************************************************************/
+
+@object GenInteractionClass ISDocuInfoDialog = {
+    GI_visMoniker = "Document Information";
+    GI_comp = @DIGroup;
+    GII_visibility = GIV_DIALOG;
+    GII_type = GIT_NOTIFICATION;
+    GII_attrs = @default | GIA_MODAL | GIA_NOT_USER_INITIATABLE;
+    HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+    HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
+}
+
+@object GenInteractionClass DIGroup = {
+    GI_comp = @DITitleText, @DILocationText, @DIModifiedText;
+    HINT_DRAW_IN_BOX;
+    HINT_DRAW_STYLE_3D_LOWERED; 
+    HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+    HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
+    HINT_CENTER_CHILDREN_ON_MONIKERS;
+}
+
+@object GenTextClass DITitleText = {
+    GI_visMoniker = "Title";
+    GI_attrs = @default | GA_READ_ONLY;
+    GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT;
+    HINT_TEXT_FRAME;
+    HINT_DRAW_STYLE_FLAT; 
+    HINT_TEXT_WASH_COLOR = {C_WHITE};
+    HINT_TEXT_DISPLAY_FOCUSABLE;
+    HINT_FIXED_SIZE = {SST_PIXELS|160, SST_LINES_OF_TEXT|1};
+}
+
+@object GenTextClass DILocationText = {
+    GI_visMoniker = "Location";
+    GI_attrs = @default | GA_READ_ONLY;
+    HINT_TEXT_FRAME;
+    HINT_DRAW_STYLE_FLAT; 
+    HINT_TEXT_WASH_COLOR = {C_WHITE};
+    HINT_TEXT_DISPLAY_FOCUSABLE;
+    HINT_FIXED_SIZE = {SST_PIXELS|160, SST_LINES_OF_TEXT|2};
+}
+
+@object GenTextClass DIModifiedText = {
+    GI_visMoniker = "Modified";
+    GI_attrs = @default | GA_READ_ONLY;
+    GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT;
+    HINT_DRAW_STYLE_FLAT; 
+    HINT_TEXT_FRAME;
+    HINT_TEXT_WASH_COLOR = {C_WHITE};
+    HINT_TEXT_DISPLAY_FOCUSABLE;
+    HINT_FIXED_SIZE = {SST_PIXELS|160, SST_LINES_OF_TEXT|1};
+}
+
+
+/*************************************************************************/
+/* Objects for Local Preference						 */
+/*************************************************************************/
+@object GenInteractionClass ISLocalPreferenceDialog = {
+    GI_visMoniker = "Local Preferences";
+    GI_comp = @LPGroup,	@LPPrevButton, @LPNextButton, @ISLPDOKButton;
+    GII_visibility = GIV_DIALOG;
+    GII_attrs = @default | GIA_MODAL | GIA_NOT_USER_INITIATABLE;
+    ATTR_GEN_INTERACTION_GROUP_TYPE = GIGT_OPTIONS_MENU;
+    HINT_POSITION_WINDOW_AT_RATIO_OF_PARENT = { SWSS_RATIO | PCT_25,
+						SWSS_RATIO | PCT_15 };
+}
+
+@object GenInteractionClass LPGroup = {
+    GI_comp = 	
+	@LPItemGroup, @LPTimeGroup, @LPSpaceValue, @LPClearButton;
+
+    HINT_DRAW_IN_BOX;
+    HINT_DRAW_STYLE_3D_LOWERED;
+    HINT_CENTER_CHILDREN_HORIZONTALLY;
+    HINT_CENTER_CHILDREN_VERTICALLY;
+
+    HINT_FIXED_SIZE = {SST_PIXELS|236, SST_PIXELS|86};
+    HINT_CUSTOM_CHILD_SPACING = { SST_PIXELS | 0 };
+}
+	
+@object GenInteractionClass LPItemGroup = {
+    GI_comp = @LPAutoLoadGroup, @LPConfirmGroup, @LPHistoryLength;
+    HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+    HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
+    HINT_CENTER_CHILDREN_ON_MONIKERS;
+    HINT_CENTER_CHILDREN_VERTICALLY;
+}
+	
+
+
+@object GenItemGroupClass LPAutoLoadGroup = {
+    GI_comp = @LPAutoLoadItem;
+    GIGI_behaviorType = GIGBT_NON_EXCLUSIVE;
+
+}
+
+@object GenValueClass LPHistoryLength = {
+    GI_visMoniker = "History Length" ;
+    GVLI_value = MakeWWFixed(20);
+    GVLI_maximum = MakeWWFixed(50);
+    GVLI_minimum = 0;
+    GVLI_increment = MakeWWFixed(1);
+    GVLI_displayFormat = GVDF_INTEGER;
+	
+    HINT_PLACE_MONIKER_TO_RIGHT ;
+}
+
+@object GenItemClass LPAutoLoadItem = {
+    GI_visMoniker = "Auto load images";
+    GII_identifier = ISPST_AUTO_LOAD_IMAGE;
+}
+
+@chunk word Item[1] = {ISPST_CONFIRM_CANCEL};
+
+@object GenItemGroupClass LPConfirmGroup = {
+    GI_comp = @LPConfirmCancelItem;
+    GIGI_behaviorType = GIGBT_NON_EXCLUSIVE;
+
+    GIGI_numSelections = 1;
+    GIGI_selection = @Item;
+}
+
+@object GenItemClass LPConfirmCancelItem = {
+    GI_visMoniker = "Confirm cancel downloads";
+    GII_identifier = ISPST_CONFIRM_CANCEL;
+}    
+
+@object GenInteractionClass LPTimeGroup = {
+    GI_visMoniker = "After a download,"; 
+    GI_comp = @LPTimeGroupLow;
+    GI_states = @default & ~GS_USABLE;
+    GII_visibility = GIV_SUB_GROUP;
+    GII_type = GIT_ORGANIZATIONAL;
+    HINT_PLACE_MONIKER_ABOVE;
+}
+
+@object GenInteractionClass LPTimeGroupLow = {
+    GI_visMoniker = "hold connection for:";
+    GI_comp = @LPTimeValue;
+    GII_visibility = GIV_SUB_GROUP;
+    GII_type = GIT_ORGANIZATIONAL;
+    HINT_PLACE_MONIKER_ABOVE;
+    HINT_ORIENT_CHILDREN_HORIZONTALLY;
+}
+
+@object GenValueClass LPTimeValue = {
+    GVLI_value = MakeWWFixed(30);
+    GVLI_maximum = MakeWWFixed(99);
+    GVLI_minimum = 0;
+    GVLI_increment = MakeWWFixed(1);
+    GVLI_displayFormat = GVDF_INTEGER;
+    HINT_FIXED_SIZE = { SST_PIXELS | 25, 0, 1};
+}
+
+
+
+@object ISValueClass LPSpaceValue = {
+    GI_visMoniker = "Space reserved for cache:";
+    GI_states = @default & ~GS_USABLE; 
+    GVLI_value = MakeWWFixed(100);
+    GVLI_maximum = MakeWWFixed(1000);
+    GVLI_increment = MakeWWFixed(50);
+    GVLI_destination = process;
+    HINT_PLACE_MONIKER_ABOVE;
+}
+
+@object GenTriggerClass LPClearButton = {
+    GI_visMoniker = "Clear";
+    GI_states = @default & ~GS_USABLE; 
+    GTI_destination = process;
+    GTI_actionMsg = MSG_GPC_CLEAR_CACHE;
+}
+
+@object GenTriggerClass LPPrevButton = {
+    GI_visMoniker = "<<";
+    GI_states = @default & ~GS_ENABLED; 
+    GTI_destination = process;
+    GTI_actionMsg = MSG_GPC_LP_PREV;
+    HINT_SEEK_REPLY_BAR;
+    ATTR_GEN_TRIGGER_INTERACTION_COMMAND = {IC_PREVIOUS};
+}
+
+@object GenTriggerClass LPNextButton = {
+    GI_visMoniker = ">>" ;
+    GTI_destination = process;
+    GTI_actionMsg = MSG_GPC_LP_NEXT;
+    HINT_SEEK_REPLY_BAR;
+    ATTR_GEN_TRIGGER_INTERACTION_COMMAND = {IC_NEXT};
+}
+
+@object GenTriggerClass ISLPDOKButton = {
+    GI_attrs =  @default | GA_SIGNAL_INTERACTION_COMPLETE;
+    GTI_destination = process;
+    GTI_actionMsg = MSG_GPC_LOCAL_PREFERENCE_CLOSE;
+    ATTR_GEN_TRIGGER_INTERACTION_COMMAND = {IC_OK};
+    HINT_SEEK_REPLY_BAR;
+}
+
+/**************************************************************************
+ * Confirm Clear
+ **************************************************************************/
+@object GenInteractionClass ISConfirmClearDialog = {
+    GI_visMoniker = "Confirm Clear";
+    GI_comp = @ISCClearText, @ISCClearOKButton;
+    GII_visibility = GIV_DIALOG;
+    GII_attrs = @default | GIA_INITIATED_VIA_USER_DO_DIALOG | GIA_MODAL;
+}
+
+@object GenTextClass ISCClearText = {
+    GTXI_text = "\rClear cache?\r";
+    GI_attrs = @default | GA_READ_ONLY;
+    HINT_DRAW_IN_BOX;
+    HINT_DRAW_STYLE_3D_LOWERED; 
+    ATTR_GEN_TEXT_DEFAULT_PARA_ATTR = {DEF_PARA_ATTR_CENTER};
+    HINT_FIXED_SIZE = {SST_PIXELS|130, 0};
+}
+
+@object GenTriggerClass ISCClearOKButton = {
+    GI_states = @default;
+    GI_attrs =  @default | GA_SIGNAL_INTERACTION_COMPLETE;
+    ATTR_GEN_TRIGGER_INTERACTION_COMMAND = {IC_OK};
+    HINT_SEEK_REPLY_BAR;
+    HINT_DEFAULT_DEFAULT_ACTION;
+}
+
+/****************************************************************
+	find function
+*****************************************************************/
+
+@object SearchReplaceControlClass ISLIFindControl = {
+    GI_visMoniker = "Find";
+    GI_states = @default | GS_USABLE | GS_ENABLED;
+    GII_attrs = @default | GIA_NOT_USER_INITIATABLE | GIA_MODAL;
+    GII_visibility = GIV_DIALOG;
+    GII_type = GIT_MULTIPLE_RESPONSE;
+    GCI_output = process;
+    HINT_GADGET_BACKGROUND_COLORS = { 
+	C_WHITE, C_WHITE, C_LIGHT_GRAY, C_LIGHT_GRAY };
+    ATTR_GEN_CONTROL_REQUIRE_UI = {
+	SRCF_FIND_FROM_TOP
+      | SRCF_FIND_NEXT | SRCF_FIND_PREV | SRCF_CLOSE | SRCF_PARTIAL_WORDS
+      };
+    ATTR_GEN_CONTROL_PROHIBIT_UI = {
+      SRCF_REPLACE_CURRENT | SRCF_REPLACE_ALL_IN_SELECTION | 
+      SRCF_REPLACE_ALL | SRCF_IGNORE_CASE |
+      SRCF_WILDCARDS | SRCF_SPECIAL_CHARS | SRCF_REPLACE_ALL_IN_SELECTION
+      };
+}
+
+@object GenInteractionClass ISSearchDialog = {
+    GI_comp = @ISSearchPreviousButton, @ISSearchCancelButton,
+              @ISSearchNextButton;
+    GI_visMoniker = "Search";
+    GII_visibility = GIV_DIALOG;
+    GII_attrs = @default | GIA_NOT_USER_INITIATABLE;
+    HINT_DRAW_STYLE_3D_LOWERED;
+    HINT_ORIENT_CHILDREN_HORIZONTALLY;
+    HINT_NO_WIDER_THAN_CHILDREN_REQUIRE;
+    HINT_POSITION_WINDOW_AT_RATIO_OF_PARENT = { SWSS_RATIO | PCT_35,
+						SWSS_RATIO | PCT_80 };
+}
+
+@chunk char SearchNextHelp[] = "Find Next";
+
+@object GenTriggerClass ISSearchNextButton = {
+    GI_visMoniker = "Next";
+    GTI_destination = ISLIFindControl;
+    GTI_actionMsg = MSG_SRC_FIND_NEXT;
+    HINT_GADGET_BACKGROUND_COLORS = { 
+	C_WHITE, C_WHITE, C_LIGHT_GRAY, C_LIGHT_GRAY };
+    ATTR_GEN_FOCUS_HELP = {@SearchNextHelp};
+}
+
+@chunk char SearchPreviousHelp[] = "Find Previous";
+
+@object GenTriggerClass ISSearchPreviousButton = {
+    GI_visMoniker = "Previous";
+    GTI_destination = ISLIFindControl;
+    GTI_actionMsg = MSG_SRC_FIND_PREV;
+    HINT_GADGET_BACKGROUND_COLORS = { 
+	C_WHITE, C_WHITE, C_LIGHT_GRAY, C_LIGHT_GRAY };
+    ATTR_GEN_FOCUS_HELP = {@SearchPreviousHelp};
+}
+
+@chunk char SearchCancelHelp[] = "Cancel Search";
+
+@object GenTriggerClass ISSearchCancelButton = {
+    GI_visMoniker = "Cancel";
+    GI_attrs = @default | GA_SIGNAL_INTERACTION_COMPLETE;
+    GTI_destination = ISLIFindControl;
+    GTI_actionMsg = MSG_SRC_SEARCH_ABORTED;
+    HINT_GADGET_BACKGROUND_COLORS = { 
+	C_WHITE, C_WHITE, C_LIGHT_GRAY, C_LIGHT_GRAY };
+    ATTR_GEN_FOCUS_HELP = {@SearchCancelHelp};
+}
+
+@object GenInteractionClass ISSearchNotFoundDialog = {
+    GI_comp = @ISSearchNotFoundText;
+    GI_visMoniker = "Not Found";
+    GII_visibility = GIV_DIALOG;
+    GII_type = GIT_NOTIFICATION;
+    GII_attrs = @default | GIA_NOT_USER_INITIATABLE | GIA_MODAL;
+    HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+    HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
+    HINT_DRAW_IN_BOX;
+    HINT_DRAW_STYLE_3D_LOWERED; 
+    HINT_FIXED_SIZE = {SST_PIXELS|130, 0};
+}
+
+@object GenGlyphClass ISSearchNotFoundText = {
+    GI_visMoniker = "String not found in current document" ;
+}
+
+@end IconsResource;

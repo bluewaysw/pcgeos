@@ -1,0 +1,1393 @@
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Geoworks 1996 -- All Rights Reserved
+
+PROJECT:	WWW2 Library
+MODULE:		SGML
+FILE:		sgml.goc
+
+AUTHOR:		Kok Kin Kee: Feb 13, 1998
+
+ROUTINES:
+	Name			Description
+	----			-----------
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	kkee   	2/13/98  	Initial version
+
+DESCRIPTION:
+	
+	SGML. All the code here is ported from Geos Library/WWW/Conv/SGML/
+	and back to Geos
+
+	$Id: sgml.goc,v 1.1 98/08/04 17:26:23 edwin Exp $
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+/*
+#include <system.h>
+#include <kernel/log.h>
+#include <string.h>
+#include <driver/keyboard/tchar.h>
+*/
+
+@include <stdapp.goh>
+@include "WWW2/WW2Core/ww2string.goh"
+@include "WWW2/Conv/sgml.goh"
+@include "WWW2/wwMacro.h"
+
+#define _stream		pself->__stream
+#define _thisWord	pself->__thisWord
+#define _thisSym	pself->__thisSym
+#define _elementStack	pself->__elementStack
+#define _stackPos	pself->__stackPos
+#define _content	pself->__content
+#define _delayStack	pself->__delayStack
+#define _delayPos	pself->__delayPos
+#define _endOfFile	pself->__endOfFile
+#define _dtd		pself->__dtd
+#define _target		pself->__target
+#define _ungottenChar	pself->__ungottenChar
+#define _numOfUngotten	pself->__numOfUngotten
+#define _textBuffer	pself->__textBuffer
+#define _textLength	pself->__textLength
+#define _hasTrailingWhiteSpace pself->__hasTrailingWhiteSpace
+#define _attr		pself->__attr
+
+@classdecl SgmlClass;
+@extern method SgmlClass, SGMLScanGetChar;
+@extern method SgmlClass, SGMLScanGetReduceWhiteChar;
+@extern method SgmlClass, SGMLScanGetNonWhiteChar;
+@extern method SgmlClass, SGMLScanGobbleSym;
+@extern method SgmlClass, SGMLScanGobbleValue;
+@extern method SgmlClass, SGMLScanGobbleQuotedValue;
+@extern method SgmlClass, SGMLSearchTag;
+@extern method SgmlClass, SGMLSearchAttr;
+@extern method SgmlClass, SGMLSearchEntity;
+@extern method SgmlClass, SGMLParseReference;
+@extern method SgmlClass, SGMLScanUngetChar;
+
+
+/*---------------------------------------------------------------------------
+//		Sgml::Sgml()
+//---------------------------------------------------------------------------
+// 
+// SYNOPSIS: 	Constructor.
+// SCOPE:	Public
+// RETURN:	Nothing
+// STRATEGY:	
+// 
+// REVISION HISTORY: 
+//	Name		Date		Description 
+//	----		----		----------- 
+//	kkee    	2/13/98 	Initial version 
+//	
+//-------------------------------------------------------------------------*/
+@method SgmlClass, Sgml /* () */
+{
+}	/* End of Sgml::Sgml() */
+
+
+/*---------------------------------------------------------------------------
+//		Sgml::~Sgml()
+//---------------------------------------------------------------------------
+// 
+// SYNOPSIS: 	Destructor.
+// SCOPE:	Public
+// RETURN:	Nothing
+// STRATEGY:	
+// 
+// REVISION HISTORY: 
+//	Name		Date		Description 
+//	----		----		----------- 
+//	kkee    	2/13/98 	Initial version 
+//	
+//-------------------------------------------------------------------------*/
+@method SgmlClass, MSG_META_FINAL_OBJ_FREE /* ::~Sgml() */
+{
+}	/* End of Sgml::~Sgml() */
+
+
+
+/***********************************************************************
+ *		SGMLAppendChar
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Append a character to text buffer without reducing
+ *              consecutive whitespaces. Make sure you put this call
+ *              in braces as the macro expands into two statements.
+ * CALLED BY:	SGMLParseText.
+ * RETURN:	Nothing.
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:    Define as a macro for efficiency.
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	kkee	10/ 8/96   	Initial Revision
+ *      kkee    2/17/98         Ported from Geos to Geos-SC
+ *
+ ***********************************************************************/
+#define SGMLAppendAllChar(chr) \
+    {\
+        _textBuffer[_textLength++] = chr; \
+        if (_textLength == SGML_TEXT_BUFFER_SIZE) \
+           @call self::SGMLHandleText(); \
+    }
+
+#define SGMLAppendChar(chr) SGMLAppendAllChar(chr)
+
+/* @@@
+static void _pascal SGMLAppendChar(uint8 chr) {
+	_textBuffer[_textLength++] = chr; 
+
+	if (_textLength == SGML_TEXT_BUFFER_SIZE) 
+	    SGMLHandleText();
+}
+@@@ */
+
+
+/***********************************************************************
+ *		SGMLAppendReduceWhiteChar
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Append a character to text buffer. It reduces 
+ *              consecutive white spaces into one white space. 
+ * CALLED BY:	
+ * RETURN:	
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:    Define as a macro for efficiency.
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *      kkee    2/17/98         Ported from Geos to Geos-SC
+ *	kkee	10/30/96   	Initial Revision
+ *
+ ***********************************************************************/
+#define SGMLAppendReduceWhiteChar(chr) \
+	if (!((chr == ' ') &&  \
+	      (_textBuffer[_textLength-1] == ' '))) { \
+	    _textBuffer[_textLength++] = chr; \
+	    if (_textLength == SGML_TEXT_BUFFER_SIZE) \
+		@call self::SGMLHandleText(); \
+	}
+/* @@@
+static void _pascal SGMLAppendReduceWhiteChar(uint8 chr) {
+
+	if (!((chr == ' ') && 
+	      (_textBuffer[_textLength-1] == ' '))) {
+	    _textBuffer[_textLength++] = chr; 
+
+	    if (_textLength == SGML_TEXT_BUFFER_SIZE) 
+		SGMLHandleText(); 
+	}
+}
+@@@ */
+
+
+/*---------------------------------------------------------------------------
+//		Sgml::Parse()
+//---------------------------------------------------------------------------
+// 
+// SYNOPSIS: 	Parse sgml data in stream according to dtd.
+// SCOPE:	Public
+// RETURN:	SGML_OK
+//              SGML_OUT_OF_MEMORY
+// STRATEGY:	Ported from Geos SGMLParserThread
+// 
+// REVISION HISTORY: 
+//	Name		Date		Description 
+//	----		----		----------- 
+//	kkee    	2/14/98 	Initial version 
+//      kkee            2/17/98         Ported from Geos to Geos-SC
+//	
+//-------------------------------------------------------------------------*/
+@method /* SGMLResultCode */
+SgmlClass, Parse /* (WWStream *stream, SGMLDTD *dtd, Target *target) */
+{
+    PARAM_ASSERT(stream != NULL);
+    PARAM_ASSERT(dtd != NULL);
+    PARAM_ASSERT(target != NULL);
+
+    /* Initialize instance data */
+    _stream = stream;
+    _dtd = dtd;
+    _target = target;
+    _stackPos = 0;
+    _content =  SGMLC_MIXED;
+    _delayPos = 0;
+    _endOfFile = FALSE;
+    _numOfUngotten = 0;
+    _textLength = 0;
+    _hasTrailingWhiteSpace = TRUE;
+    
+    /* Enter main parsing loop ... */
+    Boolean retCode = TRUE;
+    byte chr;
+    ParseRefType result;
+    byte refChar;
+
+    do {
+	if (_endOfFile)
+	    break;  /* out of the while loop and exit */
+
+	/*
+	 * Parse according to current content model.
+	 */
+	if (_content == SGMLC_LITERAL)
+	    @call self::SGMLParseLiteral();
+
+	else if (_content == SGMLC_IGNORE)
+	    @call self::SGMLParseIgnore();
+
+	else {
+	    if (_content == SGMLC_PREFORMATTED)
+		chr = @call self::SGMLScanGetChar();
+	    else
+		chr = @call self::SGMLScanGetReduceWhiteChar();
+
+	    if (chr == '<') {
+		retCode = @call self::SGMLParseOpenBracket();
+		if (retCode != TRUE) break;
+	    } else if (chr == '&') {
+		result = @call self::SGMLParseReference(&refChar);
+                switch (result) {
+                    case PARSE_REF_ENTITY_REF:
+                    case PARSE_REF_CHAR_REF:
+                        SGMLAppendChar(refChar);
+                        break;
+                    case PARSE_REF_WHITE_SPACE: {
+                        SGMLAppendChar('&');
+                        SGMLAppendChar(' ');
+                        }
+                        break;
+                    case PARSE_REF_LEFT_BRACKET:
+                    case PARSE_REF_NON_REFERENCE:
+                        SGMLAppendChar('&');
+                        break;
+                    default:
+                        break;
+                 }
+	    } else {
+		/* If it's an ISO character, convert to GEOS first */
+                /* Commented out by kkee 2/19/98 because Geos-SC 
+                 * character set is the same as ISO-8859-1. If not,
+                 * this translation is needed.
+                 */
+                /* if ((chr >= 0xA0) && (chr < 0x100)) {
+                 *   ct = CHARACTERTRANSLATE[chr-0xA0][0];
+                 *   if (ct > 0)
+                 *      chr = ct;
+                 *}
+                 */
+                
+		if (_content == SGMLC_PREFORMATTED) {
+		    SGMLAppendChar(chr); 
+		} else {
+		    SGMLAppendReduceWhiteChar(chr);
+		}
+		@call self::SGMLParseText();
+	    }
+
+	}
+
+    } while (!_endOfFile);
+
+	/* 
+	 * If there is buffered data, flush it. We do not buffer elements.
+	 */
+    if (retCode == TRUE && _textLength) {
+	    @call self::SGMLHandleText();
+    }
+
+	/* If there is leftover start elements on element stack, push them
+	 * all to the target 
+	 */
+	while (_stackPos)
+	    @call self::SGMLHandleEndElement(_elementStack[_stackPos-1]);
+
+    return SGML_OK;
+
+/*    uint8 readByte = '\0';
+//    WWStreamResultCode rc;
+//    do {
+//        rc = stream->ReadByte(&readByte);
+//        if (rc == WWSTREAM_OK) {
+//           // Do something with byte....
+//        }
+//    } while (rc == WWSTREAM_OK);
+*/
+}	/* End of Sgml::Parse() */
+
+
+/***********************************************************************
+ *		SGMLPutTokenText
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Put the current token as text.
+ * CALLED BY:	SGMLIgnoreStartElement
+ * RETURN:	Nothing
+ *	
+ * STRATEGY:	This routine implements the opposite of SGMLGobbleSym.
+ *              Here we convert the symbol into its text equivalent and
+ *              put it to target.
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	kkee    	9/ 5/97   	Initial Revision
+ *      kkee            2/17/98         Ported from Geos to Geos-SC
+ *	
+ ***********************************************************************/
+@method /* void */ SgmlClass, SGMLPutTokenText /* () */
+{
+    switch (_thisSym) {
+    case SGMLT_STRING:
+	{
+	    word i;
+	    word length = strlen((char*)_thisWord);
+	    for (i=0; i<length; i++) {
+		SGMLAppendChar(_thisWord[i]);
+	    }
+	}
+	break;
+    case SGMLT_CLOSE_BRACKET:
+	SGMLAppendChar('>');
+	break;
+    case SGMLT_EQUAL:
+	SGMLAppendChar('=');
+	break;
+    case SGMLT_DOUBLE_QUOTE:
+	SGMLAppendChar('\"');
+	break;
+    case SGMLT_SINGLE_QUOTE:
+	SGMLAppendChar('\'');
+	break;
+    default:
+	/* Ignore */
+	break;
+    }
+}	/* End of SGMLPutTokenText.	*/
+
+
+
+/***********************************************************************
+ *		SGMLIgnoreElementCommon
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Ignore the common part of a start and end element and
+ *              put it to target as text.
+ * CALLED BY:	SGMLIgnoreStartElement, SGMLIgnoreEndElement
+ * RETURN:	Nothing
+ *	
+ * STRATEGY:	Changed to not push the ignored element to target although
+ *              QA thinks otherwise - 11/10/97 -kkee
+ *              So I commented out code that calls SGMLAppendChar.
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	kkee    	9/ 5/97   	Initial Revision
+ *      kkee            2/17/98         Ported from Geos to Geos-SC
+ *	
+ ***********************************************************************/
+@method /* void */ SgmlClass, SGMLIgnoreElementCommon /* () */
+{
+    byte c;
+    /* SGMLPutTokenText(); */
+
+    /* Treat attrs (if any) as text */
+    do {
+	if (_content == SGMLC_PREFORMATTED) { 
+	    /* Accepts white spaces */
+	    c = @call self::SGMLScanGetChar();
+	} else {
+	    c = @call self::SGMLScanGetReduceWhiteChar();
+	}
+	if (_endOfFile) break; /* End of file */
+	if (c=='>') {
+	    /* SGMLAppendChar(c); */
+	    break; /* Done */
+	} else if (c=='<') {
+	    /* Start of an element, unget it */
+	    @call self::SGMLScanUngetChar(c);
+	    break; /* Done */
+	} else {
+	    /* SGMLAppendChar(c); */
+	}
+    } while (1);
+}	/* End of SGMLIgnoreElementCommon.	*/
+
+
+
+/***********************************************************************
+ *		SGMLGarbageCollectStack
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Attempt to claim some room from the element stack.
+ * CALLED BY:	SGMLHandleStartElement
+ * RETURN:	Nothing
+ *	
+ * STRATEGY:	We garbage collect without breaking the integrity of 
+ *              stack. This is done in the following order:
+ *                  1. First throw away very trivial tags from the stack.
+ *                  2. If step 1 did not make any room, then start popping
+ *                     from the stack those elements that are less important
+ *                     than tptr (that is, elements whose end scope is
+ *                     greater than tptr end scope).
+ *                  3. If step 2 fails, then don't garbage collect.
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	kkee    	10/25/97   	Initial Revision
+ *      kkee            2/17/98         Ported from Geos to Geos-SC
+ *	
+ ***********************************************************************/
+@method /* void */ SgmlClass, SGMLGarbageCollectStack /* (const SGMLTag *tptr) */
+{
+    word claimed = 0;
+    sword i, j;
+
+    /* Step 1: garbage collectable tags */
+    for (i=_stackPos-1; i>=0; i--) {
+	if (_elementStack[i]->SGMLT_endScope ==
+	    SGMLT_GARBAGE_COLLECT) {
+	    _elementStack[i] = 0;  /* Throw away */
+	    j = i;
+	    claimed += 1;
+	}
+    }
+    /* Compact the stack */
+    if (claimed) {
+	for (i=j+1; i<_stackPos; i++) {
+	    if (_elementStack[i]) {
+		_elementStack[j] = _elementStack[i];
+		_elementStack[i] = 0; /* For safety */
+		j += 1;
+	    }
+	}
+	_stackPos -= claimed;
+	/* If necessary, change current content model */
+	/* @@@ */
+	return;
+    }
+
+    /* Step 2: check priority */
+    if (_elementStack[_stackPos-1]->
+	SGMLT_endScope > tptr->SGMLT_endScope){
+	@call self::SGMLHandleEndElement(_elementStack[_stackPos-1]);
+    }
+}	/* End of SGMLGarbageCollectStack.	*/
+
+
+/***********************************************************************
+ *		SGMLHandleStartElement
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Push a token onto our element stack.
+ * CALLED BY:	SGMLParseStartElement.
+ * RETURN:	Nothing.
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	kkee	10/13/96   	Initial Revision
+ *      kkee    2/17/98         Ported from Geos to Geos-SC
+ *      kkee    5/21/98         Handle SGMLC_OPTIONAL
+ *
+ ***********************************************************************/
+@method /* Boolean */ SgmlClass, SGMLHandleStartElement /* (const SGMLTag *tptr) */
+{
+    /* See if there is buffered text, push text first */
+    if (_textLength) @call self::SGMLHandleText();
+
+    if (_stackPos == SGML_MAX_ELEMENT_NESTING_LEVEL) {
+	/* 
+	 * If tptr is more important (has lower endScope) than
+	 * those at the upper 1/2 (last 50) of the element stack.
+	 * Remove as many of those items to make room for tptr and
+	 * subsequent tags.
+	 */
+	EC_WARN("Sgml::SGMLHandleStartElement() exceeds nesting level");
+	@call self::SGMLGarbageCollectStack(tptr);
+	if (_stackPos == SGML_MAX_ELEMENT_NESTING_LEVEL) {
+	    /* 
+	     * Failed to claim space on the stack to accomodate tptr,
+	     * so ignore tptr.
+	     */
+	    return TRUE;
+	}
+    }
+	
+    /* Update our element stack */
+    if (tptr->SGMLT_content != SGMLC_EMPTY &&
+        tptr->SGMLT_content != SGMLC_OPTIONAL) {
+	_elementStack[_stackPos++] = tptr;
+
+	if(tptr->SGMLT_content != SGMLC_MIXED) {
+	    byte chr;
+
+	    _content = tptr->SGMLT_content;
+	    /*
+	     * reduce the first RETURN character 
+	     */
+	    chr = @call self::SGMLScanGetChar();
+	    if(chr != C_CR && chr != C_LF) @call self::SGMLScanUngetChar(chr);
+	}
+    }
+
+    if(tptr->SGMLT_content != SGMLC_IGNORE) {
+	/* Now push the element to target */
+	return @call _target::PutStartElement(tptr->SGMLT_token, _attr);
+    } else
+	return TRUE;
+}	/* End of SGMLHandleStartElement.	*/
+
+
+
+/***********************************************************************
+ *		SGMLPushEndElement
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Attempt to push an element to target. 
+ * CALLED BY:	SGMLHandleEndElement
+ * RETURN:	END_ELEMENT_ACCPTED for element push to target.
+ *              END_ELEMENT_OUT_OF_SCOPE for out of scope. Element should
+ *                tried again later.
+ *              END_ELEMENT_REJECTED for ignoring the element.
+ *	
+ * STRATEGY:    If we have a start element and end element mismatch,
+ *              we try to recover using Maciej Puzio's approach 
+ *              (puzio@laser.mimuw.edu.pl). See
+ *          http://www.w3c.org/pub/WWW/Library/User/Patch/lib_4.0_1.fix.
+ *              Basically, if end element does not match the last start 
+ *              element, we use the following rules.
+ *              1. If we are on the last level (i.e., only <HTML> is on
+ *                 element stack), we ignore the bad element.
+ *              2. If there are some other start elements, we assume the 
+ *                 corresponding end tags (execpt <HTML>), free those
+ *                 elements from the stack, and then repeat 1 and 2.
+ *                 We stop when we find the matching start element or 
+ *                 we are at the last level.
+ *              3. Puzio's patch basically ignores the ill-nested 
+ *                 end element if it does not have a corresponding
+ *                 start element on the element stack.
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	kkee    	7/13/97   	Initial Revision
+ *      kkee            2/17/98         Ported from Geos to Geos-SC
+ *      kkee            5/21/98         Handle SGMLC_OPTIONAL
+ *	
+ ***********************************************************************/
+@method /* ElementError */ SgmlClass, SGMLPushEndElement /* (const SGMLTag *tptr) */
+{
+    sword i, index;
+
+    if ((tptr->SGMLT_content == SGMLC_EMPTY) || 
+	!_stackPos) 
+	return ELEMENT_REJECTED;
+
+    /* No need to check for start element. */
+    if (tptr->SGMLT_content == SGMLC_OPTIONAL) {
+        @call _target::PutEndElement(tptr->SGMLT_token);
+        return ELEMENT_ACCEPTED;
+    }
+
+    /*
+     * If the end element does not have a corresponding start element
+     * on the stack, it is ignored.
+     */
+    index = -1;
+    for (i=_stackPos-1; i>=0; i--) {
+	if (_elementStack[i] == tptr) {
+	    index = i;
+	    break;  /* found */
+	}
+    }
+
+    if (index == -1) return ELEMENT_REJECTED;  /* Ignored! */
+
+    /* 
+     * Start popping all the start elements on the stack until the 
+     * the matching element.
+     *
+     * 7/13/97. I added scoping to prevent trivial elements (e.g, FONT)
+     * from correcting important elements (e.g., FORM).
+     */
+    for(i=_stackPos-1; i>=index; i--) {
+	if (tptr->SGMLT_endScope > _elementStack[i]->SGMLT_endScope) {
+	    _stackPos = i+1;
+	    return ELEMENT_OUT_OF_SCOPE;
+
+	} else {
+            @call _target::PutEndElement(_elementStack[i]->SGMLT_token);
+
+	    /* End preformatted content? */
+	    if(tptr->SGMLT_content == _content)
+		_content = SGMLC_MIXED;
+	}
+    }
+
+    _stackPos = index;
+    return ELEMENT_ACCEPTED;
+}	/* End of SGMLPushEndElement.	*/
+
+
+
+/***********************************************************************
+ *		SGMLHandleEndElement
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Pop a tag from the element stack. 
+ * CALLED BY:	SGMLParseEndElement.
+ * RETURN:	Nothing
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:    If we have a start element and end element mismatch,
+ *              we try to recover using Maciej Puzio's approach 
+ *              (puzio@laser.mimuw.edu.pl). See
+ *          http://www.w3c.org/pub/WWW/Library/User/Patch/lib_4.0_1.fix.
+ *              Basically, if end element does not match the last start 
+ *              element, we use the following rules.
+ *              1. If we are on the last level (i.e., only <HTML> is on
+ *                 element stack), we ignore the bad element.
+ *              2. If there are some other start elements, we assume the 
+ *                 corresponding end tags (execpt <HTML>), free those
+ *                 elements from the stack, and then repeat 1 and 2.
+ *                 We stop when we find the matching start element or 
+ *                 we are at the last level.
+ *              3. Puzio's patch basically ignores the ill-nested 
+ *                 end element if it does not have a corresponding
+ *                 start element on the element stack.
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	kkee	10/13/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method /* void */ SgmlClass, SGMLHandleEndElement /* (const SGMLTag *tptr) */
+{
+    ElementError err;
+    sword i;
+
+    /* 
+     * Before we push the end element, we must flush all buffered
+     * text, if any. 
+     */
+    if (_textLength)	@call self::SGMLHandleText();
+
+    err = @call self::SGMLPushEndElement(tptr);
+    if (err == ELEMENT_REJECTED) return;
+    if (err == ELEMENT_OUT_OF_SCOPE &&
+	_delayPos < SGML_MAX_ELEMENT_NESTING_LEVEL) {
+	_delayStack[_delayPos++] = tptr;
+	return;
+    }
+    /* We can only proceed to attempt to push delayed elements
+     * when the current element gets ELEMENT_ACCEPTED.
+     */
+    for (i=_delayPos-1; i>=0; i--) {
+	err = @call self::SGMLPushEndElement(_delayStack[i]);
+	if (err == ELEMENT_OUT_OF_SCOPE) {
+	    _delayPos = i+1;
+	    return;
+	}	    
+    }
+    /* All delay elements accepted or rejected */
+    _delayPos = 0;
+}	/* End of SGMLHandleEndElement.	*/
+
+
+
+/***********************************************************************
+ *		SGMLHandleText
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Push text to target.
+ * CALLED BY:	SGMLParse... routines.
+ * RETURN:	Nothing
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:       If we had previously pushed text with a trailing
+ *                 whitespace AND the current text to push has a 
+ *                 leading white space, we ignore the leading 
+ *                 whitespace. Initially 
+ *                 _hasTrailingWhiteSpace is set to TRUE.
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	kkee	10/15/96   	Initial Revision
+ *      kkee    2/17/98         Ported from Geos to Geos-SC
+ *
+ ***********************************************************************/
+@method /* void */ SgmlClass, SGMLHandleText /* () */
+{
+    ASSERTS(_textLength != 0,
+            "Sgml::SGMLHandleText() textBuffer is empty");
+
+    if(_content == SGMLC_LITERAL 
+       || _content == SGMLC_PREFORMATTED) {
+	@call _target::PutBlock(_textBuffer, _textLength);
+	_textLength = 0;
+	return;
+    }
+	
+
+    /* Check for trailing and leading white spaces */
+    if (_hasTrailingWhiteSpace &&
+	_textBuffer[0] == ' ') {
+	
+	if (_textLength > 1)
+	    @call _target::PutBlock(_textBuffer+1, _textLength-1);
+
+    } else {
+
+	@call _target::PutBlock(_textBuffer, _textLength);
+
+    }
+
+    if (_textBuffer[_textLength-1] == ' ')
+	_hasTrailingWhiteSpace = TRUE;
+
+    else
+	_hasTrailingWhiteSpace = FALSE;
+
+    _textLength = 0;
+}	/* End of SGMLHandleText.	*/
+
+
+
+
+/***********************************************************************
+ *		SGMLParseStartElement
+ ***********************************************************************
+ *
+ * SYNOPSIS:	We have seen "<?". So parse a start element.
+ * CALLED BY:	SGMLParseOpenBracket
+ * RETURN:	Nothing
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:    
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	kkee	10/ 2/96   	Initial Revision
+ *      kkee    2/17/98         Ported from Geos to Geos-SC
+ *
+ ***********************************************************************/
+@method /* Boolean */ SgmlClass, SGMLParseStartElement /* () */
+{
+    sword index = -1;
+
+    @call self::SGMLScanGobbleSym();
+
+    if (_thisSym == SGMLT_STRING)
+	index = @call self::SGMLSearchTag(TAGLIST,
+			      NUMOFTAGS,
+			      _thisWord);
+
+    if (index > -1) {
+	/* Found the tag in DTD! */
+
+	if (TAGLIST[index].SGMLT_attrList)
+	    @call self::SGMLParseElementAttrs(&TAGLIST[index]);
+
+	else {
+	    /* Element has no attrs, so ignore if there is any */
+	    @call self::SGMLIgnoreAttr();
+
+            /* Terminate attr list */
+	    _attr[0].SGMLE_token = HTML_ATTR_XXX_INVALID;
+	    _attr[0].SGMLE_value[0] = 0;
+	}    
+
+	return @call self::SGMLHandleStartElement(&TAGLIST[index]);
+	
+    } else {
+	/* Tag not found in DTD, treat as text */
+	@call self::SGMLIgnoreStartElement();
+	EC_WARN("Sgml::SGMLParseStartElement() unknow start element");
+    }
+    return TRUE;
+
+}	/* End of SGMLParseStartElement.	*/
+
+
+
+/***********************************************************************
+ *		SGMLParseElementAttrs
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Parse the attributes of an element. 
+ * CALLED BY:	SGMLParserStartElement.
+ * RETURN:	Nothing.
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:    Attributes in the form of 
+ *              name or
+ *              name = value or 
+ *              name = "value"
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	kkee	10/ 3/96   	Initial Revision
+ *      kkee    2/17/98         Ported from Geos to Geos-SC
+ *
+ ***********************************************************************/
+@method /* void */ SgmlClass, SGMLParseElementAttrs /* (const SGMLTag *tptr) */
+{
+    const SGMLAttr *aptr;
+    byte chr, *cptr;
+    sword index = 0, attrIndex = -1;
+
+    /* Initialize SGMLEntity list */
+    _attr[0].SGMLE_token = HTML_ATTR_XXX_INVALID;  /* init list to null */
+    _attr[0].SGMLE_value[0] = 0;
+
+    aptr = tptr->SGMLT_attrList;
+
+    @call self::SGMLScanGobbleSym();
+    do {
+
+    	switch(_thisSym) {
+
+	    case SGMLT_STRING:
+    	    /* We have gobbled an attribute name in _thisWord */
+	        if ((attrIndex = @call self::SGMLSearchAttr(aptr, 
+			    		    tptr->SGMLT_numOfAttrs,
+				    	    _thisWord)) > -1) {
+
+		        if (index < MAX_SGML_ATTRIBUTES-1) {
+                    _attr[index].SGMLE_token = 
+                        aptr[attrIndex].SGMLA_token;
+		            _attr[index].SGMLE_value[0] = 0;
+
+                    /* end of list */
+                    index++;
+		            _attr[index].SGMLE_token = HTML_ATTR_XXX_INVALID;
+		            _attr[index].SGMLE_value[0] = 0;
+		        } else {
+                    index++;
+		            EC_WARN("Sgml::SGMLParseElementAttrs() attr array too small");
+                }
+
+		        @call self::SGMLScanGobbleSym();
+
+		        if (index < MAX_SGML_ATTRIBUTES && 
+                    _thisSym == SGMLT_EQUAL) {
+		            /* Attribute has a value */
+		            cptr = _attr[index-1].SGMLE_value;
+        		    cptr[0] = 0; /* In case value is NULL */
+
+		            /* Single or double quoted value */
+		            if ((chr = @call self::SGMLScanGetNonWhiteChar()) == '\"')
+			            @call self::SGMLScanGobbleQuotedValue(cptr, '\"');
+		            else if(chr == '\'')
+			            @call self::SGMLScanGobbleQuotedValue(cptr, '\'');
+		            else {
+			            @call self::SGMLScanUngetChar(chr);
+			            @call self::SGMLScanGobbleValue(cptr);
+		            } 
+		            @call self::SGMLScanGobbleSym();  /* go to next token */
+		        } 
+
+    	    } else {
+                EC_WARN("Sgml::SGMLParseElementAttrs() unknown attr name");
+
+                @call self::SGMLScanGobbleSym();
+
+                if (_thisSym == SGMLT_EQUAL) {
+		            /* Throw away */
+		            @call self::SGMLScanGobbleValue(_thisWord);
+		            @call self::SGMLScanGobbleSym();    /* go to next token */
+		        }
+	        }
+	    break;
+
+	case SGMLT_CLOSE_BRACKET:
+	case SGMLT_XXX_EOF:
+	    break;  /* done */
+
+	default:
+	    /* Ignoring other SGML tokens */
+	    @call self::SGMLScanGobbleSym();
+	    break;
+	}
+
+    } while ((_thisSym != SGMLT_CLOSE_BRACKET) &&
+	     (_thisSym != SGMLT_XXX_EOF));
+
+}	/* End of SGMLParseElementAttrs.	*/
+
+
+
+/***********************************************************************
+ *		SGMLParseEndElement
+ ***********************************************************************
+ *
+ * SYNOPSIS:	We have seen "</". So parse an end element.
+ * CALLED BY:	SGMLParseOpenBracket
+ * RETURN:	Nothing
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:    Although "</ " (with spaces) is not an end element, we
+ *              treat it so. Both for speed and valid assumption.
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	kkee	10/ 2/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method /* void */ SgmlClass, SGMLParseEndElement /* () */
+{
+    sword index = -1;
+
+    /* Now we gobble till '>' */
+    @call self::SGMLScanGobbleSym();
+    if (_thisSym == SGMLT_STRING) {
+	index = @call self::SGMLSearchTag(TAGLIST, 
+			      NUMOFTAGS,
+			      _thisWord);
+    }
+    if (index != -1) {
+	/* Valid end element */
+	@call self::SGMLHandleEndElement(&TAGLIST[index]);
+	/* Ignore till '>' */
+	@call self::SGMLIgnoreAttr();
+    } else {
+	@call self::SGMLIgnoreEndElement();
+    }
+}	/* End of SGMLParseEndElement.	*/
+
+
+
+/***********************************************************************
+ *		SGMLParseOpenBracket
+ ***********************************************************************
+ *
+ * SYNOPSIS:	We have seen an '<', parse the rest.
+ * CALLED BY:	Parse.
+ * RETURN:	Nothing
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:    <tag               => a start element
+ *              </tag              => an end element
+ *              < tag              => treated as <tag
+ *              <!--               => begin of comment
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	kkee	10/ 2/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method /* Boolean */ SgmlClass, SGMLParseOpenBracket /* () */
+{
+    byte c;
+
+    c = @call self::SGMLScanGetChar();
+
+
+    /* 
+     * Although c may be a whitespace, but we don't care. We need to 
+     * assume its a tag. We do this to improve performance.
+     *
+     * if (ISWHITE(c)) {
+     *	SGMLAppendChar(c);
+     *	SGMLParseText();
+     * }
+     */
+
+    if (c == '/')
+	@call self::SGMLParseEndElement();
+
+    else if (c == '!')
+	@call self::SGMLParseComment();
+
+    else { 
+	@call self::SGMLScanUngetChar(c);
+	return @call self::SGMLParseStartElement();
+    }
+    return TRUE;
+}	/* End of SGMLParseOpenBracket.	*/
+
+
+
+/***********************************************************************
+ *		SGMLParseComment
+ ***********************************************************************
+ *
+ * SYNOPSIS:	We have seen '<!'. Parse the rest of the comment.
+ * CALLED BY:	SGMLParseOpenBracket.
+ * RETURN:	Nothing.
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:	Strip the following comments:
+ *    
+ *              <!-- Comment line 1 --  -- Comment line 2 -->
+ *
+ *              <!- Comment line 1 --  -- Comment line 2 ->
+ *
+ *              <! ... > This is also a comment.
+ *
+ *              <!- ... > Thiis a also a comment.
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	kkee	10/ 4/96   	Initial Revision
+ *      kkee    2/17/98         Ported from Geos to Geos-SC
+ *
+ ***********************************************************************/
+@method /* void */ SgmlClass, SGMLParseComment /* () */
+{
+    byte chr;
+
+    /* 
+     * No need to check for _endOfFile until the while 
+     * statement. We do this to improve performance.
+     */
+    /* Comment without !-- */
+    if (@call self::SGMLScanGetChar() != '-' || @call self::SGMLScanGetChar() != '-') {
+	while ((@call self::SGMLScanGetChar() != '>') &&
+	       !_endOfFile);
+
+	return;
+    }
+
+    /* Comment with !--  */
+    do {
+
+	while(@call self::SGMLScanGetChar() != '-' && !_endOfFile);
+
+	if(@call self::SGMLScanGetChar() == '-') {
+	    if((chr = @call self::SGMLScanGetChar()) == '>') {
+		break;
+	    } else {
+		@call self::SGMLScanUngetChar('-');
+		@call self::SGMLScanUngetChar(chr);
+	    }
+	} 
+
+    } while(!_endOfFile);
+
+}	/* End of SGMLParseComment.	*/
+
+
+
+/***********************************************************************
+ *		SGMLParseText
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Parse text until we see a token.
+ * CALLED BY:	Parse.
+ * RETURN:	Nothing.
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:    Stop when we see '<' or '&'.
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	kkee	10/ 2/96   	Initial Revision
+ *      kkee    2/17/98         Ported from Geos to Geos-SC
+ *
+ ***********************************************************************/
+@method /* void */ SgmlClass, SGMLParseText /* () */
+{
+    byte c;
+
+    if (_content == SGMLC_PREFORMATTED)
+	c = @call self::SGMLScanGetChar();
+    else
+	c = @call self::SGMLScanGetReduceWhiteChar();
+
+    while ((c != '<') && (c != '&') && (!_endOfFile)) {
+
+        /*
+         * Convert the character to local format if there is
+         * a mapping for it in the translation table.
+         */
+        /* Commented out by kkee 2/19/98 because Geos-SC 
+         * character set is the same as ISO-8859-1. If not,
+         * this translation is needed.
+         */
+        /* if ((c >= 0xA0) && (c < 0x100)) {
+         *   ct = CHARACTERTRANSLATE[c-0xA0][0];
+         *   if (ct > 0)
+         *       c = ct;
+         * } 
+         */
+
+	SGMLAppendChar(c);
+
+	/* 
+	 * SGMLC_PREFORMATTED content model accepts all whitespaces.
+	 */
+	if (_content == SGMLC_PREFORMATTED)
+
+	    c = @call self::SGMLScanGetChar();
+
+	else
+	    /* SGMLC_MIXED */
+	    c = @call self::SGMLScanGetReduceWhiteChar();
+    }
+
+    /* 
+     * We have read one character ahead.
+     */
+    if (!_endOfFile)
+	@call self::SGMLScanUngetChar(c);
+
+}	/* End of SGMLParseText.	*/
+
+
+
+/***********************************************************************
+ *		SGMLParseIgnore
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Start tag and anything up to the matching end tag are
+ *              ignored (client will not the start tag, end tag, and
+ *              all the contents in between).
+ * CALLED BY:	Parse.
+ * RETURN:	Nothing
+ *	
+ * STRATEGY:	
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	mzhu    	9/22/97   	Initial Revision
+ *      kkee            2/17/98         Ported from Geos to Geos-SC
+ *	
+ ***********************************************************************/
+@method /* void */ SgmlClass, SGMLParseIgnore /* () */
+{
+    sword index;
+    byte chr;
+
+    ASSERTS(_stackPos != 0,
+            "Sgml::SGMLParseIgnore() expected start element missing");
+
+    /* 
+     * Flush buffer if there is any text in it as we are going to 
+     * use the buffer. 
+     */
+    if (_textLength)
+	@call self::SGMLHandleText();
+
+    /* Ignore leading white spaces */
+    chr = @call self::SGMLScanGetNonWhiteChar();
+
+    do {
+	
+	if (chr == '<') {
+
+	    if ((chr = @call self::SGMLScanGetChar()) == '/') {
+
+		chr = @call self::SGMLScanGetChar();
+		if (!ISWHITE(chr)) {
+
+		    @call self::SGMLScanUngetChar(chr);
+		    @call self::SGMLScanGobbleSym();
+
+		    if (((index = 
+			  @call self::SGMLSearchTag(TAGLIST,
+					NUMOFTAGS,
+					_thisWord)) > -1) &&
+			(TAGLIST[index].SGMLT_token == 
+			 _elementStack[_stackPos-1]->SGMLT_token)) {
+
+			@call self::SGMLIgnoreAttr();
+
+			_stackPos --;
+			break;  /* done! exit the while loop */
+		    }
+		}
+	    } else if (chr == '!')
+		@call self::SGMLParseComment();
+	}
+	    
+	chr = @call self::SGMLScanGetChar();
+
+    } while (!_endOfFile);
+
+    _content = SGMLC_MIXED;
+}	/* End of SGMLParseIgnore.	*/
+
+
+
+
+/***********************************************************************
+ *		SGMLParseLiteral
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Parse literal text until the expected end element
+ *              is encountered. 
+ * CALLED BY:	Parse
+ * RETURN:	Nothing
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:  
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	kkee	10/ 8/96   	Initial Revision
+ *      kkee    2/17/98         Ported from Geos to Geos-SC
+ *
+ ***********************************************************************/
+@method /* void */ SgmlClass, SGMLParseLiteral /* () */
+{
+    word i, length;
+    sword index;
+    byte chr;
+
+    ASSERTS(_stackPos != 0,
+            "Sgml::SGMLParseLiteral() expected start element missing");
+
+    /* 
+     * Flush buffer if there is any text in it as we are going to 
+     * use the buffer. 
+     */
+    if (_textLength)
+	@call self::SGMLHandleText();
+
+    /* Ignore leading white spaces */
+    chr = @call self::SGMLScanGetChar();
+
+    do {
+	
+	if (chr == '<') {
+
+	    if ((chr = @call self::SGMLScanGetChar()) == '/') {
+
+		chr = @call self::SGMLScanGetChar();
+		if (!ISWHITE(chr)) {
+
+		    @call self::SGMLScanUngetChar(chr);
+		    @call self::SGMLScanGobbleSym();
+
+		    if (((index = 
+			  @call self::SGMLSearchTag(TAGLIST,
+					NUMOFTAGS,
+					_thisWord)) > -1) &&
+			(TAGLIST[index].SGMLT_token == 
+			 _elementStack[_stackPos-1]->SGMLT_token)) {
+
+			/* Found the element to end the literal content */
+			/* Ignore attrs if any */
+			@call self::SGMLIgnoreAttr();
+
+			break;  /* done! exit the while loop */
+		    }
+
+		    SGMLAppendAllChar('<');
+		    SGMLAppendAllChar('/');
+
+		    length = strlen((char*)_thisWord);
+		    for (i=0; i<length; i++) {
+			SGMLAppendAllChar(_thisWord[i]);
+		    }
+
+		} else { 
+		    SGMLAppendAllChar('<');
+		    SGMLAppendAllChar('/');
+		    SGMLAppendAllChar(chr);
+		}
+
+	    } else {
+		SGMLAppendAllChar('<');
+		SGMLAppendAllChar(chr);
+	    }
+
+	} else 
+	    SGMLAppendAllChar(chr);
+	    
+	chr = @call self::SGMLScanGetChar();
+
+    } while (!_endOfFile);
+
+    @call self::SGMLHandleEndElement(&TAGLIST[index]);
+}	/* End of SGMLParseLiteral.	*/    
+
+
+
+/***********************************************************************
+ *		SGMLIgnoreStartElement
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Skip an element and all its attributes. The skipped 
+ *              text is treated as plain text.
+ * CALLED BY:	SGMLParseStartElement
+ * RETURN:	Nothing
+ *	
+ * STRATEGY:	Changed to not push the ignored element to target although
+ *              QA thinks otherwise - 11/10/97 -kkee
+ *              So I commented out code that calls SGMLAppendChar.
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	kkee    	9/ 4/97   	Initial Revision
+ *      kkee            2/17/98         Ported from Geos to Geos-SC
+ *	
+ ***********************************************************************/
+@method /* void */ SgmlClass, SGMLIgnoreStartElement /* () */
+{
+    /* Treat the element as text */
+    /* SGMLAppendChar('<'); */
+    @call self::SGMLIgnoreElementCommon();
+}	/* End of SGMLIgnoreStartElement.	*/
+
+
+/***********************************************************************
+ *		SGMLIgnoreEndElement
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Ignore an end element and put to target as plain text.
+ * CALLED BY:	SGMLParseEndElement
+ * RETURN:	Nothing
+ *	
+ * STRATEGY:	Changed to not push the ignored element to target although
+ *              QA thinks otherwise - 11/10/97 -kkee
+ *              So I commented out code that calls SGMLAppendChar.
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	kkee    	9/ 5/97   	Initial Revision
+ *      kkee            2/17/98         Ported from Geos to Geos-SC
+ *	
+ ***********************************************************************/
+@method /* void */ SgmlClass, SGMLIgnoreEndElement /* () */
+{
+    /* Treat the element as text */
+    /* SGMLAppendChar('<'); */
+    /* SGMLAppendChar('</'); */
+    @call self::SGMLIgnoreElementCommon();
+}	/* End of SGMLIgnoreEndElement.	*/
+
+
+@method /* void */ SgmlClass, SGMLIgnoreAttr /* () */
+{
+    while ((@call self::SGMLScanGetChar() != '>') && (!_endOfFile));
+}
+

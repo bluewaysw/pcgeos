@@ -1,0 +1,204 @@
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Geoworks 1996.  All rights reserved.
+	GEOWORKS CONFIDENTIAL
+
+PROJECT:	Penelope Information Services
+MODULE:
+FILE:		infoServProcApp.goc
+
+AUTHOR:		Mingzhe Zhu, Sep 11, 1996
+
+ROUTINES:
+	Name			Description
+	----			-----------
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	jharlan	11/12/97   	Initial version.
+
+DESCRIPTION:
+
+	$Id: toolbar.goc,v 1.1 98/08/13 15:11:01 edwin Exp $
+
+	This file contains code for handling toolbar in NIKE product
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+@include "gpcDecl.goh"
+@include "gpcUI.goh"
+
+
+@classdecl ISConfigToolbarGenInteractionClass;
+
+@extern object @ISLIBookmarkButton;
+@extern object @ISButtonBarAddBookmarkTrigger;
+@extern object @ISConfigureOptionsGroup;
+@extern object @ISButtonBarOpenLocationTrigger;
+@extern object @ISButtonBarStopTrigger;
+@extern object @ISButtonBarHistoryTrigger;
+/***********************************************************************
+ *		MSG_ISCTGI_BEFORE for ISConfigToolbarGenInteractionClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	initialize dialog before opening
+ * PARAMETERS:	    
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:	    
+ *
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	jharlan 	11/12/97   	Initial Revision
+ *	
+ ***********************************************************************/
+@method ISConfigToolbarGenInteractionClass, MSG_ISCTGI_BEFORE
+{
+	word selectedBooleans=0;
+
+	if (@call ISButtonBarOpenLocationTrigger::MSG_GEN_GET_USABLE())
+		selectedBooleans |= ISOPEN_ALLOWED;
+	if (@call ISButtonBarStopTrigger::MSG_GEN_GET_USABLE())
+		selectedBooleans |= ISSTOP_ALLOWED;
+	if (@call ISLIReloadButton::MSG_GEN_GET_USABLE())
+		selectedBooleans |= ISRELOAD_ALLOWED;
+	if (@call ISLIBackButton::MSG_GEN_GET_USABLE())
+		selectedBooleans |= ISBACK_ALLOWED;
+	if (@call ISLIForwardButton::MSG_GEN_GET_USABLE())
+		selectedBooleans |= ISFORWARD_ALLOWED;
+	if (@call ISButtonBarAddBookmarkTrigger::MSG_GEN_GET_USABLE())
+		selectedBooleans |= ISADD_ALLOWED;
+	if (@call ISLIBookmarkButton::MSG_GEN_GET_USABLE())
+		selectedBooleans |= ISBOOKMARKS_ALLOWED;
+	if (@call ISButtonBarHistoryTrigger::MSG_GEN_GET_USABLE())
+		selectedBooleans |= ISHISTORY_ALLOWED;
+
+	@send ISConfigureOptionsGroup ::
+		MSG_GEN_BOOLEAN_GROUP_SET_GROUP_STATE(selectedBooleans,0) ;
+
+	// save current values in case user hits Close
+	pself = ObjDerefGen(oself);
+	pself->ISCTGII_selectedBooleans = selectedBooleans;
+
+	// open the dialog
+	@send oself :: MSG_GEN_INTERACTION_INITIATE();
+
+}	/* End of MSG_ISCTGI_BEFORE	*/
+
+static void setObjectVisibility(optr theObject,Boolean visibleFlag)
+	// set object as USABLE or NOT_USABLE
+	// called in MSG_ISCTGI_APPLY
+{
+	if (visibleFlag)
+		@send theObject :: MSG_GEN_SET_USABLE(VUM_DELAYED_VIA_UI_QUEUE);
+	else
+		@send theObject :: MSG_GEN_SET_NOT_USABLE(VUM_DELAYED_VIA_UI_QUEUE);
+}
+
+/***********************************************************************
+ *		MSG_ISCTGI_CLOSE for ISConfigToolbarGenInteractionClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	get new values from dialog and apply them
+ * PARAMETERS:
+ * SIDE EFFECTS:
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	jharlan 	11/12/97   	Initial Revision
+ *
+ ***********************************************************************/
+@method ISConfigToolbarGenInteractionClass, MSG_ISCTGI_CLOSE
+{
+	pself->ISCTGII_selectedBooleans = @call ISConfigureOptionsGroup::
+			MSG_GEN_BOOLEAN_GROUP_GET_SELECTED_BOOLEANS();
+
+	@send oself :: MSG_ISCTGI_APPLY();
+
+}	/* End of MSG_ISCTGI_CLOSE.	*/
+
+/***********************************************************************
+ *		MSG_ISCTGI_APPLY for ISConfigToolbarGenInteractionClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	show/hide selected toolbar buttons
+ * PARAMETERS:
+ * SIDE EFFECTS:
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	jharlan 	11/12/97   	Initial Revision
+ *
+ ***********************************************************************/
+@method ISConfigToolbarGenInteractionClass, MSG_ISCTGI_APPLY
+{
+	word selectedBooleans;
+
+	selectedBooleans = pself->ISCTGII_selectedBooleans;
+
+	setObjectVisibility(@ISButtonBarOpenLocationTrigger,		selectedBooleans & ISOPEN_ALLOWED);
+	setObjectVisibility(@ISButtonBarStopTrigger,				selectedBooleans & ISSTOP_ALLOWED);
+	setObjectVisibility(@ISLIReloadButton,			selectedBooleans & ISRELOAD_ALLOWED);
+	setObjectVisibility(@ISLIBackButton,			selectedBooleans & ISBACK_ALLOWED);
+	setObjectVisibility(@ISLIForwardButton,			selectedBooleans & ISFORWARD_ALLOWED);
+	setObjectVisibility(@ISButtonBarAddBookmarkTrigger,	selectedBooleans & ISADD_ALLOWED);
+	setObjectVisibility(@ISLIBookmarkButton,		selectedBooleans & ISBOOKMARKS_ALLOWED);
+	setObjectVisibility(@ISButtonBarHistoryTrigger,		selectedBooleans & ISHISTORY_ALLOWED);
+
+}	/* End of MSG_ISCTGI_APPLY.	*/
+
+/***********************************************************************
+ *		MSG_ISCTGI_SELECT_ALL for ISConfigToolbarGenInteractionClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Select all items in the dialog
+ * PARAMETERS:
+ * SIDE EFFECTS:
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	jharlan 	11/02/97   	Initial Revision
+ *
+ ***********************************************************************/
+@method ISConfigToolbarGenInteractionClass, MSG_ISCTGI_SELECT_ALL
+{
+	@send ISConfigureOptionsGroup ::
+		MSG_GEN_BOOLEAN_GROUP_SET_GROUP_STATE(0xFFFF,0);
+
+}	/* End of MSG_ISCTGI_SELECT_ALL.	*/
+
+/***********************************************************************
+ *		MSG_ISCTGI_SELECT_NONE for ISConfigToolbarGenInteractionClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Unselect all items in the dialog
+ * PARAMETERS:
+ * SIDE EFFECTS:
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	jharlan 	11/02/97   	Initial Revision
+ *
+ ***********************************************************************/
+@method ISConfigToolbarGenInteractionClass, MSG_ISCTGI_SELECT_NONE
+{
+	@send ISConfigureOptionsGroup ::
+		MSG_GEN_BOOLEAN_GROUP_SET_GROUP_STATE(0,0) ;
+
+}	/* End of MSG_ISCTGI_SELECT_NONE.	*/
+
+
+

@@ -1,0 +1,150 @@
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Geoworks 1996.  All rights reserved.
+	GEOWORKS CONFIDENTIAL
+
+PROJECT:	Geos WWW Library
+MODULE:		
+FILE:		htscan.goh
+
+AUTHOR:		Kok Kin Kee, Sep 27, 1996
+
+ROUTINES:
+	Name			Description
+	----			-----------
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	kkee	9/27/96   	Initial version.
+
+DESCRIPTION:
+        MIME/HTTP scanner.
+	
+
+	$Id: htscan.goh,v 1.1 97/04/04 15:54:48 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+@ifndef __HTSCAN_GOH__
+@define __HTSCAN_GOH__
+
+@include <stdapp.goh>
+@include <WWW/HTCore/htreq.goh>
+@include <WWW/HTCore/htstring.goh>
+@include <WWW/HTCore/htsock.goh>
+#include <WWW/htmem.h>
+
+typedef MemHandle HTScannerHandle;   /* HTScanner descriptor */
+
+/*
+ * The MIME tokens.
+ */
+typedef enum {
+     /* MIME headers supported. */
+      HTST_CACHE_CONTROL
+     ,HTST_CONTENT_ENCODING
+     ,HTST_CONTENT_TYPE
+     ,HTST_CONTENT_LENGTH
+     ,HTST_CONTENT_RANGE
+     ,HTST_EXPIRES
+     ,HTST_LAST_MODIFIED
+     ,HTST_LOCATION
+     ,HTST_PRAGMA
+     ,HTST_WWW_AUTHENTICATE 
+
+     /* HTST_WWW_AUTHENTICATE header values */
+     ,HTST_BASIC_SCHEME        /* Basic scheme */
+
+     /* Misc tokens. */
+     ,HTST_COLON               /* : */
+     ,HTST_EQUAL               /* = */
+     ,HTST_COMMA               /* , */
+     ,HTST_NUMBER              /* positive integer as a word */
+     ,HTST_QUOTED_STRING       /* String enclosed by two double quotes */
+     ,HTST_UNKNOWN             /* Unknown word token */
+
+     ,HTST_XXX_EOL             /* Symbolic end of line */
+} HTScanToken;
+
+
+/*
+ * Scanner state. States are aligned according to CR and LF.
+ */
+typedef enum {
+    HTSS_EOL_FCR,
+    HTSS_EOL_FLF,
+    HTSS_EOL_BEGIN,
+    HTSS_EOL_SCR
+} HTScanState;
+
+/*
+ * Max length of a scanned word.
+ */
+#define HTSCAN_MAX_WORD_LENGTH                  64
+#define HTSCAN_BUFFER_SIZE  HTSOCKET_BUFFER_SIZE
+#define HTSCAN_MAX_NUMBER_UNGET_CHARS           10    /* a safe size */
+
+/*
+ * HTScan Scanner structure.
+ */
+typedef struct {
+    /* Current reserved word */
+    char HTS_thisWord[HTSCAN_MAX_WORD_LENGTH];
+   
+    /* Current token */
+    HTScanToken HTS_thisSym;
+    
+    /* Current number */
+    dword HTS_thisNum;
+
+    /* Scanner state */
+    HTScanState HTS_state;
+
+    /* Target for pushing data */
+    HTStreamHandle HTS_target;
+
+    /* The request it is serving */
+    HTRequestHandle HTS_request;
+
+    /* If transparent, no parsing, just push data */
+    Boolean HTS_transparent;
+
+    /* For buffering data to parse. We buffer one line at a time */
+    char HTS_buffer[HTSCAN_BUFFER_SIZE];
+    word HTS_length;
+    word HTS_index;
+    
+    /* For ungetting characters */
+    char HTS_ungottenChar[HTSCAN_MAX_NUMBER_UNGET_CHARS];
+    word HTS_numOfUngotten;
+
+} HTScanner;
+
+
+/* --------------------------------------------------------------------------
+ * 		Client Public Function Prototypes
+ * --------------------------------------------------------------------------*/
+
+extern HTScannerHandle _far _pascal
+    HTScanNew(HTRequestHandle request, HTStreamHandle target);
+
+#define HTScanDelete(scanner) MemFree(scanner)
+
+extern int _far _pascal
+    HTScanPutBlock(HTScanner *sptr, const char *data, word len);
+
+extern int _far _pascal
+    HTScanPutChar(HTScanner *sptr, char chr);
+
+extern char _far _pascal
+    HTScanGetChar(HTScanner *sptr);
+
+#define HTScanUngetChar(sptr, chr) \
+    sptr->HTS_ungottenChar[sptr->HTS_numOfUngotten++] = chr
+
+extern void _far _pascal
+    HTScanGobbleSym(HTScanner *sptr);
+
+@endif
+

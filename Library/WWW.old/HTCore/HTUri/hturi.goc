@@ -1,0 +1,645 @@
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Geoworks 1996 -- All Rights Reserved
+
+PROJECT:	Geos WWW Library.
+MODULE:		URI Manager.
+FILE:		hturi.goc
+
+AUTHOR:		Kok Kin Kee, Jul 16, 1996
+
+ROUTINES:
+	Name			Description
+	----			-----------
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	kkee	7/16/96   	Initial version.
+
+DESCRIPTION:
+	URI Management.
+
+	$Id: hturi.goc,v 1.1 97/04/07 11:48:57 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+@include <WWW/HTCore/hturi.goh>
+@include <WWW/HTCore/htutils.goh>
+#include <WWW/htmem.h>
+
+@include "htfatals.goh"
+
+#include <Ansi/string.h>
+#include <Ansi/stdlib.h>
+
+
+/* --------------------------------------------------------------------------
+ * 		PRIVATE DATA
+ * --------------------------------------------------------------------------*/
+
+/*
+ * Various components of a URI.
+ */
+typedef struct {
+    char * access;		/* Now known as "scheme" */
+    char * host;
+    char * port;
+    char * absolute;
+    char * relative;
+    char * anchor;
+} HTURI;
+
+
+/***********************************************************************
+  		PRIVATE FUNCTIONS
+***********************************************************************/
+
+
+/***********************************************************************
+ *		HTScanURI
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Break a URI into various components. Cut up name into
+ *              various URI components so name is modified!
+ * CALLED BY:	
+ * PASS:        name, points to a document name which may be incomplete.
+ * RETURN:	parts, contains various components of the URI. Anything 
+ *              nonzero in parts is null-terminated. These results are 
+ *              guaranteed on return:
+ *
+ *               1. parts->absolute or parts->relative may
+ *                  NULL, *but* not both.
+ *
+ *               2. parts->host, parts->anchor, and 
+ *                  parts->access may be non-NULL if they were
+ *                  specified in name.
+ *
+ *
+ * SIDE EFFECTS:We overwrite the passed in name to NULL the strings in 
+ *              parts. So name will be modified.
+ *	
+ * STRATEGY:
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	kkee	10/31/96   	Initial Revision
+ *
+ ***********************************************************************/
+static void _pascal
+HTScanURI (char *name, HTURI *parts)
+{
+    char * after_access;
+    char * p;
+    int length = strlen(name);
+
+    /* Initialize to all NULL */
+    parts->access = 0;
+    parts->host = 0;
+    parts->port = 0;
+    parts->absolute = 0;
+    parts->relative = 0;
+    parts->anchor = 0;
+
+    if (!name) return;               /* It could be null */
+    
+    after_access = name;
+
+    for(p=name; *p; p++) {
+
+	if (*p==':') {
+	    *p = 0;
+	    parts->access = after_access; /* Scheme has been specified */
+	    after_access = p+1;
+
+	    if (0==strcasecmp("URL", parts->access)) {
+		parts->access = NULL;  /* Ignore IETF's URL: pre-prefix */
+	    } else break;
+	}
+	if (*p=='/') break;		/* Access has not been specified */
+	if (*p=='#') break;
+    }
+    
+    for(p=name+length-1; p>=name; p--) {
+	if (*p =='#') {
+	    parts->anchor=p+1;
+	    *p=0;			/* cut off anchor  */
+	}
+    }
+
+    p = after_access;
+
+    /* file scheme does not have port, only absolute/relative path */
+    if (parts->access && !strcasecmp(parts->access, "file")) {
+	if (*p=='/') {
+	    if (p[1]=='/') {
+		if (p[2]=='/')
+		    parts->absolute = p+3;
+		else
+		    parts->absolute = p+2;
+	    } else 
+		parts->absolute = p+1;
+	} else {
+	    parts->absolute = 
+		(*after_access) ? after_access : 0;
+	}
+	return;
+    }
+    
+    /* Other schemes */
+    if (*p=='/'){
+	if (p[1]=='/') {
+	    parts->host = p+2;         /* host has been specified 	*/
+	    *p=0;	               /* Terminate access 		*/
+
+	    p=strchr(parts->host,':'); /* look for port number */
+	    
+	    if(p) {
+		parts->port = p+1;
+		*p=0;                  /* terminate host */
+		p=parts->port;
+	    } else
+		p=parts->host;
+		
+	    p=strchr(p,'/');           /* look for end of host or port if any */
+
+	    if(p) {
+	        *p=0;	        	/* terminate host or port */
+	        parts->absolute = p+1;	/* Root has been found */
+	    }
+
+	} else {
+	    parts->absolute = p+1;	/* Root found but no host */
+	}
+	    
+    } else {
+        parts->relative = 
+	    (*after_access) ? after_access : 0; /* zero for "" */
+    }
+}	/* End of HTScanURI.	*/
+
+
+
+
+
+/***********************************************************************
+ *		HTCanonURI
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Canonicalize a URL.
+ * CALLED BY:	
+ * RETURN:	The position of the current path part of the URL
+ *		which might be the old one or a new one.
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY: Ported from W3C HTCanon in HTParse.c.
+ *
+ *	1) The host name is converted to lowercase.
+ *	2) Expands the host name of the URL from a local name to a full
+ *	   domain name. A host name is started by `://'.
+ *	3) Chop off port if `:80' (http), `:70' (gopher), or `:21' (ftp).
+ *
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	kkee	10/31/96   	Initial Revision
+ *
+ ***********************************************************************/
+static char * _pascal
+HTCanonURI (char **filename, char *host)
+{
+    char *newname = NULL;
+    char *port;
+    char *strptr;
+    char *path;
+    char *access = host-3;
+
+    while (access>*filename && *(access-1)!='/')       /* Find access method */
+	access--;
+    if ((path = strchr(host, '/')) == NULL)			/* Find path */
+	path = host + strlen(host);
+    if ((strptr = strchr(host, '@')) != NULL && strptr<path)	   /* UserId */
+	host = strptr;
+    if ((port = strchr(host, ':')) != NULL && port>path)      /* Port number */
+	port = NULL;
+
+    strptr = host;				    /* Convert to lower-case */
+    while (strptr<path) {
+	*strptr = tolower(*strptr);
+	strptr++;
+    }
+    
+    /* 
+     * Does the URL contain a full domain name? This also works for a
+     * numerical host name. The domain name is already made lower-case
+     * and without a trailing dot. 
+     * 
+     * We don't support local domain name.
+     */
+    if (((strptr = strchr(host, '.')) == NULL || strptr >= path) &&
+	strncasecmp(host, "localhost", 9)) {
+
+	/* Do nothing even if we get here as we don't support local domain */
+	/* @@@ */
+
+    } else {					  /* Look for a trailing dot */
+	char *dot = port ? port : path;
+	if (dot > *filename && *--dot=='.') {
+	    char *orig=dot, *dest=dot+1;
+	    while((*orig++ = *dest++) != NULL);
+	    if (port) port--;
+	    path--;
+	}
+    }
+    /* Chop off port if `:', `:80' (http), `:70' (gopher), or `:21' (ftp) */
+    if (port) {
+	if (!*(port+1) || *(port+1)=='/') {
+	    if (!newname) {
+		char *orig=port, *dest=port+1;
+		while((*orig++ = *dest++) != NULL);
+	    }
+	} else if ((!strncmp(access, "http", 4) &&
+	     (*(port+1)=='8'&&*(port+2)=='0'&&(*(port+3)=='/'||!*(port+3)))) ||
+	    (!strncmp(access, "gopher", 6) &&
+	     (*(port+1)=='7'&&*(port+2)=='0'&&(*(port+3)=='/'||!*(port+3)))) ||
+	    (!strncmp(access, "ftp", 3) &&
+	     (*(port+1)=='2'&&*(port+2)=='1'&&(*(port+3)=='/'||!*(port+3))))) {
+	    if (!newname) {
+		char *orig=port, *dest=port+3;
+		while((*orig++ = *dest++) != NULL);
+		path -= 3;   	       /* Update path position, Henry Minsky */
+	    }
+	} else if (newname)
+	    strncat(newname, port, (int) (path-port));
+    }
+
+    if (newname) {
+	/* Won't get here as we don't have local domain name */
+	/* @@@ */
+    }
+
+    return path;
+}	/* End of HTCanonURI.	*/
+
+
+
+/***********************************************************************
+  		PUBLIC FUNCTIONS
+***********************************************************************/
+
+
+
+/***********************************************************************
+ *		HTSIMPLIFYURI
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Simplify a URL.
+ * CALLED BY:	Client.
+ * RETURN:	The simplified passed in URL.
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY: Ported from W3C HTSimplify in HTParse.c.
+ *
+ * A URI is allowed to contain the seqeunce xxx/../ which may be
+ * replaced by "" , and the seqeunce "/./" which may be replaced by "/".
+ * Simplification helps us recognize duplicate URIs. 
+ *
+ *	Thus, 	/etc/junk/../fred 	becomes	/etc/fred
+ *		/etc/junk/./fred	becomes	/etc/junk/fred
+ *
+ *      but we should NOT change
+ *		http://fred.xxx.edu/../..
+ *
+ *	or	../../albert.html
+ *
+ * In order to avoid empty URLs the following URLs become:
+ *
+ *		/fred/..		becomes /fred/..
+ *		/fred/././..		becomes /fred/..
+ *		/fred/.././junk/.././	becomes /fred/..
+ *
+ * If more than one set of `://' is found (several proxies in cascade) then
+ * only the part after the last `://' is simplified.
+ *
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	kkee	10/31/96   	Initial Revision
+ *
+ ***********************************************************************/
+char* _far _pascal
+HTSIMPLIFYURI (char **url)
+{
+    char *path, *p;
+
+    if (!url || !*url) return *url;
+
+    PUSHDS;
+    SET_DS_LIB_DGROUP;
+
+    /* Find any scheme name */
+    if ((path = strstr(*url, "://")) != NULL) {		   /* Find host name */
+
+	char *newptr;
+	char *access = *url;
+	while (access<path && (*access=tolower(*access)) != NULL) access++;
+	path += 3;
+
+	while ((newptr = strstr(path, "://")) != NULL)        /* For proxies */
+	    path = newptr+3;
+	path = HTCanonURI(url, path);       	      /* We have a host name */
+
+    } else if ((path = strstr(*url, ":/")) != NULL) {
+	path += 2;
+
+    } else
+	path = *url;
+
+    if (*path == '/' && *(path+1)=='/') {	  /* Some URLs start //<foo> */
+	path += 1;
+
+    } else if (!strncmp(path, "news:", 5)) {
+	char *ptr = strchr(path+5, '@');
+	if (!ptr) ptr = path+5;
+
+	while (*ptr) {			    /* Make group or host lower case */
+	    *ptr = tolower(*ptr);
+	    ptr++;
+	}
+
+	POPDS;
+	return *url;		      /* Doesn't need to do any more */
+    }
+
+    if ((p = path)!=NULL) {
+
+	char *end;
+	if (!((end = strchr(path, ';')) != NULL || 
+	      (end = strchr(path, '?')) != NULL ||
+	      (end = strchr(path, '#')) != NULL))
+	    end = path+strlen(path);
+
+	/* Parse string second time to simplify */
+	p = path;
+	while(p<end) {
+
+	    if (*p=='/') {
+		if (p>*url && *(p+1)=='.' && (*(p+2)=='/' || !*(p+2))) {
+
+		    char *orig = p+1;
+		    char *dest = (*(p+2)!='/') ? p+2 : p+3;
+
+		    /* Remove a slash and a dot */
+		    while ((*orig++ = *dest++) != NULL); 
+		    end = orig-1;
+
+		} else if (*(p+1)=='.' && *(p+2)=='.' && (*(p+3)=='/' || !*(p+3))) {
+		    char *q = p;
+
+		    while (q>path && *--q!='/');	       /* prev slash */
+
+		    if (strncmp(q, "/../", 4)) {
+			char *orig = q+1;
+			char *dest = (*(p+3)!='/') ? p+3 : p+4;
+			/* Remove /xxx/.. */
+			while ((*orig++ = *dest++) != NULL);
+			end = orig-1;
+			p = q;		      /* Start again with prev slash */
+
+		    } else
+			p++;
+
+		} else if (*(p+1)=='/') {
+
+		    while (*(p+1)=='/') {
+			char *orig=p, *dest=p+1;
+			/* Remove multiple /'s */
+			while ((*orig++ = *dest++) != NULL);
+			end = orig-1;
+		    }
+
+		} else
+		    p++;
+
+	    } else
+		p++;
+	}
+    }
+
+    POPDS;
+    return *url;
+}	/* End of HTSIMPLIFYURI.	*/
+
+
+
+
+/***********************************************************************
+ *		HTPARSEURI
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Return those parts of a name which are given and 
+ *              requested. We substitute parts from the related name 
+ *              where necessary. The HTMemory returned must be *freed*.
+ *
+ * CALLED BY:	Client.
+ * PASS:        aName
+ *                 - absolute URL or filename given relatedName.
+ *                 - related name to aName. Pass NULL if aName is absolute.
+ *              wanted
+ *                 - a mask for the parts which are wanted.
+ * RETURN:	HTMemory, must be freed be caller or NULL.
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:    This routine will replace HTParseURI. 
+ *              Ported from W3C HTParse HTParse.c. and extended by kkee.
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	kkee	10/31/96   	Initial Revision
+ *
+ ***********************************************************************/
+HTMemHandle _far _pascal
+HTPARSEURI (const char *aName, const char *relatedName, word wanted)
+{
+    HTMemHandle memName, memRel, memResult;
+    HTMemHandle memReturn = NULL;
+    char * ret;
+    char * result = 0;
+    int len;
+    char * name = 0;
+    char * rel = 0;
+    char * p;
+    char * access;
+    HTURI given, related;
+    
+    PUSHDS;
+    SET_DS_LIB_DGROUP;
+
+    if (!relatedName)        /* HWL 23/8/94: dont dump due to NULL */
+        relatedName = "";
+    
+    /* Make working copies of input strings to cut up */
+    len = strlen(aName)+strlen(relatedName)+10;
+
+    memName = HTMemAlloc(strlen(aName)+1);
+    memRel = HTMemAlloc(strlen(relatedName)+1);
+    /* Lots of space: more than enough */
+    memResult = HTMemAlloc(len);
+
+    if (!memName || !memRel || !memResult) {
+	if (memName) HTMemFree(memName);
+	if (memRel) HTMemFree(memRel);
+	if (memResult) HTMemFree(memResult);
+	POPDS;
+	return NULL;
+    }
+
+    name = (char *) HTMemLock(memName);
+    rel = (char *) HTMemLock(memRel);
+    result = (char *) HTMemLock(memResult);
+
+    strcpy(name, aName);
+    strcpy(rel, relatedName);
+
+    /* Modifies name and rel */
+    HTScanURI(name, &given);
+    HTScanURI(rel,  &related); 
+    result[0]=0;		/* Clear string  */
+    access = given.access ? given.access : related.access;
+
+    if (wanted & HTURI_PARSE_ACCESS)
+        if (access) {
+	    strcat(result, access);
+	    if(wanted & HTURI_PARSE_PUNCTUATION) strcat(result, "://");
+	}
+	
+    if (given.access && related.access)	/* If diff access, inherit nothing. */
+        if (strcmp(given.access, related.access)!=0) {
+	    related.host=0;
+	    related.port=0;
+	    related.absolute=0;
+	    related.relative=0;
+	    related.anchor=0;
+	}
+	
+    if (wanted & HTURI_PARSE_HOST)
+        if(given.host || related.host) {
+	    strcat(result, given.host ? given.host : related.host);
+	}
+	
+    if ((given.host && related.host)) /* If diff hosts, inherit no path. */
+        if ((strcmp(given.host, related.host)!=0)) {
+	    related.port=0;
+	    related.absolute=0;
+	    related.relative=0;
+	    related.anchor=0;
+	}
+
+    if ((given.port && related.port)) /* If diff ports, inherit no path. */
+        if ((strcmp(given.port, related.port)!=0)) {
+	    related.absolute=0;
+	    related.relative=0;
+	    related.anchor=0;
+	}
+
+    if (wanted & HTURI_PARSE_PORT)
+	if (given.port || related.port) {
+	    if(wanted & HTURI_PARSE_PUNCTUATION) strcat(result, ":");
+	    strcat(result, given.port ? given.port : related.port);
+	}
+
+    if (wanted & HTURI_PARSE_PATH) {
+        if(given.absolute) {				/* All is given */
+	    if(wanted & HTURI_PARSE_PUNCTUATION) strcat(result, "/");
+	    strcat(result, given.absolute);
+	} else if(related.absolute) {	/* Adopt path not name */
+	    strcat(result, "/");
+	    strcat(result, related.absolute);
+	    if (given.relative) {
+		p = strchr(result, '?');	/* Search part? */
+		if (!p) p=result+strlen(result)-1;
+		for (; *p!='/'; p--);	/* last / */
+		p[1]=0;					/* Remove filename */
+		strcat(result, given.relative);		/* Add given one */
+	    }
+	} else if(given.relative) {
+	    strcat(result, given.relative);		/* what we've got */
+	} else if(related.relative) {
+	    strcat(result, related.relative);
+	} else {  /* No inheritance */
+	    strcat(result, "/");
+	}
+    }
+		
+    if (wanted & HTURI_PARSE_ANCHOR)
+	if(given.anchor || related.anchor) {
+	    if(given.absolute && given.anchor) {   /*Fixes for relURLs...*/
+		if(wanted & HTURI_PARSE_PUNCTUATION) strcat(result, "#");
+		strcat(result, given.anchor); 
+	    } else if (!(given.absolute) && !(given.anchor)) {
+		strcat(result, "");
+	    } else {
+		if(wanted & HTURI_PARSE_PUNCTUATION) strcat(result, "#");
+		strcat(result, given.anchor ? given.anchor : related.anchor); 
+	    }
+	}
+
+    HTMemUnlockAndFree(memName);  
+    HTMemUnlockAndFree(memRel);
+    
+    ret = (char *) HTMemAllocAndLock(&memReturn, strlen(result)+1);
+    strcpy(ret, result);
+    HTMemUnlockAndFree(memResult);
+    
+    HTMemUnlock(memReturn);           /* Must unlock */
+
+    POPDS;
+    return memReturn;	        /* exactly the right length */
+}	/* End of HTPARSEURI.	*/
+
+
+
+
+/***********************************************************************
+ *		HTPARSEHTMEMHANDLEURI
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Same as HTParseURI, but take HTMemHandle.
+ *
+ * CALLED BY:	Client.
+ * RETURN:	HTMemHandle or NULL.
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:    
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	kkee	11/29/96   	Initial Revision
+ *
+ ***********************************************************************/
+HTMemHandle _far _pascal
+HTPARSEHTMEMHANDLEURI (const HTMemHandle aName,
+		       const HTMemHandle relatedName, word wanted)
+{
+    HTMemHandle ret;
+    char *a = NULL, *r = NULL;
+
+    if (aName) a = (char *) HTMemLock(aName);
+    if (relatedName) r = (char *) HTMemLock(relatedName);
+
+    ret = HTParseURI(a, r, wanted);
+
+    if (aName) HTMemUnlock(aName);
+    if (relatedName) HTMemUnlock(relatedName);
+
+    return ret;
+}	/* End of HTPARSEHTMEMHANDLEURI.	*/
+
+
+
+

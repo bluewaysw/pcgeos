@@ -1,0 +1,2003 @@
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Geoworks 1996 -- All Rights Reserved
+
+PROJECT:	Penelope
+MODULE:		Table Construct
+FILE:		uitable.goc
+
+AUTHOR:		Edwin Yu, May 27, 1996
+
+ROUTINES:
+	Name			Description
+	----			-----------
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	EY	5/27/96   	Initial version.
+
+DESCRIPTION:
+	This file defines message handlers and functions neccessary
+	to create the elements in a TABLE construct.
+
+	$Id: uitable.goc,v 1.1 97/04/07 11:49:29 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+@include <stdapp.goh>
+@include <WWW/pmanager.goh>
+@include <WWW/uigenera.goh>
+@include "uifatals.goh"
+#include <Ansi/string.h>
+#include <Ansi/stdlib.h>        	/* atoi() defined */
+
+@classdecl	HTGenTableClass;	/* <TABLE>	*/
+@classdecl	HTGenTCellClass;	/* <TH> + <TD>	*/
+@classdecl	HTGenCaptionClass;	/* <CAPTION>	*/
+
+
+optr InitializeTableCellCommon (optr pmObj, ObjInfo *target);
+
+Boolean	TrMode = FALSE;
+
+
+/***********************************************************************
+ *		MSG_UI_GENERATOR_START_TABLE for UIGeneratorClass
+ ***********************************************************************
+ * SYNOPSIS:	    Create a ui object representing a table.
+ *
+ * PARAMETERS:	    (MemHandle block, SGMLEntity *entity)
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	EY	5/27/96   	Initial Revision
+ *
+ ***********************************************************************/
+@extern method UIGeneratorClass, MSG_UI_GENERATOR_START_TABLE
+{
+  /* 
+   *  If there is some object in UIG_target, insert it to the ui tree.
+   */
+  if ((pself->UIG_target.class == (ClassStruct *)&HTGenFormClass)  ||
+      (pself->UIG_target.class == (ClassStruct *)&HTGenTableClass) ||
+      (pself->UIG_target.class == (ClassStruct *)&HTGenTCellClass) ){
+    @call pself->UIG_pmObj::MSG_PM_TAKE_UNFINISHED_UI_OBJ
+	(pself->UIG_target.obj);
+  }
+  else if (pself->UIG_target.obj) {
+    @call pself->UIG_pmObj::MSG_PM_TAKE_FINISHED_UI_OBJ
+	(pself->UIG_target.obj);
+#if 1
+    @call self::MSG_UI_GENERATOR_BROADCAST_RESIZE_POSITION
+       (pself->UIG_target.obj);
+#endif
+  }
+  /*
+   *  Now create and store a table object in target.obj.
+   */
+  pself->UIG_target.obj = 
+    @call pself->UIG_pmObj::MSG_PM_OBJECT_INSTANTIATE(&HTGenTableClass);
+  pself->UIG_target.class = (ClassStruct *)&HTGenTableClass;
+  /*
+   *  Process the attributes.
+   */
+  @call pself->UIG_target.obj::MSG_GEN_TABLE_PROCESS_ATTRIBUTE
+     (block, entity);
+
+  TrMode = FALSE;
+  return UI_GEN_NO_ERROR;
+}	/* End of MSG_UI_GENERATOR_START_TABLE.	*/
+
+
+/***********************************************************************
+ *		MSG_UI_GENERATOR_END_TABLE for UIGeneratorClass
+ ***********************************************************************
+ * SYNOPSIS:	    Finish up the table object and ask PManager 
+ *		    to render it.
+ *		    
+ * PARAMETERS:	    none
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	EY	5/28/96   	Initial Revision
+ *
+ ***********************************************************************/
+@extern method UIGeneratorClass, MSG_UI_GENERATOR_END_TABLE
+{
+  optr obj;
+  if (!pself->UIG_target.obj)
+    return UI_GEN_ERROR;
+  /*
+   *  Travel up the ui tree till a table is seen,  and mark all the 
+   *  objects usable along the way.
+   */
+  @call pself->UIG_pmObj::MSG_PM_TAKE_UNFINISHED_UI_OBJ
+	(pself->UIG_target.obj);
+  if (pself->UIG_target.class != (ClassStruct *)&HTGenTableClass) {
+    while (1) {
+      @call pself->UIG_pmObj::MSG_PM_MARK_RECV_OBJECT_DONE
+		(&(pself->UIG_target.obj),&(pself->UIG_target.class));
+      EC_ERROR_IF(pself->UIG_target.obj == NULL ||
+		pself->UIG_target.class==(ClassStruct*)&HTGenTextClass,
+		UIG_INVALID_OPERATION_ON_UI_TREE);
+      if (pself->UIG_target.class == (ClassStruct *)&HTGenTableClass) {
+        break;
+      }
+    }
+  }
+  EC_ERROR_IF(pself->UIG_target.class != (ClassStruct *)&HTGenTableClass,
+	UIG_INVALID_OPERATION_ON_UI_TREE);
+  /*
+   *  Tell the receiving object (which should be HTGenTable object)
+   *  that there are no more children for the table.  So the 
+   *  presentation manager can mark the table usable.
+   */
+  obj = pself->UIG_target.obj;
+  @call pself->UIG_pmObj::MSG_PM_MARK_RECV_OBJECT_DONE
+		(&(pself->UIG_target.obj),&(pself->UIG_target.class));
+#if 1
+  @call self::MSG_UI_GENERATOR_BROADCAST_RESIZE_POSITION(obj);
+#endif
+
+  return UI_GEN_NO_ERROR;
+}	/* End of MSG_UI_GENERATOR_END_TABLE.	*/
+
+
+/***********************************************************************
+ *		MSG_UI_GENERATOR_START_CAPTION for UIGeneratorClass
+ ***********************************************************************
+ * SYNOPSIS:	    Create a ui representing the caption for a table.
+ *	
+ * PARAMETERS:	    (MemHandle block, SGMLEntity *entity);
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	EY	5/28/96   	Initial Revision
+ *
+ ***********************************************************************/
+@extern method UIGeneratorClass, MSG_UI_GENERATOR_START_CAPTION
+{
+  int index;
+  char *value, align = 0;
+  optr caption;
+  /*
+   *  Process its attribute list.
+   */
+  for(index = 0; entity[index].SGMLE_token; index++) {
+    if (entity[index].SGMLE_token == HTML_ATTR_ALIGN) {
+      if (entity[index].SGMLE_value) {
+	value = (char *)LMemDerefHandles(block, entity[index].SGMLE_value);
+	if (strcasecmp(value, "top") == 0)
+	    align = 0;
+	else if (strcasecmp(value, "bottom") == 0)
+	    align = 1;
+      }
+    }
+  }
+  /*
+   *  Finished whatever object is there.
+   */
+  @call pself->UIG_pmObj::MSG_PM_TAKE_UNFINISHED_UI_OBJ
+      (pself->UIG_target.obj);
+  /*
+   *  Create a caption object and switch PM's PM_receiving object.
+   */
+  caption = @call pself->UIG_pmObj::\
+      MSG_PM_OBJECT_INSTANTIATE(&HTGenCaptionClass);
+  /*
+   *  Tell the PM to save the current receiving object, and back 
+   *  up the ui tree to the same level as the table, and add the
+   *  caption object before or after(depending align) the table 
+   *  object.
+   */
+  @call pself->UIG_pmObj::MSG_PM_ENTER_CAPTION_MODE
+      (&HTGenTableClass, align, caption);
+  @call caption::MSG_GEN_CAPTION_SAVE_UIG_STATE
+      (pself->UIG_target.obj, pself->UIG_target.class);
+
+  pself->UIG_target.obj = caption;
+  pself->UIG_target.class = &HTGenCaptionClass;
+
+  return UI_GEN_NO_ERROR;
+}
+
+
+/***********************************************************************
+ *		MSG_UI_GENERATOR_END_CAPTION for UIGeneratorClass
+ ***********************************************************************
+ * SYNOPSIS:	    
+ * PARAMETERS:	    
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	EY	8/ 7/96   	Initial Revision
+ *
+ ***********************************************************************/
+@extern method UIGeneratorClass, MSG_UI_GENERATOR_END_CAPTION
+{
+  optr dummy;
+  ClassStruct *class;
+
+  if (!pself->UIG_target.obj)
+    return UI_GEN_ERROR;
+  /*
+   *  Finish whatever current object.
+   */
+  @call pself->UIG_pmObj::MSG_PM_TAKE_UNFINISHED_UI_OBJ
+	(pself->UIG_target.obj);
+  /*
+   *  Traverse up the ui tree to the caption level.
+   */
+  if (pself->UIG_target.class != (ClassStruct *)&HTGenCaptionClass) {
+    while (1) {
+      @call pself->UIG_pmObj::MSG_PM_MARK_RECV_OBJECT_DONE
+		(&(pself->UIG_target.obj),&(pself->UIG_target.class));
+      EC_ERROR_IF(pself->UIG_target.obj == NULL ||
+		pself->UIG_target.class==(ClassStruct*)&HTGenTextClass,
+		UIG_INVALID_OPERATION_ON_UI_TREE);
+      if (pself->UIG_target.class == (ClassStruct *)&HTGenCaptionClass){
+        break;
+      }
+    }
+  }
+  EC_ERROR_IF(pself->UIG_target.class!=(ClassStruct*)&HTGenCaptionClass,
+	      UIG_INVALID_OPERATION_ON_UI_TREE);
+  /*
+   *  And make the caption subtree usable.
+   */
+  @call pself->UIG_pmObj::MSG_PM_MARK_RECV_OBJECT_DONE(&dummy, &class);
+
+#if 1
+  @call self::MSG_UI_GENERATOR_BROADCAST_RESIZE_POSITION
+	(pself->UIG_target.obj);
+#endif
+  /*
+   *  Tell the PM to restore the receiving object to what it was 
+   *  before the caption object was created.
+   */
+  @call pself->UIG_pmObj::MSG_PM_EXIT_CAPTION_MODE();
+  @call pself->UIG_target.obj::MSG_GEN_CAPTION_RESTORE_UIG_STATE
+	(&dummy,&class);
+  pself->UIG_target.obj   = dummy;
+  pself->UIG_target.class = class;
+
+  return UI_GEN_NO_ERROR;
+}	/* End of MSG_UI_GENERATOR_END_CAPTION.	*/
+
+
+
+/***********************************************************************
+ *		MSG_UI_GENERATOR_START_TR for UIGeneratorClass
+ ***********************************************************************
+ * SYNOPSIS:	End the modication of the ui objects in the previous 
+ *		table cell if there is any.
+ *		
+ * PARAMETERS:	    (MemHandle block, SGMLEntity *entity)
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *		If target.obj has any object from the previous
+ *		modification, insert it to the ui tree and traverse up
+ *		the tree to find the first table object.  We mark all
+ *		the encouting objects usable while traversing up the
+ *		tree.
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	EY	5/29/96   	Initial Revision
+ *
+ ***********************************************************************/
+@extern method UIGeneratorClass, MSG_UI_GENERATOR_START_TR
+{
+  if (!pself->UIG_target.obj)
+	return UI_GEN_ERROR;
+
+  if (pself->UIG_target.class != (ClassStruct *)&HTGenTableClass) {
+    /*
+     *  No matter what's in the current target.obj, insert that object 
+     *  to the bottom leaf of the ui tree.
+     */
+    @call pself->UIG_pmObj::MSG_PM_TAKE_UNFINISHED_UI_OBJ
+	(pself->UIG_target.obj);
+    /*
+     * Traverse up the ui tree from the leaf to find the first table 
+     * object.  Any future table cell objects will be added to the
+     * children list of this table object.  In other word, we tell the
+     * PManager to travel up the ui tree until a table object becomes
+     * its recvObj.
+     */
+    while (1) {
+	@call pself->UIG_pmObj::MSG_PM_MARK_RECV_OBJECT_DONE
+		(&(pself->UIG_target.obj), &(pself->UIG_target.class));
+	/*
+	 * Now pself->UIG_target.obj contains PManager's recvObj.
+	 */
+	EC_ERROR_IF(pself->UIG_target.class == NULL || 
+		    pself->UIG_target.obj == NULL ||
+		    pself->UIG_target.class==(ClassStruct *)&HTGenTextClass,
+		    UIG_INVALID_OPERATION_ON_UI_TREE);
+	if (pself->UIG_target.class == (ClassStruct *)&HTGenTableClass)
+		break;	/* found the table object */
+    }
+  }
+  if (TrMode == FALSE) {
+      /*
+       * Reset the suggested rowNo and colNo to the next new row of cells.
+       */
+      @call pself->UIG_target.obj::MSG_GEN_TABLE_INCREMENT_ROW_COUNT();
+      TrMode = TRUE;
+  }
+
+  return UI_GEN_NO_ERROR;
+}
+
+
+/***********************************************************************
+ *		MSG_UI_GENERATOR_CREATE_TH for UIGeneratorClass
+ ***********************************************************************
+ * SYNOPSIS:	    Create a header cell <TH> for the TABLE construct.
+ *
+ * PARAMETERS:	    (MemHandle block, SGMLEntity *entity)
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	EY	5/29/96   	Initial Revision
+ *
+ ***********************************************************************/
+@extern method UIGeneratorClass, MSG_UI_GENERATOR_CREATE_TH
+{
+  optr table;
+  int colSpan;
+  /*
+   *  Do some work common both for <TH> header cells and <TD> data cells.
+   */
+  table = InitializeTableCellCommon(pself->UIG_pmObj,&(pself->UIG_target));
+  /*
+   *  By default, the text is bold for <TH>.
+   */
+  @call self::MSG_UI_GENERATOR_START_BOLD();
+  /*
+   *  Process the attribute list.
+   */
+  colSpan = @call pself->UIG_target.obj::MSG_GEN_TCELL_PROCESS_ATTRIBUTE
+  				(block, entity, 1, table);
+  /* 
+   *  Passing colspan value (at least 1) to increment the suggested
+   *  colNo for the next future table cell in the same row.
+   */
+  @send table::MSG_GEN_TABLE_INCREMENT_COL_COUNT(colSpan);
+
+  return UI_GEN_NO_ERROR;
+}
+
+
+/***********************************************************************
+ *		MSG_UI_GENERATOR_CREATE_TD for UIGeneratorClass
+ ***********************************************************************
+ * SYNOPSIS:	    Create a data cell <TD> for the TABLE construct
+ *		    
+ * PARAMETERS:	    (MemHandle dataBlock, SGMLEntity *entity)
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	EY	5/29/96   	Initial Revision
+ *
+ ***********************************************************************/
+@extern method UIGeneratorClass, MSG_UI_GENERATOR_CREATE_TD
+{
+  optr table;
+  int colSpan;
+  /*
+   *  Do some comon work for both <TH> header cells and <TD> data cells.
+   */
+  table = InitializeTableCellCommon(pself->UIG_pmObj,&(pself->UIG_target));
+  /*
+   *  Process the attribute list.
+   */
+  colSpan = @call pself->UIG_target.obj::MSG_GEN_TCELL_PROCESS_ATTRIBUTE
+  				(block, entity, 0, table);
+  /* 
+   *  Passing colspan value (at least 1) to increment the suggested 
+   *  colNo for the next future table cell in the same row.
+   */
+  @send table::MSG_GEN_TABLE_INCREMENT_COL_COUNT(colSpan);
+
+  return UI_GEN_NO_ERROR;
+}
+
+
+/***********************************************************************
+ *		MSG_GEN_TABLE_PROCESS_ATTRIBUTE for HTGenTableClass
+ ***********************************************************************
+ * SYNOPSIS:	    Process the attribute list of the the TABLE element
+ * PARAMETERS:	    (MemHandle block, SGMLEntity *entity)
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:	
+ *	Supported Attr:
+ *		BORDER
+ *		CELLPADDING = n
+ *		CELLSPACING = n
+ *		WIDTH = n | n%
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	EY	5/27/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method HTGenTableClass, MSG_GEN_TABLE_PROCESS_ATTRIBUTE
+{
+  char *value;
+  int	index, j, *array, i;
+  Boolean percent;
+
+  for(index = 0; entity[index].SGMLE_token; index++) {
+    /*
+     *  Border can have no value.  It's a special case.
+     */
+    if (!entity[index].SGMLE_value) {
+      if (entity[index].SGMLE_token == HTML_ATTR_BORDER) {
+	pself->HTGT_showBorder = TRUE;
+	@send self::MSG_META_ADD_VAR_DATA(HINT_DRAW_IN_BOX,0,NULL);
+      }
+      continue;
+    }
+    value = (char *)LMemDerefHandles(block, entity[index].SGMLE_value);
+    switch(entity[index].SGMLE_token) {
+    case HTML_ATTR_BORDER:                       /* BORDER */
+      if (*value != '0') {
+	pself->HTGT_showBorder = TRUE;
+	@send self::MSG_META_ADD_VAR_DATA(HINT_DRAW_IN_BOX,0,NULL);
+      }
+      break;
+    case HTML_ATTR_WIDTH:                        /* WIDTH */
+      /*
+       *  Checking for % sign.
+       */
+      for (j = 0, percent = FALSE; value[j] != NULL; j++)
+	if (value[j] == '%')
+	  percent = TRUE;
+      if (percent == FALSE)
+	pself->HTGT_width = atoi(value);         /* No percent sign */
+      else
+	pself->HTGT_width = -atoi(value);        /* negative means % */
+      break;
+    case HTML_ATTR_CELLPADDING:                  /* CELLPADDING */
+      pself->HTGT_cellpadding = atoi(value);
+      break;
+    case HTML_ATTR_CELLSPACING:                  /* CELLSPACING */
+      pself->HTGT_cellspacing = atoi(value);
+      break;
+    }
+  }
+  /*
+   *  No 3-D look.
+  @call self::MSG_META_ADD_VAR_DATA(HINT_DRAW_STYLE_FLAT,0,NULL);
+   */
+  /*
+   *  Initialize the row and column array.
+   */
+  @self->HTGT_rowHeight = LMemAlloc(HandleOf(oself), sizeof(int)*ROW_SIZE);
+  array = (int*)LMemDerefHandles(HandleOf(oself), @self->HTGT_rowHeight);
+  @self->HTGT_rowSize = ROW_SIZE;
+  for (i=0; i < ROW_SIZE; i++) array[i] = 0;
+
+  @self->HTGT_colWidth = LMemAlloc(HandleOf(oself), sizeof(int)*COLUMN_SIZE);
+  array = (int*)LMemDerefHandles(HandleOf(oself), @self->HTGT_colWidth);
+  @self->HTGT_columnSize = COLUMN_SIZE;
+  for (i=0; i < COLUMN_SIZE; i++) array[i] = 0;
+
+  @self->HTGT_finalColWidth=LMemAlloc(HandleOf(oself),sizeof(int)*COLUMN_SIZE);
+  array=(int*)LMemDerefHandles(HandleOf(oself), @self->HTGT_finalColWidth);
+  for (i=0; i < COLUMN_SIZE; i++) array[i] = 0;
+
+  return;
+}	/* End of MSG_GEN_TABLE_PROCESS_ATTRIBUTE.	*/
+
+
+/***********************************************************************
+ *	MSG_GEN_TABLE_GET_NEXT_TABLE_CELL_POSITION for HTGenTableClass
+ ***********************************************************************
+ * SYNOPSIS:	    Find the actuall cell position for the new cell obj.
+ * PARAMETERS:	    (int *row, int *col)
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	EY	6/ 5/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method HTGenTableClass, MSG_GEN_TABLE_GET_NEXT_TABLE_CELL_POSITION
+{
+  int rowPos, colPos, rowSpan, colSpan, i, *array, j;
+  optr child = NULL;
+
+  child = @call self::MSG_GEN_FIND_CHILD_AT_POSITION(0);
+
+  for (i=0; child != NULL; 
+	i++, child = @call self::MSG_GEN_FIND_CHILD_AT_POSITION(i)) {
+    @call child::MSG_GEN_TCELL_GET_CELL_POSITION(&rowPos, &colPos);
+
+    if (colPos > @self->HTGT_colNo)
+	continue;   /* cells byond the current column will not affect */
+    else if (rowPos == @self->HTGT_rowNo)
+	break;
+
+    EC_ERROR_IF (rowPos > @self->HTGT_rowNo, UIG_UI_TABLE_OPERATION_FAILS);
+
+    @call child::MSG_GEN_TCELL_GET_CELL_SPAN(&rowSpan, &colSpan);
+    /* 
+     *  Is the cell(rowPos, colPos) occupies the suggested new cell 
+     *  position?
+     */
+    if ((rowPos + rowSpan - 1) >= @self->HTGT_rowNo) {
+	/*
+	 * This cell spans to the suggested row.
+	 */
+	if ((colPos + colSpan - 1) >= @self->HTGT_colNo)
+	  /* 
+	   * This cell also spans to the suggested column.
+	   */
+	  @self->HTGT_colNo = colPos + colSpan;
+	else if (colPos == @self->HTGT_colNo)
+	  /* 
+	   * This cell span rows only.  Increment the suggested column
+	   * number if it's in the same column as this cell.
+	   */
+	  @self->HTGT_colNo++;
+	if (@self->HTGT_colNo > @self->HTGT_columnSize) {
+	  /*
+	   *  Realloc the array.
+	   */
+	  EC_WARNING(UIG_TABLE_ARRAY_SIZE_REALLOC);
+	  j = @self->HTGT_columnSize;
+	  @self->HTGT_columnSize += COLUMN_SIZE;
+	  LMemReAllocHandles(HandleOf(oself),
+			     @self->HTGT_colWidth, 
+			     sizeof(int) * @self->HTGT_columnSize);
+	  array=(int*)LMemDerefHandles(HandleOf(oself), @self->HTGT_colWidth);
+	  for (; j < @self->HTGT_columnSize; j++) array[j] = 0;
+	  
+	  LMemReAllocHandles(HandleOf(oself),
+			     @self->HTGT_finalColWidth,
+			     sizeof(int) * @self->HTGT_columnSize);
+	  array=(int*)LMemDerefHandles(HandleOf(oself), 
+				       @self->HTGT_finalColWidth);
+	  j = @self->HTGT_columnSize - COLUMN_SIZE;
+	  for (; j < @self->HTGT_columnSize; j++) array[j] = 0;
+	  
+	}
+    }
+  }
+  *row = @self->HTGT_rowNo;
+  *col = @self->HTGT_colNo;
+
+  return;
+}	/* End of MSG_GEN_TABLE_GET_NEXT_TABLE_CELL_POSITION.	*/
+
+
+/***********************************************************************
+ *	MSG_GEN_TABLE_UPDATE_MAX_CELL_HEIGHT for HTGenTableClass
+ ***********************************************************************
+ * SYNOPSIS:	    Keep track the maxinum size of the biggest table
+ *		    cell.
+ * PARAMETERS:	    (int row, int col, int width, int height);
+ *		    row - row number of the table cell.
+ *		    height - height of the table cell.
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	EY	6/11/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method HTGenTableClass, MSG_GEN_TABLE_UPDATE_MAX_CELL_HEIGHT
+{
+  int *array;
+
+  EC_ERROR_IF(row > pself->HTGT_rowNo, UIG_ERROR_IN_TABLE);
+  array = (int *)LMemDerefHandles(HandleOf(oself), pself->HTGT_rowHeight);
+
+  if (height > array[row - 1]) {
+    if (array[row - 1] != 0 && array[row - 1] == array[row])
+      array[row] = height - array[row-1];
+    array[row - 1] = height;
+  }
+  return;
+}	/* End of MSG_GEN_TABLE_UPDATE_MAX_CELL_HEIGHT. */
+
+
+/***********************************************************************
+ *	MSG_GEN_TABLE_GET_FINAL_CELL_PIXEL_POSITION for HTGenTableClass
+ ***********************************************************************
+ * SYNOPSIS:	    Given the row and column number, calculate the
+ *		    position of that cell, in pixels, relative to (0,0).
+ *
+ * PARAMETERS:	     (int row, int col, int *xPixel, int *yPixel)
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	EY	6/11/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method HTGenTableClass, MSG_GEN_TABLE_GET_FINAL_CELL_PIXEL_POSITION
+{
+  int i, *array, *array2;
+
+  array = (int *)LMemDerefHandles(HandleOf(oself), pself->HTGT_rowHeight);
+  array2 =(int *)LMemDerefHandles(HandleOf(oself), pself->HTGT_finalColWidth);
+
+  *xPixel = *yPixel = 0;
+  /*
+   *  Add up the space for row heights and the cellspace.
+   */
+  for (i=0; i < (row-1) && i < pself->HTGT_rowSize; i++) {
+	*yPixel += (array[i] + pself->HTGT_cellspacing);
+  }
+  *yPixel += pself->HTGT_cellspacing;
+  /*
+   *  Add up the space for column widths and the cellspace.
+   */
+  for (i=0; i < (col-1) && i < pself->HTGT_columnSize; i++) {
+	*xPixel += (array2[i] + pself->HTGT_cellspacing);
+  }
+  *xPixel += pself->HTGT_cellspacing;
+
+  return;
+}	/* End of MSG_GEN_TABLE_GET_FINAL_CELL_PIXEL_POSITION.	*/
+
+
+
+/***********************************************************************
+ *		MSG_GEN_TABLE_INCREMENT_ROW_COUNT for HTGenTableClass
+ ***********************************************************************
+ * SYNOPSIS:	    Increment the row count whenever <TR> is seen
+ * PARAMETERS:	    none
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:	Increment the row count.
+ *		Reset the column count to 1.
+ *		This (row count, column count) will be the table
+ *		 position of the next table cell object.
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	EY	6/ 5/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method HTGenTableClass, MSG_GEN_TABLE_INCREMENT_ROW_COUNT
+{
+  int i, *array;
+  /*
+   *  Reset the position count for the next new table cell.
+   */
+  pself->HTGT_rowNo++;
+  if (pself->HTGT_rowNo > pself->HTGT_rowSize) {
+    /*
+     *  Realloc the array.
+     */
+    EC_WARNING(UIG_TABLE_ARRAY_SIZE_REALLOC);
+    i = pself->HTGT_rowSize;
+    pself->HTGT_rowSize += ROW_SIZE;
+    LMemReAllocHandles(HandleOf(oself), 
+		       pself->HTGT_rowHeight, 
+		       sizeof(int) * pself->HTGT_rowSize);
+    array = (int*)LMemDerefHandles(HandleOf(oself), @self->HTGT_rowHeight);
+    for (; i < @self->HTGT_rowSize; i++) array[i] = 0;
+  }
+
+  @self->HTGT_colNo = 1;	/* reset to 1 */
+}	/* End of MSG_GEN_TABLE_INCREMENT_ROW_COUNT.	*/
+
+
+/***********************************************************************
+ *		MSG_GEN_TABLE_INCREMENT_COL_COUNT for HTGenTableClass
+ ***********************************************************************
+ * SYNOPSIS:	    Increment the col count for any new <TH> or <TD>
+ * PARAMETERS:	    (int incAmount)
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:	This column count is the suggested column position in
+ *		the current row.  (Note, the actual column position 
+ *		for the new table cell object will be determined by 
+ *		taking into account any nearby object that spans over
+ *		rows or columns.)
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	EY	6/ 6/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method HTGenTableClass, MSG_GEN_TABLE_INCREMENT_COL_COUNT
+{
+  int *array, i;
+
+  pself->HTGT_colNo += incAmount;
+  if (pself->HTGT_colNo > pself->HTGT_columnSize) {
+    /*
+     *  Realloc the array.
+     */
+    EC_WARNING(UIG_TABLE_ARRAY_SIZE_REALLOC);
+    i = pself->HTGT_columnSize;
+    pself->HTGT_columnSize += COLUMN_SIZE;
+    LMemReAllocHandles(HandleOf(oself),
+		       pself->HTGT_colWidth, 
+		       sizeof(int) * pself->HTGT_columnSize);
+    array = (int*)LMemDerefHandles(HandleOf(oself), @self->HTGT_colWidth);
+    for (; i < @self->HTGT_columnSize; i++) array[i] = 0;
+
+    i = @self->HTGT_columnSize - COLUMN_SIZE;
+    LMemReAllocHandles(HandleOf(oself),
+		      @self->HTGT_finalColWidth, 
+		      sizeof(int) * @self->HTGT_columnSize);
+    array = (int*)LMemDerefHandles(HandleOf(oself), 
+				   @self->HTGT_finalColWidth);
+    for (; i < @self->HTGT_columnSize; i++) array[i] = 0;
+  }
+  /*
+   *  Keep track of the maximum number of columns among all table rows.
+   */
+  if ((@self->HTGT_colNo - 1) > @self->HTGT_numCols)
+	@self->HTGT_numCols = @self->HTGT_colNo - 1;
+
+}	/* End of MSG_GEN_TABLE_INCREMENT_COL_COUNT.	*/
+
+
+/***********************************************************************
+ *		MSG_GEN_TABLE_GET_ROWSPAN_SIZE for HTGenTableClass
+ ***********************************************************************
+ * SYNOPSIS:	   Given the starting row number and ROWSPAN, accumulate
+ *		   the heights of the rows that the cell spans.
+ * PARAMETERS:	   (int rowNo, int rowSpan);
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	EY	6/12/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method HTGenTableClass, MSG_GEN_TABLE_GET_ROWSPAN_SIZE
+{
+  int height, *array;
+
+  EC_ERROR_IF(rowNo < 1, UIG_ERROR_IN_TABLE);
+  array = (int *)LMemDerefHandles(HandleOf(oself), pself->HTGT_rowHeight);
+
+  for(height = 0, --rowNo; rowSpan > 0 && rowNo < pself->HTGT_rowNo; 
+      rowSpan--, rowNo++) {
+    height += array[rowNo];
+  }
+
+  return height;
+}	/* End of MSG_GEN_TABLE_GET_ROWSPAN_SIZE.	*/
+
+
+/***********************************************************************
+ *		MSG_GEN_TABLE_GET_COLSPAN_SIZE for HTGenTableClass
+ ***********************************************************************
+ * SYNOPSIS:	  Given the starting column number and COLSPAN, 
+ *		  accumlate the widths of the columns that the cell spans.
+ * PARAMETERS:	  int (int colNo, int colSpan);
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	EY	6/12/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method HTGenTableClass, MSG_GEN_TABLE_GET_COLSPAN_SIZE
+{
+  int width, *array;
+
+  EC_ERROR_IF(colNo < 1, UIG_ERROR_IN_TABLE);
+  array = (int *)LMemDerefHandles(HandleOf(oself), pself->HTGT_colWidth);
+
+  for(width = 0, --colNo; colSpan > 0 && colNo < pself->HTGT_colNo; 
+      colSpan--, colNo++) {
+    width += array[colNo];
+  }
+  return width;
+}	/* End of MSG_GEN_TABLE_GET_COLSPAN_SIZE.	*/
+
+
+/***********************************************************************
+ *		MSG_GEN_TABLE_SHOW_BORDER for HTGenTableClass
+ ***********************************************************************
+ * SYNOPSIS:	    Does the table have BORDER attribute?
+ * PARAMETERS:	    Boolean ()
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	EY	6/13/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method HTGenTableClass, MSG_GEN_TABLE_SHOW_BORDER
+{
+  return pself->HTGT_showBorder;
+}	/* End of MSG_GEN_TABLE_SHOW_BORDER.	*/
+
+
+
+/***********************************************************************
+ *		MSG_GEN_TABLE_GET_CELLPADDING for HTGenTableClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    Return CELLPADDING attribute of the table.
+ * PARAMETERS:	    int ();
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	edwin	9/ 2/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method HTGenTableClass, MSG_GEN_TABLE_GET_CELLPADDING
+{
+  return pself->HTGT_cellpadding;
+}	/* End of MSG_GEN_TABLE_GET_CELLPADDING.	*/
+
+
+
+/***********************************************************************
+ *	MSG_GEN_TABLE_DISTRIBUTE_COLUMN_WIDTH for HTGenTableClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    Given the parent's width, either distribute the 
+ *                  width equally among the table columns, or use it to
+ *                  blow up the proportion of the columns.
+ * PARAMETERS:	    (int width)  width - the parent object's width
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	edwin	9/23/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method HTGenTableClass, MSG_GEN_TABLE_DISTRIBUTE_COLUMN_WIDTH
+{
+  int share_w, i, sum_w, sum_pixel = 0, sum_percent = 0, no_value = 0,
+    *array, *array2;
+  Boolean  percent = FALSE, pixel = FALSE;
+
+  if (pself->HTGT_numCols == 0)
+    return;
+
+  array = (int *)LMemDerefHandles(HandleOf(oself), pself->HTGT_colWidth);
+  array2 =(int *)LMemDerefHandles(HandleOf(oself), pself->HTGT_finalColWidth);
+
+  if (array2[0] == 0) {
+    /*
+     *  The table is doing its first pass of calculating the sizes
+     *  of its children.
+     */
+    /*
+     *  Scan through column widths to see if they have correct values.
+     */
+    for (i=0; i < pself->HTGT_numCols; i++) {
+      if (array[i] > 0) {
+	pixel = TRUE;
+	sum_pixel += array[i];
+      }
+      else if (array[i] < 0) {
+	percent = TRUE;
+	sum_percent += array[i];
+      }
+      else
+	no_value++;
+    }
+    /* 
+     *  Width values MUST uniformly either be in % or in absolute pixels.
+     */
+    if (pixel == TRUE && percent == TRUE) {
+      /*
+       *  Absolute pixel value overwrite the percent value.
+       */
+      for (i=0; i < pself->HTGT_numCols; i++) {
+	if (array[i] < 0)
+	  array[i] = width / pself->HTGT_numCols;
+      }
+    }
+    else if (pixel == FALSE && percent == TRUE) {
+      /*
+       *  Make sure percentages add up to 100%!
+       */
+      if (sum_percent != -100) {
+	for (i=0; i < pself->HTGT_numCols; i++) {
+	  if (array[i] == 0) {
+	    if (sum_percent > -100)
+	      array[i] = -((100+sum_percent) / no_value);
+	    else
+	      array[i] = (100+sum_percent) / no_value;
+	  }
+	}
+      }
+      for (i=0; i < pself->HTGT_numCols; i++) {
+	array[i] = 
+	  (((float)(-array[i])) / (float)100) * width ;
+      }
+    }
+    else if (pixel == TRUE && percent == FALSE) {
+      if (sum_pixel < width) {
+	for (i=0; i < pself->HTGT_numCols; i++) {
+	  if (array[i] == 0)
+	    array[i] = (width - sum_pixel) / no_value;
+	}
+      }
+      else {
+	for (i=0; i < pself->HTGT_numCols; i++) {
+	  if (array[i] == 0)
+	    array[i] = (width) / pself->HTGT_numCols;
+	}
+      }
+    }
+    else /* if (pixel == FALSE && percent == FALSE) */ {
+      /*
+       *  Table cell elements (<TD> or <TH>) didn't have WIDTH attribute.
+       *  Thus, We make our own guess about the column widths by
+       *  dividing the width equally among all the columns.
+       */
+      share_w = width / pself->HTGT_numCols;
+      for (i=0; i < pself->HTGT_numCols; i++) {
+	array[i] = share_w;
+      }
+    }
+  }
+  else {
+    /*
+     *  The table is doing its second pass of re-calculating the sizes
+     *  of its children.
+     */
+    if (pself->HTGT_width) {
+      /*
+       *  Now, we can use the current column widths
+       *  and adjust its proportion to the right sizes.
+       */
+      for (i=0, sum_w=0; i < pself->HTGT_numCols; i++)
+	sum_w += array2[i];
+      /*
+       *  If there is CELLSPACING attr, we need to take it into account.
+       */
+      width -= (pself->HTGT_numCols+1) * pself->HTGT_cellspacing;
+      /*
+       *  Now blow up the proportion of each columns
+       */
+      if (width > 0)
+	for (i=0; i < pself->HTGT_numCols; i++) {
+	      array[i]=
+		  (((float)array2[i])/(float)sum_w)*width;
+	}
+    }
+  }
+  return;
+}	/* End of MSG_GEN_TABLE_DISTRIBUTE_COLUMN_WIDTH.	*/
+
+
+
+/***********************************************************************
+ *		MSG_GEN_TABLE_SET_FINAL_CELL_WIDTH for HTGenTableClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    Store the width of the column at colPos.  This width
+ *		    is the calculated value from the Geometry Manager
+ *		    after all its children sizes have been resized.
+ *                  Return the maximun width seen so far for this column
+ *                  Or the width adjusted for the colSpan.
+ * PARAMETERS:	    int (int colPos, int width, bye colSpan);
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	edwin	9/25/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method HTGenTableClass, MSG_GEN_TABLE_SET_FINAL_CELL_WIDTH
+{
+  int acc_width, span = colSpan, pos = colPos, *array, *array2;
+
+  EC_ERROR_IF(colPos < 1, UIG_ERROR_IN_TABLE);
+  array = (int *)LMemDerefHandles(HandleOf(oself), pself->HTGT_colWidth);
+  array2 =(int *)LMemDerefHandles(HandleOf(oself), pself->HTGT_finalColWidth);
+
+  if (colSpan == 1) {
+    if (array2[colPos-1] < width)
+      array2[colPos-1] = width;
+  }
+  
+  for(acc_width = 0, --colPos; colSpan > 0; colSpan--, colPos++) {
+    acc_width += array2[colPos];
+  }
+  if (acc_width == 0 && span > 0) {
+    /*  Too bad that we are in the first row and have no previous
+	row to give us this information */
+    for(--pos; span > 0; span--, pos++) {
+      acc_width += array[pos];
+      array2[pos] = array[pos];
+    }
+  }
+  return acc_width;
+}	/* End of MSG_GEN_TABLE_SET_FINAL_CELL_WIDTH.	*/
+
+
+
+/***********************************************************************
+ *		MSG_GEN_TABLE_STORE_TCELL_WIDTH for HTGenTableClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    Store the width of the given column number, if it's
+ *                  new maximum number.
+ * PARAMETERS:	    (int colPos, int width);
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	edwin	9/27/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method HTGenTableClass, MSG_GEN_TABLE_STORE_TCELL_WIDTH
+{
+  int *array;
+
+  array = (int *)LMemDerefHandles(HandleOf(oself), pself->HTGT_colWidth);
+
+  /*  if (array[colPos-1] > width) */
+  array[colPos-1] = width;
+
+  return;
+}	/* End of MSG_GEN_TABLE_STORE_TCELL_WIDTH.	*/
+
+
+
+/***********************************************************************
+ *		MSG_GEN_TCELL_PROCESS_ATTRIBUTE for HTGenTCellClass
+ ***********************************************************************
+ * SYNOPSIS:	    Process the attribute list of the the TR element
+ * PARAMETERS:	    int (MemHandle block, SGMLEntity *entity, 
+ *			int type, optr table)
+ *		    if type is non-zero, it's <TH>, else it's <TD> cell.
+ *		    return colspan number
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:	
+ *		Supported Attr:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	EY	5/29/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method HTGenTCellClass, MSG_GEN_TCELL_PROCESS_ATTRIBUTE
+{
+  char *value;
+  int	index, j, align = -1, valign = 1;
+  Boolean percent = FALSE;
+
+  pself->HTGTC_rowSpan = pself->HTGTC_colSpan = 1;
+
+  if (type)
+    pself->HTGTC_cellType = CELL_HEADER;
+
+  for(index = 0; entity[index].SGMLE_token; index++) {
+    if (!entity[index].SGMLE_value)
+      continue;
+    value = (char *)LMemDerefHandles(block, entity[index].SGMLE_value);
+    switch(entity[index].SGMLE_token) {
+    case HTML_ATTR_ALIGN:                                  /* ALIGN */
+      if (strcasecmp(value, "left") == 0)
+	align = 0;
+      else if (strcasecmp(value, "center") == 0)
+	align = 1;
+      else if (strcasecmp(value, "right") == 0)
+	align = 2;
+      break;
+    case HTML_ATTR_VALIGN:                                 /* VALIGN */
+      if (strcasecmp(value, "top") == 0)
+	valign = 0;
+      else if (strcasecmp(value, "middle") == 0)
+	valign = 1;
+      else if (strcasecmp(value, "bottom") == 0)
+	valign = 2;
+      break;
+    case HTML_ATTR_ROWSPAN:                                /* ROWSPAN */
+      pself->HTGTC_rowSpan = atoi(value);
+      break;
+    case HTML_ATTR_COLSPAN:                                /* COLSPAN */
+      pself->HTGTC_colSpan = atoi(value);
+      break;
+    case HTML_ATTR_WIDTH:                                  /* WIDTH */
+      for (j = 0, percent = FALSE; value[j] != NULL; j++)
+	if (value[j] == '%')
+	  percent = TRUE;
+      if (percent == FALSE)
+	@send table::MSG_GEN_TABLE_STORE_TCELL_WIDTH
+	  (pself->HTGTC_colPos, atoi(value));
+      else
+	@send table::MSG_GEN_TABLE_STORE_TCELL_WIDTH
+	  (pself->HTGTC_colPos, -atoi(value));
+      /* negative value means % */
+      break;
+    }
+  }
+  switch (align) {
+    case 0:	/* left align */
+/*      @send self::MSG_META_ADD_VAR_DATA
+		(HINT_LEFT_JUSTIFY_CHILDREN,0,NULL);  default already */
+      break;
+    case 1:	/* center align */
+      @send self::MSG_META_ADD_VAR_DATA
+		(HINT_CENTER_CHILDREN_HORIZONTALLY,0,NULL);
+      break;
+    case 2:	/* right align */
+      @send self::MSG_META_ADD_VAR_DATA
+		(HINT_RIGHT_JUSTIFY_CHILDREN,0,NULL);
+      break;
+/*    default:
+      if (type)
+	@send self::MSG_META_ADD_VAR_DATA(
+		HINT_CENTER_CHILDREN_HORIZONTALLY,0,NULL);
+*/
+  }
+
+  switch (valign) {
+    case 0:		/* top align */
+      @send self::MSG_META_ADD_VAR_DATA
+	(HINT_TOP_JUSTIFY_CHILDREN,0,NULL);
+      break;
+    case 1:		/* center align */
+      @send self::MSG_META_ADD_VAR_DATA
+	(HINT_CENTER_CHILDREN_VERTICALLY, 0, NULL);
+      break;
+    case 2:		/* bottom align */
+      @send self::MSG_META_ADD_VAR_DATA
+	(HINT_BOTTOM_JUSTIFY_CHILDREN, 0, NULL);
+      break;
+  }
+  return pself->HTGTC_colSpan;
+}
+
+
+/***********************************************************************
+ *		MSG_GEN_TCELL_SET_CELL_POSITION for HTGenTCellClass
+ ***********************************************************************
+ * SYNOPSIS:	    Set the cell position
+ * PARAMETERS:	    (int row, int col)
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	EY	6/ 4/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method HTGenTCellClass, MSG_GEN_TCELL_SET_CELL_POSITION
+{
+  pself->HTGTC_rowPos = row;
+  pself->HTGTC_colPos = col;
+  return;
+}	/* End of MSG_GEN_TCELL_SET_CELL_POSITION.	*/
+
+
+/***********************************************************************
+ *		MSG_GEN_TCELL_GET_CELL_POSITION for HTGenTCellClass
+ ***********************************************************************
+ * SYNOPSIS:	    Return its table postion
+ * PARAMETERS:	    (int *row, int *col)
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	EY	6/ 5/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method HTGenTCellClass, MSG_GEN_TCELL_GET_CELL_POSITION
+{
+  *row = pself->HTGTC_rowPos;
+  *col = pself->HTGTC_colPos;
+}	/* End of MSG_GEN_TCELL_GET_CELL_POSITION.	*/
+
+
+/***********************************************************************
+ *		MSG_GEN_TCELL_GET_CELL_SPAN for HTGenTCellClass
+ ***********************************************************************
+ * SYNOPSIS:	    Return the cell's ROWSPAN and COLSPAN numbers.
+ * PARAMETERS:	    (int *row, int *col)
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	EY	6/ 6/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method HTGenTCellClass, MSG_GEN_TCELL_GET_CELL_SPAN
+{
+  *row = pself->HTGTC_rowSpan;
+  *col = pself->HTGTC_colSpan;
+}	/* End of MSG_GEN_TCELL_GET_CELL_SPAN.	*/
+
+
+
+/***********************************************************************
+ *		MSG_VIS_RECALC_SIZE for HTGenTableClass
+ ***********************************************************************
+ * SYNOPSIS:	    Intercept this message and calculate its size 
+ *		    manually.
+ * PARAMETERS:	    SizeAsDWord (RecalcSizeArgs width,
+ *				RecalcSizeArgs height)
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	EY	6/12/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method HTGenTableClass, MSG_VIS_RECALC_SIZE
+{
+  int i, *array, *array2;
+  SizeAsDWord size;
+  CompSizeHintArgs sizeArgs;
+
+  sizeArgs.CSHA_width = 0;		/* clear the field */
+
+  @call self::MSG_META_GET_VAR_DATA
+	(HINT_FIXED_SIZE, sizeof(sizeArgs), &sizeArgs);
+  if (sizeArgs.CSHA_width == 0) {	/* Has the width been set before? */
+    /*
+     *  Set the width of the table cell object.
+     *
+     *  Two sources where we can get the width:
+     *	1) The WIDTH attribute stored in HTGT_width
+     *	2) The parent width sets the width of this object.
+     */
+    if (pself->HTGT_width) {
+      /*
+       *  Method (1), the table specifies its own size, according to
+       *  the WIDTH attribute.
+       */
+      if (pself->HTGT_width < 0) {
+        /*
+         *  HTGT_width is negative, that means the width is a percentage
+	 *  of the parent size.
+         */
+        @call @genParent::MSG_META_GET_VAR_DATA
+	  (HINT_FIXED_SIZE, sizeof(sizeArgs), &sizeArgs);
+        /* assume CSHA_width is in SST_PIXELS */
+	width = sizeArgs.CSHA_width * (- pself->HTGT_width) / 100;
+        sizeArgs.CSHA_width = SST_PIXELS | width;
+      }
+      else
+	/*
+	 *  HTGT_width stores an absolute size in pixels.
+	 */
+        sizeArgs.CSHA_width = SST_PIXELS | pself->HTGT_width;
+    }
+    else {
+      /*
+       *  Method (2), the parent size determine the size of the table
+       *  cell.
+       */
+      @call @genParent::MSG_META_GET_VAR_DATA
+	(HINT_FIXED_SIZE, sizeof(sizeArgs), &sizeArgs);
+      width = sizeArgs.CSHA_width;	/* assume it's SST_PIXELS */
+      sizeArgs.CSHA_width = SST_PIXELS | width; /* - NESTED_MARGIN; */
+    }
+    /*
+     *  Set the width.
+     */
+    sizeArgs.CSHA_height = 0;
+    sizeArgs.CSHA_count = 1;
+    @call self::MSG_META_ADD_VAR_DATA
+	(HINT_FIXED_SIZE, sizeof(sizeArgs), &sizeArgs);
+  }
+  /*
+   *  Now we know the size of the table and the number of columns in
+   *  the table.  So we can distribute the table width to determine
+   *  the size of each column.
+   */
+  width = sizeArgs.CSHA_width;
+  @call self::MSG_GEN_TABLE_DISTRIBUTE_COLUMN_WIDTH(width);
+
+  size = @callsuper();
+  /*  @send @genChildren::MSG_VIS_RECALC_SIZE(width, height); */
+     
+  /*
+   *  After calling the super class, all the children under the table
+   *  cell have calculate its size.  Thus, HTGT_rowHeight and 
+   *  HTGT_colWidth contain the updated infomation, which we can use
+   *  to shrink the table cell tight to contain all the children objects.
+   */
+  array = (int *)LMemDerefHandles(HandleOf(oself), pself->HTGT_rowHeight);
+  for (i=0, height = 0; array[i] != 0 && i < pself->HTGT_rowSize; i++){
+	height += (array[i] + pself->HTGT_cellspacing);
+  }
+  array2 = (int *)LMemDerefHandles(HandleOf(oself),pself->HTGT_finalColWidth);
+  for (i=0, width = 0; array2[i] != 0 && i < pself->HTGT_columnSize; i++) {
+	width += (array2[i] + pself->HTGT_cellspacing);
+  }
+  size = MAKE_SIZE_DWORD(
+	width + pself->HTGT_cellspacing,
+	height+ pself->HTGT_cellspacing);
+
+  return size;   
+}	/* End of MSG_VIS_RECALC_SIZE.	*/
+
+
+
+/***********************************************************************
+ *		MSG_META_UIG_CALC_POSITION for HTGenTableClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    
+ * PARAMETERS:	    
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	edwin	10/31/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method HTGenTableClass, MSG_META_UIG_CALC_POSITION
+{
+  int row;
+  SizeAsDWord size = @call self::MSG_VIS_GET_SIZE();
+  /*
+   *  Get an estimate position of the object
+   */
+  pself->HTGT_xPos = UpdateItsPotentialPosition(oself, size, &row);
+  pself->HTGT_pageRow = row;
+
+  return;
+}	/* End of MSG_META_UIG_CALC_POSITION.	*/
+
+
+
+/***********************************************************************
+ *		MSG_VIS_POSITION_BRANCH for HTGenTableClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    
+ * PARAMETERS:	    
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	edwin	10/31/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method HTGenTableClass, MSG_VIS_POSITION_BRANCH
+{
+  XYValueAsDWord xy = @call @genParent::MSG_VIS_GET_POSITION();
+
+  xOrigin = DWORD_X(xy) + pself->HTGT_xPos;
+  yOrigin = DWORD_Y(xy) + 
+    GetItsPotentialHeight(oself, pself->HTGT_pageRow);
+
+  /*  selfxy = @call self::MSG_VIS_GET_POSITION();
+    if (DWORD_X(selfxy) == xOrigin && DWORD_Y(selfxy))
+    return; */
+  /*  @send genChlidren::MSG_VIS_POSITION_BRANCH(0,0); */
+
+  @callsuper();
+  return;
+}	/* End of MSG_VIS_POSITION_BRANCH.	*/
+
+
+/***********************************************************************
+ *		MSG_GEN_DESTROY for HTGenTableClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    Free allocated space.
+ * PARAMETERS:	    
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:	    
+ *
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	edwin   	3/10/97   	Initial Revision
+ *	
+ ***********************************************************************/
+@method HTGenTableClass, MSG_GEN_DESTROY
+{
+  @callsuper();
+  LMemFreeHandles(HandleOf(oself), pself->HTGT_rowHeight);
+  LMemFreeHandles(HandleOf(oself), pself->HTGT_colWidth);
+  LMemFreeHandles(HandleOf(oself), pself->HTGT_finalColWidth);
+
+  return;
+}	/* End of MSG_GEN_DESTROY.	*/
+
+
+
+/***********************************************************************
+ *		MSG_VIS_DRAW for HTGenTableClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    Disable the 3-D border when printing.
+ * PARAMETERS:	    (DrawFlags drawFlags, GStateHandle gstate = bp)
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	edwin	1/ 7/97   	Initial Revision
+ *
+ ***********************************************************************/
+@method HTGenTableClass, MSG_VIS_DRAW
+{
+  word ra, lo;
+
+  if (drawFlags & DF_PRINT) {
+    /*
+     *  Delete any 3-D hints in printing.
+     */
+    ra = @call self::MSG_META_DELETE_VAR_DATA(HINT_DRAW_STYLE_3D_RAISED);
+    lo = @call self::MSG_META_DELETE_VAR_DATA(HINT_DRAW_STYLE_3D_LOWERED);
+    /*
+     *  Draw in flat style
+     */
+    @call self::MSG_META_ADD_VAR_DATA(HINT_DRAW_STYLE_FLAT,0,NULL);
+    @callsuper();
+    @call self::MSG_META_DELETE_VAR_DATA(HINT_DRAW_STYLE_FLAT);
+    /*
+     *  Restore any 3-D hints.
+     */
+    if (!ra)
+      @call self::MSG_META_ADD_VAR_DATA(HINT_DRAW_STYLE_3D_RAISED,0,NULL);
+    if (!lo)
+      @call self::MSG_META_ADD_VAR_DATA(HINT_DRAW_STYLE_3D_LOWERED,0,NULL);
+  }
+  else
+    @callsuper();
+  return;
+}	/* End of MSG_VIS_DRAW.	*/
+
+
+
+/***********************************************************************
+ *		MSG_VIS_RECALC_SIZE for HTGenTCellClass
+ ***********************************************************************
+ * SYNOPSIS:	Intercept this message and update its genParent about
+ *		its new size.  Thus, later the parent will know how
+ *		much it should expand itself.
+ * PARAMETERS:	    SizeAsDWord (RecalcSizeArgs width,
+ *				RecalcSizeArgs height)
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	EY	6/12/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method HTGenTCellClass, MSG_VIS_RECALC_SIZE
+{
+  SizeAsDWord size;
+  CompSizeHintArgs sizeArgs;
+  int max_width, value;
+  Boolean forceSize = FALSE;
+
+  /*
+   *  Get the suggested width of the table cell.
+   */
+  width = @call @genParent::MSG_GEN_TABLE_GET_COLSPAN_SIZE
+		(pself->HTGTC_colPos, pself->HTGTC_colSpan);
+  if (!(pself->HTGTC_positioning)) {
+    sizeArgs.CSHA_width = SST_PIXELS | width;
+    sizeArgs.CSHA_height = 0;
+    sizeArgs.CSHA_count = 1;
+    @call self::MSG_META_ADD_VAR_DATA
+	(HINT_FIXED_SIZE, sizeof(sizeArgs), &sizeArgs);
+    pself->HTGTC_positioning = TRUE;
+    /*    if (pself->HTGTC_cellType == CELL_HEADER)
+      @call self::MSG_META_ADD_VAR_DATA
+	(HINT_ORIENT_CHILDREN_HORIZONTALLY,0,0); */
+    size = @callsuper();
+    /*
+     *  Tell the parent about its actual cell width and also get
+     *  the size adjusted to the colspan.
+     */
+    @call self::MSG_GEN_HTML_CONTENT_RESET_ROW_COUNTER();
+    @send @genChildren::MSG_META_UIG_CALC_POSITION();
+    max_width = @call @genParent::MSG_GEN_TABLE_SET_FINAL_CELL_WIDTH
+	(pself->HTGTC_colPos, pself->HTGHC_maxRowWidth, 
+	 pself->HTGTC_colSpan);
+    /*
+     *  Sum up the heights of rows in this table cell.
+     */
+    height = @call self::MSG_GEN_HTML_CONTENT_SUM_ROW_HEIGHTS();
+    /*
+     *  Update the maximum height seen so far, in the parent.
+     */
+    @call @genParent::MSG_GEN_TABLE_UPDATE_MAX_CELL_HEIGHT(
+		pself->HTGTC_rowPos, height);
+  }
+  else {
+    sizeArgs.CSHA_width = 0;
+    @call self::MSG_META_GET_VAR_DATA
+	(HINT_FIXED_SIZE, sizeof(sizeArgs), &sizeArgs);
+    if (width != sizeArgs.CSHA_width) {
+      /*
+       *  If current assigned width is different from the previous
+       *  assigned width, that means the parent has done a second pass
+       *  of the re-calculation of the columns widths.  Thus, the 
+       *  table cell needs to updates its fixed size to reflect the
+       *  new width from the parent's second pass of calculation.
+       */
+      sizeArgs.CSHA_width = SST_PIXELS | width;
+      sizeArgs.CSHA_height = sizeArgs.CSHA_count = 0;
+      @call self::MSG_META_ADD_VAR_DATA
+	(HINT_FIXED_SIZE, sizeof(sizeArgs), &sizeArgs);
+      forceSize = TRUE;
+    }
+    size = @callsuper();
+    @call self::MSG_GEN_HTML_CONTENT_RESET_ROW_COUNTER();
+    @send @genChildren::MSG_META_UIG_CALC_POSITION();
+    height = @call self::MSG_GEN_HTML_CONTENT_SUM_ROW_HEIGHTS();
+    @call @genParent::MSG_GEN_TABLE_UPDATE_MAX_CELL_HEIGHT(
+		pself->HTGTC_rowPos, height);
+    /*
+     *  Get the height.
+     */
+    height = @call @genParent::MSG_GEN_TABLE_GET_ROWSPAN_SIZE
+		(pself->HTGTC_rowPos, pself->HTGTC_rowSpan);
+    if (forceSize == TRUE || (DWORD_WIDTH(size) == 0))
+      size = MAKE_SIZE_DWORD(width, DWORD_HEIGHT(size));
+    /*
+     *  Tell the parent about its actual cell width and also get the
+     *  size adjusted to the colspan.
+     */
+    max_width = @call @genParent::MSG_GEN_TABLE_SET_FINAL_CELL_WIDTH
+      (pself->HTGTC_colPos, DWORD_WIDTH(size),pself->HTGTC_colSpan);
+  }
+  size = MAKE_SIZE_DWORD(max_width, height);
+  /*
+   *  Finish the last row.
+   */
+  @call self::MSG_GEN_HTML_CONTENT_START_NEW_ROW(0, &value);
+
+  return size;
+}	/* End of MSG_VIS_RECALC_SIZE.	*/
+
+
+/***********************************************************************
+ *		MSG_VIS_POSITION_BRANCH for HTGenTCellClass
+ ***********************************************************************
+ * SYNOPSIS:	Intercept this message and ask its parent, which is
+ *		a table object, for its position(in pixels).  Also,
+ *		set its vis bound if this cell spans rows or columns.
+ * PARAMETERS:	    void (int xOrigin, int yOrigin)
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	EY	6/12/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method HTGenTCellClass, MSG_VIS_POSITION_BRANCH
+{
+  XYValueAsDWord position;
+  /*
+   *  Get the parent's absolute position in pixels.
+   */
+  position = @call @genParent::MSG_VIS_GET_POSITION();
+  /*
+   *  Ask the parent the (left, top) position, relatvie to the table's 
+   *  origin, given row number and column number.
+   */
+  @call @genParent::MSG_GEN_TABLE_GET_FINAL_CELL_PIXEL_POSITION(
+	pself->HTGTC_rowPos, pself->HTGTC_colPos,
+	&xOrigin, &yOrigin);
+  /*
+   *  Calculate the cell's (left, top) absolute position, in pixels.
+   */
+  xOrigin += DWORD_X(position);
+  yOrigin += DWORD_Y(position);
+
+  @callsuper();
+  @call self::MSG_VIS_MARK_INVALID(VOF_GEOMETRY_INVALID, 
+				   VUM_DELAYED_VIA_UI_QUEUE);
+
+  return;
+}	/* End of MSG_VIS_POSITION_BRANCH.	*/
+
+
+
+/***********************************************************************
+ *		MSG_VIS_DRAW for HTGenTCellClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    Disable the 3-D border when printing.
+ * PARAMETERS:	    (DrawFlags drawFlags, GStateHandle gstate = bp)
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	edwin	1/ 7/97   	Initial Revision
+ *
+ ***********************************************************************/
+@method HTGenTCellClass, MSG_VIS_DRAW
+{
+  word ra, lo;
+
+  if (drawFlags & DF_PRINT) {
+    /*
+     *  Delete any 3-D hints in printing.
+     */
+    ra = @call self::MSG_META_DELETE_VAR_DATA(HINT_DRAW_STYLE_3D_RAISED);
+    lo = @call self::MSG_META_DELETE_VAR_DATA(HINT_DRAW_STYLE_3D_LOWERED);
+    /*
+     *  Draw in flat style
+     */
+    @call self::MSG_META_ADD_VAR_DATA(HINT_DRAW_STYLE_FLAT,0,NULL);
+    @callsuper();
+    @call self::MSG_META_DELETE_VAR_DATA(HINT_DRAW_STYLE_FLAT);
+    /*
+     *  Restore any 3-D hints.
+     */
+    if (!ra)
+      @call self::MSG_META_ADD_VAR_DATA(HINT_DRAW_STYLE_3D_RAISED,0,NULL);
+    if (!lo)
+      @call self::MSG_META_ADD_VAR_DATA(HINT_DRAW_STYLE_3D_LOWERED,0,NULL);
+  }
+  else
+    @callsuper();
+  return;
+}	/* End of MSG_VIS_DRAW.	*/
+
+
+
+/***********************************************************************
+ *		MSG_GEN_CAPTION_SAVE_UIG_STATE for HTGenCaptionClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    Save the UIGenerator's target object before entering
+ *                  <CAPTION> mode.  It will be restored back after
+ *                  exiting <CAPTION> mode.
+ * PARAMETERS:	    (optr obj, ClassStruct *class)
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:	    
+ *
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	edwin   	3/14/97   	Initial Revision
+ *	
+ ***********************************************************************/
+@method HTGenCaptionClass, MSG_GEN_CAPTION_SAVE_UIG_STATE
+{
+  pself->HTGC_targetObj = obj;
+  pself->HTGC_targetClass = class;
+  return;
+}	/* End of MSG_GEN_CAPTION_SAVE_UIG_STATE.	*/
+
+
+/***********************************************************************
+ *		MSG_GEN_CAPTION_RESTORE_UIG_STATE for HTGenCaptionClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    Restore UIGenerator's target object after exiting
+ *                  <CAPTION> mode.
+ * PARAMETERS:	    void.
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:	    
+ *
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	edwin   	3/14/97   	Initial Revision
+ *	
+ ***********************************************************************/
+@method HTGenCaptionClass, MSG_GEN_CAPTION_RESTORE_UIG_STATE
+{
+  *obj = pself->HTGC_targetObj;
+  *class = pself->HTGC_targetClass;
+  return;
+}	/* End of MSG_GEN_CAPTION_RESTORE_UIG_STATE.	*/
+
+
+/***********************************************************************
+ *		MSG_META_UIG_CALC_POSITION for HTGenCaptionClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    
+ * PARAMETERS:	    
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:	    
+ *
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	edwin   	3/13/97   	Initial Revision
+ *	
+ ***********************************************************************/
+@method HTGenCaptionClass, MSG_META_UIG_CALC_POSITION
+{
+  int row;
+  SizeAsDWord size = @call self::MSG_VIS_GET_SIZE();
+  /*
+   *  Get an estimate position of the object
+   */
+  pself->HTGC_xPos = UpdateItsPotentialPosition(oself, size, &row);
+  pself->HTGC_pageRow = row;
+  return;
+}	/* End of MSG_UIG_RECALC_POSITION.	*/
+
+/***********************************************************************
+ *		MSG_VIS_POSITION_BRANCH for HTGenCaptionClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    
+ * PARAMETERS:	    
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:	    
+ *
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	edwin   	3/13/97   	Initial Revision
+ *	
+ ***********************************************************************/
+@method HTGenCaptionClass, MSG_VIS_POSITION_BRANCH
+{
+  XYValueAsDWord xy = @call @genParent::MSG_VIS_GET_POSITION();
+    
+  xOrigin = DWORD_X(xy) + pself->HTGC_xPos;
+  yOrigin = DWORD_Y(xy) + GetItsPotentialHeight(oself,pself->HTGC_pageRow);
+
+  @callsuper();
+
+  return;
+}	/* End of MSG_GEN_POSITION_BRANCH.	*/
+
+
+/***********************************************************************
+ *		MSG_VIS_RECALC_SIZE for HTGenCaptionClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    
+ * PARAMETERS:	    
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:	    
+ *
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	edwin   	3/13/97   	Initial Revision
+ *	
+ ***********************************************************************/
+@method HTGenCaptionClass, MSG_VIS_RECALC_SIZE
+{
+  SizeAsDWord size;
+  CompSizeHintArgs sizeArgs;
+  int value;
+  VisTextInstance  *vself;
+
+  sizeArgs.CSHA_width = 0;
+  @call self::MSG_META_GET_VAR_DATA
+	(HINT_FIXED_SIZE, sizeof(sizeArgs), &sizeArgs);
+  if (sizeArgs.CSHA_width == 0) {
+    @call @genParent::MSG_META_GET_VAR_DATA
+	(HINT_FIXED_SIZE, sizeof(sizeArgs), &sizeArgs);
+    width = sizeArgs.CSHA_width;	/* assume it's SST_PIXELS */
+    if (width > NESTED_MARGIN)
+      sizeArgs.CSHA_width = width - NESTED_MARGIN;
+    else
+      sizeArgs.CSHA_width = width;
+    sizeArgs.CSHA_count = 0;
+    sizeArgs.CSHA_height = 0;
+    EC_ERROR_IF(sizeArgs.CSHA_width < 0, UIG_ERROR_NEGATIVE_WIDTH);
+    @call self::MSG_META_ADD_VAR_DATA
+	(HINT_FIXED_SIZE, sizeof(sizeArgs), &sizeArgs);
+  }
+  else
+    width = sizeArgs.CSHA_width;	/* assume it's SST_PIXELS */
+
+  size = @callsuper();
+  /*
+   *  Clear all the row information.  Tell its children to calculate
+   *  their own position and store that information in a heigtArray.
+   */
+  @call self::MSG_GEN_HTML_CONTENT_RESET_ROW_COUNTER();
+  @send @genChildren::MSG_META_UIG_CALC_POSITION();
+  /*
+   *  Sum up the heights of rows in this form.
+   */
+  height = @call self::MSG_GEN_HTML_CONTENT_SUM_ROW_HEIGHTS();
+  
+  size = MAKE_SIZE_DWORD(width, height);
+  /*
+   *  Finish the last row.
+   */
+  @call self::MSG_GEN_HTML_CONTENT_START_NEW_ROW(0, &value);
+  /*
+   *  Tell the Geometry Manager to send a messaeg instead of caling a
+   *  a routine.
+   */
+  vself = ObjDerefVis(oself);
+  vself->VI_geoAttrs &= ~VGA_USE_VIS_SET_POSITION;
+
+  return size;
+}	/* End of MSG_VIS_RECALC_SIZE.	*/
+
+
+
+/***********************************************************************
+ *		  InitializeTableCellCommon
+ ***********************************************************************
+ * SYNOPSIS:	Create a HTGenTCellClass object.
+ * CALLED BY:	Common function called by <TH> and <TD> msg handlers.
+ * RETURN:	optr table - HTGenTable object.
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	EY	6/ 4/96   	Initial Revision
+ *
+ ***********************************************************************/
+optr 
+InitializeTableCellCommon (optr pmObj, ObjInfo *target)
+{
+  int row, col;
+  optr table;
+  Rectangle rect;
+  /*
+   *  Insert whatever object in target to the ui tree, and trace back
+   *  up the tree to find the first table ui object.
+   */
+  @call pmObj::MSG_PM_TAKE_UNFINISHED_UI_OBJ(target->obj);
+
+  if (target->class != (ClassStruct *)&HTGenTableClass) {
+    while (1) {
+	@call pmObj::MSG_PM_MARK_RECV_OBJECT_DONE
+		(&(target->obj),&(target->class));
+	/*
+	 * Now target->obj has PManager's recvObj.
+	 */
+	EC_ERROR_IF(target->class == NULL || target->obj == NULL ||
+	    target->class == (ClassStruct *)&HTGenTextClass,
+	    UIG_INVALID_OPERATION_ON_UI_TREE);
+	if (target->class == (ClassStruct *)&HTGenTableClass)
+		break;
+    }
+  }
+  /*
+   * Now we know PManager's recvObj must be a HTGenTable object.
+   */
+  EC_ERROR_IF(target->class != (ClassStruct *)&HTGenTableClass,
+	UIG_UI_TREE_OPERATION_FAILS);
+  /*
+   *  Ask the table ui object for the cell position for this new
+   *  table cell object.  Table object will use the suggested
+   *  column count and take into account any nearby cells that span 
+   *  over rows or columns to calculate the actual cell position.
+   */
+  @call target->obj::MSG_GEN_TABLE_GET_NEXT_TABLE_CELL_POSITION(&row, &col);
+  /*
+   * Now create a table cell object.
+   */
+  table = target->obj;
+  target->obj = @call pmObj::MSG_PM_OBJECT_INSTANTIATE(&HTGenTCellClass);
+  target->class = (ClassStruct *)&HTGenTCellClass;
+  /*
+   * Mark its table position.
+   */
+  @send target->obj::MSG_GEN_TCELL_SET_CELL_POSITION(row, col);
+  /*
+   * Add HINTs
+   */
+  if ((@call table::MSG_GEN_TABLE_SHOW_BORDER()) == TRUE) {
+    rect.R_left = -7;
+    rect.R_top = -7;
+    rect.R_right = -1;
+    rect.R_bottom= -7;
+    @send target->obj::MSG_META_ADD_VAR_DATA(HINT_DRAW_IN_BOX,0,NULL);
+    @send target->obj::MSG_META_ADD_VAR_DATA
+       (HINT_CUSTOM_EXTRA_MARGINS, sizeof(Rectangle), &rect);
+  }
+  /*
+  @send target->obj::MSG_META_ADD_VAR_DATA
+	(HINT_NO_WIDER_THAN_CHILDREN_REQUIRE,0,NULL);
+  @send target->obj::MSG_META_ADD_VAR_DATA
+	(HINT_NO_TALLER_THAN_CHILDREN_REQUIRE,0,NULL);
+  */
+  TrMode = FALSE;
+  return table;
+}	/* End of   InitializeTableCellCommon.	*/
+
+

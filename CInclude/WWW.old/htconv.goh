@@ -1,0 +1,126 @@
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Geoworks 1997.  All rights reserved.
+	GEOWORKS CONFIDENTIAL
+
+PROJECT:	
+MODULE:		
+FILE:		htconverter.goh
+
+AUTHOR:		Mingzhe Zhu, Feb  2, 1997
+
+ROUTINES:
+	Name			Description
+	----			-----------
+
+REVISION HISTORY:
+	Name		Date		Description
+	----		----		-----------
+	mzhu    	2/ 2/97   	Initial version.
+
+DESCRIPTION:
+
+	define the common data structure and superclass for 
+	all image converter, jpeg/gif/...
+
+	$Id: htconv.goh,v 1.1 97/04/04 15:55:32 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+@ifndef __HTCONV_GOH__
+@define __HTCONV_GOH__
+
+@include <WWW/HTCore/htstream.goh>
+#include <vm.h>
+
+/* --------------------------------------------------------------------------
+ * 			DATA STRUCTURE
+ * --------------------------------------------------------------------------*/
+/* 
+ * The data structure for passing data between the real image converters
+ * (functions) and the htconv object.
+ */
+typedef struct {
+    MemHandle 	buffer_handle;		/* the shared buffer handle for
+					 * incoming data 
+					 */
+    word buffer_size;			/* the number of new data in the 
+					 * buffer 
+					 */
+    SemaphoreHandle buffer_empty;	
+    SemaphoreHandle buffer_full;	/* these two semaphore to synchonize
+					 * the read/write from/to the 
+					 * buffer 
+					 */
+    optr htobject;			/* the htconv(htjpeg/htgif) object
+				  	 * used by the converter to send
+					 * out some image update message 
+					 */
+    SemaphoreHandle converter_exit;
+    SemaphoreHandle done_sem;		/* synchonize the two threads 
+					 */
+    Boolean done;			/* flag to tell to stop loading
+					 * new data
+					 */
+} HTConverterStruct;
+
+
+/* --------------------------------------------------------------------------
+ * 			HTConverterClass
+ * --------------------------------------------------------------------------*/
+/* 
+ * The parent class of all the image converter class (htjpeg/htgif/...).
+ */
+@class HTConverterClass, HTStreamClass;
+
+/*
+ * The HTConverter object needs the uigenerator to send out resize message.
+ *
+ * Context:	Set instance data, uigenerator
+ * Source:	Self
+ * Destination:	
+ * Interception:
+ */
+@message void MSG_HTC_SET_UIGENERATOR(optr uigenerator);
+
+/*
+ * This message sets the target image object size.
+ *
+ * Context:	Pass the size to the image objets.
+ * Source:	Image converter.
+ * Destination:	
+ * Interception:
+ */
+@message void MSG_HTC_SET_TARGET_SIZE(word width, word height);
+
+/*
+ * This message link the bitmap with the image object.
+ *
+ * Context:	Set the image object's bitmap.
+ * Source:	Image converter.
+ * Destination:	
+ * Interception:
+ */
+@message void MSG_HTC_SET_TARGET_BITMAP(VMFileHandle vmFile, 
+					VMBlockHandle bitmap);
+
+/*
+ * Call the uigenerator to resize and position the vis tree.
+ *
+ * Context:	Send the resize message to uigenerator.
+ * Source:	Image converter.
+ * Destination:	
+ * Interception:
+ */
+@message void MSG_HTC_CALL_RESIZE();
+
+/* the uigenerator to update the image */
+@instance optr HTC_uigenerator;
+
+/* data buffer shared by HTJPEG and the jpeg decoder */
+@instance MemHandle struct_handle = NullHandle;
+
+@endc;
+
+@endif
+

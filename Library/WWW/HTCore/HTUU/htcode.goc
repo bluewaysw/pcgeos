@@ -1,0 +1,307 @@
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Geoworks 1997.  All rights reserved.
+	GEOWORKS CONFIDENTIAL
+
+PROJECT:	Geos WWW Library
+MODULE:		
+FILE:		htcode.goc
+
+AUTHOR:		Kok Kin Kee, Jun 11, 1997
+
+ROUTINES:
+	Name			Description
+	----			-----------
+
+REVISION HISTORY:
+	Name		Date		Description
+	----		----		-----------
+	kkee    	6/11/97   	Initial version.
+
+DESCRIPTION:
+
+	Encoding and decoding streams.
+
+	$Id: htcode.goc,v 1.4.4.1 97/09/05 10:49:15 jeremyb Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+@include <WWW/HTCore/htstream.goh>
+@include <WWW/HTCore/htuu.goh>
+@include <WWW/HTCore/htutils.goh>
+@include <WWW/HTCore/htobj.goh>
+@include <WWW/HTCore/htstring.goh>
+@include <WWW/HTCore/htsock.goh>
+@include "HTUU/htcode.goh"
+@include "htfatals.goh"
+
+#define PUTBLOCK(target, data, len)  \
+        @call target::MSG_HT_STREAM_PUT_BLOCK(data, len)
+
+#define HTBASE64_BUFFER_SIZE         6*76
+#define HTBASE64_DECODED_BUFFER_SIZE 6*57+3 /* +2 for decoding process */
+
+
+/***********************************************************************
+ *		HTDECODENEW
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Create an decoding stream.
+ * CALLED BY:	Client
+ * RETURN:	HTStreamHandle or the passed in target itself.
+ *	
+ * STRATEGY:	
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	kkee    	6/11/97   	Initial Revision
+ *	
+ ***********************************************************************/
+HTStreamHandle _far _pascal
+HTDECODENEW (const char *str, HTStreamHandle target)
+{
+    HTStreamHandle stream = 0;
+EC( if (target) ECCheckOD(target);                                      )
+
+    PUSHDS;
+    SET_DS_LIB_DGROUP;
+    /* Choose a stream to instantiate */
+    if (!strcasecmp(str, "base64"))
+	stream = HTObjInstantiateForThread(0, &HTBase64DecodeClass);
+    else if (!strcasecmp(str, "quoted-printable"))
+	stream = HTObjInstantiateForThread(0, &HTQPDecodeClass);
+ 
+    /* Other encoding we don't handle */
+    POPDS;
+
+    if (!stream) {
+	return target;
+    } else {
+	/* Initialize the stream instance data */
+	@call stream::MSG_HT_STREAM_SET_TARGET(target);
+    }
+    return stream;
+
+}	/* End of HTDECODENEW.	*/
+
+
+
+
+/***********************************************************************
+		Class Declaration
+***********************************************************************/
+
+@classdecl	HTBase64DecodeClass;
+@classdecl	HTQPDecodeClass;
+
+
+/***********************************************************************
+		Message Handlers for HTBase64DecodeClass
+***********************************************************************/
+
+/***********************************************************************
+ *		MSG_META_INITIALIZE for HTBase64DecodeClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    Allocate a buffer for decoding data.
+ * PARAMETERS:	    void (void)
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:	    
+ *
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	kkee    	6/11/97   	Initial Revision
+ *	
+ ***********************************************************************/
+@method HTBase64DecodeClass, MSG_META_INITIALIZE
+{
+    HTMemHandle htmh;
+
+    @self->HTBDI_bufferPtr = 
+	HTMemAllocAndLock(&htmh, HTBASE64_DECODED_BUFFER_SIZE);
+    @self->HTBDI_buffer = htmh;
+
+    @self->HTBDI_bufPlainPtr = 
+	HTMemAllocAndLock(&htmh, HTBASE64_DECODED_BUFFER_SIZE);
+    @self->HTBDI_bufPlain = htmh;
+
+    @callsuper();
+}	/* End of MSG_META_INITIALIZE.	*/
+
+
+
+/***********************************************************************
+ *		MSG_HT_STREAM_ABORT for HTBase64DecodeClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    Push remaining buffered data and delete buffer.
+ * PARAMETERS:	    int (int status)
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:	    
+ *
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	kkee    	6/11/97   	Initial Revision
+ *	
+ ***********************************************************************/
+@method HTBase64DecodeClass, MSG_HT_STREAM_ABORT
+{
+    if (@self->HTBDI_length) {
+	word length;
+	length = HTUUDecodePtr(@self->HTBDI_bufferPtr,
+			       @self->HTBDI_length,
+			       @self->HTBDI_bufPlainPtr,
+			       HTBASE64_DECODED_BUFFER_SIZE);
+	if (length) 
+	    PUTBLOCK(@self->HTSI_target, @self->HTBDI_bufPlainPtr, 
+		     length);
+    }
+    if (@self->HTBDI_buffer) HTMemUnlockAndFree(@self->HTBDI_buffer);
+    if (@self->HTBDI_bufPlain) HTMemUnlockAndFree(@self->HTBDI_bufPlain);
+
+    return @callsuper();
+}	/* End of MSG_HT_STREAM_ABORT.	*/
+
+
+
+/***********************************************************************
+ *		MSG_HT_STREAM_PUT_BLOCK for HTBase64DecodeClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    Base64 decode a chunk of data. Data must be NULL
+ *                  terminated. The only non-based64 chars allowed are
+ *                  CRLF that ends a line of base64 encoded data.
+ * PARAMETERS:	    int (const byte *data, word len).
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:	    Base64 needs at least 4 octets (24 bits) of data to 
+ *                  be decoded into 3 8-bit octets (i.e., 24 bits). 
+ *                  Therefore, we buffer data to reach multiple of
+ *                  4 bytes if we dont have enough data to decode. 
+ *                  The last buffered data is handled by 
+ *                  MSG_HT_STREAM_ABORT.
+ * 
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	kkee    	6/11/97   	Initial Revision
+ *	
+ ***********************************************************************/
+@method HTBase64DecodeClass, MSG_HT_STREAM_PUT_BLOCK
+{
+    word length;
+    int ret;
+    int inbufsize = @self->HTBDI_length;
+    byte *bufCoded = @self->HTBDI_bufferPtr;
+    byte *bufPlain = @self->HTBDI_bufPlainPtr;
+
+    if (!data || !len) return HT_OK;
+
+    if (@self->HTSI_transparent)
+	return PUTBLOCK(@self->HTSI_target, data, len);
+
+    while (len--) {
+	/* 
+	 * Skipping all white spaces, especially CRLF that
+	 * ends an encoded line.
+	 */
+	if (!ISWHITE(*data)) {
+	    bufCoded[inbufsize++] = *data;
+	    if (inbufsize == HTBASE64_BUFFER_SIZE) {
+		length = HTUUDecodePtr(bufCoded, inbufsize, 
+			        bufPlain, HTBASE64_DECODED_BUFFER_SIZE);
+		ret = PUTBLOCK(@self->HTSI_target, bufPlain, length);
+		if (ret != HT_OK) return ret;
+		inbufsize = 0;
+	    }
+	}
+	data++;
+    }
+    @self->HTBDI_length = inbufsize;
+    return HT_OK;
+}	/* End of MSG_HT_STREAM_PUT_BLOCK.	*/
+
+
+
+
+/***********************************************************************
+		Message Handlers for HTQPDecodeClass
+***********************************************************************/
+
+/* 0 is the default state value for HTQPDI_state */
+#define QPDECODE_BEGIN 0
+#define SAW_EQUAL      1
+#define SAW_FIRST_HEX  2
+#define SKIP_WHITE     3
+
+/***********************************************************************
+ *		MSG_HT_STREAM_PUT_BLOCK for HTQPDecodeClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    Quoted-printable decode a chunk of data.
+ * PARAMETERS:	    int (const byte *data, word len)
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:	    We overwrite the original buffer.
+ *
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	kkee    	6/11/97   	Initial Revision
+ *	
+ ***********************************************************************/
+@method HTQPDecodeClass, MSG_HT_STREAM_PUT_BLOCK
+{
+    byte *start = (byte *)data;
+    byte *end = (byte *)data;
+    
+    if (!len || !data) return HT_OK;
+
+    if (@self->HTSI_transparent)
+	return PUTBLOCK(@self->HTSI_target, data, len);
+
+    while (len--) {
+	if (@self->HTQPDI_state == SAW_EQUAL) {
+	    /* Skipping whitespaces */
+	    if (!ISWHITE(*data)) {
+		if (ISDIGIT(*data)) 
+		    @self->HTQPDI_buffer = (*data-'0') << 4;
+		else
+		    @self->HTQPDI_buffer = 
+			(TOUPPER(*data) - 'A' + 10) << 4;
+		@self->HTQPDI_state = SAW_FIRST_HEX;
+	    } else
+		@self->HTQPDI_state = SKIP_WHITE;
+	    
+	} else if (@self->HTQPDI_state == SAW_FIRST_HEX) {
+	    /* Decode a qp-encoded word */
+	    if (ISDIGIT(*data)) 
+		@self->HTQPDI_buffer = @self->HTQPDI_buffer |
+		    (*data - '0');
+	    else {
+		@self->HTQPDI_buffer = @self->HTQPDI_buffer |
+		    (TOUPPER(*data) - 'A' + 10);
+	    }
+	    *end++ = @self->HTQPDI_buffer;
+	    @self->HTQPDI_state = QPDECODE_BEGIN;
+	} else if (@self->HTQPDI_state == SKIP_WHITE) {
+	    if (!ISWHITE(*data)) {
+		/* Unget the byte */
+		len++; data--;
+		@self->HTQPDI_state = QPDECODE_BEGIN;
+	    }
+	} else if (*data == '=') {
+	    @self->HTQPDI_state = SAW_EQUAL;
+	} else {
+	    *end++ = *data;
+	}
+	data++;
+    }
+
+    return PUTBLOCK(@self->HTSI_target, start, end-start);
+}	/* End of MSG_HT_STREAM_PUT_BLOCK.	*/

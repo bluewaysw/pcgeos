@@ -1,0 +1,695 @@
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Geoworks 1996 -- All Rights Reserved
+
+PROJECT:	Geos WWW Library
+MODULE:		GeoBrowser (client of WWW Library)
+FILE:		geobrowser.goc
+
+AUTHOR:		Edwin Yu, Apr 15, 1996
+
+ROUTINES:
+	Name			Description
+	----			-----------
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	kkee	4/17/96		Initial version.
+
+DESCRIPTION:
+	GeoBrowser appl using WWW Library.
+
+	$Id: geobrowser.goc,v 1.1 97/04/04 17:20:25 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+/* Geos stuff */
+@include <stdapp.goh>		/* Standard application                 */
+@include <sem.h>                /* Semaphore pascal routines            */
+#include <Ansi/stdio.h>
+#include <Ansi/string.h>
+
+/* WWW Library stuff */
+@include <WWW/htcore.goh>	/* WWW Core Library                     */
+@include <WWW/http.goh>		/* WWW HTTP protocol class              */
+@include <WWW/htmlp.goh>	/* WWW HTML Parser class                */
+@include <WWW/htjpeg.goh>	/* WWW image/jpeg class */
+
+/* WWW UI stuff */
+/* @include <WWW/uigenera.goh> */    /* UI Generator */
+/* @include <WWW/pmanager.goh> */    /* UI Presentation Manager */
+ 
+/* GeoBrowser stuff */
+@include "htfatals.goh"
+@include "GeoBrowser/geobrowser.goh"	/* GeoBrowser Manager           */
+@include "HTCbf/htCbf.goh"
+@include "HTParser/htparser.goh"/* My Header and MIME parser            */ 
+@include "HTDirect/htdirect.goh"/* My director	                        */
+
+/* GeoBrowser content-type handlers */
+@include "Plain/plain.goh"      /* text/plain                           */
+@include "GIF/gif.goh"          /* image/gif                            */
+@include "HTML/html.goh"        /* text/html                            */
+
+
+/*--------------------------------------------------------------------------
+ *		Class declarations
+ *-------------------------------------------------------------------------*/
+@classdecl	GBProcessClass, neverSaved;
+
+/*--------------------------------------------------------------------------
+ *		Global Variables
+ *-------------------------------------------------------------------------*/
+
+#if ERROR_CHECK
+FatalErrors geoBrowserFatalErrors;
+Warnings    geoBrowserWarnings;
+#endif
+
+/*--------------------------------------------------------------------------
+ *		Local Constants and Variables
+ *-------------------------------------------------------------------------*/
+
+/* 
+ * Geoworks now uses a new proxy with firewall etc. We have to go thru 
+ * this proxy.
+ */
+static char geoworksHTTPProxyName[] = "192.168.70.1";
+static word geoworksHTTPProxyPort = 80;
+
+/*
+ * List of "before" callbacks.
+ */
+static HTListHandle beforeCbfList = NULL;
+/*
+ * List of "after" callbacks.
+ */
+static HTListHandle afterCbfList = NULL;
+/*
+ * List of "request" callbacks.
+ */
+static HTListHandle requestCbfList = NULL;
+/* 
+ * List of protocol methods used to service requests.
+ */
+static HTListHandle protocolList = NULL;
+/*
+ * Synchronized list of requests.
+ */
+static optr sRequestList = NullOptr;
+static SemaphoreHandle isStopping = NULL;
+static Boolean processDetaching = FALSE;
+
+
+/*--------------------------------------------------------------------------
+ *		Application Object
+ *-------------------------------------------------------------------------*/
+@start	AppResource;
+
+@object GenApplicationClass GBApp = {
+    GI_visMoniker = list { @GBMoniker }
+    GI_comp = @GBPrimary;
+    gcnList(MANUFACTURER_ID_GEOWORKS,GAGCNLT_WINDOWS) = @GBPrimary;
+}
+
+@visMoniker GBMoniker = "C GeoBrowser";
+
+@end	AppResource;
+
+
+/*--------------------------------------------------------------------------
+ *		Interface
+ *-------------------------------------------------------------------------*/
+@start	Interface;
+
+@object GenPrimaryClass GBPrimary  = {
+	GI_comp = @GBFileMenu,
+		  @GBGoMenu,
+	          @GBReloadTrigger,
+		  @GBStopTrigger,
+	          @GBTextView,
+       		  @GBStatus;
+	HINT_DISPLAY_MAXIMIZED_ON_STARTUP;
+	HINT_DISPLAY_NOT_RESIZABLE;
+	HINT_PRIMARY_NO_FILE_MENU;
+}
+
+/*
+ * GBPrimary window is further decomposed into 3 sub windows (a),
+ * (b), and (c) where
+ * (a1) through (a2) are menus are count as one sub window.
+ *
+ * (a) (a1) GBFileMenu, (a2) GBGoMenu, 
+ *     (a3) GBReloadTrigger, (a4) GBStopTrigger
+ * (b) GBView.
+ * (c) GBStatus
+ */
+
+/*
+ * (a1) GBFileMenu
+ */
+@object GenInteractionClass GBFileMenu = {
+	GI_visMoniker = 'F', "File";
+	GII_visibility = GIV_POPUP;
+	GI_comp = @GBOpenLocation;
+	ATTR_GEN_INTERACTION_GROUP_TYPE = GIGT_FILE_MENU;
+}
+
+/*
+ * (a1)(i) GBOpenLocation
+ */
+@object GenInteractionClass GBOpenLocation = {
+	GI_visMoniker = 'O', "Open Location...";
+	GII_visibility = GIV_DIALOG;
+	GII_type = GIT_MULTIPLE_RESPONSE;
+	GI_comp = @GBOpenLocEntry,
+		  @GBOpenLocOpenTrigger,
+		  @GBOpenLocClearTrigger,
+ 		  @GBOpenLocCancelTrigger;
+}
+
+/*
+ * (a1)(ii) GBOpenLocEntry
+ */
+@object GenTextClass GBOpenLocEntry = {
+	GTXI_text = "http://www.geoworks.com/index.html";
+/*	GTXI_text = "file://test.txt"; */
+	GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT;
+	HINT_DRAW_IN_BOX;
+	HINT_PLACE_MONIKER_TO_LEFT;
+	ATTR_GEN_TEXT_NO_SPACES;
+}
+
+/*
+ * (a1)(iii) GBOpenLocOpenTrigger
+ */
+@object GenTriggerClass GBOpenLocOpenTrigger = {
+	GI_visMoniker = "Open";
+	GI_attrs = GA_SIGNAL_INTERACTION_COMPLETE;
+	GTI_destination = process;
+	GTI_actionMsg = MSG_GBP_OPEN_URL;
+	HINT_SEEK_REPLY_BAR;
+	HINT_DEFAULT_DEFAULT_ACTION;
+}
+
+/*
+ * (a1)(iv) GBOpenLocClearTrigger
+ */
+@object GenTriggerClass GBOpenLocClearTrigger = {
+	GI_visMoniker = "Clear";
+	GTI_destination = @GBOpenLocEntry;
+	GTI_actionMsg = MSG_VIS_TEXT_DELETE_ALL;
+	HINT_SEEK_REPLY_BAR;
+}
+
+/*
+ * (a1)(v) GBOpenLocCancelTrigger
+ */
+@object GenTriggerClass GBOpenLocCancelTrigger = {
+	GI_visMoniker = "Cancel";
+	GI_attrs = GA_SIGNAL_INTERACTION_COMPLETE;
+	HINT_SEEK_REPLY_BAR;
+}
+
+/*
+ * (a2) GBGoMenu
+ */
+@object GenInteractionClass GBGoMenu = {
+	GI_visMoniker = 'G', "Go";
+	GII_visibility = GIV_POPUP;
+	GI_comp = @GBChooseLocList;
+	ATTR_GEN_INTERACTION_GROUP_TYPE = GIGT_OPTIONS_MENU;
+}
+
+/*
+ * (a2)(i) GBChooseLocList
+ */
+@object GenDynamicListClass GBChooseLocList = {
+/*
+	GIGI_destination = process;
+	GIGI_applyMsg = MSG_GBP_GO_LOCATION;
+	GDLI_queryMsg = MSG_GBP_UPDATE_GO_LIST; 
+*/
+	HINT_DRAW_IN_BOX;
+	HINT_ITEM_GROUP_SCROLLABLE;
+}
+
+/*
+ * (a3) GBReloadTrigger
+ */
+@object GenTriggerClass GBReloadTrigger = {
+	GI_visMoniker = 'R', "Reload";
+	GTI_destination = process;
+	GTI_actionMsg = MSG_GBP_RELOAD;
+	HINT_SEEK_MENU_BAR;
+}
+
+/*
+ * (a4) GBStopTrigger
+ */
+@object GenTriggerClass GBStopTrigger = {
+	GI_visMoniker = 'S', "Stop";
+	GTI_destination = process;
+	GTI_actionMsg = MSG_GBP_STOP;
+	HINT_SEEK_MENU_BAR;
+}
+
+/*
+ * (b) GBTextView (text only browser view)
+ */
+@object GenTextClass GBTextView = {
+	GTXI_attrs = @default | GTA_INIT_SCROLLING | 
+	    GTA_DONT_SCROLL_TO_CHANGES;
+	HINT_DRAW_IN_BOX;
+	HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
+}
+
+/*
+ * OR (b) Saves to a file.
+ */
+@object HTFWriteClass GBFileWriter = {
+	HTFWI_filename = @GBFileName;
+}
+@chunk char GBFileName[] = "gb.txt";
+
+/*
+ *(c) GBStatus
+ */
+@object GenTextClass GBStatus = {
+	GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT;
+	HINT_DRAW_IN_BOX;
+}
+
+@end Interface;
+
+
+/*--------------------------------------------------------------------------
+ *		Messsage Handlers for GBProcessClass
+ *-------------------------------------------------------------------------*/
+
+
+/***********************************************************************
+ *		MSG_META_ATTACH_GENPROCESSCLASS for GBProcessClass
+ ***********************************************************************
+ * SYNOPSIS:	    Intercept to perform init Geos WWW Library.
+ * PARAMETERS:      void (MemHandle appLaunchBlock = dx)
+ * SIDE EFFECTS:    None
+ *
+ * STRATEGY:	    1. Initialize WWW Library. 
+ *                  2. Register protocol and content handlers.
+ *                  3. Create a content thread for running content
+ *                     handlers. This thread must not make blocking calls
+ *                     to the WWW Library.
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	kkee	4/18/96   	Initial Revision
+ *
+ ***********************************************************************/
+static HTPolicyContentCallback contentCbf = &GBDirectorGetContent;
+static ClassStruct *slistClassName = &SListClass;
+static ClassStruct *htmlpClassName = &HTMLPClass;
+static ClassStruct *jpegClassName = &HTJPEGClass;
+
+@method GBProcessClass, MSG_META_ATTACH_GENPROCESSCLASS
+{
+	GeodeHandle myGeodeHandle;
+	ThreadHandle contentThread;
+
+	@callsuper();
+
+	myGeodeHandle = GeodeGetProcessHandle();
+
+	/* Initialize www library, must be called. 
+	 * We are using accessPoint0001 defined in the "ini" file.
+	 */
+	HTRegister(myGeodeHandle, 1);
+
+	/* 
+ 	 * Register my policy manager the WWW Library will use.
+ 	 */
+	HTPolicyAddClient(myGeodeHandle, contentCbf);
+
+	/* Register protocol handlers we want to use. */
+	protocolList = HTListNew();
+#if ERROR_CHECK
+	HTPolicyAddProtocolHandler(protocolList, HTStringFor("http"), 
+				   HTStringFor("httpec.geo"));
+#else 
+	HTPolicyAddProtocolHandler(protocolList, HTStringFor("http"), 
+				   HTStringFor("http.geo"));
+#endif
+	
+	/* Register "before" callback functions. */
+	beforeCbfList = HTListNew();
+	HTNetAddBeforeCallback(beforeCbfList, GBCheckCache, HT_ALL);
+
+	/* Register "after" callback functions. */
+	afterCbfList = HTListNew();
+	HTNetAddAfterCallback(afterCbfList, GBTerminateRequest, HT_ALL);
+
+	/* Register "request" callback functions. */
+	requestCbfList = HTListNew();
+	HTNetAddRequestCallback(requestCbfList, GBProgressCallback, 
+				HT_LOADING_DATA);
+	HTNetAddRequestCallback(requestCbfList, GBRequestCallback,
+				HT_ALL);
+
+	/* Create a content thread for the director. */
+	@call process::MSG_PROCESS_CREATE_EVENT_THREAD(&contentThread, 
+						     &ProcessClass, 1024);
+	if (contentThread)
+	    GBDirectorInitialize(contentThread);
+
+	GBDirectorAddContent(HT_CONTENT_TYPE_TEXT_XGW_HTML, 
+			     HT_CONTENT_TYPE_TEXT_XGWP_HTML,
+			     htmlpClassName);
+
+	GBDirectorAddContent(HT_CONTENT_TYPE_TEXT_XGWP_HTML, 
+			     HT_CONTENT_TYPE_STAR_STAR,
+			     &HTMLClass);
+
+	GBDirectorAddContent(HT_CONTENT_TYPE_TEXT_PLAIN, 
+			     HT_CONTENT_TYPE_STAR_STAR,
+			     &HTPlainClass);
+
+	GBDirectorAddContent(HT_CONTENT_TYPE_IMAGE_JPEG,
+			     HT_CONTENT_TYPE_STAR_STAR,
+			     jpegClassName);
+
+	/* Inform callbacks our process so that they can send messages
+	   to GBProcess */
+	GBSetProcessHandle(GeodeGetProcessHandle());
+
+	/* Create a list for synchronizing access to my requests */
+	sRequestList = ObjInstantiateForThread(0, slistClassName);
+	isStopping = ThreadAllocSem(1);
+	
+
+}	/* End of MSG_META_ATTACH_GENPROCESSCLASS.	*/
+
+
+
+/***********************************************************************
+ *		MSG_META_DETACH for GBProcessClass
+ ***********************************************************************
+ * SYNOPSIS:	    Intercept to terminate Geos WWW Library.
+ * PARAMETERS:	    void (word callerID = cx, optr caller = dx:bp)
+ * SIDE EFFECTS:    None
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	kkee	4/18/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method GBProcessClass, MSG_META_DETACH
+{
+    /* This needs to be called once only. */
+    if (!processDetaching) {
+	processDetaching = TRUE;
+	@call process::MSG_GBP_STOP();
+    }
+
+    /* 
+     * We can't terminate until we are sure all requests have
+     * been killed and deleted, which is acknowledged by
+     * SRequestList by 'V'ing isStopping semaphore.
+     */
+    if (ThreadPTimedSem(isStopping, 1) == SE_TIMEOUT) {
+	@send,forceQueue process::
+	    MSG_META_DETACH(callerID, caller);
+	return;
+    }
+
+    /* 
+     * For Lazarus protection, we must zero out everything.
+     */
+    HTListDelete(protocolList);
+    protocolList = NULL;
+    
+    HTListDelete(beforeCbfList);
+    beforeCbfList = NULL;
+
+    HTListDelete(afterCbfList);
+    afterCbfList = NULL;
+
+    @call sRequestList::MSG_META_OBJ_FREE();
+    sRequestList = NullOptr;
+
+    HTUnregister(GeodeGetProcessHandle());
+
+    /* 
+     * Now we can safely kill our content thread after we have
+     * unregistered from the WWW Library 
+     */
+    GBDirectorDetach();
+
+    @callsuper();
+}	/* End of MSG_META_DETACH.	*/
+
+
+
+/***********************************************************************
+ *		MSG_GBP_OPEN_URL for GBProcessClass
+ ***********************************************************************
+ * SYNOPSIS:	    Open a URL.
+ * PARAMETERS:	    void (void)	    
+ * SIDE EFFECTS:    None
+ *
+ * STRATEGY:	    Get the URL string and call the and submit a request
+ *		    to WWW Library. Must synchronize access to requestList 
+ *                  as we use in "after" callbacks in htCbf.goc which are 
+ *                  executed by the Library.
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	kkee	4/30/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method GBProcessClass, MSG_GBP_OPEN_URL
+{	
+    HTRequestHandle request;
+    char uri[128];
+
+    @call GBOpenLocEntry::MSG_VIS_TEXT_GET_ALL_PTR(uri);
+
+    request = HTRequestCreate(HTTPT_REQUEST);
+    @call sRequestList::MSG_SLIST_ADD_REQUEST(request);
+
+    /* Geoworks now uses a http proxy */
+    HTRequestSetProxy(request, geoworksHTTPProxyName, 
+		      geoworksHTTPProxyPort);
+
+    /* The Request-Line */
+    HTRequestSetMethod(request, HTM_GET);
+    HTRequestSetURI(request, uri);
+    HTRequestSetHTTPVersion(request, HTTPV_1_1);
+
+    /* Add some general headers */
+    /* ... */
+
+    /* Add some entity headers. Should not use this approach. I should
+     * create an anchor structure for storing entity information. To put
+     * an entity to the stream pipe, i should use HTTPReqClass. 
+     */
+    /*
+     * HTRequestSetEntityHeaderMask(request, HTEH_CONTENT_ENCODING); 
+     * HTRequestAddEntityHeaderField(request, HTEH_CONTENT_ENCODING, 
+     *			  HTStringFor("gzip"));
+     */
+
+    /* Try using Library default protocols. Add this line to 
+     * register your own protocol.
+     *
+     * HTRequestSetProtocolList(request, protocolList);
+     */
+
+    HTRequestSetBeforeCallbackList(request, beforeCbfList);
+
+    HTRequestSetAfterCallbackList(request, afterCbfList);
+
+    HTRequestSetRequestCallbackList(request, requestCbfList);
+
+    HTRequestSetPostCallback(request, GBPostCallback); 
+
+/* 
+ * Uncomment this line to provide our own parser that the Library
+ * will call instead of the Library MIME parser.
+ */
+/*    HTRequestSetResponseParser(request, &HTParserClass); */
+	
+    /* Fire away the request! */
+    HTRequestSubmit(request, GeodeGetProcessHandle());
+ 
+    /* 
+     * This request is deleted in GBTerminateRequest (HTCbf/htCbf.goc), 
+     * an "after" function callback registered when the application is
+     * fired up (i.e., in MSG_META_ATTACH_GENPROCESSCLASS).
+     */
+}	/* End of MSG_GBP_OPEN_URL.	*/
+
+
+
+/***********************************************************************
+ *		MSG_GBP_RELOAD for GBProcessClass
+ ***********************************************************************
+ * SYNOPSIS:	    
+ * PARAMETERS:	    
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	kkee	4/30/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method GBProcessClass, MSG_GBP_RELOAD
+{
+    TimerDateAndTime tm;
+    Boolean ok;
+
+    char s1[] = " Thursday, 10-Jun-93 01:29:59 GMT ";
+    char s2[] = "Thu, 10 Jan 1993 01:29:59 GMT";
+    char s3[] = "  Wed Jun  9 01:29:59 1993 GMT";
+
+    ok = HTParseTime(s1, &tm);
+    ok = HTParseTime(s2, &tm);
+    ok = HTParseTime(s3, &tm);
+
+    TimerGetDateAndTime(&tm);
+
+    HTRequestKillAll();
+}	/* End of MSG_GBP_RELOAD.	*/
+
+
+
+/***********************************************************************
+ *		MSG_GBP_STOP for GBProcessClass
+ ***********************************************************************
+ * SYNOPSIS:	    Stop all requests. This method is guaranteed not to 
+ *                  return until all requests have been killed using 
+ *                  HTRequestKill.
+ * PARAMETERS:	    Nothing
+ * SIDE EFFECTS:    Nothing
+ *
+ * STRATEGY:        Kill all active requests. Must synchronize access to 
+ *                  requestList as it is accessed by "after" callbacks in
+ *                  htCbf.goc which are run by the Library thread.
+ *                  We use a semaphore to halt until we have completely
+ *                  killed all requests.
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	kkee	4/30/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method GBProcessClass, MSG_GBP_STOP
+{
+    /* 
+     * Each killed request is deleted in GBTerminateRequest in 
+     * HTCbf/htCbf.goc, which ends up sending MSG_GBP_DELETE_REQUEST
+     * to process.
+     */
+
+    if (ThreadPTimedSem(isStopping, 1) == SE_TIMEOUT) {
+	/*
+	 * We've been here before and we are still not done killing
+	 * Don't grab again as we will deadlock.
+	 */
+	return;
+    }
+
+    /* isStopping will be 'v'ed when Slist is done killing. */
+    @call sRequestList::MSG_SLIST_KILL_ALL(isStopping);
+
+}	/* End of MSG_GBP_STOP.	*/
+
+
+
+
+/***********************************************************************
+ *		MSG_GBP_DELETE_REQUEST for GBProcessClass
+ ***********************************************************************
+ * SYNOPSIS:	    Delete a request.
+ * PARAMETERS:	    void (HTRequestHandle request)
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	kkee	8/21/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method GBProcessClass, MSG_GBP_DELETE_REQUEST
+{
+    @call sRequestList::MSG_SLIST_DELETE_REQUEST(request);
+}	/* End of MSG_GBP_DELETE_REQUEST.	*/
+
+
+
+
+/***********************************************************************
+ *		MSG_GBP_DOCUMENT_MOVED for GBProcessClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    Document has moved. New URL is provided by the Web
+ *                  Library in the request.
+ * PARAMETERS:	    void (HTRequestHandle request)
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:        Do not enter the request into slist as this is an
+ *                  old request which we are going to resubmit.
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	kkee	11/18/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method GBProcessClass, MSG_GBP_DOCUMENT_MOVED
+{
+    /* Fire away the request! */
+    HTRequestSubmit(request, GeodeGetProcessHandle());
+}	/* End of MSG_GBP_DOCUMENT_MOVED.	*/
+
+
+
+
+/***********************************************************************
+ *		MSG_GBP_UNAUTHORIZED for GBProcessClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    Requested document was unauthorized.
+ * PARAMETERS:	    void (HTRequestHandle
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:        We get userid and password from user and then 
+ *                  reissue the request.
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	kkee	12/11/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method GBProcessClass, MSG_GBP_UNAUTHORIZED
+{
+    char username[] = "kkee";
+    char password[] = "open sesame";
+
+    if (HTAASetBasicUserIDPassword(request, username, password))
+	HTRequestSubmit(request, GeodeGetProcessHandle());
+    else
+	@call process::MSG_GBP_DELETE_REQUEST(request);
+}	/* End of MSG_GBP_UNAUTHORIZED.	*/

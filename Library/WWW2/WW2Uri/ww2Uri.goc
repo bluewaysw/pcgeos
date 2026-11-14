@@ -1,0 +1,935 @@
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Geoworks 1998.  All rights reserved.
+	GEOWORKS CONFIDENTIAL
+
+PROJECT:	WWW2 Library
+MODULE:		WW2Core
+FILE:		ww2Uri.goc
+
+AUTHOR:		Allen Yuen, Aug 13, 1998
+
+ROUTINES:
+	Name			Description
+	----			-----------
+
+REVISION HISTORY:
+	Name		Date		Description
+	----		----		-----------
+	allen   	8/13/98   	Initial version
+
+DESCRIPTION:
+
+	URI Management.
+	//depot/liberty/project/ellery/980805/library/www/wwcore/wwuri.cpp#1 
+
+	$Id: ww2Uri.goc,v 1.1 98/08/14 04:18:29 allen Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+#include <Ansi/stdlib.h>
+#include <Ansi/string.h>
+#include <file.h>
+#include <WWW2/wwMacro.h>
+@include <WWW2/WW2Core/ww2string.goh>
+#include <WWW2/WW2Core/ww2Uri.h>
+
+
+/*
+ * Various components of a URI.
+ */
+typedef struct 
+{
+    char *access;      /* Now known as "scheme" */
+    char *host;
+    char *port;
+    char *absolute;
+    char *relative;
+    char *anchor;
+} WWURI;
+
+
+//--------------------------------------------------------------------------
+// WWScanURI
+//--------------------------------------------------------------------------
+//
+// DESCRIPTION:     Break a URI into various components. Cut up name into
+//                  various URI components so name is modified!
+// 
+// SCOPE:           PRIVATE
+// PASS:            name, points to a document name which may be incomplete.
+//
+// RETURN:          Parts, contains various components of the URI. Anything 
+//                  nonzero in parts is null-terminated. These results are 
+//                  guaranteed on return:
+//
+//                   1. parts->absolute or parts->relative may
+//                      NULL,//but* not both.
+//
+//                   2. parts->host, parts->anchor, and 
+//                      parts->access may be non-NULL if they were
+//                      specified in name.
+//
+//
+// IMPLEMENTATION:  We overwrite the passed in name to NULL the strings in 
+//                  parts. So name will be modified.
+//  
+// REVISION HISTORY:
+//  Name    Date        Description
+//  ----    ----        -----------
+//  kkee    10/31/96    Initial Revision
+//  jsenior 11/11/97    New Sokoto Port.
+//
+//--------------------------------------------------------------------------
+static void WWScanURI(char *name, WWURI *parts)
+{
+    char *after_access;
+    char *p;
+    size_t length = strlen(name);
+
+    PARAM_ASSERT(name != NULL); 
+
+    /* Initialize to all NULL */
+    parts->access = 0;
+    parts->host = 0;
+    parts->port = 0;
+    parts->absolute = 0;
+    parts->relative = 0;
+    parts->anchor = 0;
+
+    after_access = name;
+
+    for(p = name; *p; p++)
+    {
+        if (*p == ':')
+        {
+            *p = 0;
+            parts->access = after_access; // Scheme has been specified
+            after_access = p + 1;
+
+            if (0 == WWStrCaseCmp("URL", parts->access))
+            {
+                parts->access = NULL;  // Ignore IETF's URL: pre-prefix
+            }
+            else
+            {
+                break;
+            }
+        }
+        if (*p == '/') // Access has not been specified
+        {
+            break;      
+        }
+        if (*p == '#') 
+        {
+            break;
+        }
+    }
+    
+    for(p = name + length - 1; p >= name; p--)
+    {
+        if (*p =='#')
+        {
+            parts->anchor = p + 1;
+            *p = 0; // cut off anchor
+        }
+    }
+
+    p = after_access;
+
+    // file scheme does not have port, only absolute/relative path
+    if (parts->access && !WWStrCaseCmp(parts->access, ("file")))
+    {
+        if (*p=='/')
+        {
+            if (p[1]=='/')
+            {
+                if (p[2]=='/')
+                {
+                    parts->absolute = p + 3;
+                }
+                else
+                {
+                    parts->absolute = p + 2;
+                }
+            }
+            else
+            {
+                parts->absolute = p + 1;
+            }
+        }
+        else
+        {
+            parts->absolute = (*after_access) ? after_access : 0;
+        }
+        return;
+    }
+    
+    /* Other schemes */
+    if (*p == '/')
+    {
+        if (p[1] == '/')
+        {
+            parts->host = p + 2;   /* host has been specified */
+            *p = 0;                /* Terminate access */
+
+            /* look for port number */
+            p = parts->host;
+            while(*p && *p != '/')
+            {
+                if(*p == ':')
+                {
+                    parts->port = p + 1;
+                    *p = 0;         /* terminate host */
+                }
+                p++;
+            }
+
+            if(*p == '/')
+            {
+                *p = 0; 
+                parts->absolute = p + 1; /* Root found but no host */
+            }
+        }
+        else
+        {
+            parts->absolute = p + 1;    /* Root found but no host */
+        }
+    }
+    else
+    {
+        parts->relative = (*after_access) ? after_access : 0; /* zero for "" */
+    }
+} /* End of WWScanURI. */
+
+
+
+//--------------------------------------------------------------------------
+// WWCanonURI
+//--------------------------------------------------------------------------
+//
+// DESCRIPTION:     Canonicalize a URL.
+//
+// SCOPE:           PRIVATE
+//
+// RETURN:          The position of the current path part of the URL
+//                  which might be the old one or a new one.
+//
+// IMPLEMENTATION:  Ported from W3C HTCanon in HTParse.c.
+//                  1) The host name is converted to lowercase.
+//                  2) Expands the host name of the URL from a local name to
+//                     a fulldo main name. A host name is started by `://'.
+//                  3) Chop off port if `:80' (http), `:70' (gopher), or
+//                    `:21' (ftp).
+//
+// REVISION HISTORY:
+//      Name        Date        Description
+//      ----        ----        -----------
+//      kkee        10/31/96    Initial Revision
+//      jsenior     11/11/97    New Sokoto Port.
+//
+//--------------------------------------------------------------------------
+static char *WWCanonURI(char **filename, char *host)
+{
+    char *newname = NULL;
+    char *port;
+    char *strptr;
+    char *path;
+    char *access = host - 3;
+
+    PARAM_ASSERT(*filename != NULL);
+    PARAM_ASSERT(host != NULL);
+
+    while (access > *filename && *(access - 1) != '/') /* Find access method */
+    {
+        access--;
+    }
+    if ((path = strchr(host, '/')) == NULL) /* Find path */
+    {
+        path = host + strlen(host);
+    }
+    if ((strptr = strchr(host, '@')) != NULL && strptr < path) /* UserId */
+    {
+        host = strptr;
+    }
+    if ((port = strchr(host, ':')) != NULL && port > path) /* Port number */
+    {
+        port = NULL;
+    }
+
+    strptr = host; /* Convert host to lower-case */
+    while (strptr < path)
+    {
+        *strptr = tolower(*strptr);
+        strptr++;
+    }
+    
+    /* 
+     * Does the URL contain a full domain name? This also works for a
+     * numerical host name. The domain name is already made lower-case
+     * and without a trailing dot. 
+     * 
+     * We don't support local domain name.
+     */
+    if (((strptr = strchr(host, '.')) == NULL || strptr >= path) &&
+        WWStrNCaseCmp(host, "localhost", 9))
+    {
+        ; /* Do nothing even if we get here as we don't support local domain */
+    }
+    else /* Look for a trailing dot */
+    {
+        char *dot = port ? port : path;
+        if (dot > *filename && *--dot == '.')
+        {
+            char *orig = dot,
+                  *dest = dot + 1;
+            while ((*orig++ = *dest++) != NULL); // copy
+            if (port)
+            {
+                port--;
+            }
+            path--;
+        }
+    }
+    /* Chop off port if `:', `:80' (http), `:70' (gopher), or `:21' (ftp) */
+    if (port)
+    {
+        if (!*(port + 1) || *(port + 1) == '/')
+        {
+            if (!newname)
+            {
+                char *orig = port,
+                      *dest = port + 1;
+
+                while((*orig++ = *dest++) != NULL); // copy
+            }
+        }
+        else if ((!strncmp(access, "http", 4) &&
+                    (*(port + 1) == '8' && 
+                    *(port + 2)== '0' &&
+                    (*(port + 3) == '/' ||
+                    !*(port + 3)))) ||
+                    (!strncmp(access, "gopher", 6) &&
+                    (*(port + 1)== '7' && 
+                    *(port + 2)== '0' &&
+                    (*(port + 3) == '/' ||
+                    !*(port + 3)))) ||
+                    (!strncmp(access, "ftp", 3) &&
+                    (*(port + 1)== '2' &&
+                    *(port + 2)== '1' &&
+                    (*(port + 3)== '/' ||
+                    !*(port + 3)))))
+        {
+            if (!newname)
+            {
+                char *orig = port,
+                      *dest = port + 3;
+
+                while((*orig++ = *dest++) != NULL); // copy
+                path -= 3; /* Update path position, Henry Minsky */
+            }
+        }
+        else if (newname)
+        {
+            strncat(newname, port, (int) (path - port));
+        }
+    }
+
+    if (newname)
+    {
+        /* Won't get here as we don't have local domain name */
+    }
+
+    return path;
+} /* End of WWCanonURI. */
+
+
+
+//--------------------------------------------------------------------------
+// WWSimplifyURI
+//--------------------------------------------------------------------------
+//
+// DESCRIPTION:     Simplify a URL.
+//
+// SCOPE:           PUBLIC
+//
+// RETURN:          The simplified passed in URL.
+//
+// IMPLEMENTATION:  Ported from W3C HTCanon in HTParse.c.
+//                  A URI is allowed to contain the seqeunce xxx/../ which
+//                  may be replaced by "" , and the seqeunce "/./" which may 
+//                  be replaced by "/". Simplification helps us recognize
+//                  duplicate URIs. 
+//
+//                  Thus,   /etc/junk/../fred   becomes /etc/fred
+//                  /etc/junk/./fred    becomes /etc/junk/fred
+//
+//                  but we should NOT change
+//                  http://fred.xxx.edu/../..
+//
+//                  or  ../../albert.html
+//
+//                  In order to avoid empty URLs the following URLs become:
+//
+//                  /fred/..        becomes /fred/..
+//                  /fred/././..        becomes /fred/..
+//                  /fred/.././junk/.././   becomes /fred/..
+//
+//                  If more than one set of `://' is found (several proxies
+//                  in cascade) then only the part after the last `://' is
+//                  simplified.
+//
+//
+// REVISION HISTORY:
+//      Name        Date        Description
+//      ----        ----        -----------
+//      kkee        10/31/96    Initial Revision
+//      jsenior     11/11/97    New Sokoto Port.
+//
+//--------------------------------------------------------------------------
+char *WWSimplifyURI(char **url)
+{
+    if (!url || !*url)
+    {
+        EC_WARN("Bad URL passed to WWSimplifyURL - aborting");
+        return *url;
+    }
+
+    char *path,
+          *p;
+
+    /* Find any scheme name */
+    if ((path = strstr(*url, "://")) != NULL) /* Find host name */
+    {          
+        char *newptr,
+              *access = *url;
+
+        while (access < path && (*access = tolower(*access)) != NULL)
+        {
+            access++;
+        }
+        path += 3;
+
+        while ((newptr = strstr(path, "://")) != NULL) /* For proxies */
+        {
+            path = newptr + 3;
+        }
+        path = WWCanonURI(url, path); /* We have a host name */
+
+    }
+    else if ((path = strstr(*url, ":/")) != NULL) 
+    {
+        path += 2;
+    } 
+    else
+    {
+        path = *url;
+    }
+
+    if (*path == '/' && *(path + 1) == '/')
+    {                                   /* Some URLs start //<foo> */
+        path += 1;
+    }
+    else if (!strncmp(path, "news:", 5))
+    {
+        char *ptr = strchr(path + 5, '@');
+
+        if (!ptr)
+        {
+            ptr = path + 5;
+        }
+
+        while (*ptr) /* Make group or host lower case */
+        {               
+            *ptr = tolower(*ptr);
+            ptr++;
+        }
+        return *url; /* Doesn't need to do any more */
+    }
+
+    if ((p = path) != NULL) 
+    {
+        char *end;
+
+        if (!((end = strchr(path, ';')) != NULL || 
+            (end = strchr(path, '?')) != NULL ||
+            (end = strchr(path, '#')) != NULL))
+        {
+            end = path + strlen(path);
+        }
+
+        /* Parse string second time to simplify */
+        p = path;
+        while(p < end)
+        {
+            if (*p == '/')
+            {
+                if (p > *url && *(p + 1) == '.' &&
+                    (*(p + 2) == '/' || !*(p + 2)))
+                {
+                    char *orig = p + 1,
+                        *dest = (*(p + 2) != '/') ? p + 2 : p + 3;
+
+                    /* Remove a slash and a dot */
+                    while ((*orig++ = *dest++) != NULL); // copy
+                    end = orig - 1;
+                }
+                else if (*(p + 1) == '.' &&
+                        *(p + 2) == '.' &&
+                        (*(p + 3) == '/' || !*(p + 3)))
+                {
+                    char *q = p;
+
+                    while (q > path && *--q != '/'); /* prev slash */
+
+                    if (strncmp(q, "/../", 4)) 
+                    {
+                        char *orig = q + 1,
+                            *dest = (*(p + 3) != '/') ? p + 3 : p + 4;
+                        /* Remove /xxx/.. */
+                        while ((*orig++ = *dest++) != NULL);
+                        end = orig - 1;
+                        p = q; /* Start again with prev slash */
+                    }
+                    else
+                    {
+                        p++;
+                    }
+                }
+                else if (*(p + 1) == '/')
+                {
+                    while (*(p + 1) == '/')
+                    {
+                        char *orig = p,
+                              *dest = p + 1;
+                        /* Remove multiple /'s */
+                        while ((*orig++ = *dest++) != NULL);
+                        end = orig - 1;
+                    }
+                }
+                else
+                {
+                    p++;
+                }
+            }
+            else
+            {
+                p++;
+            }
+        }
+    }
+
+    return *url;
+} /* End of WWSimplifyURI. */
+
+
+
+//--------------------------------------------------------------------------
+// WWParseURIStr
+//--------------------------------------------------------------------------
+//
+// DESCRIPTION:     Return those parts of a name which are given and 
+//                  requested. We substitute parts from the related name 
+//                  where necessary. The returned buffer is allocated
+//                  using malloc() and must be *freed*.
+//
+// SCOPE:           PUBLIC
+//
+// RETURN:          Must be freed be caller or NULL.
+//
+// IMPLEMENTATION:  Ported from W3C HTParse HTParse.c. and extended by kkee.
+//                  See header for parameters.
+//
+// REVISION HISTORY:
+//      Name        Date        Description
+//      ----        ----        -----------
+//      kkee        10/31/96    Initial Revision
+//      jsenior     12/11/97    New Sokoto Port.
+//
+//--------------------------------------------------------------------------
+char * WWParseURIStr(const char *aName, 
+                   const char *relatedName, 
+                   word wanted)
+{
+    char *ret = 0,
+          *result = 0,
+          *name = 0,
+          *rel = 0,
+          *p = 0,
+          *access = 0;
+    word len;
+    WWURI given,
+          related;
+
+    PARAM_ASSERT(aName != NULL);
+
+    if (!relatedName)        /* HWL 23/8/94: dont dump due to NULL */
+    {
+        relatedName = "";
+    }
+    
+    /* Make working copies of input strings to cut up */
+    len = strlen(aName) + strlen(relatedName) + 10;
+
+    name = (char *) malloc(strlen(aName) + 1);
+
+    rel = (char *) malloc(strlen(relatedName) + 1);
+
+    /* Lots of space: more than enough */
+    result = (char *) malloc(len);
+
+    if (!name || !rel || !result) // if any failed free the others
+    {
+        if (name)
+        {
+            free(name);
+        }
+        if (rel) 
+        {
+            free(rel);
+        }
+        if (result)
+        {
+            free(result);
+        }
+        EC_WARN("WWParseURIStr(): Memory allocation failure");
+        return NULL;
+    }
+
+    strcpy(name, aName);
+    strcpy(rel, relatedName);
+
+    /* Modifies name and rel */
+    WWScanURI(name, &given);
+    WWScanURI(rel,  &related); 
+    result[0] = 0;      /* Clear string  */
+    access = given.access ? given.access : related.access;
+
+    if ((wanted & WWURI_PARSE_ACCESS) && access) //check**
+    {
+        strcat(result, access);
+        if(wanted & WWURI_PARSE_PUNCTUATION) //check**
+        {
+            strcat(result, "://");
+        }
+    }   
+    
+    if ((given.access && related.access) && /* If diff access, inherit nothing. */
+        (strcmp(given.access, related.access) != 0))
+    {
+        related.host = 0;
+        related.port = 0;
+        related.absolute = 0;
+        related.relative = 0;
+        related.anchor = 0;
+    }
+    
+    if ((wanted & WWURI_PARSE_HOST) && //check**
+        (given.host || related.host))
+    {
+        strcat(result, given.host ? given.host : related.host);
+    }
+        
+    if ((given.host && related.host) && /* If diff hosts, inherit no path. */
+        (strcmp(given.host, related.host) != 0))
+    {
+        related.port = 0;
+        related.absolute = 0;
+        related.relative = 0;
+        related.anchor = 0;
+    }
+
+    if ((given.port && related.port) && /* If diff ports, inherit no path. */
+        (strcmp(given.port, related.port) != 0)) 
+    {
+        related.absolute = 0;
+        related.relative = 0;
+        related.anchor = 0;
+    }
+
+    if ((wanted & WWURI_PARSE_PORT) &&
+        (given.port || related.port))
+    {
+        if (wanted & WWURI_PARSE_PUNCTUATION)
+        {
+            strcat(result, ":");
+        }
+        strcat(result, given.port ? given.port : related.port);
+    }
+
+    if (wanted & WWURI_PARSE_PATH)
+    {
+        if (given.absolute) /* All is given */
+        {               
+            if (wanted & WWURI_PARSE_PUNCTUATION)
+            {
+                strcat(result, "/");
+            }
+            strcat(result, given.absolute);
+        }
+        else if (related.absolute) /* Adopt path not name */
+        { 
+            strcat(result, "/");
+            strcat(result, related.absolute);
+            if (given.relative)
+            {
+                p = strchr(result, '?'); /* Search part? */
+                if (!p)
+                {
+                    p = result + strlen(result) - 1;
+                }
+                for (; *p != '/'; p--);   /* last / */
+                p[1] = 0;                        /* Remove filename */
+                strcat(result, given.relative);  /* Add given one */
+            }
+        }
+        else if(given.relative)
+        {
+            strcat(result, given.relative);     /* what we've got */
+        }
+        else if(related.relative)
+        {
+            strcat(result, related.relative);
+        }
+        else /* No inheritance */
+        {  
+            strcat(result, "/");
+        }
+    }
+        
+    if (wanted & WWURI_PARSE_ANCHOR)
+    {
+        if (given.anchor) 
+        {
+            if (given.absolute && given.anchor) /*Fixes for relURLs...*/
+            {   
+                if(wanted & WWURI_PARSE_PUNCTUATION)
+                {
+                    strcat(result, "#");
+                }
+                strcat(result, given.anchor); 
+            }
+            else if (!(given.absolute) && !(given.anchor)) 
+            {
+                strcat(result, ""); // never executed ?? check**
+            }
+            else 
+            {
+                if(wanted & WWURI_PARSE_PUNCTUATION)
+                {
+                    strcat(result, "#");
+                }
+                strcat(result, given.anchor);
+            }
+        }
+    }
+
+    free(name);
+    free(rel);
+    
+    ret = (char *) malloc(sizeof(char) * (strlen(result) + 1));
+    strcpy(ret, result);
+    free(result);
+
+    return ret; /* exactly the right length */
+} /* End of WWParseURIStr. */
+
+
+//---------------------------------------------------------------------------
+//		WWParseURIHandle()
+//---------------------------------------------------------------------------
+// 
+// SYNOPSIS: 	Same as WWParseURIStr(const char*, const char*, uint16),
+//              but take two WWMemHandles.
+// SCOPE:	Public
+// RETURN:      Must be freed be caller or NULL.
+// STRATEGY:	
+// 
+// REVISION HISTORY: 
+//	Name		Date		Description 
+//	----		----		----------- 
+//	kkee    	4/15/98 	Initial version 
+//	
+//---------------------------------------------------------------------------
+char*
+WWParseURIHandle(WWMemHandle aNameH, WWMemHandle relatedNameH, word wanted)
+{
+    PARAM_ASSERT(aNameH);
+
+    char *aName = (char*) WWMemLock(aNameH);
+    char *relatedName = NULL;
+    if (relatedNameH) {
+        relatedName = (char*) WWMemLock(relatedNameH);
+    }
+    char *ret = WWParseURIStr(aName, relatedName, wanted);
+    WWMemUnlock(aNameH);
+    if (relatedNameH) {
+        WWMemUnlock(relatedNameH);
+    }
+
+    return ret;
+}	/* End of WWParseURIHandle() */
+
+//--------------------------------------------------------------------------
+//
+// DESCRIPTION:     Return those parts of a name which are given and 
+//                  requested. We substitute parts from the related name 
+//                  where necessary. The returned buffer is allocated
+//                  using malloc() and must be *freed*.
+//
+// SCOPE:           PUBLIC
+//
+// RETURN:          Must be freed be caller or NULL.
+//
+// REVISION HISTORY:
+//      Name        Date        Description
+//      ----        ----        -----------
+//      mzhu        5/4/98      Initial version
+//
+//--------------------------------------------------------------------------
+char * WWParseURIStrAll(const char *aName, 
+                   const char *relatedName)
+{
+    PARAM_ASSERT(aName);
+
+    //
+    // parse the aName first
+    //
+    while(isspace(*aName)) {
+        aName++;
+    }
+    char *bName = (char *)aName;
+    if(*aName != '#')
+    {
+        bName = WWParseURIStr(aName, NULL, WWURI_PARSE_ALL);
+        if(!bName) 
+            //something wrong, we give up...
+            return NULL;
+    }
+
+    //
+    // if the relatedName passed, parse it and combine them
+    //
+    if(relatedName)
+    {
+        char *pName = WWParseURIStr(relatedName, NULL, WWURI_PARSE_ALL);
+        if(!pName)
+        {
+            //something wrong, 
+            if(bName != (char *) aName) free(bName);
+            return NULL;
+        }
+
+        //parse the combined URL
+        char *ret = WWParseURIStr(bName, pName, WWURI_PARSE_ALL);
+        if(!ret)
+        {
+            //something wrong, 
+            if(bName != (char *) aName) free(bName);
+            free(pName);
+            return NULL;
+        }
+        if(bName != (char *) aName) free(bName);
+        free(pName);
+        return WWSimplifyURI(&ret);
+    }
+    else
+        return WWSimplifyURI(&bName);
+}
+
+
+//---------------------------------------------------------------------------
+//		WWParseURIHandleAll()
+//---------------------------------------------------------------------------
+// 
+// SYNOPSIS: 	Same as WWParseURIStrAll(const char*, const char*),
+//              but take two WWMemHandles.
+// SCOPE:	Public
+// RETURN:      Must be freed be caller or NULL.
+// STRATEGY:	
+// 
+// REVISION HISTORY: 
+//	Name		Date		Description 
+//	----		----		----------- 
+//	mzhu    	5/4/98 	Initial version 
+//	
+//---------------------------------------------------------------------------
+char*
+WWParseURIHandleAll(WWMemHandle aNameH, WWMemHandle relatedNameH)
+{
+    PARAM_ASSERT(aNameH);
+
+    char *aName = (char*) WWMemLock(aNameH);
+    char *relatedName = NULL;
+    if (relatedNameH) {
+        relatedName = (char*) WWMemLock(relatedNameH);
+    }
+    char *ret = WWParseURIStrAll(aName, relatedName);
+    WWMemUnlock(aNameH);
+    if (relatedNameH) {
+        WWMemUnlock(relatedNameH);
+    }
+
+    return ret;
+}
+
+//--------------------------------------------------------------------------
+// WWFileURIOpen
+//--------------------------------------------------------------------------
+//
+// DESCRIPTION:     Open a file URI.
+//
+// SCOPE:           PUBLIC
+//
+// RETURN:          FileHandle if open, else NULL.
+//
+// IMPLEMENTATION:  The New Sokoto filesystem is in a state of flux. For
+//                  Sokoto 2 this function will need to be revised.
+//                  Responsibility for file closing is with the caller.
+//    
+//                  This function does not attempt to implement non local
+//                  file retrieval.
+//
+// REVISION HISTORY:
+//      Name        Date        Description
+//      ----        ----        -----------
+//      kkee         8/15/97    Initial Revision
+//      jsenior     12/11/97    New Sokoto Port.
+//
+//--------------------------------------------------------------------------
+FileHandle WWFileURIOpen(const char *turl)
+{
+    if (!turl || !WWStrCaseStr(turl, "file://"))
+    {
+        return NULL;
+    }
+
+    char *url = WWParseURIStr(turl, NULL, WWURI_PARSE_PATH | 
+                                       WWURI_PARSE_PUNCTUATION);
+    
+    // switch '\' to '/'
+    char *p = url;
+    while (*p) {
+        if (*p == '\\') {
+            *p = '/'; 
+        }
+        p++;
+    }
+
+    TCHAR *tmp = malloc(sizeof(TCHAR) * (strlen(url)+1));
+    if (!tmp) {
+        free(url);
+        return NULL;
+    }
+    Jstrcpy(tmp, url);
+
+    FileHandle result = FileOpen(tmp, FILE_DENY_W | FILE_ACCESS_R);
+    if (!result && !WWStrNCaseCmp(url, "/localhost/", 11)) {
+        result = FileOpen(&tmp[11], FILE_DENY_W | FILE_ACCESS_R);
+    }
+
+    free(tmp);
+    free(url);
+
+    return result;
+} /* End of WWFileURIOpen. */

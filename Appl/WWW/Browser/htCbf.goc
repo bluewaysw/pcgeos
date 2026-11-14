@@ -1,0 +1,307 @@
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Geoworks 1996 -- All Rights Reserved
+
+PROJECT:	GeoBrowser
+MODULE:		Callbacks
+FILE:		htCbf.goc
+
+AUTHOR:		Kok Kin Kee, Jun  4, 1996
+
+ROUTINES:
+	Name			Description
+	----			-----------
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	kkee	6/ 4/96   	Initial version.
+
+DESCRIPTION:
+	GeoBrowser (i.e., application-specific) "before" and "after"
+ 	callback functions.
+
+	$Id: htCbf.goc,v 1.1 97/04/04 17:20:41 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+
+@include <WWW/HTCore/htreq.goh>
+@include <WWW/HTCore/htstream.goh>
+@include <WWW/uigenera.goh>
+@include <Ansi/string.h>
+@include <sem.h>
+
+@include "bConst.goh"
+@include "bUI.goh"
+@include "reqList.goh"
+
+extern void ISSetWindowMoniker(char *, char *);
+
+static optr processOptr = NULL;
+extern SReqList sRequestList;
+extern SemaphoreHandle sRequestEmpty;
+extern Boolean IsBusy;
+
+
+/***********************************************************************
+ *		GBSetProcessHandle
+ ***********************************************************************
+ * SYNOPSIS:	Set the application process thread optr here so we 
+ *              send messages to the process thread when these callbacks
+ *              get called from the Library HTCore thread.
+ * CALLED BY:	MSG_META_ATTACH_GENPROCESSCLASS
+ * RETURN:	Nothing
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	kkee	8/22/96   	Initial Revision
+ *
+ ***********************************************************************/
+void _far _pascal
+GBSetProcessHandle (ThreadHandle appProcess)
+{
+    processOptr = ConstructOptr(appProcess, 0);
+}	/* End of GBSetProcessHandle.	*/
+
+
+
+
+/***********************************************************************
+ *		GBCheckCache
+ ***********************************************************************
+ * SYNOPSIS:	Check cache. A "before" callback.
+ * CALLED BY:	The Library in the "before" callback loop.
+ * RETURN:	HT_OK or HT_NO.
+ * SIDE EFFECTS:Nothing
+ *	
+ * STRATEGY:
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	kkee	6/ 4/96   	Initial Revision
+ *
+ ***********************************************************************/
+/*
+int _far _pascal
+GBCheckCache (HTRequestHandle request, int status)
+{
+    return HT_OK;
+}	* End of GBStartLoad.	*/
+
+
+
+/***********************************************************************
+ *		GBRequestCallback
+ ***********************************************************************
+ * SYNOPSIS:	Callback from WWW Library to indicate to us what is 
+ *              going on with our request.
+ * CALLED BY:	Library.
+ * RETURN:	HT_OK, if we want to request continue being serviced
+ *              by the Library. Any code other than HT_OK will cause
+ *              the request to be terminated and returned to us in the 
+ *              "after" callback loop. We *MUST* not delete the request
+ *              as the Library relies on getting it back.
+ *
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	kkee	8/22/96   	Initial Revision
+ *
+ ***********************************************************************/
+int _far _pascal 
+GBRequestCallback (HTRequestHandle request, int status)
+{
+    dword contentLength, bytesRead;
+    char  title[MAX_TITLE_LEN/2+1], url[MAX_TITLE_LEN/2+1];
+
+    PUSHDS;
+    SET_DS_LIB_DGROUP;  /* To local static variables since we are
+			   called WWW Library HTCore thread. */
+    switch (status) {
+    case HT_RESOLVING_HOST:
+	ISSetWindowMoniker("Resolving Host...","");
+	break;
+
+    case HT_CONNECTING_TO_SERVER:
+	ISSetWindowMoniker("Connecting Server...","");
+	break;
+
+    case HT_RETRY_CONNECTING_TO_SERVER:
+	ISSetWindowMoniker("Retrying to Connect Server...","");
+	break;
+
+    case HT_WAITING_FOR_REPLY:
+	ISSetWindowMoniker("Waiting for Reply...","");
+	break;
+
+    case HT_LOADING_DATA:
+ 	if(SReqListGetURL(sRequestList, url, MAX_TITLE_LEN/2)) {
+	    if(!SReqListGetTitle(sRequestList, title, MAX_TITLE_LEN/2))
+	        strcpy(title, url);
+    	    ISSetWindowMoniker(title, url);
+     	}
+
+	if(IsBusy) {
+	    @send ISApp::MSG_GEN_APPLICATION_MARK_APP_NOT_COMPLETELY_BUSY();
+	    IsBusy = FALSE;
+	}
+
+	break;
+
+    default:
+	break;  /* We are not interested in other states */
+    }
+
+    POPDS;
+    return HT_OK;
+}	/* End of GBRequestCallback.	*/
+
+
+
+/***********************************************************************
+ *		GBTerminateRequest
+ ***********************************************************************
+ * SYNOPSIS:	Terminate request handler for handling requests that
+ *              are completed. An "after" callback.
+ * CALLED BY:	The Library in "after" callback loop.
+ * RETURN:	HT_NO (Terminate the "after" callback loop in the Net 
+ *              Manager).
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:    You should register this as the last "after" callback
+ *              with the Net Manager. Since this callback runs in the
+ *              Library HTCore thread, we need to send a message to our
+ *              process to synch access to request.
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	kkee	6/ 4/96   	Initial Revision
+ *
+ ***********************************************************************/
+int _far _pascal
+GBTerminateRequest (HTRequestHandle request, int status)
+{
+    char  title[MAX_TITLE_LEN/2+1], url[MAX_TITLE_LEN/2+1];
+
+    PUSHDS; 
+    SET_DS_LIB_DGROUP;  /* To use static vars */
+
+    if(IsBusy) {
+    	@send ISApp::MSG_GEN_APPLICATION_MARK_APP_NOT_COMPLETELY_BUSY();
+    	IsBusy = FALSE;
+    }
+
+    @send ISNotificationDialog::MSG_GEN_SET_WIN_POSITION(
+				0, 145, 20);
+    @send ISNotificationDialog::MSG_GEN_REPLACE_VIS_MONIKER_TEXT(
+				"Open Location", VUM_DELAYED_VIA_APP_QUEUE);
+
+    if(SReqListGetURL(sRequestList, url, MAX_TITLE_LEN/2)) {
+        if(!SReqListGetTitle(sRequestList, title, MAX_TITLE_LEN/2))
+	    strcpy(title, url);
+        ISSetWindowMoniker(title, url);
+    }
+
+    switch (status) {
+    case HT_INTERRUPTED:
+
+	break;
+
+    case HT_OUT_OF_MEMORY:
+
+	@send ISNotificationText::MSG_VIS_TEXT_REPLACE_ALL_PTR(
+				"Out Of Memory!", 0);
+	UserDoDialog(@ISNotificationDialog);
+	break;
+
+    case HT_CANNOT_RESOLVE_HOST_NAME:
+	if(SReqListGetRequestTarget(sRequestList, request)
+		== @UIGenerator ){
+	    @send ISNotificationText::MSG_VIS_TEXT_REPLACE_ALL_PTR(
+				"Cannot Find the Host!", 0);
+	    UserDoDialog(@ISNotificationDialog);
+	}
+	break;
+
+    case HT_LINK_FAILED:
+	if(SReqListGetRequestTarget(sRequestList, request)
+		== @UIGenerator ){
+	    @send ISNotificationText::MSG_VIS_TEXT_REPLACE_ALL_PTR(
+				"Link Failed!", 0);
+	    UserDoDialog(@ISNotificationDialog);
+	}
+	break;
+
+    case HT_NO_PROTOCOL:
+	if(SReqListGetRequestTarget(sRequestList, request)
+		== @UIGenerator ){
+	    @send ISNotificationText::MSG_VIS_TEXT_REPLACE_ALL_PTR(
+				"Not Supported Protocol!", 0);
+	    UserDoDialog(@ISNotificationDialog);
+ 	}
+	break;
+
+    case HT_CANNOT_CONNECT:
+	if(SReqListGetRequestTarget(sRequestList, request)
+		== @UIGenerator ){
+	    @send ISNotificationText::MSG_VIS_TEXT_REPLACE_ALL_PTR(
+				"Cannot Connect Server!", 0);
+	    UserDoDialog(@ISNotificationDialog);
+	}
+	break;
+
+    case HT_CANNOT_OPEN_FILE:
+	if(SReqListGetRequestTarget(sRequestList, request)
+		== @UIGenerator ){
+   	    @send ISNotificationText::MSG_VIS_TEXT_REPLACE_ALL_PTR(
+				"Cannot Open File!", 0);
+	    UserDoDialog(@ISNotificationDialog);
+	}
+	break;
+
+    case HT_LOADED:
+
+	break;
+
+    default:
+	break;
+    }
+
+    SReqListDeleteRequest(sRequestList, request);
+    if( !SReqListGetRequestCount(sRequestList) )
+	ThreadVSem(sRequestEmpty);
+
+    POPDS;
+
+    return HT_NO;    /* Stop the callback loop */
+}	/* End of GBTerminateRequest.	*/
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

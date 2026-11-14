@@ -1,0 +1,844 @@
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Geoworks 1996 -- All Rights Reserved
+
+PROJECT:	Geos WWW Library
+MODULE:		HTSocket Mgr
+FILE:		htsockMan.goc
+
+AUTHOR:		Kok Kin Kee, Jul 30, 1996
+
+ROUTINES:
+	Name			Description
+	----			-----------
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	kkee	7/30/96   	Initial version.
+
+DESCRIPTION:
+	The socket manager.  The manager creates and deletes to implement 
+	certain policies, the most important of which is persistent 
+	connections.
+
+	$Id: htsockMan.goc,v 1.1 97/04/07 11:48:43 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+@include <WWW/HTCore/htsock.goh>
+@include <WWW/HTCore/hterror.goh>
+@include <WWW/HTCore/htlist.goh>
+@include <WWW/HTCore/htstream.goh>
+@include <WWW/HTCore/htsockMan.goh>
+#include <WWW/htmem.h>
+@include <WWW/HTCore/hturi.goh>
+@include <WWW/HTCore/htanchor.goh>
+@include "htfatals.goh"
+#include <Ansi/string.h>
+#include <sem.h>
+
+/* --------------------------------------------------------------------------
+ * 		PRIVATE DATA
+ * --------------------------------------------------------------------------*/
+
+extern char tcpDomain;      /* in htsock.goc */
+extern Boolean wwwMediumIsUp;  /* in htsock.goc */
+extern MediumAndUnit wwwMedium;      /* in htsock.goc */
+
+/* 
+ * Each persistent connection is owned by a client. We need to 
+ * keep track of persistent connections to implement some traffic
+ * congestion control policy as to avoid overwhelming the server/proxy, 
+ * network.
+ */
+typedef struct {
+    GeodeHandle HTSC_clientGeodeHandle;
+    byte HTSC_persistentSockets;   /* number of persistent sockets. */
+} HTSocketClient;
+
+typedef struct {
+    GeodeHandle  HTSC_clientGeodeHandle;
+    HTStreamHandle HTSC_htsocket; /* the persistent socket. */
+} HTSocketConnection;
+
+/* 
+ * For resolving socket host names only. To find a persistent connection 
+ * that matches a request's host/proxy name, we need to use the resolved
+ * name as it uniquely identifies the host/proxy. 
+ */
+static SocketAddress sockAddress;
+static byte resolvedAddress[MAX_RESOLVED_ADDRESS_LENGTH];
+
+/*
+ * List of persistent socket connections.
+ */
+static HTListHandle socketList = NULL;
+/*
+ * List of clients using persistent socket connections.
+ */
+static HTListHandle clientList = NULL;
+/*
+ * Semaphore for synchronous access to socketList and clientList.
+ */
+static SemaphoreHandle smSyncSem = NULL;
+
+
+/***********************************************************************
+		Private Functions
+***********************************************************************/
+
+static void _pascal HTSocketDeleteSocketList(HTListHandle list);
+static void _pascal HTSocketDeleteClientList(HTListHandle list);
+static HTStreamHandle _pascal HTSocketReuse(HTRequest *rptr);
+static void _pascal HTSocketFree(HTStreamHandle socket);
+static Boolean _pascal HTSocketResolveRequest(HTRequest *rptr, 
+				   byte *resolvedAddr, word *length);
+static word _pascal HTSocketGetClientConnection(GeodeHandle client);
+static void _pascal HTSocketDecrementClientConnection(GeodeHandle client);
+static void _pascal HTSocketIncrementClientConnection(GeodeHandle client);
+
+
+/***********************************************************************
+ *		HTSockManLibraryEntry
+ ***********************************************************************
+ * SYNOPSIS:	Initialize Library data.
+ * CALLED BY:	HTCoreLibraryEntry
+ * RETURN:	Must return 0 to indicate all is ok to Geos.
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	kkee	7/30/96   	Initial Revision
+ *
+ ***********************************************************************/
+int _far _pascal
+HTSockManLibraryEntry (LibraryCallType ty, GeodeHandle client)
+{
+    if (ty == LCT_ATTACH) {
+	PUSHDS;
+	SET_DS_LIB_DGROUP;
+
+	socketList = HTListNew();
+	clientList = HTListNew();
+	smSyncSem = ThreadAllocSem(1);
+	HandleModifyOwner(smSyncSem, GeodeGetCodeProcessHandle());
+	
+	POPDS;
+
+    } else if (ty == LCT_DETACH) {
+	PUSHDS;
+	SET_DS_LIB_DGROUP;
+
+	HTSocketDeleteSocketList(socketList);
+	HTListDelete(socketList);
+	socketList = NULL;          /* Lazarus protection. */
+
+	HTSocketDeleteClientList(clientList);
+	HTListDelete(clientList);
+	clientList = NULL;
+
+	ThreadFreeSem(smSyncSem);
+	smSyncSem = NULL;
+
+	POPDS;
+    }
+
+    return 0; /* Return value required by Geos kernel. */
+}	/* End of HTSockManLibraryEntry.	*/
+
+
+
+@ifndef __TEST_HT_SOCKET__
+
+
+/***********************************************************************
+ *		HTSocketReuse
+ ***********************************************************************
+ * SYNOPSIS:	Find an existing persistent HTSocket to service a 
+ *              request.
+ * CALLED BY:	HTSocketCreate.
+ * RETURN:	HTStreamHandle - NullOptr if no HTSocket was found to 
+ *              service request.
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:    The socket must be owned by the same client and have 
+ *              the server address as the request passed in.
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	kkee	7/30/96   	Initial Revision
+ *
+ ***********************************************************************/
+static HTStreamHandle _pascal
+HTSocketReuse (HTRequest *rptr)
+{
+    word count, i, size, index;
+    byte socketAddr[MAX_RESOLVED_ADDRESS_LENGTH];
+    byte requestAddr[MAX_RESOLVED_ADDRESS_LENGTH];
+    word requestAddrLength, socketAddrLength;
+    HTSocketConnection htsocket;
+    HTStreamHandle socket;
+    Boolean found = FALSE;
+   
+    count = HTListGetCount(socketList);
+    if (count) {
+	if (!HTSocketResolveRequest(rptr, requestAddr, &requestAddrLength))
+	    count = 0;  /* not resolved */
+	size = sizeof(HTSocketConnection);
+    }
+
+    for (i=0; i<count; i++) {
+	HTListGetItem(socketList, i, &htsocket, size);
+	socketAddrLength = @call htsocket.HTSC_htsocket::
+	    MSG_HT_SOCKET_GET_RESOLVED_ADDRESS(socketAddr, 
+					       MAX_RESOLVED_ADDRESS_LENGTH);
+	if (requestAddrLength != socketAddrLength)
+	    /* 
+	     * This must be checked first as we do not want to compare
+	     * substrings in memcmp.
+	     */
+	    continue;
+
+	if ((!memcmp(requestAddr, socketAddr, requestAddrLength)) &&
+	    (htsocket.HTSC_clientGeodeHandle==rptr->HTR_clientGeodeHandle)){
+	    /* Found a matching persistent connection for the client. */
+	    found = TRUE;
+	    index = i;
+	    break;
+	}
+    }
+    
+    if (found) {
+	HTListRemoveItem(socketList, index, &htsocket, size);
+	socket = htsocket.HTSC_htsocket;
+    } else 
+	socket = NullOptr;
+
+    return socket;
+}	/* End of HTSocketReuse.	*/
+
+@endif
+
+
+
+/***********************************************************************
+ *		HTSocketIncrementClientConnection
+ ***********************************************************************
+ * SYNOPSIS:	Increment a client hold on number of persistent 
+ *              connections.
+ * CALLED BY:	HTSocketCreate
+ * RETURN:	Nothing
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:    If a new client, we add to list and initialize the 
+ *              number of persistent connections it has to 1.
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	kkee	8/11/96   	Initial Revision
+ *
+ ***********************************************************************/
+static void _pascal
+HTSocketIncrementClientConnection (GeodeHandle client)
+{
+    HTSocketClient htclient;
+    word count, i;
+    Boolean found = FALSE;
+    word size = sizeof(HTSocketClient);
+
+EC( ECCheckProcessHandle(client);                                      )
+
+    count = HTListGetCount(clientList);
+
+    for (i=0; i<count; i++) {
+	HTListGetItem(clientList, i, (void *)(& htclient), size);
+
+	if (htclient.HTSC_clientGeodeHandle == client) {
+	    HTListRemoveItem(clientList, i, (void *)(& htclient), size);
+	    (htclient.HTSC_persistentSockets)++;
+	    HTListAppend(clientList, (void *)(& htclient), size);
+
+#if ERROR_CHECK
+            if (htclient.HTSC_persistentSockets > 
+		MAX_PERSISTENT_CONNECTIONS_PER_SERVER)
+                EC_ERROR(EXCEED_MAX_PERSISTENT_CONNECTIONS);
+#endif
+
+	    found = TRUE;
+	    break; /* Terminate the for loop */
+	}
+    }
+
+    /* New client? */
+    if ((!count) || (!found)) {
+	htclient.HTSC_clientGeodeHandle = client;
+	htclient.HTSC_persistentSockets = 1;
+	HTListAppend(clientList, (void *)(&htclient), size);
+    }
+    
+}	/* End of HTSocketIncrementClientConnection.	*/
+
+
+
+
+/***********************************************************************
+ *		HTSocketDecrementClientConnection
+ ***********************************************************************
+ * SYNOPSIS:	Decrement the number of persistent connections of  a
+ *              client.
+ * CALLED BY:	HTSocketCreate
+ * RETURN:	Nothing.
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	kkee	8/11/96   	Initial Revision
+ *
+ ***********************************************************************/
+static void _pascal
+HTSocketDecrementClientConnection (GeodeHandle client)
+{
+    HTSocketClient htclient;
+    word count, i;
+    Boolean found = FALSE;
+    word size = sizeof(HTSocketClient);
+
+EC( ECCheckProcessHandle(client);                                       )
+
+    count = HTListGetCount(clientList);
+
+    for (i=0; i<count; i++) {
+	HTListGetItem(clientList, i, (void *)(& htclient), size);
+
+	if (htclient.HTSC_clientGeodeHandle == client) {
+	    HTListRemoveItem(clientList, i, (void *)(& htclient), size);
+
+EC(     if (htclient.HTSC_persistentSockets == 0)                       )
+EC(         EC_ERROR(NO_PERSISTENT_CONNECTIONS);                        )
+
+	    (htclient.HTSC_persistentSockets)--;
+	    HTListAppend(clientList, (void *)(& htclient), size);
+
+	    found = TRUE;
+	    break; /* Terminate the for loop */
+	}
+    }
+
+    /* New client? Programming Error! */
+EC( if ((!count) || (!found)) EC_ERROR(INVALID_CLIENT);                 )
+    
+}	/* End of HTSocketDecrementClientConnection.	*/
+
+
+
+
+/***********************************************************************
+ *		HTSocketGetClientConnection
+ ***********************************************************************
+ * SYNOPSIS:	Get the number of persistent connections of a client.
+ * CALLED BY:	HTSocketCreate
+ * RETURN:	
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	kkee	8/11/96   	Initial Revision
+ *
+ ***********************************************************************/
+static word _pascal
+HTSocketGetClientConnection (GeodeHandle client)
+{
+    HTSocketClient htclient;
+    word count, i, retValue = 0;  /* For new client is 0 */
+    Boolean found = FALSE;
+    word size = sizeof(HTSocketClient);
+
+EC( ECCheckProcessHandle(client);                                       )
+
+    count = HTListGetCount(clientList);
+
+    for (i=0; i<count; i++) {
+	HTListGetItem(clientList, i, (void *)(& htclient), size);
+
+	if (htclient.HTSC_clientGeodeHandle == client) {
+	    retValue = htclient.HTSC_persistentSockets;
+	    found = TRUE;
+	    break; /* Terminate the for loop */
+	}
+    }
+
+    return retValue;
+}	/* End of HTSocketGetClientConnection.	*/
+
+
+
+
+/***********************************************************************
+ *		HTSocketFree
+ ***********************************************************************
+ * SYNOPSIS:	Delete a HTSocket. The socket manager uses it instead of
+ *              MSG_META_OBJ_FREE.
+ * CALLED BY:	HTSocketDelete, HTSocketDeleteSocketList.
+ * RETURN:	Nothing
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	kkee	7/30/96   	Initial Revision
+ *
+ ***********************************************************************/
+static void _pascal
+HTSocketFree (HTStreamHandle socket)
+{
+
+EC( ECCheckStream(socket);                                              )
+
+    /* Since HTSocket is now a part of the htcore Library (instead of 
+     * being a library by itself, we don't have to change its class.
+     * If htsock is a library by itself, we need to change its class
+     * and call MSG_HT_SOCKET_CLOSE instead of using MSG_META_OBJ_FREE
+     * to close the socket as we will not be executing the htsock 
+     * MSG_META_OBJ_FREE.
+     *
+     * PUSHDS;
+     * SET_DS_LIB_DGROUP;
+     * HTUtilChangeClass(socket, &HTStreamClass);
+     * POPDS;
+     */
+
+    /* 
+     * Must @call instead of @send as we want to this socket is gone
+     * before returning to client 
+     */
+    @call socket::MSG_META_OBJ_FREE();
+}	/* End of HTSocketFree.	*/
+
+
+
+
+/***********************************************************************
+ *		HTSocketDeleteSocketList
+ ***********************************************************************
+ * SYNOPSIS:	Delete all persistent HTSockets in a list.
+ * CALLED BY:	HTSocketLibraryEntry
+ * RETURN:	Nothing
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:    Since this API is called when we get LCT_DETACH,
+ *              the htcore thread queue would have been gone.
+ *              So we should NOT call HTSocketFree.
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	kkee	7/30/96   	Initial Revision
+ *
+ ***********************************************************************/
+static void _pascal
+HTSocketDeleteSocketList (HTListHandle list)
+{
+    HTSocketConnection htsocket;
+    word count, i, size;
+
+    count = HTListGetCount(list);
+    size = sizeof(HTSocketConnection);
+
+    for (i=0; i<count; i++) {
+	HTListRemoveItem(list, 0, &htsocket, size);
+	/* HTSocketFree(htsocket.HTSC_htsocket); */
+    }
+}	/* End of HTSocketDeleteSocketList.	*/
+
+
+
+
+/***********************************************************************
+ *		HTSocketDeleteClientList
+ ***********************************************************************
+ * SYNOPSIS:	Delete all clients of a the socket manager.
+ * CALLED BY:	HTSocketLibraryEntry
+ * RETURN:	Nothing.
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	kkee	8/13/96   	Initial Revision
+ *
+ ***********************************************************************/
+static void _pascal
+HTSocketDeleteClientList (HTListHandle list)
+{
+    HTSocketClient htclient;
+    word count, i, size;
+
+    count = HTListGetCount(list);
+    size = sizeof(HTSocketClient);
+
+    for (i=0; i<count; i++)
+	HTListRemoveItem(list, 0, &htclient, size);
+}	/* End of HTSocketDeleteClientList.	*/
+
+
+
+
+
+/***********************************************************************
+ *		HTSocketResolveRequest
+ ***********************************************************************
+ * SYNOPSIS:	Resolve the host/proxy address of a request.
+ * CALLED BY:	HTSocketCreate.
+ * RETURN:	TRUE if the request address is resolved, else FALSE.
+ *              If TRUE, resolvedAddr stores the resolved address.
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:    If there is a proxy, the resolvedAddr is that of the 
+ *              proxy, else its the host.
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	kkee	7/30/96   	Initial Revision
+ *
+ ***********************************************************************/
+static Boolean _pascal
+HTSocketResolveRequest (HTRequest *rptr, byte *resolvedAddr,
+			word *length)
+{
+    HTMemHandle htmh;
+    char *cptr;
+    Boolean ret = TRUE;
+    HTTCPAddress tcpAddress;
+
+    tcpAddress.HA_linkAddress.HTLA_size = 3;
+    tcpAddress.HA_linkAddress.HTLA_type = LT_ID;
+    tcpAddress.HA_linkAddress.HTLA_id = rptr->HTR_accessPoint;
+
+    if (rptr->HTR_proxy)
+	strcpy(tcpAddress.HA_ipAddress,
+	       (char *) rptr->HTR_proxyName);
+
+    else {
+	MemLock(rptr->HTR_uriString);
+	cptr = (char *) MemDeref(rptr->HTR_uriString);
+
+	htmh = HTParseURI(cptr, NULL, HTURI_PARSE_HOST);
+	MemUnlock(rptr->HTR_uriString);
+
+	if (!htmh) return FALSE;
+
+	cptr = (char *) HTMemLock(htmh);
+	strcpy(tcpAddress.HA_ipAddress, cptr);
+	HTMemUnlockAndFree(htmh);
+    }
+    
+    /* Resolve the raw IP adrress. */
+    *length = SocketResolve(&tcpDomain,
+			    (byte *) &tcpAddress,
+			    sizeof(HTLinkAddress) + 
+			    strlen(tcpAddress.HA_ipAddress),
+			    (byte *)resolvedAddr,
+			    MAX_RESOLVED_ADDRESS_LENGTH);
+
+    if (!(*length) ||
+	(*length > MAX_RESOLVED_ADDRESS_LENGTH)) 
+	ret = FALSE;
+
+    return ret;
+}	/* End of HTSocketResolveRequest.	*/
+
+
+
+
+/***********************************************************************
+		Public Functions
+***********************************************************************/
+
+
+/***********************************************************************
+ *		HTSOCKETCREATE
+ ***********************************************************************
+ * SYNOPSIS:	Create a HTSocket object. 
+ * CALLED BY:	Library.
+ * RETURN:	- HT_OK if a HTSocket is created and socket contains the 
+ *                HTSocket.
+ *              - HT_WOULD_BLOCK if we have reached the maximum allowable
+ *                sockets per client/server pair. The caller should try
+ *                again later.
+ *              - HT_OUT_OF_MEMORY if we ran out of memory.
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:    The socket manager may reuse an existing persistent 
+ *              socket that was released earlier using HTSocketDelete.
+ *             
+ *              If an existing connection is not available, we create
+ *              a new one, but only if we have not exceeded the maximum 
+ *              number of connections per client to a server. That means
+ *              we keep count of client/server connections, where:
+ *                Client == HTRequest.HTR_clientGeodeHandle 
+ *                Server == resolvedName of HTRequest.HTR_proxyName OR
+ *                          resolvedName of HTRequest.HTR_uri.HTU_hostName.
+ *
+ *              There is a maximum number of persistent connections 
+ *              per client to a particular server. When this is reached,
+ *              we return HT_WOULD_BLOCK is not returned.
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	kkee	6/23/96   	Initial Revision
+ *
+ ***********************************************************************/
+int _far _pascal
+HTSOCKETCREATE (HTRequestHandle request, HTStreamHandle *socket)
+{
+    HTRequest *rptr;
+    int ret = HT_OK;    
+    
+EC( ECCheckRequest(request);                                            )
+
+    PUSHDS;
+    SET_DS_LIB_DGROUP;
+    ThreadPSem(smSyncSem);
+
+    rptr = (HTRequest *) MemThreadGrab(request);
+
+    /* 
+     * Use an existing persistent HTSocket if one exists. 
+     * Otherwise we create a new HTSocket. 
+     */
+    *socket = HTSocketReuse(rptr);
+
+    if (*socket) {
+
+	@call *socket::MSG_HT_STREAM_SET_REQUEST(request);
+
+    } else {
+
+	/* 
+	 * Can't find an existing socket, we create one if we have
+	 * not already met the maximum allowable connections.
+	 */
+	if ((HTSocketGetClientConnection(rptr->HTR_clientGeodeHandle)) 
+	     >= MAX_PERSISTENT_CONNECTIONS_PER_SERVER) {
+	    ret = HT_WOULD_BLOCK;
+
+	} else {
+	    *socket = ObjInstantiateForThread(0, &HTSocketClass);
+	    
+	    if (!(*socket)) {
+		ret = HT_OUT_OF_MEMORY;
+	    } else {
+		/* Initialize the socket. */
+		if (@call *socket::MSG_HT_SOCKET_INITIALIZE() != HT_OK) {
+		    HTSocketFree(*socket);
+		    *socket = NullOptr;
+		    ret = HT_OUT_OF_MEMORY;
+		} else
+		    @call *socket::MSG_HT_STREAM_SET_REQUEST(request);
+	    }
+
+	    /* We increment a client's number of persistent connections */
+	    if (*socket) 
+		HTSocketIncrementClientConnection(rptr->HTR_clientGeodeHandle);
+	}
+    }
+
+    MemThreadRelease(request);
+    ThreadVSem(smSyncSem);
+    POPDS;
+    return ret;
+}	/* End of HTSOCKETCREATE.	*/
+
+
+
+
+/***********************************************************************
+ *		HTSOCKETDELETE
+ ***********************************************************************
+ * SYNOPSIS:	Deletes a HTSocket. You should use API instead of 
+ *              send MSG_META_OBJ_FREE to HTSocket directly. This
+ *              allows us to implement the socket manager.
+ * CALLED BY:	Library.
+ * RETURN:	Nothing
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:    Here are the conditions that a HTSocket must meet to be
+ *              maintained as a persistent connection:
+ *              1. HT_OK. Of course, the socket itself may be
+ *                 closed for some reason before the client gets to use
+ *                 it. 
+ *              2. The data object being downloaded by HTSocket must be 
+ *                 be completed. If we have any doubt at all, we must
+ *                 close the connection. This means it must have a 
+ *                 content-length and that bytesRead >= content-length.
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	kkee	7/29/96   	Initial Revision
+ *
+ ***********************************************************************/
+void _far _pascal
+HTSOCKETDELETE (HTStreamHandle socket, HTRequestHandle request)
+{
+    HTSocketConnection connection;
+    int state;
+    HTRequest *rptr;
+    dword contentLength;
+    Boolean persistent = FALSE;
+
+EC( ECCheckStream(socket);                                             )
+EC( ECCheckRequest(request);                                           )
+
+
+    PUSHDS;
+    SET_DS_LIB_DGROUP;
+    ThreadPSem(smSyncSem);
+
+    state = @call socket::MSG_HT_SOCKET_GET_STATE();
+
+    rptr = (HTRequest *) MemThreadGrab(request);
+
+    if ((state == HT_OK) &&
+	((contentLength=HTAnchorContentLength(rptr->HTR_anchor))!=0) &&
+	(rptr->HTR_bytesRead >= contentLength)) {
+	connection.HTSC_clientGeodeHandle = rptr->HTR_clientGeodeHandle;
+	connection.HTSC_htsocket = socket;
+	persistent = TRUE;
+
+	/* Things that are invalidated when a socket is deleted.
+	 * If you add instance data to HTSocketClass (and its ancestor
+	 * class HTStreamClass) make sure you reset the variables 
+	 * you care about here.
+	 */
+	@call socket::MSG_HT_STREAM_SET_TARGET(NullOptr);
+    }
+
+    if (persistent) {
+	HTListAppend(socketList, &connection, sizeof(HTSocketConnection));
+
+    } else {
+	HTSocketDecrementClientConnection(rptr->HTR_clientGeodeHandle);
+	HTSocketFree(socket);
+    }
+
+    MemThreadRelease(request);
+    ThreadVSem(smSyncSem);
+    POPDS;
+}	/* End of HTSOCKETDELETE.	*/
+
+
+
+/***********************************************************************
+ *		HTSHUTDOWN
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Shut down all open connections. This is a rude way to end
+ *              all communication in the Web Library as this call affects
+ *              all Web Library clients.
+ * CALLED BY:	GLOBAL
+ * RETURN:	Nothing
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:    Uses global variable wwwMedium which was initialized by
+ *              htsock.goc.
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	kkee	12/12/96   	Initial Revision
+ *
+ ***********************************************************************/
+void _far _pascal
+HTSHUTDOWN (void)
+{
+    PUSHDS;
+    SET_DS_LIB_DGROUP;
+    if (wwwMediumIsUp) {
+	wwwMediumIsUp = FALSE;
+	SocketCloseDomainMedium(&tcpDomain, &wwwMedium, TRUE);
+    }
+    POPDS;
+}	/* End of HTSHUTDOWN.	*/
+
+
+
+
+/***********************************************************************
+		Test routines that do not require connection.
+***********************************************************************/
+
+@ifdef __TEST_HT_SOCKET__
+
+
+/***********************************************************************
+ *		HTSocketReuse
+ ***********************************************************************
+ * SYNOPSIS:    Get a reusable socket so along as the client name 
+ *              matches, we need not look for hostname.
+ * CALLED BY:	HTSocketCreate
+ * RETURN:	StreamHandle - NullOptr if no HTSocket was found to 
+ *              service request.
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:    We only check for clientGeodHandle, no need to check 
+ *              for resolved hostname.
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	kkee	8/14/96   	Initial Revision
+ *
+ ***********************************************************************/
+static HTStreamHandle _pascal
+HTSocketReuse (HTRequest *rptr)
+{
+    word count, i, size, index;
+    HTSocketConnection htsocket;
+    HTStreamHandle socket;
+    Boolean found = FALSE;
+   
+    count = HTListGetCount(socketList);
+    size = sizeof(HTSocketConnection);
+
+    for (i=0; i<count; i++) {
+	HTListGetItem(socketList, i, &htsocket, size);
+	if (htsocket.HTSC_clientGeodeHandle==rptr->HTR_clientGeodeHandle){
+	    /* Found a matching persistent connection for the client. */
+	    found = TRUE;
+	    index = i;
+	    break;
+	}
+    }
+    
+    if (found) {
+	HTListRemoveItem(socketList, index, &htsocket, size);
+	socket = htsocket.HTSC_htsocket;
+    } else 
+	socket = NullOptr;
+
+    return socket;
+}	/* End of HTSocketReuse.	*/
+
+@endif
+
+
+

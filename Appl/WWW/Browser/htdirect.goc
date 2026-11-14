@@ -1,0 +1,270 @@
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Geoworks 1996 -- All Rights Reserved
+
+PROJECT:	GeoBrowser
+MODULE:		htdirect
+FILE:		htdirect.goc
+
+AUTHOR:		Kok Kin Kee, Aug 15, 1996
+
+ROUTINES:
+	Name			Description
+	----			-----------
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	kkee	8/15/96   	Initial version.
+
+DESCRIPTION:
+	Director that handles Library requests for content handlers.
+
+	$Id: htdirect.goc,v 1.1 97/04/04 17:20:40 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+@include <WWW/HTCore/htreq.goh>
+@include <WWW/HTCore/htlist.goh>
+@include <WWW/HTCore/htstring.goh>
+@include <WWW/HTCore/htmem.goh>
+@include <WWW/HTCore/htpolicy.goh>
+@include "htdirect.goh"
+@include "plain.goh"
+@include "html.goh"
+#include <Ansi/string.h>
+@include "reqList.goh"
+
+/*--------------------------------------------------------------------------
+ *		External Variables
+ *-------------------------------------------------------------------------*/
+@extern object @UIGenerator;
+extern SReqList sRequestList;
+
+/*--------------------------------------------------------------------------
+ *		Static Variables
+ *-------------------------------------------------------------------------*/
+
+/*
+ * Structure for maintaining registered contents.
+ */
+typedef struct {
+    HTStringHandle GBCT_inputType;
+    HTStringHandle GBCT_outputType;
+    ClassStruct _far *GBCT_class;
+} GBContentType;
+
+/*
+ * Use to instantiate content objects run by GeoBrowser. 
+ */
+static ThreadHandle contentThread = NULL;
+
+/*
+ * List of content handlers to use.
+ */
+static HTListHandle contentList = NULL;
+
+
+
+/***********************************************************************
+ *		GBDirectorInitialize
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Application just started, do the right initialization.
+ * CALLED BY:	GeoBrowser
+ * RETURN:	Nothing
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	kkee	9/15/96   	Initial Revision
+ *
+ ***********************************************************************/
+void _far _pascal
+GBDirectorInitialize (ThreadHandle thread)
+{
+
+EC( ECCheckThreadHandle(thread);                                        )
+    
+    contentThread = thread;
+
+    contentList = HTListNew();
+
+}	/* End of GBDirectorInitialize.	*/
+
+
+
+/***********************************************************************
+ *		GBDirectorDetach
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Application is closing, do the necessary cleanup.
+ * CALLED BY:	GeoBrowser
+ * RETURN:	Nothing
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	kkee	9/15/96   	Initial Revision
+ *
+ ***********************************************************************/
+void _far _pascal
+GBDirectorDetach (void)
+{
+
+EC( ECCheckThreadHandle(contentThread);                                 )
+/*
+    @send,forceQueue HandleToOptr(contentThread)::
+	MSG_META_DETACH(0, NullOptr);
+*/
+    @call HandleToOptr(contentThread)::MSG_META_DETACH(0, NullOptr);
+
+    contentThread = NULL;  /* Lazarus protection. */
+
+    HTListDelete(contentList);
+}	/* End of GBDirectorDetach.	*/
+
+
+
+/***********************************************************************
+ *		GBDirectorAddContent
+ ***********************************************************************
+ * SYNOPSIS:	Add a content that GeoBrowser will provide to the Library
+ *              WWW Library.
+ * CALLED BY:	GeoBrowser.
+ * RETURN:	HT_OK or HT_ERROR.
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	kkee	8/17/96   	Initial Revision
+ *
+ ***********************************************************************/
+int _far _pascal
+GBDirectorAddContent (HTStringHandle inputType,
+		      HTStringHandle outputType, 
+		      ClassStruct _far *class)
+{
+    GBContentType content;
+
+EC( ECCheckClass(class);                                                )
+	
+    content.GBCT_inputType = inputType;
+    content.GBCT_outputType = outputType;
+    content.GBCT_class = class;
+
+    HTListAppend(contentList, &content, sizeof(GBContentType));
+
+    return HT_OK;
+}	/* End of GBDirectorAddContent.	*/
+
+
+
+/***********************************************************************
+ *		GBDirectorContentCallback
+ ***********************************************************************
+ * SYNOPSIS:	Content callback for getting a content stream handler 
+ *              that the Library use to a stream handler to display
+ *              data.
+ * CALLED BY:	HTStreamHandle, must be a valid stream object. If 
+ *              NullOptr, the Library will not be able to display data
+ *              and will prompt user to save the data on disk.
+ * RETURN:	
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:    We are running in the Library thread, so, to access
+ *              our static variables, we must use the right ds.
+ *           
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	kkee	8/15/96   	Initial Revision
+ *
+ ***********************************************************************/
+HTMemHandle _far _pascal
+GBDirectorContentCallback (HTRequestHandle request, 
+			   HTStringHandle contentName)
+{
+    GBContentType content;
+    word count, i, size = sizeof(GBContentType);
+    HTMemHandle htmh;
+    HTContentHandler *handler;
+    optr	target;
+
+EC( ECCheckRequest(request);                                            )
+
+    PUSHDS;
+    SET_DS_LIB_DGROUP;
+
+    handler = (HTContentHandler *) 
+	HTMemAlloc(&htmh, sizeof(HTContentHandler));
+
+    if (!htmh) return NullOptr;
+
+    handler->HTCH_handler = NullOptr;
+    handler->HTCH_outputType = 0;
+
+    count = HTListGetCount(contentList);
+    for (i=0; i<count; i++) {
+	HTListGetItem(contentList, i, &content, size);
+
+	if (content.GBCT_inputType == contentName) {
+
+	    handler->HTCH_handler = 
+		ObjInstantiateForThread(contentThread, 
+					content.GBCT_class);
+	    handler->HTCH_outputType = content.GBCT_outputType;
+
+	    break;
+	}
+    }
+    
+    if ((handler->HTCH_handler) && 
+	(handler->HTCH_outputType == HT_CONTENT_TYPE_STAR_STAR)) {
+
+	/*
+	 * This is the last content handler in the output stream stack.
+	 */
+	target = SReqListGetRequestTarget(sRequestList, request);
+
+EC( 	ECCheckOD(target);						)
+
+	@call handler->HTCH_handler::
+	    MSG_HT_STREAM_SET_TARGET(target);
+
+    } else {
+	/* 
+	 * We let the Library take care of contents we can't handle.
+	 * The library will probably prompt us to save it...
+	 */
+    }
+
+    POPDS;
+    return htmh;
+
+}	/* End of GBContentCallback.	*/
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

@@ -1,0 +1,389 @@
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Geoworks 1997.  All rights reserved.
+	GEOWORKS CONFIDENTIAL
+
+PROJECT:	Geos WWW Library
+MODULE:		
+FILE:		htpop3.goc
+
+AUTHOR:		Kok Kin Kee, Jun 11, 1997
+
+ROUTINES:
+	Name			Description
+	----			-----------
+
+REVISION HISTORY:
+	Name		Date		Description
+	----		----		-----------
+	kkee    	6/11/97   	Initial version.
+
+DESCRIPTION:
+
+	POP3 Protocol.
+
+	$Id: htpop3.goc,v 1.2.4.1 97/09/05 10:52:44 jeremyb Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+
+@include <stdapp.goh>
+@include <WWW/HTCore/hturi.goh>
+@include <WWW/HTCore/htnet.goh>
+@include <WWW/HTCore/htsock.goh>
+@include <WWW/HTCore/htassoc.goh>
+@include <WWW/HTCore/htlist.goh>
+@include <WWW/HTCore/htobj.goh>
+@include <WWW/HTCore/htfwrite.goh>
+@include <WWW/HTCore/htreqMan.goh>
+@include <WWW/HTCore/htuu.goh>
+@include <WWW/htpop3.goh>
+
+#include <Ansi/string.h>                 /* strcpy, strlen */
+#include <Ansi/stdio.h>                  /* sprintf */
+
+@include "fatals.goh"
+@include "const.goh"
+
+#ifndef POP3_PORT
+#define POP3_PORT 110
+#endif
+
+static char CRLF[] = {CR, LF, 0};
+
+
+/* --------------------------------------------------------------------
+ * 		PRIVATE FUNCTIONS
+ * --------------------------------------------------------------------*/
+
+static void _pascal
+    GetAddress (HTRequestHandle request, HTSocketAddress *htAddress);
+
+
+
+/***********************************************************************
+ *		GetAddress
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Get the address of an  request for connecting to 
+ *              network.
+ * CALLED BY:	MSG_HT_PROTOCOL_LOAD
+ * RETURN:	HTSocketAddress
+ *	
+ * STRATEGY:	POP3 does not use proxy!
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	kkee    	5/20/97   	Initial Revision
+ *	
+ ***********************************************************************/
+static void _pascal
+GetAddress (HTRequestHandle request, HTSocketAddress *htAddress)
+{
+    HTMemHandle htmh;
+    HTRequest *rptr;
+    char *cptr;
+
+EC( ECCheckRequest(request);                                           )
+
+    rptr = (HTRequest *) MemThreadGrab(request);
+
+    cptr = (char *) MemLock(rptr->HTR_uriString);
+    htmh = HTParseURI(cptr, NULL, HTURI_PARSE_HOST);
+    MemUnlock(rptr->HTR_uriString);
+
+    /* IP address */
+    cptr = (char *) HTMemLock(htmh);
+    strcpy(htAddress->HTSA_ipAddress, cptr);
+    HTMemUnlockAndFree(htmh);
+
+    /* Port number */
+    htAddress->HTSA_port = POP3_PORT;
+    htAddress->HTSA_accessPoint = rptr->HTR_accessPoint;
+
+    MemThreadRelease(request);
+}	/* End of GetAddress.	*/
+
+
+
+/***********************************************************************
+		Class Declaration
+***********************************************************************/
+
+@classdecl	HTPOP3Class;
+
+/***********************************************************************
+		Message Handlers
+***********************************************************************/
+
+/***********************************************************************
+ *		MSG_META_INITIALIZE for HTPOP3Class
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    Initialize states.
+ * PARAMETERS:	    void (void)
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:	    
+ *
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	kkee    	6/11/97   	Initial Revision
+ *	
+ ***********************************************************************/
+@method HTPOP3Class, MSG_META_INITIALIZE
+{
+    @self->HTPOP3I_currentState = HTPOP3_BEGIN;
+    @self->HTPOP3I_nextState = HTPOP3_INVALID_STATE;
+    @callsuper();
+}	/* End of MSG_META_INITIALIZE.	*/
+
+
+
+/***********************************************************************
+ *		MSG_HT_STREAM_ABORT for HTPOP3Class
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    Cleanup allocated memory.
+ * PARAMETERS:	    int (int status)
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:	    
+ *
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	kkee    	6/16/97   	Initial Revision
+ *	
+ ***********************************************************************/
+@method HTPOP3Class, MSG_HT_STREAM_ABORT
+{
+    if (@self->HTPOP3I_params) HTMemFree(@self->HTPOP3I_params);
+    return @callsuper();
+}	/* End of MSG_HT_STREAM_ABORT.	*/
+
+
+
+
+/***********************************************************************
+ *		MSG_HT_STREAM_PUT_BLOCK for HTPOP3Class
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    Parse responses from POP3 server.
+ * PARAMETERS:	    int (const byte *data, word len). Returns HT_LOADED
+ *                  when done parsing.
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:	    
+ *
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	kkee    	6/13/97   	Initial Revision
+ *	
+ ***********************************************************************/
+@method HTPOP3Class, MSG_HT_STREAM_PUT_BLOCK
+{
+    PUTBLOCK(@self->HTSI_target, data, len); /* Save everything */
+
+    while (len--) {
+	if (@self->HTPOP3I_state == PARSE_DATA_LIST) {
+	    /* Data terminated by "CRLF.CRLF" */
+	    if (*data == '.') 
+		@self->HTPOP3I_state = LAST_LINE;
+	} else if (@self->HTPOP3I_state == LAST_LINE) {
+	    if (*data == LF)
+		return HT_LOADED;
+	} else if (@self->HTPOP3I_state == PARSE_DATA_RETR) {
+	    /* Data terminated by "CRLF.CRLF" */
+	    if (*data == LF) 
+		@self->HTPOP3I_state = SAW_FIRST_LF;
+	} else if (@self->HTPOP3I_state == SAW_FIRST_LF) {
+	    if (*data == '.') 
+		@self->HTPOP3I_state = SAW_DOT;
+	    else 
+		@self->HTPOP3I_state = PARSE_DATA_RETR;
+	} else if (@self->HTPOP3I_state == SAW_DOT) {
+	    if (*data == CR)
+		@self->HTPOP3I_state = LAST_LINE;
+	    else 
+		@self->HTPOP3I_state = PARSE_DATA_RETR;
+	} else if (@self->HTPOP3I_state == SKIP_LINE) {
+	    if (*data == LF) {
+		if (@self->HTPOP3I_command == HTPOP3_LIST)
+		    @self->HTPOP3I_state = PARSE_DATA_LIST;
+		else if (@self->HTPOP3I_command == HTPOP3_RETR)
+		    @self->HTPOP3I_state = PARSE_DATA_RETR;
+		else 
+		    return HT_LOADED;
+	    }
+	} else if (*data == '+') {
+	    /* Good response */
+	    @self->HTPOP3I_state = SKIP_LINE;
+	} else if (*data == '-') {
+	    /* Bad response */
+	    return HT_ERROR;
+	}
+EC(       else EC_ERROR(HTPOP3_STATE_NOT_HANDLED);                      )	
+	data++;
+    }
+}	/* End of MSG_HT_STREAM_PUT_BLOCK.	*/
+
+
+
+/***********************************************************************
+ *		MSG_HT_PROTOCOL_LOAD for HTPOP3Class
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    Run POP3 FSM protocol as per RFC1939. Only the 
+ *                  following URLs are valid:
+ *
+ *                  pop3://server/username=STRING&password=STRING.
+ *
+ * PARAMETERS:	    int (HTNetThread *net)
+ *                    Return codes:
+ *                       HT_LOADED - succesful in loading messages.
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:	    
+ *
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	kkee    	6/11/97   	Initial Revision
+ *	
+ ***********************************************************************/
+@method HTPOP3Class, MSG_HT_PROTOCOL_LOAD
+{
+
+    int ret;
+
+EC( if (@self->HTSI_request == NULL) EC_ERROR(HTPOP3_REQUEST_NOT_SET);  )
+
+    /* Jump into the state machine from previous state */
+    while (1) {
+	switch (@self->HTPOP3I_currentState) {
+	case HTPOP3_BEGIN:
+	    {
+		/* Inform client what we are doing with the request */
+		ret = HTNetReportProgress(@self->HTSI_request,
+					  HT_RESOLVING_HOST);
+		if (ret != HT_OK) return ret;
+
+		/* Create and initialize a stream socket */
+		net->HTNT_socket = HTSocketCreate();
+		if (!net->HTNT_socket) return HT_OUT_OF_MEMORY;
+
+		@self->HTPOP3I_currentState = HTPOP3_CONNECT;
+	    }
+	    break;
+
+	case HTPOP3_CONNECT:
+	    {
+		HTSocketAddress address;
+		
+		GetAddress(@self->HTSI_request, &address);
+		/* Inform client what we are going to do next */
+		ret = HTNetReportProgress(@self->HTSI_request, 
+					  HT_CONNECTING_TO_SERVER);
+		if (ret != HT_OK) return ret;
+		if (HTSocketResolveAndConnect(net->HTNT_socket, 
+					      &address) == HT_OK) {
+		    ret = HTNetReportProgress(@self->HTSI_request, 
+					      HT_CONNECTED);
+		    if (ret != HT_OK) return ret;
+		    @self->HTPOP3I_command = HTPOP3_CONNECT;
+		    @self->HTPOP3I_currentState = HTPOP3_GET_RESPONSE;
+		    @self->HTPOP3I_nextState = HTPOP3_USER;
+		} else {
+		    /* 
+		     * If we failed to connect, retry? Let's make it
+		     * simple here...
+		     */
+		    return HTSocketState(net->HTNT_socket);
+		}
+	    }
+	    break;
+
+	case HTPOP3_GET_RESPONSE:
+	    /* Reset parser to accept responses and save to file */
+	    @self->HTPOP3I_state = PARSE_BEGIN;
+	    @self->HTSI_target = HTFWriteNew("f:\\pene.ec\\document\\brother",0);
+	    @self->HTPOP3I_currentState = HTPOP3_PUSH_RESP;
+	    break;
+
+	case HTPOP3_PUSH_RESP:
+	    if (!HTSocketRecv(net->HTNT_socket, 10)) {
+		return HTSocketState(net->HTNT_socket);
+	    }
+	    ret = HTNetReportProgress(@self->HTSI_request, 
+				      HT_MORE_DATA);
+	    if (ret != HT_OK) return ret;
+	    ret = HTSocketPush(oself, net->HTNT_socket);
+	    if (ret == HT_LOADED)
+		@self->HTPOP3I_currentState = @self->HTPOP3I_nextState;
+	    else if (ret != HT_OK) 
+		return ret;
+	    break;
+
+	case HTPOP3_MAKE_REQUEST:
+	    break;
+	    
+	case HTPOP3_USER:
+	    {
+		HTSocketSend(net->HTNT_socket, (void*)"USER brothertest3", 17);
+		ret = HTSocketSend(net->HTNT_socket, (void*)CRLF, 2);
+		if (ret != HT_OK) return ret;
+		@self->HTPOP3I_command = HTPOP3_USER;
+		@self->HTPOP3I_currentState = HTPOP3_GET_RESPONSE;
+		@self->HTPOP3I_nextState = HTPOP3_PASS;
+	    }
+	    break;
+
+	case HTPOP3_PASS:
+	    {
+		HTSocketSend(net->HTNT_socket, (void*)"PASS brother", 12);
+		ret = HTSocketSend(net->HTNT_socket, (void*)CRLF, 2);
+		if (ret != HT_OK) return ret;
+		@self->HTPOP3I_command = HTPOP3_PASS;
+		@self->HTPOP3I_currentState = HTPOP3_GET_RESPONSE;
+		@self->HTPOP3I_nextState = HTPOP3_LIST;
+	    }
+	    break;
+
+	case HTPOP3_LIST:
+	    {
+		HTSocketSend(net->HTNT_socket, (void*)"LIST", 4);
+		ret = HTSocketSend(net->HTNT_socket, (void*)CRLF, 2);
+		if (ret != HT_OK) return ret;
+		@self->HTPOP3I_command = HTPOP3_LIST;
+		@self->HTPOP3I_currentState = HTPOP3_GET_RESPONSE;
+		@self->HTPOP3I_nextState = HTPOP3_RETR;
+	    }
+	    break;
+
+	case HTPOP3_RETR:
+	    {
+		HTSocketSend(net->HTNT_socket, (void*)"RETR 9", 6);
+		ret = HTSocketSend(net->HTNT_socket, (void*)CRLF, 2);
+		if (ret != HT_OK) return ret;
+		@self->HTPOP3I_command = HTPOP3_RETR;
+		@self->HTPOP3I_currentState = HTPOP3_GET_RESPONSE;
+		@self->HTPOP3I_nextState = HTPOP3_QUIT;
+	    }
+	    break;
+
+	case HTPOP3_QUIT:
+	    HTSocketSend(net->HTNT_socket, (void*)"QUIT", 4);
+	    HTSocketSend(net->HTNT_socket, (void*)CRLF, 2);
+	    return HT_LOADED;
+
+	default:
+	    EC_ERROR(HTPOP3_STATE_NOT_HANDLED);
+	    break;
+	}
+    }
+    return HT_OK;
+}	/* End of MSG_HT_PROTOCOL_LOAD.	*/

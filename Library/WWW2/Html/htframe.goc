@@ -1,0 +1,1609 @@
+//---------------------------------------------------------------------------
+//
+//	Copyright (C) Geoworks 1998.  All rights reserved.
+//	GEOWORKS CONFIDENTIAL
+//
+// PROJECT:	Geos-SC WWW Library
+// MODULE:	HTML Frame
+// FILE:	frame.cpp
+//
+// AUTHOR:	Mingzhe Zhu: Feb 13, 1998
+//
+// REVISION HISTORY:
+//	Name		Date		Description
+//	----		----		-----------
+//	mzhu    	2/13/98  	Initial version
+//      kkee            3/18/98         Change to use HTGlyph
+//
+// DESCRIPTION:
+//
+//      //depot/liberty/project/ellery/980805/library/www/html/htframe.cpp#1
+//
+//	$Id: htframe.goc,v 1.1 98/09/02 11:13:09 edwin Exp $
+//
+//---------------------------------------------------------------------------
+
+/*
+#include "htfmtter.h"
+#include "htform.h"
+*/
+
+@include <stdapp.goh>
+@include "WWW2/WW2Core/ww2Uri.h"
+@include "WWW2/Conv/htglyph.goh"
+// @include "WWW2/Conv/htcontxt.goh"
+@include "WWW2/Conv/htframe.goh"
+// @include "WWW2/Conv/htconst.goh"
+@include "WWW2/Conv/reqmgr.goh"
+@include "WWW2/wwMacro.h"
+@include "WWW2/Conv/htcomp.goh"
+@include "WWW2/Conv/htmap.goh"
+@include "WWW2/Conv/anchor.goh"
+@include "WWW2/Conv/ctlist.goh"
+
+@classdecl HTFrameClass, neverSaved;
+
+
+#define _reqManager         (pself->__reqManager)
+#define _uitree             (pself->__uitree)
+#define _textTargetList     (pself->__textTargetList)
+#define _compositeTargetList (pself->__compositeTargetList)
+#define _compositor         (pself->__compositor)
+#define _formatContext      (pself->__formatContext)
+#define _preformatContext   (pself->__preformatContext)
+#define _finishFormat       (pself->__finishFormat)
+#define _needToReformat     (pself->__needToReformat)
+#define _formatSem          (pself->__formatSem)
+#define _noSizeGlyph        (pself->__noSizeGlyph)
+#define _noSizeGlyphSem     (pself->__noSizeGlyphSem)
+#define _composition        (pself->__composition)
+#define _anchorList         (pself->__anchorList)
+#define _mapList            (pself->__mapList)
+#define _formList           (pself->__formList)
+#define _currentForm        (pself->__currentForm)
+#define _glyphContext       (pself->__glyphContext)
+#define _progressiveDisplay (pself->__progressiveDisplay)
+#define _title              (pself->__title)
+#define _urlH               (pself->__urlH)
+#define _baseUrlH           (pself->__baseUrlH)
+#define _exposed            (pself->__exposed)
+#define _panel              (pself->__panel)
+#define _dummy              (pself->__dummy)
+#define _outerPanel         (pself->__outerPanel)
+#define _vScrollbar         (pself->__vScrollbar)
+#define _hScrollbar         (pself->__hScrollbar)
+#define _ignoreLWS          (pself->__ignoreLWS)
+#define _tableCorrection    (pself->__tableCorrection)
+#define _baseTextState      (pself->__baseTextState)
+#define _initialized        (pself->__initialized)
+
+
+#if 0
+
+#ifdef ERROR_CHECK
+extern "C"
+{
+#include <stdio.h>   // sprintf
+#include <string.h>  // strlen
+}
+#include "htciter.h"
+#endif
+
+#ifdef EC_LOG
+static const TCHAR *LOGFILE = _TEXT("/int/html/logfile.txt");
+#endif
+
+#ifdef ERROR_CHECK
+static const TCHAR *UITREEFILE = _TEXT("/int/html/uitree.txt");
+#endif
+
+static void
+DrawHTFrame(optr /* HTFrame * */ frame);
+
+static void
+DrawHTGlyph(optr /* HTFrame * */ frame, optr /* HTGlyph * */ glyph, 
+	    sword x0, sdword y0, sword x1, sdword y1);
+
+// Callback to UI thread to display anchor object.
+static void
+DisplayAnchorPosition(optr /* FlexScrollbar * */ scrollbar, sword x, sdword y);
+
+// Callback to UI thread to adjust scrollers
+static void
+AdjustScrollers(optr /* FlexScrollbar * */ vScrollbar, sdword vScrollSize,
+                optr /* FlexScrollbar * */ hScrollbar, sword hScrollSize);
+static void
+AdjustOneScroller(optr /* FlexScrollbar * */ scrollbar, sdword size);
+
+// Callback to UI thread to repaint scrollers
+static void
+RepaintScrollers(optr /* FlexScrollbar * */ vScrollbar, FlexScrollbar *hScrollbar);
+
+#endif
+
+//---------------------------------------------------------------------------
+//		HTMLFrame::HTMLFrame()
+//---------------------------------------------------------------------------
+//
+// SYNOPSIS: 	Constructor.
+// SCOPE:	Public
+// RETURN:	Nothing
+// STRATEGY:	Initialize the frame.
+//
+// REVISION HISTORY:
+//	Name		Date		Description
+//	----		----		-----------
+//	mzhu    	2/13/98 	Initial version
+//	kkee    	3/18/98 	Moved from HTMLFrame to HTFrame
+//
+//---------------------------------------------------------------------------
+@method HTFrameClass, HTFrame /* (HTRequestManager *reqManager, WWMemHandle urlH,
+                 uint16 x, uint16 y, uint16 width, uint16 height) : */
+{
+    PARAM_ASSERT(reqManager);
+
+    _reqManager = reqManager;
+    _uitree = 0;
+    _compositeTargetList = NULL;
+    _compositor = 0;
+    _formatContext = 0;
+    _preformatContext = 0;
+    _finishFormat = FALSE;
+    _needToReformat = FALSE;
+    _formatSem = ThreadAllocSem(1);
+    _noSizeGlyph = 0;
+    _noSizeGlyphSem = ThreadAllocSem(1);
+    _currentForm = 0;
+    _glyphContext = 0;
+    _progressiveDisplay = TRUE;
+    _title = NULL;
+    _urlH = urlH;
+    _baseUrlH = NULL;
+    _panel = 0;
+    _dummy = 0;
+    _outerPanel = 0;
+    _vScrollbar = 0;
+    _hScrollbar = 0;
+    _ignoreLWS  = TRUE;
+@if NOT_DEFINED_YET
+    _baseTextState(HTDEFAULT_FONT_SIZE, TID_DEFAULT, RGB_BLACK, 0, 0, 0, 0);
+@endif
+
+    _exposed.offset.x = coordX;
+    _exposed.offset.y = coordY;
+    _exposed.size.width = width;
+    _exposed.size.height = height;
+
+    _tableCorrection.nestingLevel = 0;
+
+    _textTargetList = ObjInstantiate(HandleOf(oself), &WWListClass);
+    @call _textTargetList::WWList();
+    _composition = ObjInstantiate(HandleOf(oself), &HTCompositionClass);
+    @call _composition::HTComposition();
+    _anchorList = ObjInstantiate(HandleOf(oself), &HTMLAnchorListClass);
+    @call _anchorList::HTMLAnchorList();
+    _mapList = ObjInstantiate(HandleOf(oself), &HTMapListClass);
+    @call _mapList::WWList(); // HTMapList();
+    _formList = ObjInstantiate(HandleOf(oself), &WWListClass);
+    @call _formList::WWList();
+
+@if NOT_DEFINED_YET
+#ifdef GR_NATIVE16
+    _backgroundImage = 0;
+    _bgColor = HTDEFAULT_BGCOLOR;
+    _linkColor = HTDEFAULT_LINKCOLOR;
+#endif
+
+#ifdef ERROR_CHECK
+    _initialized = FALSE;
+//    _uitreeFile = NULL;
+#endif
+#ifdef EC_LOG
+   _logFile = theFileStoreManager.Open(LOGFILE, O_CREAT | O_RDWR);
+   if (!_logFile) {
+       EC_WARN("HTFrame::HTFrame() unable to create log file");
+   } else {
+       // Truncate the file to zero length
+       _logFile->LSeek(0,0);
+       _logFile->SetSize(0);
+   }
+#endif
+@endif
+}	/* End of HTFrame::HTFrame() */
+
+
+//---------------------------------------------------------------------------
+//		HTFrame::~HTFrame()
+//---------------------------------------------------------------------------
+//
+// SYNOPSIS: 	Destructor
+// SCOPE:	Public
+// RETURN:	Nothing
+// STRATEGY:
+//
+// REVISION HISTORY:
+//	Name		Date		Description
+//	----		----		-----------
+//	mzhu    	2/13/98 	Initial version
+//	kkee    	3/18/98 	Moved from HTFrame to HTFrame
+//
+//---------------------------------------------------------------------------
+@method HTFrameClass, MSG_META_OBJ_FREE // ::~HTFrame()
+{
+@if NOT_DEFINED_YET
+    // When _title goes away, we will see garbage on the title bar,
+    // so before we delete, set the title bar to empty.
+    if (_reqManager) {
+        _reqManager->GetFlexFrame()->SetTitle(_TEXT(""));
+    }
+    delete [] _title;
+    if(_urlH) WWMemFree(_urlH);
+    if(_baseUrlH) WWMemFree(_baseUrlH);
+
+    // Order of delete is important, must delete form stuff and uitree
+    // first before deleting _panel. This is because the parent
+    // of form stuff and _uitree is _panel.
+    HTForm *form;
+    while ((form = (HTForm*)_formList.Get()) != NULL) {
+        delete form;
+    }
+    delete _glyphContext;
+    delete _compositor;
+    delete _compositeTargetList;
+    delete _formatContext;
+    delete _preformatContext;
+    // Must be the last to be deleted as other deletions
+    // depend on it to exist
+    delete _uitree;
+
+    // Remove from the listener list.
+    _vScrollbar->RemoveAdjustmentListener(*this);
+    _hScrollbar->RemoveAdjustmentListener(*this);
+    (_reqManager->GetAppBase())->RemoveKeyListener(*this);
+    //(_reqManager->GetAppBase())->RemoveMouseListener(*this);
+    _dummy->RemoveMouseListener(*this);
+
+    _outerPanel->Remove(_hScrollbar);
+    delete _hScrollbar;
+    _outerPanel->Remove(_vScrollbar);
+    delete _vScrollbar;
+    _outerPanel->Remove(_panel);
+    delete _panel;
+    (_reqManager->GetFlexFrame())->Remove(_outerPanel);
+    delete _outerPanel;
+
+    // this line provent the new page is not off the right position!!!
+    (_reqManager->GetAppBase())->Invalidate();
+
+#ifdef GR_NATIVE16
+    if(_backgroundImage)
+        delete _backgroundImage;
+#endif
+
+#ifdef EC_LOG
+    if (_logFile) {
+        // No need to delete file created by theFileStoreManager
+        _logFile->Close();
+    }
+#endif
+
+@endif
+    @callsuper();
+}
+
+
+//---------------------------------------------------------------------------
+//		HTFrame::Initialize()
+//---------------------------------------------------------------------------
+//
+// SYNOPSIS: 	Initialize a frame. It is illegal to call Initialize()
+//              more than once.
+// SCOPE:	Public
+// RETURN:	TRUE if init ok, else FALSE for out of memory.
+// STRATEGY:
+//
+// REVISION HISTORY:
+//	Name		Date		Description
+//	----		----		-----------
+//	mzhu    	2/17/98 	Initial version
+//      kkee            3/19/98         Moved from frame.cpp to here.
+//
+//---------------------------------------------------------------------------
+@method // Boolean
+HTFrameClass, FrameInitialize // ()
+{
+    ASSERTS(_initialized == FALSE,
+            "HTFrame::Initialize() called more than once");
+
+    // Create a composite target list
+    _compositeTargetList = ObjInstantiate(HandleOf(oself), 
+					  &CompositeTargetListClass);
+    @call _compositeTargetList::CompositeTargetList(oself);
+
+    if (!_compositeTargetList || 
+        !@call _compositeTargetList::SetCurrentCompositeTarget(_composition)) 
+    {
+        return FALSE;
+    }
+@if NOT_DEFINED_YET
+    // Create a UI tree
+    _uitree = new HTUITree(this);
+    if (!_uitree) {
+        return FALSE;
+    }
+
+    // Panel for drawing anything.
+    _panel = new FlexPanel();
+    if(!_panel) {
+        return FALSE;
+    }
+    _outerPanel = new FlexPanel();
+    if(!_outerPanel) {
+        delete _panel;
+        return FALSE;
+    }
+
+    // Initialize the anchor name
+    char *anchor = WWParseURI(_urlH, NULL, WWURI_PARSE_ANCHOR);
+    if (anchor) {
+        _anchorList.SetAnchorToBeViewed(WWStrAllocCopy(anchor));
+        free(anchor);
+    }
+
+    // Set panel
+    //_outerPanel->SetBackground(RGB_WHITE);
+    //_panel->SetBackground(RGB_WHITE);
+    _outerPanel->SetBounds(_exposed.offset.x, _exposed.offset.y,
+                           _exposed.size.width, _exposed.size.height);
+    (_reqManager->GetFlexFrame())->Add(_outerPanel);
+    _outerPanel->Add(_panel);
+    // make room for the vertical bar.
+    _exposed.size.width -= HT_SCROLLBAR_WIDTH;
+    _exposed.size.height -= HT_SCROLLBAR_HEIGHT;
+    _panel->SetBounds(0,0, _exposed.size.width, _exposed.size.height);
+
+    // make a penel for horizontal scrollbar
+    // Create scrollbars
+    _vScrollbar = theUIFactory->CreateFlexScrollbar(HINT_SCROLLBAR_LOOK);
+    _hScrollbar = theUIFactory->CreateFlexScrollbar(HINT_SCROLLBAR_LOOK);
+    if(!_vScrollbar || !_hScrollbar) {
+        return FALSE;
+    }
+    _vScrollbar->SetValue(0);
+    _vScrollbar->SetMinimum(0);
+    _vScrollbar->SetMaximum(_exposed.size.height);
+    _vScrollbar->SetVisibleAmount(_exposed.size.height);
+    _vScrollbar->SetUnitIncrement(HT_SCROLLING_INCREMENT_UNIT);
+    _vScrollbar->SetBlockIncrement(
+        _exposed.size.height-HT_SCROLLING_INCREMENT_UNIT*2);
+    _vScrollbar->SetBounds(_exposed.size.width, 0,
+                           HT_SCROLLBAR_WIDTH, _exposed.size.height);
+    //_vScrollbar->SetID();
+    _outerPanel->Add(_vScrollbar);
+
+    _hScrollbar->SetValue(0);
+    _hScrollbar->SetMinimum(0);
+    _hScrollbar->SetMaximum(_exposed.size.width);
+    _hScrollbar->SetVisibleAmount(_exposed.size.width);
+    _hScrollbar->SetUnitIncrement(HT_SCROLLING_INCREMENT_UNIT);
+    _hScrollbar->SetOrientation(FlexScrollbar::SOT_HORIZONTAL);
+    _hScrollbar->SetBlockIncrement(
+        _exposed.size.width-HT_SCROLLING_INCREMENT_UNIT*2);
+    _hScrollbar->SetBounds(0, _exposed.size.height,
+                           _exposed.size.width, HT_SCROLLBAR_HEIGHT);
+    //_hScrollbar->SetID();
+    _outerPanel->Add(_hScrollbar);
+
+    // Add listeners
+    _vScrollbar->AddAdjustmentListener(*this);
+    _hScrollbar->AddAdjustmentListener(*this);
+    //XXX this looks odd --hlee
+    (_reqManager->GetAppBase())->AddKeyListener(*this);
+
+    //We don't want the system to do any geometry work
+    //_outerPanel->SetGeometryValid(FALSE);
+    //_panel->SetGeometryValid(FALSE);
+
+    //add the dummy FlexComp
+    _dummy = new DummyUI(this);
+    if (!_dummy) {
+        return FALSE;
+    }
+    _panel->Add(_dummy);
+    _dummy->SetBounds(0, 0, _exposed.size.width, _exposed.size.height);
+    _dummy->AddMouseListener(*this);
+
+    //create drawing context
+    _glyphContext = new HTGlyphContext();
+    if (!_glyphContext) {
+        return FALSE;
+    }
+
+    // Set the window coordinates to that of the physical window,
+    // that is, the currently exposed part of the document.
+    // Save space for the v-scrollbar
+    _exposed.offset.x = 0;        // _panel is referenced from (0,0)
+    _exposed.offset.y = 0;
+
+#ifdef ERROR_CHECK
+    _initialized = TRUE;
+#endif
+
+    // Set the frame in the anchor list.
+    _anchorList.SetFrame(this);
+
+    // Create a compositor
+    _compositor = new HTFormatter();
+    if (!_compositor) {
+        return FALSE;
+    }
+    _formatContext = new HTFormatContext(HTALIGN_LEFT);
+    if (!_formatContext) {
+        return FALSE;
+    }
+    _preformatContext = new HTPreformatContext(this);
+    if (!_preformatContext) {
+        return FALSE;
+    }
+
+    return @call _compositor::SetComposition(oself, _composition, _uitree,
+                                       _exposed.size.width, _formatContext);
+@else
+    return NULL;
+@endif
+}	/* End of HTFrame::Initialize() */
+
+
+//---------------------------------------------------------------------------
+//		HTFrame::GetURL()
+//---------------------------------------------------------------------------
+// 
+// SYNOPSIS: 	
+// SCOPE:	
+// RETURN:	
+// STRATEGY:	
+// 
+// REVISION HISTORY: 
+//	Name		Date		Description 
+//	----		----		----------- 
+//	kkee    	7/22/98 	Initial version 
+//	
+//---------------------------------------------------------------------------
+@method // void
+HTFrameClass, HTFrameGetURL /* (const char *url,
+                HTMLViewer::LoadMode loadMode,
+                RequestResponse *target) */
+{
+    // We have to Inc first before submitting as we could
+    // get Request::Done() while running GetURL()
+    @call self::WWFrameIncNumRequest();
+    if (@call _reqManager::ReqMgrGetURL(url, loadMode, target)) {
+        @call self::WWFrameDecNumRequest();
+    }
+}	/* End of HTFrame::GetURL() */
+
+
+//---------------------------------------------------------------------------
+//		HTFrame::GetURLNotify()
+//---------------------------------------------------------------------------
+// 
+// SYNOPSIS: 	
+// SCOPE:	
+// RETURN:	
+// STRATEGY:	
+// 
+// REVISION HISTORY: 
+//	Name		Date		Description 
+//	----		----		----------- 
+//	kkee    	7/22/98 	Initial version 
+//	
+//---------------------------------------------------------------------------
+@method // void
+HTFrameClass, HTFrameGetURLNotify /* (const char *url,
+                      HTMLViewer::LoadMode loadMode,
+                      RequestResponse *target) */
+{
+    // We have to Inc first before submitting as we could
+    // get Request::Done() while running GetURL()
+    @call self::WWFrameIncNumRequest();
+    if (!(@call _reqManager::GetURLNotify(url, loadMode, target))) {
+        @call self::WWFrameDecNumRequest();
+    }
+}	/* End of HTFrame::GetURLNotify() */
+
+
+
+//---------------------------------------------------------------------------
+//		HTFrame::PostURL()
+//---------------------------------------------------------------------------
+// 
+// SYNOPSIS: 	
+// SCOPE:	
+// RETURN:	
+// STRATEGY:	
+// 
+// REVISION HISTORY: 
+//	Name		Date		Description 
+//	----		----		----------- 
+//	kkee    	7/22/98 	Initial version 
+//	
+//---------------------------------------------------------------------------
+@method // void
+HTFrameClass, HTFramePostURL
+ /* (const char *url,
+                    const uint8 *buffer,
+                    const uint32 len,
+                    Boolean file) */
+{
+    // We have to Inc first before submitting as we could
+    // get Request::Done() while running GetURL()
+    @call self::WWFrameIncNumRequest();
+    if (!(@call _reqManager::ReqMgrPostURL(url, buffer, len, file))) {
+        @call self::WWFrameDecNumRequest();
+    }
+}	/* End of HTFrame::PostURL() */
+
+@method //    HTRequestManager* 
+HTFrameClass, HTFrameGetRequestManager // () const
+{
+    return _reqManager;
+}
+
+
+@method //    WWMemHandle 
+HTFrameClass, GetBaseUrlH // () 
+{
+    return _baseUrlH;
+}
+
+
+@method //    WWMemHandle 
+HTFrameClass, GetUrlH // () 
+{
+    return _urlH;
+}
+
+
+@method //    HTMLAnchorList *
+HTFrameClass, GetAnchorList // () 
+{
+    return _anchorList;
+}
+
+
+
+//---------------------------------------------------------------------------
+//		HTFrame::Done()
+//---------------------------------------------------------------------------
+//
+// SYNOPSIS: 	We are done receiving all HTML tokens and
+//              data. Cleanup unnecessary data that was allocated
+//              during the formatting process.
+// SCOPE:	Public
+// RETURN:	Nothing
+// STRATEGY:
+//
+// REVISION HISTORY:
+//	Name		Date		Description
+//	----		----		-----------
+//	kkee    	3/25/98 	Initial version
+//
+//---------------------------------------------------------------------------
+@method // void
+HTFrameClass, HTFrameDone // ()
+{
+    // Format whatever leftover glyphs not formatted.
+    ThreadPSem(_formatSem);
+
+@if NOT_DEFINED_YET
+
+#ifdef ERROR_CHECK
+    @call _compositor::ComposeEC();
+#else
+    @call _compositor::Compose();
+#endif
+    @call _compositor::HTFormatDone();
+
+    // Call UI thread to draw
+    ((_reqManager->GetAppBase())->GetMessageQueue())->QueuedFunctionCall
+        ((QueuedFunction) DrawHTFrame,
+         (MessageArg) this);
+@endif
+
+    // In case we need to reformat the uitree
+    _finishFormat = TRUE;
+    if (_needToReformat) {
+        @call self::ReformatLow();
+    }
+    ThreadVSem(_formatSem);
+}	/* End of HTFrame::Done() */
+
+
+//---------------------------------------------------------------------------
+//		HTFrame::SetBounds()
+//---------------------------------------------------------------------------
+//
+// SYNOPSIS: 	In addition to setting the frame bounds, we need to
+//              resize the frame scrollbar.
+// SCOPE:	Public
+// RETURN:	Nothing
+// STRATEGY:    Update scrollbars.
+//              Progressive display if we are within the exposed
+//              region and also when we first get out of bounds.
+//
+// REVISION HISTORY:
+//	Name		Date		Description
+//	----		----		-----------
+//	kkee    	3/24/98 	Initial version
+//
+//---------------------------------------------------------------------------
+@method // void
+HTFrameClass, HTFrameSetBounds // (const HTCoord *bounds)
+{
+@if NOT_DEFINED_YET
+    sdword vmax = _vScrollbar->GetMaximum();
+    sdword hmax = _hScrollbar->GetMaximum();
+
+    if (bounds->y1 > vmax && bounds->x1 > hmax) {
+        // New virtual document size after formatting
+        ((_reqManager->GetAppBase())->GetMessageQueue())->QueuedFunctionCall
+            ((QueuedFunction) AdjustScrollers,
+            (MessageArg) _vScrollbar,
+            (MessageArg) bounds->y1,
+            (MessageArg) _hScrollbar,
+            (MessageArg) bounds->x1);
+    } else if (bounds->y1 > vmax) {
+        ((_reqManager->GetAppBase())->GetMessageQueue())->QueuedFunctionCall
+            ((QueuedFunction) AdjustOneScroller,
+            (MessageArg) _vScrollbar,
+            (MessageArg) bounds->y1);
+    } else if (bounds->x1 > hmax) {
+        ((_reqManager->GetAppBase())->GetMessageQueue())->QueuedFunctionCall
+            ((QueuedFunction) AdjustOneScroller,
+            (MessageArg) _hScrollbar,
+            (MessageArg) bounds->x1);
+    }
+
+    if (bounds->y1 > vmax || bounds->x1 > hmax) {
+        // Call UI thread to refresh scroller
+        ((_reqManager->GetAppBase())->GetMessageQueue())->QueuedFunctionCall
+            ((QueuedFunction) RepaintScrollers,
+            (MessageArg) _vScrollbar,
+            (MessageArg) _hScrollbar);
+    }
+
+    if (_progressiveDisplay && bounds->y1 > _exposed.size.height) {
+        _progressiveDisplay = FALSE;
+#if 0
+        // Call UI thread to draw
+        ((_reqManager->GetAppBase())->GetMessageQueue())->QueuedFunctionCall
+            ((QueuedFunction) DrawHTFrame,
+            (MessageArg) this);
+#endif
+    }
+@endif
+}	/* End of HTFrame::SetBounds() */
+
+
+//---------------------------------------------------------------------------
+//		HTFrame::Draw()
+//---------------------------------------------------------------------------
+//
+// SYNOPSIS: 	Draw frame. Clear screen as Frame is the top-level
+//              window.
+// SCOPE:	Protected.
+// RETURN:	Nothing
+// STRATEGY:
+//
+// REVISION HISTORY:
+//	Name		Date		Description
+//	----		----		-----------
+//	kkee    	3/24/98 	Initial version
+//
+//---------------------------------------------------------------------------
+@method // void
+HTFrameClass, DrawFrame // ()
+{
+@if NOT_DEFINED_YET
+
+    ASSERTS(_initialized == TRUE,
+            "HTFrame::Draw() Initialize() was not called");
+
+    AppBase::SetFocus(NULL);
+    // Clean the old drawing ontext.
+    _glyphContext->Clean();
+
+    //draw background color or clean the screen
+    _panel->FillRect(0,
+                     0,
+                     _exposed.size.width,
+                     _exposed.size.height,
+#ifdef GR_NATIVE16
+                     _bgColor
+#else
+                     RGB_WHITE
+#endif
+                     );
+
+#ifdef GR_NATIVE16
+    //draw background image here
+    if(_backgroundImage)
+        _backgroundImage->Draw(_panel, _exposed, _glyphContext);
+#endif
+
+    // this time we need to draw Flex stuff
+    _glyphContext->SetDrawFlexFlag(TRUE);
+
+    // this doesnt mean we wont draw text this time, it will affect the next
+    // DrawText function. As we draw text here, we don't want draw it again.
+    // _glyphContext->SetDrawTextFlag(FALSE);
+
+    _uitree->Draw(_panel, _exposed, _glyphContext);
+
+    _glyphContext->SetDrawTextFlag(TRUE);
+@endif
+}	/* End of HTFrame::Draw() */
+
+//---------------------------------------------------------------------------
+//		HTFrame::DrawText()
+//---------------------------------------------------------------------------
+// 
+// SYNOPSIS:   Draw text only. 	
+// SCOPE:      Public
+// RETURN:     Nothing
+// STRATEGY:	
+// 
+// REVISION HISTORY: 
+//	Name		Date		Description 
+//	----		----		----------- 
+//	mzhu    	5/08/98 	Initial version 
+//	
+//---------------------------------------------------------------------------
+@method // void
+HTFrameClass, DrawText // ()
+{
+    ASSERTS(_initialized == TRUE,
+            "HTFrame::Draw() Initialize() was not called");
+
+@if NOT_DEFINED_YET
+
+    if(@call _glyphContext::GetDrawTextFlag()) {
+        @call _panel::FillRect(0, 0, _exposed.size.width,
+                        _exposed.size.height, 
+#ifdef GR_NATIVE16
+                        _bgColor
+#else
+                        RGB_WHITE
+#endif
+                        );
+
+#ifdef GR_NATIVE16
+        //draw background image here
+        if(_backgroundImage)
+            @call _backgroundImage::Draw(_panel, _exposed, _glyphContext);
+#endif
+
+        @call _glyphContext::SetDrawFlexFlag(FALSE);
+        @call _uitree::UITreeDraw(_panel, _exposed, _glyphContext);
+    }
+@endif
+
+}	/* End of HTFrame::DrawText() */
+
+
+//---------------------------------------------------------------------------
+//		HTFrame::Draw()
+//---------------------------------------------------------------------------
+//
+// SYNOPSIS: 	Draw a HTGlyph given its absolute coords.
+// SCOPE:	Public
+// RETURN:	Nothing
+// STRATEGY:
+//
+// REVISION HISTORY:
+//	Name		Date		Description
+//	----		----		-----------
+//	kkee    	5/06/98 	Initial version
+//
+//---------------------------------------------------------------------------
+@method // void
+HTFrameClass, DrawGlyph // (HTGlyph *glyph, const HTCoord *absCoord)
+{
+    HTOffsetAndSize exposed = {
+        {absCoord->x0 + _exposed.offset.x, absCoord->y0 + _exposed.offset.y},
+        {_exposed.size.width, _exposed.size.height}
+    };
+    if (@call glyph::Overlap(&exposed) == HTGLYPH_IN_BOUNDS) {
+#if 0
+        @call glyph::Draw(_panel, exposed, _glyphContext);
+#else 
+        // Try drawing the whole frame to improve perceived performance.
+    	@call self::DrawFrame();
+#endif
+    }
+}	/* End of HTFrame::Draw() */
+
+
+//---------------------------------------------------------------------------
+//		HTFrame::RequestDraw()
+//---------------------------------------------------------------------------
+//
+// SYNOPSIS: 	Accept a request to draw from a glyph in the uitree.
+// SCOPE:	Public
+// RETURN:	Nothing
+// STRATEGY:
+//
+// REVISION HISTORY:
+//	Name		Date		Description
+//	----		----		-----------
+//	kkee    	5/06/98 	Initial version
+//
+//---------------------------------------------------------------------------
+@method // void
+HTFrameClass, HTFrameRequestDraw // (HTGlyph *glyph, const HTCoord* absCoord)
+{
+@if 0
+    PARAM_ASSERT(glyph);
+
+    // Call UI thread to draw
+    ((_reqManager->GetAppBase())->GetMessageQueue())->QueuedFunctionCall
+        ((QueuedFunction) DrawHTGlyph,
+         (MessageArg) this,
+         (MessageArg) glyph,
+         (MessageArg) absCoord->x0,
+         (MessageArg) absCoord->y0,
+         (MessageArg) absCoord->x1,
+         (MessageArg) absCoord->y1
+         );
+@endif
+}	/* End of HTFrame::RequestDraw() */
+
+
+@method
+HTFrameClass, IsProgressiveDisplay
+{
+    return _progressiveDisplay;
+}
+
+
+//---------------------------------------------------------------------------
+//		HTFrame::Reformat()
+//---------------------------------------------------------------------------
+// 
+// SYNOPSIS: 	Reformat the page. Grabs format semapore.
+// SCOPE:	Private
+// RETURN:	TRUE/FALSE
+// STRATEGY:	Reformat if the document is completely formatted,
+//              otherwise delay reformat until we are done formatting.
+// 
+// REVISION HISTORY: 
+//	Name		Date		Description 
+//	----		----		----------- 
+//	kkee    	6/16/98 	Initial version 
+//	
+//---------------------------------------------------------------------------
+@method // Boolean
+HTFrameClass, Reformat // ()
+{
+    ThreadPSem(_formatSem);
+    if (_finishFormat) {
+        @call self::ReformatLow();
+    } else {
+        _needToReformat = TRUE;
+    }
+    ThreadVSem(_formatSem);
+    return TRUE;
+}	/* End of HTFrame::Reformat() */
+
+
+//---------------------------------------------------------------------------
+//		HTFrame::ReformatLow()
+//---------------------------------------------------------------------------
+// 
+// SYNOPSIS: 	Reformat the page. Assumes format semaphore is grabbed.
+// SCOPE:	Private
+// RETURN:	TRUE/FALSE
+// STRATEGY:	
+// 
+// REVISION HISTORY: 
+//	Name		Date		Description 
+//	----		----		----------- 
+//	kkee    	6/16/98 	Initial version 
+//	
+//---------------------------------------------------------------------------
+@method // Boolean
+HTFrameClass, ReformatLow // ()
+{
+    optr /* HTUITree * */ oldUITree = _uitree;
+
+@if NOT_DEFINED_YET
+    _uitree = new HTUITree(this);
+    if (!_uitree) {
+        _uitree = oldUITree;
+        return FALSE;
+    }
+
+    // Create a new compositor
+    delete _compositor;
+    _compositor = new HTFormatter();
+    if (!_compositor) {
+        return FALSE;
+    }
+    delete _formatContext;
+    _formatContext = new HTFormatContext(HTALIGN_LEFT);
+    if (!_formatContext) {
+        return FALSE;
+    }
+
+    if (_compositor->SetComposition(this, oldUITree, _uitree,
+                                    _exposed.size.width, _formatContext)) 
+    {
+        // Reformat now.
+#ifdef ERROR_CHECK
+        _compositor->ComposeEC();
+#else 
+        _compositor->Compose();
+#endif
+        _compositor->Done();
+    }
+    delete oldUITree;
+
+    // Call UI thread to draw
+    ((_reqManager->GetAppBase())->GetMessageQueue())->QueuedFunctionCall
+        ((QueuedFunction) DrawHTFrame,
+         (MessageArg) this);
+@endif
+    return TRUE;
+}	/* End of HTFrame::ReformatLow() */
+
+
+//---------------------------------------------------------------------------
+//		HTFrame::IsCompositionTarget()
+//---------------------------------------------------------------------------
+//
+// SYNOPSIS: 	Check to see if _composition is the current composite target.
+// SCOPE:	Private
+// RETURN:	TRUE if HTFrame is the current composite target, else FALSE.
+// STRATEGY:
+//
+// REVISION HISTORY:
+//	Name		Date		Description
+//	----		----		-----------
+//	kkee    	3/27/98 	Initial version
+//
+//---------------------------------------------------------------------------
+//inline Boolean
+@method
+HTFrameClass, IsCompositionTarget // ()
+{
+    return (@call _compositeTargetList::GetCurrentCompositeTarget() 
+        == _composition ? TRUE : FALSE);
+}	
+/* End of HTFrame::IsCompositionTarget() */
+
+
+
+//---------------------------------------------------------------------------
+//		DrawHTFrame()
+//---------------------------------------------------------------------------
+//
+// SYNOPSIS: 	Procedural call to draw a uitree. Provided so that
+//              non-UI thread can call UI thread to draw.
+// SCOPE:	Public
+// RETURN:	Nothing
+// STRATEGY:
+//
+// REVISION HISTORY:
+//	Name		Date		Description
+//	----		----		-----------
+//	kkee    	3/25/98 	Initial version
+//
+//---------------------------------------------------------------------------
+static void
+DrawHTFrame(optr /* HTFrame * */ frame)
+{
+    PARAM_ASSERT(frame);
+    @call frame::DrawFrame();
+}	/* End of DrawHTFrame() */
+
+
+//---------------------------------------------------------------------------
+//		DrawHTGlyph()
+//---------------------------------------------------------------------------
+//
+// SYNOPSIS: 	Procedural call to draw a htglyph. Provided so that
+//              non-UI thread can call UI thread to draw.
+// SCOPE:	Public
+// RETURN:	Nothing
+// STRATEGY:
+//
+// REVISION HISTORY:
+//	Name		Date		Description
+//	----		----		-----------
+//	kkee    	5/06/98 	Initial version
+//
+//---------------------------------------------------------------------------
+static void
+DrawHTGlyph(optr /* HTFrame * */ frame, optr /* HTGlyph * */ glyph, 
+	    sword x0, sdword y0, sword x1, sdword y1)
+{
+    PARAM_ASSERT(frame);
+    PARAM_ASSERT(glyph);
+    HTCoord absCoord = {x0, y0, x1, y1};
+    @call frame::DrawGlyph(glyph, &absCoord);
+}	/* End of DrawHTGlyph() */
+
+@if NOT_DEFINED_YET
+//---------------------------------------------------------------------------
+//		HTUITree::SetBounds()
+//---------------------------------------------------------------------------
+//
+// SYNOPSIS: 	Set bounds of frame.
+// SCOPE:	Public
+// RETURN:	Nothing
+// STRATEGY:
+//
+// REVISION HISTORY:
+//	Name		Date		Description
+//	----		----		-----------
+//	kkee    	4/17/98 	Initial version
+//
+//---------------------------------------------------------------------------
+void
+HTUITree::SetBounds(const HTCoord *bounds)
+{
+    HTComposite::SetBounds(bounds);
+    _frame->SetBounds(bounds);
+}	/* End of HTUITree::SetBounds() */
+@endif
+
+//---------------------------------------------------------------------------
+//		HTFrame::ECPrintUITree()
+//---------------------------------------------------------------------------
+//
+// SYNOPSIS: 	Print UITree for debugging purposes.
+// SCOPE:	Public
+// RETURN:	Nothing
+// STRATEGY:
+//
+// REVISION HISTORY:
+//	Name		Date		Description
+//	----		----		-----------
+//	kkee    	4/02/98 	Initial version
+//
+//---------------------------------------------------------------------------
+@if 0
+#ifdef ERROR_CHECK
+void
+HTFrame::ECPrintUITree()
+{
+    _uitreeFile = theFileStoreManager.Open(UITREEFILE, O_CREAT | O_RDWR);
+    if (!_uitreeFile) {
+       EC_WARN("HTFrame::HTFrame() unable to create uitree file");
+    }
+    if (_uitreeFile) {
+        char preamble[256];
+        preamble[0] = 0;   // Null-terminate this string.
+
+        _uitreeFile->LSeek(0,0);
+        _uitreeFile->SetSize(0);   // Truncate all data
+
+        _uitree->ECPrintSelf(_uitreeFile, preamble);
+        _uitreeFile->Close();
+    }
+}	/* End of HTFrame::ECPrintUITree() */
+#endif
+@endif
+
+
+//---------------------------------------------------------------------------
+//		HTFrame::FindNameAnchor()
+//---------------------------------------------------------------------------
+//
+// SYNOPSIS: 	Find the matching name anchor on the document.
+// SCOPE:	Public
+// RETURN:	Anchor if found, else NULL.
+// STRATEGY:
+//
+// REVISION HISTORY:
+//	Name		Date		Description
+//	----		----		-----------
+//	edwin     	4/20/98 	Initial version
+//
+//---------------------------------------------------------------------------
+@method // HTMLAnchorItem* 
+HTFrameClass, HTFrameFindNameAnchor // (char *name)
+{
+   return (@call _anchorList::FindNameAnchor(name));
+}
+
+
+//---------------------------------------------------------------------------
+//		HTFrame::DisplayPosition()
+//---------------------------------------------------------------------------
+//
+// SYNOPSIS: 	Scroll the document to bring the passed coordinate onto the
+//              screen.
+// SCOPE:	Public
+// RETURN:
+// STRATEGY:
+//
+// REVISION HISTORY:
+//	Name		Date		Description
+//	----		----		-----------
+//	edwin     	4/20/98 	Initial version
+//
+//---------------------------------------------------------------------------
+@method // void 
+HTFrameClass, DisplayPosition // (HTCoord * rect)
+{
+@if NOT_DEFINED_YET
+    @call _vScrollbar::SetValue(rect->y0);
+@endif
+    return;
+}
+
+
+//---------------------------------------------------------------------------
+//		HTFrame::DisplayPositionOnUIThread()
+//---------------------------------------------------------------------------
+//
+// SYNOPSIS: 	Append a message on the ui thread to scroll the document to
+//              bring the passed coordinate to the screen.
+// SCOPE:	Public
+// RETURN:
+// STRATEGY:    Also see DisplayAnchorPosition.
+//
+// REVISION HISTORY:
+//	Name		Date		Description
+//	----		----		-----------
+//	edwin     	4/20/98 	Initial version
+//
+//---------------------------------------------------------------------------
+@method // void 
+HTFrameClass, DisplayPositionOnUIThread // (HTCoord * rect)
+{
+@if NOT_DEFINED_YET
+    // Call UI thread to display
+    ((_reqManager->GetAppBase())->GetMessageQueue())->QueuedFunctionCall
+        ((QueuedFunction) DisplayAnchorPosition,
+         (MessageArg) _vScrollbar, (MessageArg) rect->x0, (MessageArg) rect->y0);
+@endif
+}
+
+
+//---------------------------------------------------------------------------
+//		DisplayAnchorPosition()
+//---------------------------------------------------------------------------
+//
+// SYNOPSIS: 	Callback routine by DisplayPositionOnUIThread handler.
+//              Scroll the document to bring up the specified coordinate,
+//              like DisplayPosition method.
+// SCOPE:	Public
+// RETURN:	Nothing
+// STRATEGY:
+//
+// REVISION HISTORY:
+//	Name		Date		Description
+//	----		----		-----------
+//	edwin     	4/20/98 	Initial version
+//
+//---------------------------------------------------------------------------
+static void
+DisplayAnchorPosition(optr /* FlexScrollbar * */ scrollbar, sword x, sdword y)
+{
+@if NOT_DEFINED_YET
+    USE_IT(x);
+
+    int32 visible = scrollbar->GetVisibleAmount();
+    int32 max = scrollbar->GetMaximum();
+
+    if (visible + y > max) {
+        // If the desired position is beyond the current scroller's range,
+        // increase that range by setting a new max value.
+        scrollbar->SetMaximum(visible + y);
+    }
+
+    scrollbar->SetValue(y);
+@endif
+}	/* End of DrawHTFrame() */
+
+
+//---------------------------------------------------------------------------
+//		AdjustScrollers()
+//---------------------------------------------------------------------------
+// 
+// SYNOPSIS: 	For Callback to uithread.
+// SCOPE:	Public
+// RETURN:	Nothing
+// STRATEGY:	
+// 
+// REVISION HISTORY: 
+//	Name		Date		Description 
+//	----		----		----------- 
+//	kkee    	6/16/98 	Initial version 
+//	
+//---------------------------------------------------------------------------
+static void
+AdjustScrollers(optr /* FlexScrollbar * */ vScrollbar, 
+                sdword vScrollSize,
+                optr /* FlexScrollbar * */ hScrollbar,
+                sword hScrollSize)
+{
+@if NOT_DEFINED_YET
+    @call vScrollbar::SetMaximum(vScrollSize);
+    @call hScrollbar::SetMaximum(hScrollSize);
+@endif
+}	/* End of AdjustScrollers() */
+
+static void
+AdjustOneScroller(optr /* FlexScrollbar * */ scrollbar, 
+                  sdword size) 
+{
+@if NOT_DEFINED_YET
+    @call scrollbar::SetMaximum(size);
+@endif
+}
+
+//---------------------------------------------------------------------------
+//		RepaintScrollers()
+//---------------------------------------------------------------------------
+//
+// SYNOPSIS: 	Callback routine by DisplayPositionOnUIThread handler.
+//              Scroll the document to bring up the specified coordinate,
+//              like DisplayPosition method.
+// SCOPE:	Public
+// RETURN:	Nothing
+// STRATEGY:
+//
+// REVISION HISTORY:
+//	Name		Date		Description
+//	----		----		-----------
+//	edwin     	4/20/98 	Initial version
+//
+//---------------------------------------------------------------------------
+static void
+RepaintScrollers(optr /* FlexScrollbar * */ vScrollbar, 
+		 optr /* FlexScrollbar * */ hScrollbar)
+{
+@if NOT_DEFINED_YET
+    @call vScrollbar::Paint();
+    @call hScrollbar::Paint();
+@endif
+}	/* End of RepaintScrollers() */
+
+
+//---------------------------------------------------------------------------
+//		HTFrame::SetVisible()
+//---------------------------------------------------------------------------
+//
+// SYNOPSIS: 	Append a message on the ui thread to scroll the document to
+//              bring the passed coordinate to the screen.
+// SCOPE:	Public
+// RETURN:
+// STRATEGY:    Also see DisplayAnchorPosition.
+//
+// REVISION HISTORY:
+//	Name		Date		Description
+//	----		----		-----------
+//	edwin     	4/20/98 	Initial version
+//
+//---------------------------------------------------------------------------
+@method // void 
+HTFrameClass, HTFrameSetVisible // (Boolean visible)
+{
+    @call _panel::SetVisible(visible);
+    return;
+}
+
+
+@method //    WWMemHandle 
+HTFrameClass, GetUseMapHrefAt // (const char *name, HTPoint point)
+{
+    return (@call _mapList::GetHrefFromMapAt(name, point));
+}
+
+
+@method // Boolean 
+HTFrameClass, StartAddress // (const SGMLEntity entity[]);
+{
+    return TRUE;
+}
+
+
+@method // Boolean 
+HTFrameClass, StartBold // (const SGMLEntity entity[])
+{
+    return TRUE;
+}
+
+
+@method // Boolean 
+HTFrameClass, ChangeBigFont // (const SGMLEntity entity[])
+{
+    return TRUE;
+}
+
+
+@method //    Boolean 
+HTFrameClass, StartBlockQuote // (const SGMLEntity entity[])
+{
+    return TRUE;
+}
+
+
+@method // Boolean 
+HTFrameClass, StartCaption // (const SGMLEntity entity[])
+{
+    return TRUE;
+}
+
+
+@method // Boolean 
+HTFrameClass, StartItalic // (const SGMLEntity entity[])
+{
+    return TRUE;
+}
+
+
+@method //    Boolean 
+HTFrameClass, StartFixedWidthFont // (const SGMLEntity entity[])
+{
+    return TRUE;
+}
+
+
+@method // Boolean 
+HTFrameClass, CreateDefinitionDD // (const SGMLEntity entity[]);
+{
+    return TRUE;
+}
+
+
+@method //    Boolean 
+HTFrameClass, StartBoldItalic // (const SGMLEntity entity[])
+{
+    return TRUE;
+}
+
+
+@method // Boolean 
+HTFrameClass, StartDiv // (const SGMLEntity entity[])
+{
+    return TRUE;
+}
+
+
+@method // Boolean 
+HTFrameClass, StartDefinitionList // (const SGMLEntity entity[])
+{
+    return TRUE;
+}
+
+@method //    Boolean 
+HTFrameClass, CreateDefinitionDT // (const SGMLEntity entity[])
+{
+    return TRUE;
+}
+
+
+@method //    Boolean 
+HTFrameClass, StartKBD // (const SGMLEntity entity[])
+{
+    USE_IT(entity);
+    return TRUE;
+}
+
+@method // Boolean 
+HTFrameClass, StartPre // (const SGMLEntity entity[])
+{
+    return TRUE;
+}
+
+
+@method //    Boolean 
+HTFrameClass, StartMeta // (const SGMLEntity entity[])
+{
+    USE_IT(entity);
+    return TRUE;
+}
+
+
+@method //    Boolean 
+HTFrameClass, StartNobr // (const SGMLEntity entity[])
+{
+    return TRUE;
+}
+
+
+@method // Boolean 
+HTFrameClass, StartStrike // (const SGMLEntity entity[])
+{
+    return TRUE;
+}
+
+
+@method //    Boolean 
+HTFrameClass, ChangeSmallFont // (const SGMLEntity entity[])
+{
+    return TRUE;
+}
+
+
+@method //    Boolean 
+HTFrameClass, StartSubscript // (const SGMLEntity entity[])
+{
+    return TRUE;
+}
+
+
+@method //    Boolean 
+HTFrameClass, StartSuperscript // (const SGMLEntity entity[])
+{
+    return TRUE;
+}
+
+
+@method // Boolean 
+HTFrameClass, EndFormat // ()
+{
+    return TRUE;
+}
+
+
+@method // Boolean 
+HTFrameClass, EndAddress // ()
+{
+    return TRUE;
+}
+
+
+@method // Boolean 
+HTFrameClass, EndCaption // ()
+{
+    return TRUE;
+}
+
+
+@method // Boolean 
+HTFrameClass, EndFormatTwice // ()
+{
+    return TRUE;
+}
+
+@method // Boolean 
+HTFrameClass, EndNobr // ()
+{
+    return TRUE;
+}
+
+
+@method //    Boolean 
+HTFrameClass, EndSetIgnoreLWS // ()
+{
+    // Ignore LWS that follows
+        @call self::SetIgnoreLWS(TRUE);
+    return TRUE;
+}
+
+
+@method //    void 
+HTFrameClass, SetIgnoreLWS // (Boolean flag) 
+{
+    _ignoreLWS = flag;
+}
+
+
+@method //    Boolean 
+HTFrameClass, IsIgnoreLWS // () const
+{
+    return _ignoreLWS;
+}
+
+
+@method //    HTComposite* 
+HTFrameClass, HTFrameGetCurrentCompositeTarget // () 
+{
+    return (@call _compositeTargetList::GetCurrentCompositeTarget());
+}
+
+
+@method // Boolean 
+HTFrameClass, HTFrameSetCurrentCompositeTarget // (HTComposite *composite)
+{
+    return (@call _compositeTargetList::SetCurrentCompositeTarget(composite));
+}
+
+
+@method // Boolean 
+HTFrameClass, HTFrameAppendToCurrentCompositeTarget // (HTGlyph *glyph)
+{
+    return (@call _compositeTargetList::AppendToCurrentCompositeTarget(glyph));
+}
+
+
+@method // void 
+HTFrameClass, HTFrameMoveCurrentCompositeTargetTo // (HTMLToken compositeToken)
+{
+    @call _compositeTargetList::
+	MoveCurrentCompositeTargetTo(compositeToken);
+}
+
+
+@method // void 
+HTFrameClass, HTFrameMoveCurrentCompositeTargetToBefore // (HTMLToken compositeToken)
+{
+    @call _compositeTargetList::
+	MoveCurrentCompositeTargetToBefore(compositeToken);
+}
+
+
+@method // HTComposite * 
+HTFrameClass, HTFrameFindCompositeTarget // (HTMLToken compositeToken)
+{
+    return (@call _compositeTargetList::FindCompositeTarget(compositeToken));
+}
+
+
+@method //    HTComposite *
+HTFrameClass, HTFrameFindCompositeTargetWithToken // (HTMLToken compositeToken,
+                                  //   HTMLToken searchUntilToken) 
+{
+    return (@call _compositeTargetList::
+	FindCompositeTargetWithToken(compositeToken, searchUntilToken)); 
+}
+
+@method // inline void
+HTFrameClass, IncNoSizeGlyph // ()
+{
+    ThreadPSem(_noSizeGlyphSem);
+    _noSizeGlyph += 1;
+    ThreadVSem(_noSizeGlyphSem);
+}
+
+
+@method // inline void
+HTFrameClass, DecNoSizeGlyph // ()
+{
+    ThreadPSem(_noSizeGlyphSem);
+    _noSizeGlyph -= 1;
+    ASSERT(_noSizeGlyph >= 0);
+    ThreadVSem(_noSizeGlyphSem);
+}
+
+
+@method // inline int16
+HTFrameClass, GetNumNoSizeGlyph // ()
+{
+    ThreadPSem(_noSizeGlyphSem);
+    sword ret = _noSizeGlyph;
+    ThreadVSem(_noSizeGlyphSem);
+    return ret;
+}
+
+
+@if NOT_DEFINED_YET
+@method // inline const HTTextState&
+HTFrameClass, GetBaseTextState // () const
+{
+    return _baseTextState;
+}
+@endif
+
+@method // inline Boolean
+HTFrameClass, OkToFormat // () 
+{
+    // Allow format if we are appending to the root composition, 
+    // otherwise let other composites decide when they want to 
+    // format. Also make sure all the glyphs have a size to avoid
+    // unnecessary reformat.
+#if 0
+    return ((IsCompositionTarget() && (GetNumNoSizeGlyph()==0)) ? 
+        TRUE:FALSE);
+#else 
+    return ((@call self::IsCompositionTarget()) ? TRUE:FALSE);
+#endif
+}
+
+
+

@@ -1,0 +1,221 @@
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Geoworks 1996 -- All Rights Reserved
+
+PROJECT:	Penelope
+MODULE:		Text formating module
+FILE:		uitext.goc
+
+AUTHOR:		Edwin Yu, Apr 28, 1996
+
+ROUTINES:
+	Name			Description
+	----			-----------
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	EY	4/28/96   	Initial version.
+
+DESCRIPTION:
+	This files defines all the mesage handlers that are 
+	responsible for setting different text styles.
+	
+
+	$Id: uigMouse.goc,v 1.6.6.6 97/12/08 19:37:16 mzhu Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+@include <stdapp.goh>
+@include <WWW/html.goh>
+@include <Objects/vLTextC.goh>    /* VisLargeText definitions */
+@include "UIG/utility.goh"
+
+
+
+/***********************************************************************
+ *		MSG_META_LOST_SYS_TARGET_EXCL for HTGenTextClass
+ ***********************************************************************
+ * SYNOPSIS:	    
+ * PARAMETERS:	    
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	EY	7/19/96   	Initial Revision
+ *
+ ***********************************************************************/
+@extern method HTGenTextClass, MSG_META_LOST_SYS_TARGET_EXCL
+{
+#if 0
+@ifdef PRODUCT_RESPONDER
+    pself = ObjDerefGen(oself);
+@endif
+  if (@self->HTGT_selected == FALSE)
+    @callsuper();
+  else
+    @call self::MSG_META_DELETE_VAR_DATA(TEMP_VIS_TEXT_SYS_TARGET);
+#endif
+  @callsuper();
+
+  return;
+}	/* End of MSG_META_LOST_SYS_TARGET_EXCL.	*/
+
+
+@extern method HTGenTextClass, MSG_META_GAINED_SYS_TARGET_EXCL
+{
+#if 0
+  VisTextIntSelFlags oldFlags;
+  VisLargeTextInstance *vself;
+
+  vself = ObjDerefVis(oself);
+  oldFlags = vself->VTI_intSelFlags;
+  vself->VTI_intSelFlags &= ~VTISF_IS_FOCUS;
+  @callsuper();
+  vself = ObjDerefVis(oself);
+  vself->VTI_intSelFlags = oldFlags;
+#endif
+  @callsuper();
+
+  return;
+}	/* End of MSG_META_GAINED_SYS_TARGET_EXCL.	*/
+
+
+/***********************************************************************
+ *		MSG_META_LOST_SYS_FOCUS_EXCL for HTGenTextClass
+ ***********************************************************************
+ * SYNOPSIS:	    
+ * PARAMETERS:	    
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	EY	7/24/96   	Initial Revision
+ *
+ ***********************************************************************/
+@extern method HTGenTextClass, MSG_META_LOST_SYS_FOCUS_EXCL
+{
+#if 0
+  if (@self->HTGT_selected == FALSE)
+    @callsuper();
+  else {
+    @call self::MSG_META_ADD_VAR_DATA(TEMP_VIS_TEXT_SYS_TARGET,0,NULL);
+    @callsuper();
+    @call self::MSG_META_DELETE_VAR_DATA(TEMP_VIS_TEXT_SYS_TARGET);
+  }
+#endif
+  @callsuper();
+
+  return;
+}	/* End of MSG_META_LOST_SYS_FOCUS_EXCL.	*/
+
+
+/***********************************************************************
+ *		MSG_META_START_SELECT for HTGenTextClass
+ ***********************************************************************
+ * SYNOPSIS:	    
+ * PARAMETERS:	    (MouseReturnParams *retVal = bpaxdxcx,
+ *			      sword xPosition = cx,
+ *			      sword yPosition = dx,
+ *			      word inputState = bp)
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	EY	7/22/96   	Initial Revision
+ *
+@extern method HTGenTextClass, MSG_META_START_SELECT
+{
+  @self->HTGT_selected = TRUE;
+*  @call self::MSG_VIS_MARK_INVALID(VOF_IMAGE_INVALID, 
+				   VUM_DELAYED_VIA_APP_QUEUE); *
+  @callsuper();
+
+  return;
+}	* End of MSG_META_START_SELECT.	*
+ ***********************************************************************/
+
+
+/***********************************************************************
+ *		MSG_META_END_SELECT for HTGenTextClass
+ ***********************************************************************
+ * SYNOPSIS:	    
+ * PARAMETERS:	    
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	EY	7/26/96   	Initial Revision
+ *
+ ***********************************************************************/
+@extern method HTGenTextClass, MSG_META_END_SELECT
+{
+  @self->HTGT_selected = FALSE;
+@if @SHORT_LONG_TOUCH
+  @self->HTGT_rawMouseCoord.P_x = xPosition;
+  @self->HTGT_rawMouseCoord.P_y = yPosition;
+@endif /* SHORT_LONG_TOUCH */
+  @callsuper();
+  return;
+}	/* End of MSG_META_END_SELECT.	*/
+
+
+/***********************************************************************
+ *		MSG_VIS_TEXT_SELECT_ALL for HTGenTextClass
+ ***********************************************************************
+ * SYNOPSIS:	    Inercept the message mark the object 'selected'.
+ * PARAMETERS:	    same as default handler.
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	EY	7/25/96   	Initial Revision
+ *
+ ***********************************************************************/
+@extern method HTGenTextClass, MSG_META_UIG_SELECT_ALL
+{
+  @self->HTGT_selected = TRUE;
+  @call self::MSG_VIS_TEXT_SELECT_ALL();
+  return;
+}	/* End of MSG_VIS_TEXT_SELECT_ALL.	*/
+
+
+/***********************************************************************
+ *		MSG_VIS_TEXT_SELECT_RANGE for HTGenTextClass
+ ***********************************************************************
+ * SYNOPSIS:	    Intercept the message and mark the object 
+ *		    'unselected' if the range is (0,0)
+ * PARAMETERS:	    (@stack dword end, dword start)
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	EY	7/26/96   	Initial Revision
+ *
+ ***********************************************************************/
+@extern method HTGenTextClass, MSG_META_UIG_SELECT_NONE
+{
+  @self->HTGT_selected = FALSE;
+  @call self::MSG_VIS_TEXT_SELECT_RANGE(0,0);
+  return;
+}	/* End of MSG_VIS_TEXT_SELECT_RANGE.	*/
+
+
+

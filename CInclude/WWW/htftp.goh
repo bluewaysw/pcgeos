@@ -1,0 +1,136 @@
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Geoworks 1996.  All rights reserved.
+	GEOWORKS CONFIDENTIAL
+
+PROJECT:	Geos WWW Library
+MODULE:		htftp
+FILE:		htftp.goh
+
+AUTHOR:		Jeremy Broestl, Jun 15, 1996
+
+ROUTINES:
+	Name			Description
+	----			-----------
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	jeremyb	6/15/98   	Initial version.
+
+DESCRIPTION:
+
+	HTFile protocol.
+
+	$Id: htftp.goh,v 1.1.1.3 98/07/29 09:20:40 jeremyb Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+
+@ifndef __HT_FTP_GOH__
+@define __HT_FTP_GOH__
+
+@deflib htftp
+
+@include <WWW/HTCore/htstream.goh>
+@include <WWW/HTCore/htreq.goh>
+#include <Ansi/stdio.h>                         /* FILE operations */
+
+/* --------------------------------------------------------------------------
+ * 		I. FREQUENTLY ASKED QUESTIONS - FAQ
+ * --------------------------------------------------------------------------*/
+
+/* --------------------------------------------------------------------------
+ * 		A. HTFile CLASS
+ * --------------------------------------------------------------------------*/
+
+/****************************************************************************
+
+  The HTFTPClass is inherited from HTProtocolClass defined in htstream.goh.
+  We intercept all the methods in the class to implement the protocol. The most
+  important method is MSG_HT_PROTOCOL_LOAD. The method is implemented in a
+  finite-state machine manner, i.e., HTFTP keeps track of its execution state
+  so that it knows where to resume execution when it is scheduled to run 
+  again. Scheduling a protocol is done in the Net Manager, see API 
+  HTNetNewClient in file htnet.goh{goc}.
+
+  HTFTPClass is ported from Netscape's ftp code.
+
+  All intercepted methods must return HT_ERROR or HT_OK, an integer value.
+
+ ****************************************************************************/
+
+/* --------------------------------------------------------------------------
+ * 		B. Register HTTP CLASS
+ * --------------------------------------------------------------------------*/
+
+/****************************************************************************
+
+  In order for the Library to be aware of the HTTP class so as to use it,
+  you need to register the class with the Library through the Policy
+  Manager using API HTPolicyAddProtocolHandler in htpolicy.goh{goc}. 
+  If you don't, the Library uses the default HTFile Library.
+  Whenever needed, the Library will instantiate an object of HTTP to handle
+  a HTTP request.
+
+  I don't know how this particular comment applies to FTP.  If you request
+  an ftp preceded location, and ftp = htftp.geo is in your ini file, the
+  default policy manager can find htftp, and we proceed (jeremyb 6/15/98)
+
+ ****************************************************************************/
+
+/*
+ * HTFTP states. Final states have negative value.
+ */
+typedef enum {
+    HTFILE_BEGIN                = 0,
+    HTFILE_READ
+} HTFTPState;
+
+void _far _pascal FTPFilenameReceivedFromClient(HTMemHandle nameHandle);
+void _far _pascal FTPClientRegister(GeodeHandle client, word message, 
+				    optr view);
+
+typedef enum {
+    FTP_TRYING_TO_LOG_IN,
+    FTP_LOGGED_IN,
+    FTP_RETURN_PATH_TO_USE,
+    FTP_DOWNLOAD_COMMENCING,
+    FTP_DOWNLOAD_PARTIALLY_COMPLETE,
+    FTP_DOWNLOAD_COMPLETE,
+    FTP_DOWNLOAD_STALLED,
+    FTP_LOGGED_OUT
+} FTPMsgType;
+
+@prototype void MSG_FROM_FTP_PROCESS(FTPMsgType msg, HTMemHandle value);
+
+@class HTFTPClass, HTProtocolClass;
+
+/* --------------------------------------------------------------------------
+ * 		Instance Data.
+ * --------------------------------------------------------------------------*/
+
+/*
+ * HTFTP finite state machine info is kept by HTFI_currentState
+ */
+@instance HTFTPState HTFI_currentState;
+
+/* 
+ * File pointer to the file which we are saving
+ */
+@instance FileHandle HTFI_fileHandle;
+
+/*
+ * Buffer for reading data.
+ */
+@instance MemHandle HTFI_block;
+@instance char *HTFI_buffer;
+@instance Boolean HTFI_hasMIME;
+
+@endc;
+/************************************************************/
+
+@endlib
+
+@endif
+

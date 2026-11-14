@@ -1,0 +1,643 @@
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Geoworks 1997.  All rights reserved.
+	GEOWORKS CONFIDENTIAL
+
+PROJECT:	WWW2 Library
+MODULE:		WW2String
+FILE:		ww2string.goh
+
+AUTHOR:		Kok Kin Kee
+
+ROUTINES:
+	Name			Description
+	----			-----------
+
+REVISION HISTORY:
+	Name		Date		Description
+	----		----		-----------
+
+DESCRIPTION:
+        This module provides a) String storage using hashing
+                             b) Basic WWMem string handling
+                             c) Extentions - Case insensitive
+                             d) Time parsing functions
+	$Id: ww2string.goh,v 1.2 98/08/03 10:07:16 edwin Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+@ifndef _WWSTRING_H_
+@define _WWSTRING_H_
+
+/*
+#include <basedef.h>
+#include <system.h>
+#include <jstring.h>
+#include <tstring.h>
+#include <kernel/datetime.h>
+#include <driver/platform.h>
+*/
+
+@include "WWW2/ww2mem.h"
+@include "WWW2/WW2Core/ww2mlist.goh"
+@include "WWW2/WW2Core/ww2liter.goh"
+
+
+
+#if 0
+/*****************************************************************************/
+
+/*------------------------------------------------------------------------
+  CLASS 
+      WWTime
+
+      Allows two way conversion from string GMT to intenal time formats.
+
+  OVERVIEW
+        Html pages are sent with a timestamp. The WW library needs to store
+        this and convert it to the New Sokoto internal DateTime
+        representation. Conversion from the internal format to a string
+        acceptable to the server is also required. This class provides this
+        functionality. Inline functions are provided such that the class
+        implementation may be ignored and the API is consistent.
+
+  KEYWORDS
+      Time, Date, Delta, DateTime, WWW
+
+  CLASS TREE
+  <pre>
+      WWtime
+  </pre>
+  ------------------------------------------------------------------------*/
+@class WWTime, MetaClass;
+
+/* public: */
+
+    /*////////
+    //
+    // ParseTime converts a string format time to it's local DateTime
+    // representation. 
+    //
+    //      Four formats are accepted:
+    //
+    //      Wkd, 00 Mon 0000 00:00:00 GMT       (rfc1123) 
+    //      Weekday, 00-Mon-00 00:00:00 GMT     (rfc850) 
+    //      Wkd Mon 00 00:00:00 0000 GMT        (ctime)
+    //      1*DIGIT                             (delta-seconds)
+    //
+    // Note: the 'day of the week' information is ignored by this method.
+    // It may be recreated by the New Sokoto DayOfWeek function. If the
+    // 'day of the week' is wrong, a call to ParseTime and then
+    // CreateTime will generate different a weekday name. No warning is
+    // given.
+    //
+    // Parameters_
+    //
+    // [in]  pString   The null-terminated time in one of the
+    //                 above formats.
+    // [out] dateTime  The internal New Sokoto time format (allocated
+    //                 before calling this function).
+    //
+    // Return_value_   TRUE if convesion was successful. FALSE otherwise.
+    //
+    // Status_  Functional
+    */
+    @message Boolean ParseTime(const char *pString, DateTime *dateTime);
+
+    /*////////
+    //
+    // CreateTime converts from New Sokoto internal representation to that
+    // specified in (rfc1123) ie: Wkd, 00 Mon 0000 00:00:00 GMT
+    //
+    // Parameters_
+    //
+    // [in] dateTime  The internal New Sokoto time format to be converted.
+    //
+    // Return_value_  A WWMemHandle to the DateTime of the resulting conversion
+    //                or NULL if allocation failed. Memory must be freed by the
+    //                caller.
+    //
+    // Status_ Functional
+    */
+    @message WWMemHandle CreateTime(const DateTime * const dateTime);
+
+//===========================================================================
+//
+//                       W A R N I N G 
+// 
+// THE LIBERTY EXTERNAL API IS FOUND ABOVE THIS BARRIER. ANYTHING BELOW
+// THIS NOTICE IS IMPLEMENTATION DEPENDENT AND SUBJECT TO CHANGE.
+//
+//
+//===========================================================================
+
+ private:
+
+
+    //
+    // Form an integer from a two digit string.
+    //
+    // Status_ Functional
+    // 
+    @instance byte MakeNum(const char *pString);
+
+    //
+    // Form an integer month number from a string.
+    //
+    // Status_ Functional
+    // 
+    @instance byte MakeMonth(const char *pMonthString);
+
+    //
+    // Add the given number of seconds to the given datetime.
+    //
+    // Status_ Functional
+    // 
+    @instance void AddSeconds(dword addTime, DateTime *dateTime);
+
+    //
+    // Form a string from a given integer.
+    //
+    // Status_ Functional
+    // 
+    @instance void Write2Digits(char *pString, byte number);
+
+    @instance char * const timeTemplate;  /* format used for datetime */
+    @instance char * const months[12];
+    @instance char * const wkdays[7];
+    @instance word daysBeforeMonthTable[12];
+
+@endc;
+
+/*****************************************************************************/
+#endif
+
+size_t _far _pascal Tstrlen(const TCHAR *s);
+TCHAR* _far _pascal Tstrcpy( TCHAR *s, const TCHAR *ct );
+TCHAR* Tstrncpy( TCHAR *s, const TCHAR *ct, size_t n );
+TCHAR* _far _pascal Tstrrchr( const TCHAR *cs, int c );
+char* _far _pascal Jstrcpy( char *s, const TCHAR *ct );
+/* char* _far _pascal JstrncpyToTCHAR(char *s, const TCHAR *ct, size_t n); */
+TCHAR* _far _pascal Jstrncpy(TCHAR *s, const char *ct, size_t n);
+
+
+    /*////////
+    //
+    // WWStringECCheck provides a consistent interface to the
+    // WWMem equivalent. See wwmem.h. String handles and Mem
+    // handles are equivalent (unlike Geos).
+    //
+    // Parameters_
+    //
+    // [in]  hString        stringhandle
+    //
+    // Return_value_        none
+    //
+    // See_also_    wwmem.h
+    //
+    // Status_ Functional
+    */
+void _far _pascal WWStringECCheck(WWMemHandle hString);
+
+    /*////////
+    //
+    // WWStrCaseCmp implements a case insensitive version of strcmp
+    //
+    // Parameters_
+    //
+    // [in]  pa  a string
+    //       pb  another string 
+    //
+    // Return_value_   <0 if pa<pb
+    //                  0 if pa==pb
+    //                  >0 if pa>pb
+    //
+    // Status_ Functional
+    */
+int _far _pascal WWStrCaseCmp(const char *pA, const char *pB); 
+
+    /*////////
+    //
+    // WWStrCaseCmpWWMem performs a case insensitive string comparison
+    // between one string and a string represented by a memhandle.     
+    //
+    // Parameters_
+    //
+    // [in]  ha  a memhandle
+    //       pb  a string
+    //
+    // Return_value_   <0 if ha's string < pb
+    //                  0 if ha's string == pb
+    //                  >0 if ha's string > pb
+    //
+    // Status_ Functional
+    */
+int _far _pascal WWStrCaseCmpWWMem(const WWMemHandle hA, const char *pB); 
+
+    /*////////
+    //
+    // WWStrNCaseCmp performs a case insensitive comparison of the first n
+    // characters of two strings.
+    //
+    // Parameters_
+    //
+    // [in]  pa  a string
+    //       pb  another string 
+    //       n   number of characters
+    //
+    // Return_value_   <0 if pa<pb
+    //                  0 if pa==pb
+    //                  >0 if pa>pb
+    //
+    // Status_ Functional.
+    */
+int _far _pascal WWStrNCaseCmp(const char *pA, const char *pB, int n); 
+
+    /*////////
+    //
+    // WWStrNCaseCmpWWMem performs a case insensitive comparison of the first n
+    // characters of one string and another string represented by a memhandle.
+    //
+    // [in]  ha  a memhandle
+    //       pb  a string
+    //       n   number of characters
+    //
+    // Return_value_   <0 if ha's string < pb
+    //                  0 if ha's string == pb
+    //                  >0 if ha's string > pb
+    //
+    // Status_ Functional
+    */
+int _far _pascal WWStrNCaseCmpWWMem(const WWMemHandle hA, const char *pB, int n); 
+
+    /*////////
+    //
+    // WWStrCaseStr implements a case insensitive version of strstr.
+    //
+    // [in]  pS1  a string
+    //       pS2  another string 
+    //
+    // Return_value_   pointer to first occurrence of string s2 in s1, or NULL
+    //                 if not present.
+    //
+    // Status_ Functional
+    */
+char * _far _pascal WWStrCaseStr(const char *pS1, const char *pS2); 
+
+
+    /*////////
+    //
+    // WWStrToLower converts a string to lower case.
+    //
+    // Parameters_
+    //
+    // [in] pString   The string to be converted. This is modified as a
+    //                result of the conversion.
+    //
+    // Return_value_  The pointer passed in.
+    //
+    // Status_ Functional.
+    */
+char * _far _pascal WWStrToLower(char *pString); 
+
+    /*////////
+    //
+    // WWStrToUpper converts a string to upper case.
+    //
+    // Parameters_
+    //
+    // [in] pString   The string to be converted. This is modified as a
+    //                result of the conversion.
+    //
+    // Return_value_  The pointer passed in.
+    //
+    // Status_ Functional
+    */
+char * _far _pascal WWStrToUpper(char *pString);
+
+
+    /*////////
+    //
+    // String allocate and copy.
+    //
+    // Parameters_
+    //
+    // [in]  str  String to copy
+    //
+    // Return_value_ char*, must be freed by caller via "delete [] ..."
+    //               NULL if failed to allocate or str is NULL.
+    //
+    // See_also_ strnallocopy
+    //
+    // Status_ Functional
+    */
+char * _far _pascal stralloccopy(const char *str);
+TCHAR* _far _pascal stralloccopyTCHAR(const char *str);
+
+    /*////////
+    //
+    // String allocate and copy, given n bytes.
+    //
+    // Parameters_
+    //
+    // [in]  str   String to copy
+    // [in]  n     Number of bytes to copy
+    //
+    // Return_value_ char*, must be freed by caller via "delete [] ..."
+    //               NULL if failed to allocate or str is NULL. 
+    //
+    // See_also_ stralloccopy
+    //
+    // Overrides_
+    //
+    // Status_ Functional
+    */
+char*  _far _pascal strnalloccopy(const char *str, word n);
+TCHAR* _far _pascal strnalloccopyTCHAR(const char *str, word n);
+
+TCHAR * _far _pascal
+strncpyToTCHAR(TCHAR *s1, const byte *s2, word len);
+
+byte * _far _pascal
+strncpyTCHAR(byte *s, const TCHAR *ct, size_t n);
+
+
+    /*////////
+    //
+    // WWStrLenWWMem determines the length of a string represented by a
+    // memhandle.          
+    //
+    // Parameters_
+    //
+    // [in] hString   a memhandle
+    //
+    // Return_value_  the length of the string represented by the memhandle
+    //
+    // Status_ Functional
+    */
+size_t _far _pascal WWStrLenWWMem(const WWMemHandle hString);
+
+    /*////////
+    //
+    // WWStringLen carries over the old API. It is equivalent
+    // to WWStrLenWWMem. String handles and Mem handles are
+    // equivalent (unlike Geos).
+    //
+    // Parameters_
+    //
+    // [in] hString   a memhandle
+    //
+    // Return_value_  the length of the string represented by the memhandle
+    //
+    // See_also_ WWStrLenWWMem
+    //
+    // Status_ Functional
+    */
+size_t _far _pascal WWStringLen(const WWMemHandle hString);
+
+    /*////////
+    //
+    // WWStrCpyWWMem implements strcpy using WWMemHandles to represent the 
+    // strings.
+    //
+    // Parameters_
+    //
+    // [in] hDest   a memhandle of the string being copied to
+    //      hSource a memhandle of the string being copied from
+    //
+    // Return_value_  memhandle hDest
+    //
+    // Status_ Functional
+    */
+WWMemHandle _far _pascal
+WWStrCpyWWMem(const WWMemHandle hDest, const WWMemHandle hSource);
+
+    /*////////
+    //
+    // WWStrCatWWMem implements strcpy using WWMemHandles to represent the 
+    // strings.
+    //
+    // Parameters_
+    //
+    // [in] hS1    memhandle for the first string
+    //      hS2    memhandle for the second string
+    //
+    // Return_value_  memhandle hS1 which now points to the concatenation
+    //                of the first and second strings
+    //
+    // Status_ Functional
+    */
+WWMemHandle _far _pascal WWStrCatWWMem(const WWMemHandle hS1, const WWMemHandle hS2);
+
+    /*////////
+    //
+    // WWStrAllocCopy takes a string, allocates and copies it, 
+    // returning a WWMemHandle to the copy of the original string.
+    //
+    // Parameters_
+    //
+    // [in] pString   a string
+    //
+    // Return_value_  a WWMemHandle to the copy of the original string
+    //
+    // Status_ Functional
+    */
+WWMemHandle _far _pascal WWStrAllocCopy(const char *pString); 
+WWMemHandle _far _pascal WWStrAllocCopyTCHAR(const TCHAR *pString); 
+
+    /*////////
+    //
+    // WWStrNAllocCopy takes a SB string, allocates and copies it to 
+    // double byte TCHAR string.
+    //
+    // Parameters_
+    //
+    // [in] pString   a string, needs not NUll-terminated.
+    // [in] length    Number of bytes in pString to copy.
+    //
+    // Return_value_  a WWMemHandle to the TCHAR copy of the original string
+    //
+    // Status_ Functional
+    */
+WWMemHandle _far _pascal WWStrNAllocCopyTCHAR(const char *pString, word length); 
+
+    /*////////
+    //
+    // WWStrNAllocCopy takes a string, allocates and copies up
+    // to the first n bytes of it, and returns a WWMemHandle to the copy.
+    //
+    // Parameters_
+    //
+    // [in] pString   a string
+    //      n         number of characters 
+    //
+    // Return_value_  a WWMemHandle to the copy of the original string
+    //
+    // Status_ Functional
+    */
+WWMemHandle _far _pascal WWStrNAllocCopy(const char *pString, size_t n); 
+
+    /*////////
+    //
+    // WWStrAllocCat takes a WWMemHandle to a string, reallocates it
+    // to take into account the appendage and appends the appendage, much
+    // like strcat.
+    //
+    // Parameters_
+    //
+    // [in] hString   a memhandle
+    //      pAppendage  a string
+    //
+    // Return_value_  The passed in WWMemHandle or NULL if failed to 
+    //                append. If NULL, hString is not modified.
+    //
+    // Status_ Functional
+    //
+    // Status_ Not tested.
+    */
+WWMemHandle _far _pascal
+WWStrAllocCat(WWMemHandle hString, const char *pAppendage); 
+
+
+    /*////////
+    //
+    // WWStrNAllocCatTCHAR appends a single byte string to a double
+    // byte string and returns a concated double byte string.
+    //
+    // Parameters_
+    //
+    // [in]  strH        Handle to string to append to.
+    // [in]  append      String to append, which needs not be NULL-terminated.
+    // [in]  length      Length of append.
+    //
+    // Return_value_  WWMemHandle or NULL if not enough memory. 
+    //                If NULL, strH is not modified.
+    //
+    // See_also_ 
+    //
+    // Overrides_
+    //
+    // Status_ Functional
+    */
+WWMemHandle _far _pascal
+WWStrNAllocCatTCHAR(WWMemHandle strH, const char *append,
+                                word length);
+
+    /*////////
+    //
+    // Combine str and append into a new string. str is not modified
+    // and usually should be freed if a new string is returned.
+    //
+    // Parameters_
+    //
+    // [in] str    This string to concate to. This string is not
+    //             modified as we allocate a new bigger
+    //             string. Usually caller needs to free this upon
+    //             getting a new string back.
+    // [in] append
+    // [in] length
+    //
+    // Return_value_ TCHAR*, newly created string. Caller must delete
+    //               using "delete [] ...". NULL if append is NULL or 
+    //               length is zero or cannot allocate string.
+    //
+    // Status_ Functional
+    */
+TCHAR* _far _pascal strnalloccatTCHAR(TCHAR *str, const char *append, word
+                         length);
+
+    /*////////
+    //
+    // WWStrAllocCopyWWMem works like WWStrAllocCopy but takes a WWMemHandle
+    // to a string instead of a string.
+    //
+    // Parameters_
+    //
+    // [in]  a memhandle
+    //
+    // Return_value_  a memhandle to the copy of the original string
+    //
+    // See_also_   WWStrAllocCopy
+    //
+    // Status_ Functional
+    */
+WWMemHandle _far _pascal WWStrAllocCopyWWMem(const WWMemHandle hString);
+
+#if 0
+/*****************************************************************************/
+
+    //////////
+    //
+    // WWParseTime is equivalent to WWTime::ParseTime
+    // Parameters_
+    //
+    // [in]  pString   The null-terminated time in one of the
+    //                 above formats.
+    // [out] dateTime  The internal New Sokoto time format (allocated
+    //                 before calling this function).
+    //
+    // Return_value_   TRUE if convesion was successful. FALSE otherwise.
+    //
+    // See_also_   WWTime::ParseTime
+    //
+    // Status_  Functional
+    //
+inline Boolean WWParseTime(const char *pString, DateTime *dateTime)
+{
+    return WWTime::ParseTime(pString, dateTime);
+}
+
+    //////////
+    //
+    // WWCreateTime is equivalent to WWTime::CreateTime
+    //
+    // Parameters_
+    //
+    // [in] dateTime  The internal New Sokoto time format to be converted.
+    //
+    // Return_value_  A WWMemHandle to the DateTime of the resulting conversion
+    //                or NULL if allocation failed. Memory must be freed by the
+    //                caller.
+    //
+    // See_also_   WWTime::CreateTime
+    //
+    // Status_ Functional
+    //
+inline WWMemHandle WWCreateTime(DateTime *dateTime)
+{
+    return WWTime::CreateTime(dateTime);
+}
+
+/*****************************************************************************/
+#endif
+
+
+
+// 
+// Macros provided for performance improvement
+//
+// Single-byte versions
+#define ISWHITE(c) \
+	(((c==' ') || (c>=9 && c<=13)) ? TRUE : FALSE)
+
+#define ISDIGIT(c) \
+	((c>='0' && c<='9') ? TRUE : FALSE)
+
+#define ISALPHA(c)  \
+	(((c>='a' && c<='z') || (c>='A' && c<='Z')) ? TRUE : FALSE)
+
+#define ISALNUM(c) \
+	((ISALPHA(c) || ISDIGIT(c)) ? TRUE : FALSE)
+
+#define TOLOWER(c) \
+        (((c>='A') && (c<='Z')) ? c+32 : c)
+
+#define TOUPPER(c) \
+        (((c>='a') && (c<='z')) ? c-32 : c)
+
+
+// Double-byte versions
+#define ISWHITE_TCHAR(c) \
+	(((c==_CHAR(' ')) || (c>=_CHAR(9) && c<=_CHAR(13))) ? TRUE : FALSE)
+        
+@endif //ndef _WWSTRING_H_

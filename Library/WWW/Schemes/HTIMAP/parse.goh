@@ -1,0 +1,111 @@
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Geoworks 1997.  All rights reserved.
+	GEOWORKS CONFIDENTIAL
+
+PROJECT:	Geos WWW Library
+MODULE:		parse
+FILE:		parse.goh
+
+AUTHOR:		Kok Kin Kee, May 26, 1997
+
+ROUTINES:
+	Name			Description
+	----			-----------
+
+REVISION HISTORY:
+	Name		Date		Description
+	----		----		-----------
+	kkee    	5/26/97   	Initial version.
+
+DESCRIPTION:
+
+	IMAP Parser.
+
+	$Id: parse.goh,v 1.12.5.1 97/09/05 10:52:24 jeremyb Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+@ifndef __IMAPPARSE_GOH__
+@define __IMAPPARSE_GOH__
+
+@include "scan.goh"
+@include <WWW/HTCore/htconst.goh>
+@include <WWW/HTCore/htassoc.goh>
+#include <WWW/htmem.h>
+
+@include "const.goh"
+
+/*
+ * Client requests in the URL; e.g., http://server/
+ */
+typedef enum {
+    /* Invalid requests used internally for error checking and for
+     * filtering our unwanted parsed tokens.
+     */
+    IMAPC_INVALID = -1,            /* BinSearch returns -1 for not found */
+    IMAPC_IGNORE  = 0,             /* For filtering out unwanted tokens */
+
+    /* Only the following are valid requests */
+    IMAPC_LOGON,                   /* Logon and selects INBOX */
+    IMAPC_LIST,                    /* Get messages UIDs */
+    IMAPC_BODY,                    /* Get message body */
+    IMAPC_PBODY,                   /* Get partial message body */
+    IMAPC_ATTACH,                  /* Get attachment */
+    IMAPC_PATTACH,                 /* Get partial attachment */
+    IMAPC_DELETE,                  /* Delete a message */
+    IMAPC_LOGOUT,                  /* Logout */
+
+} IMAPRequest;
+
+
+/*
+ * IMAP Parser.
+ */
+typedef struct {
+    /* Scanner */
+    IMAPScanner      scanner;
+
+    /* The type of IMAP server we are communicating with */
+    IMAPServerVersion server;
+
+    /* Data items provided by HTIMAPClass */
+    IMAPRequest      wanted;    /* Response we want to parse */
+    HTStreamHandle   target;    /* For pushing data */
+    HTAssocList      taggedCmdList;  /* Tagged commands we have made */
+    void            *resp;         /* Response data structrue */
+    HTMemHandle      resphtmh;     /* The handle of resp */
+
+    /* Data items used by parser */
+    HTMemHandle      strhtmh; /* latest parsed string if mode = SAVE_STRING in
+				 ParseString or ParseNString */
+    HTStreamHandle   strTarget; /* target to push parsed string if not saved
+				  to memory */
+    HTMemHandle      param1;    /* parameters to pass around routines */
+    HTMemHandle      param2;
+
+    /* Nested body numbering */
+    HTMemHandle      bodyNumber;/* Body part numbering in x.y.z... format */
+
+    /* Data items provided by parser to HTIMAPClass */
+    HTListHandle     retList;      /* Use to save current response data
+				      that need to be passed to the next
+				      IMAP cmd in a list of data items */
+    HTMemHandle      retData;      /* Use to save current response data 
+				      that need to be passed to the next 
+				      IMAP cmd as a null-terimnated string */
+    dword            retNum;       /* Message sequence number (not UID) */
+	HTIMAPEncoding   retEncoding;  /* Body encoding for body, pbody, 
+	                  attach, and pattach requests. Default IE_NOTSET */
+} IMAPParser;
+
+extern IMAPRequest _pascal
+    IMAPParseCommand (HTRequestHandle request, HTMemHandle *params);
+extern char * _pascal NextToken (char **p);
+
+extern HTMemHandle _pascal ParseNew (void);
+extern int _pascal ParseResponse (IMAPParser *p);
+extern void _pascal ParseDelete (HTMemHandle pp);
+
+@endif /* __IMAPPARSE_GOH__ */
+

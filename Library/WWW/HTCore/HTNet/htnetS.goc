@@ -1,0 +1,369 @@
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Geoworks 1996 -- All Rights Reserved
+
+PROJECT:	Geos WWW Library
+MODULE:		The Net Manager.
+FILE:		htnetS.goc
+
+AUTHOR:		Kok Kin Kee, Jun  5, 1996
+
+ROUTINES:
+	Name			Description
+	----			-----------
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	kkee	6/ 5/96   	Initial version.
+
+DESCRIPTION:
+	The Net Scheduler class.
+
+	$Id: htnetS.goc,v 1.27.2.8 97/11/18 22:31:33 kkee Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+@include <WWW/HTCore/htreqMan.goh>
+@include <WWW/HTCore/hturi.goh>
+@include <WWW/HTCore/htstring.goh>
+@include <WWW/HTCore/htconst.goh>
+@include <WWW/HTCore/htsock.goh>
+@include <WWW/HTCore/htanchor.goh>
+@include <WWW/HTCore/htmime.goh>
+@include "HTNet/htnetS.goh"
+@include "htfatals.goh"
+#include <WWW/htmem.h>
+#include <sem.h>
+
+/* These are in htnet.goc */
+extern void _pascal ECCheckHTNet (HTNetThread *net);
+
+extern int _pascal
+	HTNetAlloc (HTRequest *req, HTMemHandle url, HTNetThread **net);
+
+extern HTNetThread * _pascal HTNetGetNext(optr scheduler);
+
+extern void _pascal HTNetFree (HTNetThread *net);
+
+extern Boolean _pascal
+    HTNetChangeState (HTNetThread *net, HTNetState newState);
+
+extern Boolean _pascal HTNetGrabState (HTNetThread *net);
+
+extern int _pascal HTNetKillLow (HTNetThread *net);
+
+
+/* --------------------------------------------------------------------------
+ *		Class Declarations
+ * --------------------------------------------------------------------------*/
+
+@classdecl      HTNetSchedulerClass, neverSaved;
+
+
+/***********************************************************************
+ *		HTNetKillInternal
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Kill an NetThread internally without informing client.
+ * CALLED BY:	MSG_HTNS_SCHEDULE_ROUND_ROBIN.
+ * RETURN:	TRUE if we kill here, else FALSE if it is dead.
+ *	
+ * STRATEGY:	
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	kkee    	4/30/97   	Initial Revision
+ *	
+ ***********************************************************************/
+static Boolean _pascal
+HTNetKillInternal (HTNetThread *net)
+{
+    if (!HTNetGrabState(net))
+	/* Already dead */
+	return FALSE;
+    if (HTNetChangeState(net, HTNET_DEAD)) {
+	if (net->HTNT_protocol) 
+	    @call net->HTNT_protocol::MSG_HT_STREAM_ABORT(net->HTNT_status);
+    }
+    ThreadVSem(net->HTNT_changeState);
+    HTNetFree(net);
+    return TRUE;
+}	/* End of HTNetKillInternal.	*/
+
+
+/* --------------------------------------------------------------------------
+ *		Message Handlers for HTNetSchedulerClass
+ * --------------------------------------------------------------------------*/
+
+
+/***********************************************************************
+ *		MSG_HTNS_NEW_CLIENT for HTNetSchedulerClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    Create a new net client.
+ * PARAMETERS:	    void (HTRequestHandle request)
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:	    
+ *
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	kkee    	8/20/97   	Initial Revision
+ *	
+ ***********************************************************************/
+@method HTNetSchedulerClass, MSG_HTNS_NEW_CLIENT
+{
+    HTMemHandle physical;
+    HTListHandle beforeList, afterList, requestList;
+    HTRequest *rptr;
+    char *p;
+    HTNetThread *net;
+    int status;
+    Boolean internalReq;
+
+    if (!request) return;
+EC( ECCheckRequest(request);                                            )
+
+    rptr = (HTRequest *) MemThreadGrab(request);
+    beforeList = rptr->HTR_beforeList;
+    afterList = rptr->HTR_afterList;    
+    requestList = rptr->HTR_requestList;    
+    internalReq = rptr->HTR_internalReq;
+    MemThreadRelease(request);
+
+    /* 
+     * Call "before" callbacks. We cannot lock the request during callback
+     * as the callback routine might use the request & cause a deadlock 
+     * (since all the HTRequest routines lock the request object).
+     */
+    if (!internalReq && 
+	(status = HTNetExecuteCallback(beforeList, request, HT_ALL)) 
+	!= HT_OK) {
+	HTNetExecuteCallback(afterList, request, status);
+	return;
+    }
+
+    /*
+     * If no URL address translation was provided by the application, 
+     * then use the anchor URL address directly.
+     */
+    rptr = (HTRequest *) MemThreadGrab(request);
+    physical = HTAnchorPhysical(rptr->HTR_anchor);
+
+    if (!physical) {
+	physical = HTAnchorAddress(rptr->HTR_anchor);
+	p = (char *) HTMemLock(physical);
+	HTAnchorSetPhysical(rptr->HTR_anchor, p);
+	HTMemUnlockAndFree(physical);
+    } else
+	HTMemFree(physical);
+
+    /* Create a new client with a network protocol scheduler. */
+    PUSHDS;
+    SET_DS_LIB_DGROUP;
+
+    /*
+     * If we have a cache hit, we have to parse out all the headers
+     * and then check for expiration. This is only done per session.
+     * Which means that if a cache copy expires while we are still
+     * in the same session, we reuse the old copy until the session
+     * is closed or a force reload. 
+     */
+    if (HTAnchorCacheHit(rptr->HTR_anchor) && 
+	!HTAnchorHeaderDone(rptr->HTR_anchor)) {
+	if(rptr->HTR_reloadMode == HTRELOAD_CACHE_ONLY) {
+           /* 
+            * in this case (transparent detach), we don't need to do
+            * any check.
+            */
+           status = HTNetAlloc(rptr, HTAnchorPhysical(rptr->HTR_anchor), &net);
+	} else {
+	    /* We revalidate our cache copy with server */
+	    status = HTNetAlloc(rptr, HTAnchorAddress(rptr->HTR_anchor), &net);
+	}
+    } else {
+	if(rptr->HTR_reloadMode == HTRELOAD_CACHE_ONLY) {
+	    /* This is for transparent detach */
+	    status = HT_LOADING_DATA;
+	} else {
+	    /* 
+	     * If there is a cache copy, the cache headers have been 
+	     * parsed and the copy has been revalidated, so go directly 
+	     * using the physical URL. If no cache copy, physical URL 
+	     * would be the http url to get the data.
+	     */
+	    if (rptr->HTR_reloadMode == HTRELOAD_FORCE_RELOAD) {
+		/* We revalidate our cache copy with server */
+		status = HTNetAlloc(rptr, HTAnchorAddress(rptr->HTR_anchor), 
+				    &net);
+	    } else {
+		status = HTNetAlloc(rptr, HTAnchorPhysical(rptr->HTR_anchor), 
+				    &net);
+	    }
+	}
+    }	
+
+    if (status != HT_OK) {
+	POPDS;
+	MemThreadRelease(request);
+	if(status == HT_LOADING_DATA) {
+	    HTNetExecuteCallback(requestList, request, status);
+	    HTNetExecuteCallback(afterList, request, HT_NO);
+	} else
+	    HTNetExecuteCallback(afterList, request, status);
+	return;
+    }
+
+    /* All objects of this client run under HTR_scheduler */
+    rptr->HTR_scheduler = OptrToHandle(oself);
+
+    /* Changing state of the net thread */
+    ThreadPSem(net->HTNT_changeState);
+    net->HTNT_state = HTNET_BLOCKED;               /* Ready to run */
+    net->HTNT_scheduler = oself;
+    net->HTNT_request = request;
+    net->HTNT_owner = rptr->HTR_client;
+    /* Schedule the protocol object to run */
+    @send,forceQueue, replace, checkDuplicate (net->HTNT_scheduler)::
+	MSG_HTNS_SCHEDULE_ROUND_ROBIN();
+    ThreadVSem(net->HTNT_changeState);
+
+    MemThreadRelease(request);
+    POPDS;
+}	/* End of MSG_HTNS_NEW_CLIENT.	*/
+
+
+
+
+/***********************************************************************
+ *		MSG_HTNS_SCHEDULE_ROUND_ROBIN for HTNetSchedulerClass
+ ***********************************************************************
+ * SYNOPSIS:	    Schedule HTNetThreads a round-robin fashion.
+ * PARAMETERS:	    void (void)
+ * SIDE EFFECTS:    Nothing.
+ *
+ * STRATEGY:        Run the first protocol object in the head of the 
+ *                  scheduling queue, then move the object to the end of 
+ *                  the queue.
+ *    
+ *                  Finally sends this message to itself to schedule the
+ *                  next protocol thread.
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	kkee	5/29/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method HTNetSchedulerClass, MSG_HTNS_SCHEDULE_ROUND_ROBIN
+{
+    HTNetThread *net;
+
+    /* 
+     * Stop the scheduler if there are no threads to schedule or
+     * get the first schedulable Net thread in the head of the queue. 
+     */
+    net = HTNetGetNext(oself);
+    if (!net) return;
+
+    if (ThreadPTimedSem(net->HTNT_changeState, 1) == SE_TIMEOUT) {
+	/* Net thread is busy, try later */
+	@send,forceQueue, checkDuplicate, replace oself::
+	    MSG_HTNS_SCHEDULE_ROUND_ROBIN();
+	return;
+    }
+
+    /* Change to running state */
+    if (!HTNetChangeState(net, HTNET_RUNNING)) {
+	/* Net thread is busy or not ready, try later */
+	ThreadVSem(net->HTNT_changeState);
+	@send,forceQueue, checkDuplicate, replace oself::
+	    MSG_HTNS_SCHEDULE_ROUND_ROBIN();
+	return;
+    }
+
+    /* New client? */
+    if (!net->HTNT_protocol) {
+	HTRequest *rptr = (HTRequest *) MemThreadGrab(net->HTNT_request);
+	net->HTNT_protocol =
+	    HTPolicyGetProtocolHandler(net->HTNT_request, 
+				       rptr->HTR_protocolList, 
+				       net->HTNT_scheme);
+	MemThreadRelease(net->HTNT_request);
+
+	if (!net->HTNT_protocol) {
+	    net->HTNT_status = HT_NO_PROTOCOL;
+	    ThreadVSem(net->HTNT_changeState);
+	    HTNetKillLow(net);
+	    return;
+
+	} else {
+	    /* Reactivate HTSocket state in case HTShutDown() was called */
+	    HTActivate();
+	}
+    } 
+
+    /* 
+     * Run the Net thread protocol synchronously. 
+     */
+    net->HTNT_status = @call net->HTNT_protocol::
+	MSG_HT_PROTOCOL_LOAD(net);
+
+    net->HTNT_state = HTNET_BLOCKED;     /* blocked for a while */
+    ThreadVSem(net->HTNT_changeState);
+
+    if (net->HTNT_status == HT_SHUT_DOWN) {
+	/* All other requests, regardless of owner, must die */
+	HTNetKillAll(0, HT_SHUT_DOWN);
+
+    } else if (net->HTNT_status == HT_KILL_AND_RESUBMIT_INTERNALLY) {
+	HTRequestHandle request = net->HTNT_request;
+	GeodeHandle owner = net->HTNT_owner;
+	HTRequest *r = MemThreadGrab(request);
+	r->HTR_internalReq = TRUE;
+	MemThreadRelease(request);
+	if (HTNetKillInternal(net)) {
+	    HTRequestSubmit(request, owner);
+	}
+
+    } else if (net->HTNT_status != HT_OK) {
+	HTNetKillLow(net);
+    }
+
+    /*
+     * Schedule the next thread 
+     */
+    @send,forceQueue, checkDuplicate, replace oself::
+	MSG_HTNS_SCHEDULE_ROUND_ROBIN();
+
+}	/* End of MSG_HTNS_SCHEDULE_ROUND_ROBIN.	*/
+
+
+
+/***********************************************************************
+ *		MSG_HTNS_NETWORK_DISCONNECTED for HTNetSchedulerClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    Network disconnect, so Net scheduler must terminate
+ *                  all Net threads, including those with persistent 
+ *                  connections.
+ * PARAMETERS:	    void (void)
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:	    All Net threads will be terminated with HT_SHUT_DOWN.
+ *
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	kkee    	7/21/97   	Initial Revision
+ *	
+ ***********************************************************************/
+@method HTNetSchedulerClass, MSG_HTNS_NETWORK_DISCONNECTED
+{
+    /* All requests, regardless of owner, must die */
+    HTNetKillAll(0, HT_SHUT_DOWN);
+}	/* End of MSG_HTNS_NETWORK_DISCONNECTED.	*/
+

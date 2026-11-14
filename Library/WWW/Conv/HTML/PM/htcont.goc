@@ -1,0 +1,436 @@
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Geoworks 1997.  All rights reserved.
+	GEOWORKS CONFIDENTIAL
+
+PROJECT:	Geos WWW Library
+MODULE:		htcont
+FILE:		htcont.goc
+
+AUTHOR:		Kok Kin Kee, Sep 24, 1997
+
+ROUTINES:
+	Name			Description
+	----			-----------
+
+REVISION HISTORY:
+	Name		Date		Description
+	----		----		-----------
+	kkee    	9/24/97   	Initial version.
+
+DESCRIPTION:
+
+	HTMLContent class inherited from GenContentClass.
+
+	$Id: htcont.goc,v 1.1.2.13 98/01/05 16:38:23 edwin Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+
+@include <stdapp.goh>
+@include <WWW/HTCore/htobj.goh>       /* HTObjInstantiateForThread */
+@include <WWW/html.goh>
+#include <Ansi/string.h>	/* strcpy() defined */
+@include "UIG/uifact.goh"
+@include "PM/utility.goh"
+
+@classdecl HTMLContentClass;
+
+@if 0
+we don't support partial selection.
+@extern method HTMLContentClass, MSG_META_START_SELECT;
+@extern method HTMLContentClass, MSG_META_END_SELECT;
+@extern method HTMLContentClass, MSG_META_MOUSE_PTR;
+@endif
+
+
+/***********************************************************************
+ *		MSG_HTML_CONTENT_VIEW_OBJECT for HTMLContentClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    Given the y position in the document coordinate,
+ *                  scroll the view to show that position.
+ * PARAMETERS:	    (sword left, sword bottom)
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	edwin	10/ 8/96   	Initial Revision
+ *
+ ************************* This is not used !!!!!!!!!!!!!!!!!!!!!!!
+@method HTMLContentClass, MSG_HTML_CONTENT_VIEW_OBJECT
+{
+  @call @self->GCI_genView::MSG_GEN_VIEW_MAKE_RECT_VISIBLE
+     (MRVF_USE_MARGIN_FROM_TOP_LEFT, MRVM_0_PERCENT, 
+      MRVF_USE_MARGIN_FROM_TOP_LEFT, MRVM_0_PERCENT, 
+      bottom+20, left, bottom, left);
+  return;
+}	/* End of MSG_HTML_CONTENT_VIEW_OBJECT.	*/
+
+
+
+/***********************************************************************
+ *		MSG_HTML_CONTENT_SET_VIEW_DOC_BOUNDS for HTMLContentClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    Set the document size for the view object.
+ * PARAMETERS:	    (SizeAsDWord size)
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	edwin	12/ 3/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method HTMLContentClass, MSG_HTML_CONTENT_SET_VIEW_DOC_BOUNDS
+{
+  VisInstance  * vself;
+  vself = ObjDerefVis(oself);
+  vself->VI_optFlags &= ~(VOF_GEOMETRY_INVALID | VOF_GEO_UPDATE_PATH);
+  @call @self->GCI_genView::MSG_GEN_VIEW_SET_DOC_BOUNDS
+     (DWORD_HEIGHT(size), DWORD_WIDTH(size), 0, 0);
+}	/* End of MSG_HTML_CONTENT_SET_VIEW_DOC_BOUNDS.	*/
+
+
+/***********************************************************************
+ *		MSG_GEN_PREPARE_FOR_DESTROY for HTMLContentClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    This message is sent by HTGenView handler 
+ *                  MSG_GEN_PREPARE_FOR_DESTROY.
+ * PARAMETERS:	    void (void)
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:	    tell view to V HTUI_waitToFree
+ *	    	    we send the semaphore handle and the content optr
+ *	    	    	as parameters so the view doesn't need to access
+ *	    	    	the currentDoc global
+ *
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	kkee    	9/24/97   	Initial Revision
+ *	
+ ***********************************************************************/
+@method HTMLContentClass, MSG_GEN_PREPARE_FOR_DESTROY
+{
+    if (uiMgr.UIM_currentDoc) {
+	@send, forceQueue (uiMgr.UIM_currentDoc->HTUI_genView)::
+	    	MSG_HT_GEN_VIEW_ALLOW_DESTROY(
+			    uiMgr.UIM_currentDoc->HTUI_waitToFree,
+			    uiMgr.UIM_currentDoc->HTUI_genContent);
+    }
+}	/* End of MSG_GEN_PREPARE_FOR_DESTROY.	*/
+
+
+
+
+/*****************************************************************
+	code moved from isProc.goc
+******************************************************************/
+
+@method HTMLContentClass, MSG_META_CONTENT_SET_VIEW
+{
+    @callsuper();
+    if(view) {
+    	@send self::MSG_SPEC_BUILD_BRANCH(SBF_WIN_GROUP 
+				      | SBF_TREE_BUILD 
+				      | SBF_VIS_PARENT_FULLY_ENABLED 
+				      | VUM_NOW);
+     	/* Manage MSG_VIS_RECALC_SIZE and MSG_VIS_POSITION_BRANCH ourselves */
+    	@send @genChildren::
+      		MSG_VIS_SET_ATTRS(0, VA_MANAGED, VUM_DELAYED_VIA_UI_QUEUE);
+    }
+}
+
+@method HTMLContentClass, MSG_META_INITIALIZE
+{
+    @callsuper();
+    @self->GI_states |= GS_USABLE;
+}
+
+
+/***********************************************************************
+ *	MSG_SPEC_NAVIGATE_TO_PREVIOUS_FIELD for HTMLContentClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    Find and show the previous focusable link.
+ * PARAMETERS:	    
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:	    
+ *
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	edwin   	3/25/97   	Initial Revision
+ *	
+ ***********************************************************************/
+@method HTMLContentClass, MSG_SPEC_NAVIGATE_TO_PREVIOUS_FIELD
+{
+    UpdateGlobalSearchVariables(SEARCH_BACKWARD, NULL, FALSE);
+    UIGotoNextFocusableField();
+}	/* End of MSG_SPEC_NAVIGATE_TO_PREVIOUS_FIELD.	*/
+
+
+/***********************************************************************
+ *	MSG_SPEC_NAVIGATE_TO_NEXT_FIELD for HTMLContentClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    Find and show the next focusable link.
+ * PARAMETERS:	    
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:	    
+ *
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	edwin   	3/25/97   	Initial Revision
+ *	
+ ***********************************************************************/
+@method HTMLContentClass, MSG_SPEC_NAVIGATE_TO_NEXT_FIELD
+{
+    UpdateGlobalSearchVariables(SEARCH_FORWARD, NULL, FALSE);
+    UIGotoNextFocusableField();
+}	/* End of MSG_SPEC_NAVIGATE_TO_NEXT_FIELD.	*/
+
+
+/***********************************************************************
+ *		MSG_HTML_CONTENT_VIEW_OBJECT for HTMLContentClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    Given the y position in the document coordinate,
+ *                  scroll the view to show that position.
+ *                  (This routine overwrites the default one and adds
+ *                  the ability to display any focusable link on the
+ *                  visible screen area.)
+ * PARAMETERS:	    (sword left, sword bottom)
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:	    
+ *
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	edwin   	8/20/97   	Initial Revision
+ *	
+ ***********************************************************************/
+@method HTMLContentClass, MSG_HTML_CONTENT_VIEW_OBJECT
+{
+  RectDWord rect;
+  /*
+   *  Bring the (left, bottom) into the view.
+   */
+  @call @self->GCI_genView::MSG_GEN_VIEW_MAKE_RECT_VISIBLE
+     (MRVF_ALWAYS_SCROLL, MRVM_100_PERCENT, 
+      MRVF_ALWAYS_SCROLL, MRVM_100_PERCENT, 
+      bottom+Y_SCREEN_SIZE, left, bottom, left);
+  /*
+   *  Show any focusable link in the new visible region.
+   */
+  @call @self->GCI_genView::MSG_GEN_VIEW_GET_VISIBLE_RECT(&rect);
+  UpdateGlobalSearchVariables(-1, &rect, TRUE);
+  UIGotoNextFocusableField();
+}	/* End of MSG_HTML_CONTENT_VIEW_OBJECT.	*/
+
+
+/***********************************************************************
+ *		MSG_META_FUP_KBD_CHAR for HTMLContentClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    
+ * PARAMETERS:	    
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:	    
+ *
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	mzhu    	4/ 4/97   	Initial Revision
+ *	
+ ***********************************************************************/
+@method HTMLContentClass, MSG_META_FUP_KBD_CHAR
+{
+    HTMemHandle srcHtmh;
+    HTMethod method = HTM_GET;
+    word len;
+    char *url, *q;
+
+    if(!uiMgr.UIM_currentDoc || !uiMgr.UIM_currentDocHandle) 
+	return @callsuper();
+   
+    if( ! ((flags & CF_REPEAT_PRESS)  
+	    || (flags & CF_RELEASE)
+	    || ((flags >> 8) & SS_LCTRL) 
+	    || ((flags >> 8) & SS_RCTRL) ))
+
+	if(character == (VC_ISCTRL << 8 | VC_ENTER)) {
+
+	    /*
+	     * here we need check if there is a link or a image 
+	     * on focus. If a link under focus, we go to open 
+	     * the link. Or if it is a unloaded image, we go to 
+	     * load this image. Otherwise, we call the Submit form
+	     * to check if it's a form ready to submit.
+	     */
+	    if((uiMgr.UIM_currentDoc)->PM_focalLink != -1 &&
+	       (uiMgr.UIM_currentDoc)->PM_hrefs && 
+	       !((uiMgr.UIM_currentDoc)->PM_focalImage && 
+		@call (uiMgr.UIM_currentDoc)->PM_focalImage::\
+		MSG_GEN_IMAGE_IS_ISMAP() == TRUE)) {
+		/* 
+		 * This is a hyperlink, so you create a request for it.
+		 */
+		len = HTListGetItemSize((uiMgr.UIM_currentDoc)->PM_hrefs, 
+				(uiMgr.UIM_currentDoc)->PM_focalLink);
+		url = HTMemAllocAndLock(&srcHtmh, len + 1);
+		HTListGetItem((uiMgr.UIM_currentDoc)->PM_hrefs, 
+			      (uiMgr.UIM_currentDoc)->PM_focalLink,
+			      url, len);
+		*(url + len) = 0;
+		if (url[0] == '#') {
+		  int nameToken;
+		  NameElement elm;
+		  SizeAsDWord sz;
+		  nameToken = HTListFindItem((uiMgr.UIM_currentDoc)->
+					     PM_anchorName, url+1, len-1);
+		  HTMemUnlockAndFree(srcHtmh);
+		  if (nameToken != -1) {
+		      HTListGetItem((uiMgr.UIM_currentDoc)->PM_nameElement, 
+				    nameToken, &elm,sizeof(NameElement));
+		      sz = @call self::MSG_VIS_GET_SIZE();
+		      @send uiMgr.UIM_currentDoc->HTUI_pmanager::
+			  MSG_PM_SHOW_ANCHOR(elm, DWORD_HEIGHT(sz));
+		  }
+		}
+		else {
+		    if ((q=strchr(url, '#')) != NULL) {
+			/*
+			 *  If it has #anchor, record it for the next page.
+			 */
+			if (uiMgr.UIM_jumpToAnchor)
+			    HTMemFree(uiMgr.UIM_jumpToAnchor);
+			uiMgr.UIM_jumpToAnchor = 
+			    HTStrAllocCopyWID(uiMgr.UIM_currentDoc->HTUI_memID,
+					      q+1);
+		    }
+ 		    HTMemUnlock(srcHtmh);
+		    @send (ConstructOptr(uiMgr.UIM_client, 0))::
+			{MSG_FROM_UI_DOCUMENT}(uiMgr.UIM_message)
+			    (UI_APPLY_ON_LINK, srcHtmh);
+		}
+		return TRUE;
+	    } else if((uiMgr.UIM_currentDoc)->PM_focalImage) {
+		/*
+		 * It's not a hyperlink, but a unloaded image, so we load it.
+		 */
+		srcHtmh = @call (uiMgr.UIM_currentDoc)->PM_focalImage
+		    ::MSG_GEN_IMAGE_GET_SRC();
+
+		if (srcHtmh) {
+		    HTMemFree(srcHtmh);
+		    @send (ConstructOptr(uiMgr.UIM_client, 0))::
+			{MSG_FROM_UI_DOCUMENT}(uiMgr.UIM_message)
+			    (UI_APPLY_ON_IMAGE, 0);
+		}
+		return TRUE;
+	    }
+	}
+
+    /*
+     * using mouse (style).
+     */
+
+    if( ! ((flags & CF_RELEASE)
+	    || ((flags >> 8) & SS_LCTRL) 
+	    || ((flags >> 8) & SS_RCTRL) )) {
+	if(!(flags & CF_REPEAT_PRESS)) {
+	    if(character == (VC_ISCTRL << 8 | VC_LEFT)) {
+		@send @self->GCI_genView::MSG_GEN_VIEW_SCROLL_PAGE_LEFT();
+		return TRUE;
+	    } else if(character == (VC_ISCTRL << 8 | VC_RIGHT)) {
+		@send @self->GCI_genView::MSG_GEN_VIEW_SCROLL_PAGE_RIGHT();
+		return TRUE;
+
+@ifdef PRODUCT_RESPONDER
+	    } else if(character == (VC_ISCTRL << 8 | VC_NEXT)) {
+		@send @self->GCI_genView::MSG_GEN_VIEW_SCROLL_DOWN();
+		return TRUE;
+	    } else if(character == (VC_ISCTRL << 8 | VC_PREVIOUS)) {
+		@send @self->GCI_genView::MSG_GEN_VIEW_SCROLL_UP();
+		return TRUE;
+	    }
+	} else {
+	    if(character == (VC_ISCTRL << 8 | VC_NEXT)) {
+		@send @self->GCI_genView::MSG_GEN_VIEW_SCROLL_PAGE_DOWN();
+		return TRUE;
+	    } else if(character == (VC_ISCTRL << 8 | VC_PREVIOUS)) {
+		@send @self->GCI_genView::MSG_GEN_VIEW_SCROLL_PAGE_UP();
+		return TRUE;
+@else
+	    } else if(character == (VC_ISCTRL << 8 | VC_DOWN)) {
+		@send @self->GCI_genView::MSG_GEN_VIEW_SCROLL_DOWN();
+		return TRUE;
+	    } else if(character == (VC_ISCTRL << 8 | VC_UP)) {
+		@send @self->GCI_genView::MSG_GEN_VIEW_SCROLL_UP();
+		return TRUE;
+	    }
+	} else {
+	    if(character == (VC_ISCTRL << 8 | VC_DOWN)) {
+		@send @self->GCI_genView::MSG_GEN_VIEW_SCROLL_PAGE_DOWN();
+		return TRUE;
+	    } else if(character == (VC_ISCTRL << 8 | VC_UP)) {
+		@send @self->GCI_genView::MSG_GEN_VIEW_SCROLL_PAGE_UP();
+		return TRUE;
+@endif
+            }
+	}
+    }
+    
+    return @callsuper();
+}	/* End of MSG_META_KBD_CHAR.	*/
+
+
+
+/***********************************************************************
+ *		MSG_META_CONTENT_TRACK_SCROLLING for ISHTMLContentClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    Tell pmanager to find a focusable object on the
+ *                  new page.
+ * PARAMETERS:	    
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:	    
+ *
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	edwin   	9/16/97   	Initial Revision
+ *	
+ ***********************************************************************/
+@method HTMLContentClass, MSG_META_CONTENT_TRACK_SCROLLING
+{
+  RectDWord rect;
+  /*
+   *  Scroll the object.
+   */
+  @call @self->GCI_genView::MSG_GEN_VIEW_SETUP_TRACKING_ARGS(args);
+  @call @self->GCI_genView::MSG_GEN_VIEW_TRACKING_COMPLETE(args);
+
+  /*
+   *  Find the navigatiion focus.
+   */
+  @call @self->GCI_genView::MSG_GEN_VIEW_GET_VISIBLE_RECT(&rect);
+  UpdateGlobalSearchVariables(-1, &rect, TRUE);
+  UIGotoNextFocusableField();
+}	/* End of MSG_META_CONTENT_TRACK_SCROLLING.	*/
+

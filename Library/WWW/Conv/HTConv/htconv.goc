@@ -1,0 +1,360 @@
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Geoworks 1997.  All rights reserved.
+	GEOWORKS CONFIDENTIAL
+
+PROJECT:	
+MODULE:		
+FILE:		htconv.goc
+
+AUTHOR:		Mingzhe Zhu, Feb  2, 1997
+
+ROUTINES:
+	Name			Description
+	----			-----------
+
+REVISION HISTORY:
+	Name		Date		Description
+	----		----		-----------
+	mzhu    	2/ 2/97   	Initial version.
+
+DESCRIPTION:
+
+	the methods defined for all image converters.
+
+	$Id: htconv.goc,v 1.12.1.13 98/01/10 02:11:13 allen Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+@include <stdapp.goh>
+#include <sem.h>
+@include <WWW/htconv.goh>
+@include <WWW/HTCore/htanchor.goh>
+@include <WWW/HTCore/htreqMan.goh>
+@include <WWW/html.goh>
+#include <Ansi/string.h>                  /* memcpy */
+@include <Objects/clipbrd.goh>
+
+
+/***********************************************************************
+		Class Declaration
+***********************************************************************/
+
+@classdecl	HTConverterClass;
+
+/* for test porpose */
+Boolean singleImage = FALSE;
+
+/***********************************************************************
+		Message Handlers
+***********************************************************************/
+
+
+/***********************************************************************
+ *		MSG_HT_STREAM_PUT_BLOCK for HTJPEGClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    JPEG data handler.
+ * PARAMETERS:	    int (const byte *data, word len)
+ * SIDE EFFECTS:    Nothing
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	mzhu	11/26/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method HTConverterClass, MSG_HT_STREAM_PUT_BLOCK
+{
+    HTConverterStruct *htConverterData;
+    char *buf;
+
+    if(!len) return HT_OK;
+EC( EC_ERROR_IF(len > 512, -1);                                         )
+
+@ifdef PRODUCT_RESPONDER
+	pself = ObjDeref(oself,0);
+@endif
+    htConverterData = MemLock(@self->struct_handle);
+
+    ThreadPSem(htConverterData->done_sem);
+    if(htConverterData->done) {
+    	ThreadVSem(htConverterData->done_sem);
+	MemUnlock(@self->struct_handle);
+	return HT_NO;
+    }
+    ThreadVSem(htConverterData->done_sem);
+
+    ThreadPSem(htConverterData->buffer_empty);
+
+    buf = MemPLock(htConverterData->buffer_handle);
+
+    htConverterData->buffer_size = len;
+    memcpy(buf, data, len);
+
+    MemUnlockV(htConverterData->buffer_handle);
+
+    ThreadVSem(htConverterData->buffer_full);
+
+@ifdef PRODUCT_RESPONDER
+	pself = ObjDeref(oself,0);
+@endif
+    MemUnlock(@self->struct_handle);
+
+    return HT_OK;
+
+}	/* End of MSG_HT_STREAM_PUT_BLOCK.	*/
+
+
+
+
+/***********************************************************************
+ *		MSG_HT_STREAM_ABORT for HTConverterClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    Cleanup and free.
+ * PARAMETERS:	    void (void)
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:        We are guaranteed by the Web Library that we won't
+ *                  be getting any messages after is one.
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	mzhu	11/27/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method HTConverterClass, MSG_HT_STREAM_ABORT
+{
+    HTConverterStruct *htConverterData;
+
+@ifdef PRODUCT_RESPONDER
+	pself = ObjDeref(oself,0);
+@endif
+    htConverterData = MemLock(@self->struct_handle);
+
+    if (status == HT_LOADED) {
+	/* We want to give the reader a chance to consume all buffered data
+	   before we tell it to finish.  So we block until the buffer is
+	   empty.  However, we only do so if the reader has not yet decided to
+	   finish by itself.  Otherwise, we may block forever if there are
+	   two (2) or more too many blocks of incoming data than the reader
+	   expects.  --- AY 1/9/89 */
+	ThreadPSem(htConverterData->done_sem);
+	if (!htConverterData->done) {
+	    ThreadVSem(htConverterData->done_sem);
+	    ThreadPSem(htConverterData->buffer_empty);
+	} else {
+	    ThreadVSem(htConverterData->done_sem);
+	}
+    }
+
+    /* tell the converter to stop */
+    ThreadPSem(htConverterData->done_sem);
+    htConverterData->done = TRUE;    
+    ThreadVSem(htConverterData->done_sem);
+
+    htConverterData->buffer_size = 0;
+    ThreadVSem(htConverterData->buffer_full);
+
+    /* waiting for the converter to quit */
+    ThreadPSem(htConverterData->converter_exit);
+
+    /* clean up */
+    MemFree(htConverterData->buffer_handle);
+    
+    ThreadFreeSem(htConverterData->buffer_empty);
+    ThreadFreeSem(htConverterData->buffer_full);
+    ThreadFreeSem(htConverterData->done_sem);
+    ThreadFreeSem(htConverterData->converter_exit);
+
+@ifdef PRODUCT_RESPONDER
+	pself = ObjDeref(oself,0);
+@endif
+    MemFree(@self->struct_handle);    
+
+    /* We don't want to abort target when we call super */
+@ifdef PRODUCT_RESPONDER
+	pself = ObjDeref(oself,0);
+@endif
+    if(singleImage) 
+	@send @self->HTSI_target::MSG_VIS_INVALIDATE();
+    @self->HTSI_target = NullOptr;
+    return @callsuper();
+}	/* End of MSG_HT_STREAM_ABORT.	*/
+
+
+/***********************************************************************
+ *		MSG_HT_STREAM_SET_TARGET for HTConverterClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    Set the target object and initilize the shared data.
+ * PARAMETERS:	    optr target
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:	    
+ *
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	mzhu    	2/ 3/97   	Initial Revision
+ *	
+ ***********************************************************************/
+@method HTConverterClass, MSG_HT_STREAM_SET_TARGET
+{
+    HTConverterStruct *htConverterData;
+    HTRequest *req;
+
+    @callsuper();
+
+@ifdef PRODUCT_RESPONDER
+	pself = ObjDeref(oself,0);
+@endif
+    @self->struct_handle = MemAlloc(sizeof(HTConverterStruct), 
+				HF_SHARABLE | HF_SWAPABLE, 
+				HAF_ZERO_INIT);
+
+@ifdef PRODUCT_RESPONDER
+	pself = ObjDeref(oself,0);
+@endif
+    ECCheckMemHandle(@self->struct_handle);
+
+    htConverterData = MemLock(@self->struct_handle);
+
+    htConverterData->buffer_handle = MemAlloc(512, 
+		HF_SHARABLE | HF_SWAPABLE, HAF_ZERO_INIT);
+   
+    htConverterData->buffer_empty = ThreadAllocSem(1);
+    htConverterData->buffer_full = ThreadAllocSem(0);
+    htConverterData->done_sem = ThreadAllocSem(1);
+    htConverterData->converter_exit = ThreadAllocSem(0);
+
+    htConverterData->done = FALSE;
+    htConverterData->htobject = oself;
+EC( ECCheckRequest(@self->HTSI_request);                                )
+    htConverterData->request = @self->HTSI_request;
+
+@ifdef PRODUCT_RESPONDER
+	pself = ObjDeref(oself,0);
+@endif
+    if(!@self->HTSI_target) {
+@ifdef PRODUCT_RESPONDER
+	pself = ObjDeref(oself,0);
+@endif
+	@self->HTSI_target = UIGen_CREATE_SINGLE_IMAGE();
+        singleImage = TRUE;
+@ifdef PRODUCT_RESPONDER
+	pself = ObjDeref(oself,0);
+@endif
+	@send @self->HTSI_target::MSG_GEN_IMAGE_SET_LOAD_STATUS(ILS_LOADED);
+
+	req = MemThreadGrab(@self->HTSI_request);
+        req->HTR_target = @self->HTSI_target;
+        MemThreadRelease(@self->HTSI_request);
+    } else
+        singleImage = FALSE;
+
+@ifdef PRODUCT_RESPONDER
+	pself = ObjDeref(oself,0);
+@endif
+
+@ifndef PRODUCT_RESPONDER
+    htConverterData->vmFileHandle = UIDocCurrentVMFileHandle();
+    if(!htConverterData->vmFileHandle) 
+	htConverterData->vmFileHandle = ClipboardGetClipboardFile();
+@else
+    htConverterData->vmFileHandle = ClipboardGetClipboardFile();
+@endif
+
+    MemUnlock(@self->struct_handle);
+}
+
+
+/***********************************************************************
+ *		MSG_HTC_SET_TARGET_SIZE for HTConverterClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    Set the image size.
+ * PARAMETERS:	    word width, word height
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:	    
+ *
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	mzhu    	2/ 3/97   	Initial Revision
+ *	
+ ***********************************************************************/
+@method HTConverterClass, MSG_HTC_SET_TARGET_SIZE
+{
+    HTConverterStruct *htConverterData;
+    if((@call @self->HTSI_target::MSG_GEN_IMAGE_SET_BOUNDS(width, height))
+	== UI_GEN_ERROR) {
+
+	htConverterData = MemLock(@self->struct_handle);
+
+	/* tell the converter to stop */
+	ThreadPSem(htConverterData->done_sem);
+	htConverterData->done = TRUE;    
+	ThreadVSem(htConverterData->done_sem);
+	htConverterData->buffer_size = 0;
+	ThreadVSem(htConverterData->buffer_full);
+	MemUnlock(@self->struct_handle);
+	@send @self->HTSI_target::MSG_GEN_IMAGE_SET_LOAD_STATUS(ILS_BROKEN);
+    }
+}	/* End of MSG_HTC_SET_TARGET_SIZE.	*/
+
+
+/***********************************************************************
+ *		MSG_HTC_SET_TARGET_BITMAP for HTConverterClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    Set the image object's bitmap.
+ * PARAMETERS:	    VMFileHandle vmFile, VMFileBlock bitmap, 
+ *                  HTReqeustHandle request
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:	    
+ *
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	mzhu    	2/ 3/97   	Initial Revision
+ *	
+ ***********************************************************************/
+@method HTConverterClass, MSG_HTC_SET_TARGET_BITMAP
+{
+    word x,y;
+    HTAnchorXImageScale(HTRequestAnchor(request), &x, &y);
+    @send @self->HTSI_target::MSG_GEN_IMAGE_SET_BITMAP
+	(vmFile, bitmap, x, y);
+
+}	/* End of MSG_HTC_SET_TARGET_BITMAP.	*/
+
+
+/***********************************************************************
+ *		MSG_HTC_CALL_RESIZE for HTConverterClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    Tell the uigenerator to resize the vis tree.
+ * PARAMETERS:	    nothing
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:	    
+ *
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	mzhu    	2/ 3/97   	Initial Revision
+ *	
+ ***********************************************************************/
+@method HTConverterClass, MSG_HTC_CALL_RESIZE
+{
+    UIGen_BROADCAST_RESIZE_POSITION(@self->HTSI_target);
+    if(singleImage)
+	@send @self->HTSI_target::MSG_VIS_SET_POSITION(0,0);
+}	/* End of MSG_HTC_CALL_RESIZE.	*/
+

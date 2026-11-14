@@ -1,0 +1,435 @@
+//---------------------------------------------------------------------------
+//                
+//	Copyright (C) Geoworks 1998.  All rights reserved.
+//	GEOWORKS CONFIDENTIAL
+//
+// PROJECT:	Geos-SC WWW Library
+// MODULE:	HTML anchor
+// FILE:	anchor.cpp
+//
+// AUTHOR:	Edwin Yu: March 30, 1998
+//
+// REVISION HISTORY:
+//	Name		Date		Description
+//	----		----		-----------
+//	edwin    	3/30/98  	Initial version
+//
+// DESCRIPTION:
+//
+//	Define HTMLAnchorItem and HTMLAnchorList.
+//      //depot/liberty/project/ellery/980805/library/www/html/anchor.cpp#1
+//
+//	$Id: anchor.goc,v 1.1 98/08/26 15:06:24 edwin Exp $
+//
+//---------------------------------------------------------------------------
+
+// @include "htfmtter.h"
+@include "WWW2/Conv/htframe.goh"
+@include "WWW2/Conv/anchor.goh"
+#include "WWW2/wwMacro.h"
+
+@classdecl HTMLAnchorListClass, neverSaved;
+@classdecl HTMLAnchorItemClass, neverSaved;
+
+@extern method HTMLAnchorItemClass, GetIdentity;
+@extern method HTMLAnchorItemClass, Format;
+
+@define FRAME_NOT_YET_DEFINED 0
+
+#define _href       (pself->__href)
+#define _name       (pself->__name)
+#define _target     (pself->__target)
+#define _title      (pself->__title)
+#define _firstChild (pself->___firstChild)
+#define _anchorNameToBeViewed (pself->__anchorNameToBeViewed)
+#define _frame      (pself->__frame)
+
+
+//---------------------------------------------------------------------------
+//		HTMLAnchorItem::HTMLAnchorItem()
+//---------------------------------------------------------------------------
+// 
+// SYNOPSIS: 	create an anchor item and null its instance data.
+// SCOPE:	Public
+// RETURN:	Nothing
+// STRATEGY:	
+// 
+// REVISION HISTORY: 
+//	Name		Date		Description 
+//	----		----		----------- 
+//	edwin    	3/30/98 	Initial version 
+//	
+//---------------------------------------------------------------------------
+@method HTMLAnchorItemClass, HTMLAnchorItem /* () : _href(NULL), _name(NULL),
+    _target(NULL), _title(NULL), _firstChild(NULL) */
+{
+    _href = NULL;
+    _name = NULL;
+    _target = NULL;
+    _title = NULL;
+    _firstChild = NULL;
+}
+
+//---------------------------------------------------------------------------
+//		HTMLAnchorItem::~HTMLAnchorItem()
+//---------------------------------------------------------------------------
+// 
+// SYNOPSIS: 	de-allocate its instance data.
+// SCOPE:	Public
+// RETURN:	Nothing
+// STRATEGY:	
+// 
+// REVISION HISTORY: 
+//	Name		Date		Description 
+//	----		----		----------- 
+//	edwin    	3/30/98 	Initial version 
+//	
+//---------------------------------------------------------------------------
+@method HTMLAnchorItemClass, MSG_META_OBJ_FREE // ::~HTMLAnchorItem()
+{
+    if (_href) {
+        WWMemFree(_href);
+    }
+    if (_name) {
+        WWMemFree(_name);
+    }
+    if (_target) {
+        WWMemFree(_target);
+    }
+    if (_title) {
+        WWMemFree(_title);
+    }
+    return;
+}
+
+//---------------------------------------------------------------------------
+//		HTMLAnchorItem::ParseAttrs()
+//---------------------------------------------------------------------------
+// 
+// SYNOPSIS: 	Parse the attribute list to initialize instance data.
+// SCOPE:	Public
+// RETURN:	Nothing
+// STRATEGY:	
+// 
+// REVISION HISTORY: 
+//	Name		Date		Description 
+//	----		----		----------- 
+//	edwin    	3/30/98 	Initial version 
+//      kkee            4/14/98         Free _href etc if non-NULL.
+//	
+//---------------------------------------------------------------------------
+@method // Boolean 
+HTMLAnchorItemClass, ParseAttrs // (const SGMLEntity entity [ ])
+{
+    Boolean done = FALSE;
+    byte i = 0;
+
+    while (!done) {
+        switch (entity[i].SGMLE_token) {
+         case HTML_ATTR_HREF:
+            if (_href) {
+                WWMemFree(_href);
+            }
+            _href = WWStrAllocCopy((const char *)entity[i].SGMLE_value);
+            break;
+         case HTML_ATTR_NAME:
+            if (_name) {
+                WWMemFree(_name);
+            }
+            _name = WWStrAllocCopy((const char *)entity[i].SGMLE_value);
+            break;
+         case HTML_ATTR_TARGET:
+            if (_target) {
+                WWMemFree(_target);
+            }
+            _target = WWStrAllocCopy((const char *)entity[i].SGMLE_value);
+            break;
+         case HTML_ATTR_TITLE:
+            if (_title) {
+                WWMemFree(_title);
+            }
+            _title = WWStrAllocCopy((const char *)entity[i].SGMLE_value);
+            break;
+         case HTML_ATTR_XXX_INVALID:
+            done = TRUE;
+            break;
+         default:
+            break;
+        }
+        i++;
+    }
+
+    return TRUE;
+}
+
+
+@method HTMLAnchorItemClass, GetHref
+{ 
+    return _href; 
+}
+
+@method // WWMemHandle 
+HTMLAnchorItemClass, GetName // () 
+{ 
+    return _name; 
+}
+
+
+@method // WWMemHandle 
+HTMLAnchorItemClass, AnchorGetTarget // () 
+{ 
+    return _target;
+}
+
+
+@method // WWMemHandle 
+HTMLAnchorItemClass, GetTitle // ()
+{ 
+    return _title;
+}
+
+
+@method // void 
+HTMLAnchorItemClass, SetFirstChild // (HTGlyph *child)
+{
+    _firstChild = child;
+}
+
+
+@method // HTGlyph* 
+HTMLAnchorItemClass, GetFirstChild // ()
+{
+    return _firstChild;
+}
+
+
+@method // virtual HTMLToken 
+HTMLAnchorItemClass, GetIdentity // ()
+{ 
+    return HTMLT_A;
+}
+
+
+
+
+//---------------------------------------------------------------------------
+//		HTMLAnchorItem::Format()
+//---------------------------------------------------------------------------
+// 
+// SYNOPSIS: 	Format the anchor object.
+// SCOPE:	Public
+// RETURN:	TRUE if ok, FALSE if out of memory
+// STRATEGY:	
+// 
+// REVISION HISTORY: 
+//	Name		Date		Description 
+//	----		----		----------- 
+//	kkee    	3/30/98 	Initial version 
+//	
+//---------------------------------------------------------------------------
+@method // Boolean
+HTMLAnchorItemClass, Format // (HTFormat *formatter)
+{
+    PARAM_ASSERT(formatter);
+@if FRAME_NOT_YET_DEFINED
+    return @call formatter::FormatHTAnchor(this);
+@else
+    return FALSE;
+@endif
+}	/* End of HTMLAnchorItem::Format() */
+
+
+@if 0
+#ifdef ERROR_CHECK
+//---------------------------------------------------------------------------
+//		HTMLAnchorItem::ECCheckSelf()
+//---------------------------------------------------------------------------
+// 
+// SYNOPSIS: 	ECCheck self
+// SCOPE:	EC only
+// RETURN:	Nothing
+// STRATEGY:	
+// 
+// REVISION HISTORY: 
+//	Name		Date		Description 
+//	----		----		----------- 
+//	edwin    	4/8/98      Initial version 
+//	
+//---------------------------------------------------------------------------
+void
+HTMLAnchorItem::ECCheckSelf(HTMLToken token)
+{
+    ASSERTS(token == HTMLT_A,
+            "HTMLAnchorItem::ECCheckSelf() anchor token expected");
+}	/* End of HTMLAnchor::ECCheckSelf() */
+#endif
+@endif
+
+
+
+@method 
+HTMLAnchorListClass, HTMLAnchorList // () 
+{
+    _anchorNameToBeViewed = NULL;
+}
+
+
+//---------------------------------------------------------------------------
+//		HTMLAnchorList::!HTMLAnchorList()
+//---------------------------------------------------------------------------
+// 
+// SYNOPSIS: 	delete all anchor items in the list
+// SCOPE:	public
+// RETURN:	Nothing
+// STRATEGY:	
+// 
+// REVISION HISTORY: 
+//	Name		Date		Description 
+//	----		----		----------- 
+//	edwin    	3/30/98     Initial version 
+//	
+//---------------------------------------------------------------------------
+@method 
+HTMLAnchorListClass, MSG_META_OBJ_FREE // ::~HTMLAnchorList()
+{
+    optr /* HTMLAnchorItem * */ item;
+    while ((item = /* (HTMLAnchorItem *) */ @call self::Get()) != NULL) {
+        @call item::MSG_META_OBJ_FREE();
+    }
+    if (_anchorNameToBeViewed) {
+        WWMemFree(_anchorNameToBeViewed);
+    }
+}
+
+
+//---------------------------------------------------------------------------
+//		HTMLAnchorList::FindNameAnchor()
+//---------------------------------------------------------------------------
+// 
+// SYNOPSIS: 	Find an anchor object whose NAME attribute matching the
+//              passed name.
+// SCOPE:	public
+// RETURN:	HTMLAnchorItem * if found, NULL otherwise.
+// STRATEGY:	
+// 
+// REVISION HISTORY: 
+//	Name		Date		Description 
+//	----		----		----------- 
+//	edwin    	4/20/98     Initial version 
+//	
+//---------------------------------------------------------------------------
+@method // HTMLAnchorItem* 
+HTMLAnchorListClass, FindNameAnchor // (char * name)
+{
+    WWMemHandle nameH;
+    optr /* HTMLAnchorItem * */ item = 
+	/* (HTMLAnchorItem *) */ @call self::Head();
+
+    ASSERTS(name[0] == '#', "The passed name char array is not #name");
+
+    while (item) {
+        nameH = @call item::GetName();
+        if (nameH && WWStrCaseCmpWWMem(nameH, name+1) == 0) {
+            return item;
+        }
+@if FRAME_NOT_YET_DEFINED
+        item = /* (HTMLAnchorItem *) */ item->_next;
+@else
+        item = NULL;
+@endif
+    }
+    return NULL;
+}
+
+
+//---------------------------------------------------------------------------
+//		HTMLAnchorList::SetAnchorToBeViewed()
+//---------------------------------------------------------------------------
+// 
+// SYNOPSIS: 	Store the anchor name that will be used to match any 
+//              added element.  If a match is found in the Append method, 
+//              it will be brought to the screen.
+// SCOPE:	public
+// RETURN:	Nothing
+// STRATEGY:	
+// 
+// REVISION HISTORY: 
+//	Name		Date		Description 
+//	----		----		----------- 
+//	edwin    	4/21/98     Initial version 
+//	
+//---------------------------------------------------------------------------
+@method // void 
+HTMLAnchorListClass, SetAnchorToBeViewed // (WWMemHandle anchorName)
+{
+    if (_anchorNameToBeViewed) {
+        WWMemFree(_anchorNameToBeViewed);
+    }
+    _anchorNameToBeViewed = anchorName;
+}
+
+
+//---------------------------------------------------------------------------
+//		HTMLAnchorList::Append()
+//---------------------------------------------------------------------------
+// 
+// SYNOPSIS: 	Append an element to the list. If it matches an existing
+//              anchor name, bring the anchor object to the screen.
+// SCOPE:	public
+// RETURN:	Nothing
+// STRATEGY:	
+// 
+// REVISION HISTORY: 
+//	Name		Date		Description 
+//	----		----		----------- 
+//	edwin    	4/21/98     Initial version 
+//      kkee            5/1/98      Fix the case where anchor
+//                                  does not have a child.
+//	
+//---------------------------------------------------------------------------
+@method // void 
+HTMLAnchorListClass, AnchorAppend // (WWListElement * element)
+{
+@if FRAME_NOT_YET_DEFINED
+    WWList::Append(element);
+@endif
+
+    if (_anchorNameToBeViewed) {
+        //  There is an existing anchor name for matching.
+        WWMemHandle nameH;
+        if ((nameH = @call /* (HTMLAnchorItem *) */ element::GetName())) {
+            char *name = (char *)WWMemLock(nameH);
+            if (name[0] == '#')
+                name++;
+            if (WWStrCaseCmpWWMem(_anchorNameToBeViewed, name) == 0) {
+                // Found a matching anchor object!
+                HTCoord rect;
+                // Now Find the first child's coordinate.
+                optr /* HTGlyph * */ child = @call /* (HTMLAnchorItem *) */ 
+                                                   element::GetFirstChild();
+                if (!child) {  // Always has a child - kkee??
+                    WWMemUnlock(nameH);
+                    return;
+                }
+                @call child::GetAbsoluteBounds(&rect);
+                // Currently it's the parser thread call this method.
+                // We need to let the ui thread to update the screen.
+@if FRAME_NOT_YET_DEFINED
+                _frame->DisplayPositionOnUIThread(&rect);
+@endif
+                // A match has been found.  Delete the _anchorNameToBeViewed
+                WWMemFree(_anchorNameToBeViewed);
+                _anchorNameToBeViewed = NULL;
+            }
+            WWMemUnlock(nameH);
+        }
+    }
+}
+
+
+@method //    void 
+HTMLAnchorListClass, SetFrame // (HTFrame *frame)
+{
+    _frame = frame;
+}
+

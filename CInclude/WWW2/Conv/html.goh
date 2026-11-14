@@ -1,0 +1,571 @@
+/*---------------------------------------------------------------------------
+//
+//  Geoworks (R) application software and GEOS (R) operating system
+//  software copyright (C) 1990-1997 Geoworks.  All rights reserved.
+//  United States Patents 5327529, 5237651, and 5438662. U.K. Patents
+//  0375703 and 0631677.  German Patents P3854269.2-08 and
+//  69307728.1-08.  French Patents 0375703 and 0631677.  Other
+//  international patents pending.
+//
+//  This software is the confidential and proprietary information of
+//  Geoworks ("Confidential Information").  You shall not disclose
+//  such Confidential Information and shall use it only in accordance
+//  with the terms of the license agreement you entered into with
+//  Geoworks.
+//
+// FILE:        html.h
+//
+// DESCRIPTION: HTMLViewer.
+//            //depot/liberty/project/ellery/main/include/www/conv/html.h#37
+//
+//      $Id: html.goh,v 1.4 98/09/03 04:13:57 allen Exp $
+//
+//-------------------------------------------------------------------------*/
+
+@ifndef _WWW_CONV_HTML_H_
+@define _WWW_CONV_HTML_H_
+
+    /*////////
+    //
+    // Loading options for GetURL(). This does not apply to PostURL()
+    // because post data is not cached. However, you can use the 
+    // URL from a previous PostURL() in GetURL() to attempt to load
+    // the PostURL() response.
+    //
+    // [] LOAD_ANY_VERSION   Data could come from cache or network.
+    // [] LOAD_FROM_NETWORK  Reload from network. This does not affect
+    //                       requests that use local protocols, like file://.
+    */
+    typedef enum {
+        LOAD_ANY_VERSION,
+        LOAD_FROM_NETWORK
+    } LoadMode;
+
+/*
+#include <basedef.h>     // USE_IT()
+#include <www/wwmem.h>
+#include <www/wwcore/wwlist.h>
+#include <www/wwcore/wwstatus.h>   // status resporting manager
+
+class AppBase;           // #include <ui/appbase.h>
+class FlexFrame;         // #include <toolkit/frame.h>
+class WWStream;          // #include <www/core/wwstream.h>
+class HTRequest;         // #include "req.h"
+class WWFrame;           // #include "wwframe.h"
+class HTFrame;           // #include "htframe.h"
+class ImgFrame;          // #include "imgframe.h"
+class HTRequestManager;  // #include "reqmgr.h"
+*/
+
+@include "WWW2/WW2Core/wwstatus.goh"
+
+    /*////////
+    //
+    // HTMLViewer return codes.
+    //
+    // [] HTMLV_OK             General success
+    //
+    // [] HTMLV_BUSY           Request cannot be made as viewer is busy.
+    //                         This normally happen if the viewer is in 
+    //                         the process of terminating old requests 
+    //                         from Stop() or successive GetURL()/PostURL().
+    //
+    // [] HTMLV_STREAM_ERROR
+    //
+    // [] HTMLV_OUT_OF_MEMORY
+    */
+typedef enum {
+     HTMLV_OK
+    ,HTMLV_BUSY
+    ,HTMLV_STREAM_ERROR
+    ,HTMLV_OUT_OF_MEMORY
+}  HTMLViewerResultCode;
+
+
+
+/***************************************************************************
+CLASS
+    HTMLViewer
+
+    Viewer for displaying HTML documents. 
+
+    A HTMLViewer is used to display HTML data and text, i.e., MIME
+    types "text/html" and "text/plain". For other data types, it will look
+    for the matching plug-ins to load and pass on the data. If there
+    is no plug-in registered to handle a MIME type, HTMLViewer will
+    prompt the user to save the data to a file.
+
+    The viewer allows only one display request at a time. A display
+    request is initiated by GetURL(), PostURL(), or NewStream().
+
+    For requests initiated using NewStream(), caller must wait for it to 
+    complete using DestroyStream(). The Stop() method can be used to
+    preempt the request so that DestroyStream() would return quickly.
+    Stop() is normally called from a different thread that calls 
+    DestroyStream().
+
+    For requests initiated using GetURL() and PostURL(), reissuing a
+    GetURL() or PostURL() request will stop any active request.
+    There are no methods to wait for GetURL() and PostURL() to run to 
+    completion and it does not make sense to have them. If necessary,
+    we could provide a function callback as an additional parameter to
+    GetURL() and PostURL() to callback the client when the display is 
+    completed.
+
+KEYWORDS
+
+    WWW, HTML
+
+CLASS TREE
+<pre>
+   WWStatus
+      |
+      +---HTMLViewer
+</pre>
+****************************************************************************/
+@class HTMLViewerClass, WWStatusClass;
+
+/* public: */
+
+    /*////////
+    //
+    // Constructor. Provides the AppBase of the application created
+    // this HTMLViewer.
+    //
+    // Parameters_
+    //
+    // [in]  coordX       Absolute screen coordinate X for upper left corner.
+    // [in]  coordY       Absolute screen coordinate Y for upper left corner.
+    // [in]  width        Width of the HTMLViewer window.
+    // [in]  height       Height of the HTMLViewer window.
+    //
+    // See_also_ Initialize()
+    //
+    // Status_ Functional
+    */
+    @message void HTMLViewer(word coordX, word coordY, 
+               		     word width, word height);
+
+    /*////////
+    //
+    // Destructor.
+    //
+    // Status_ Functional
+    //
+
+    virtual ~HTMLViewer();
+
+    */
+
+    /*////////
+    //
+    // Initialize a HTMLViewer.
+    //
+    // Parameters_
+    //
+    // [in]  frame        The flex frame that is the root of iu objects.
+    //
+    // Return_value_ HTMLV_OK
+    //               HTMLV_OUT_OF_MEMORY
+    //
+    // Status_ Functional
+    */
+    @message HTMLViewerResultCode ViewerInitialize(optr app,
+					     optr /* FlexFrame * */ flexframe);
+
+    /*////////
+    //
+    // Set the proxy preference. This may be called many times to
+    // reset or clear the proxy. You must call SetProxy() before
+    // making GetURL() or PostURL() calls for the proxy to be 
+    // effective.
+    //
+    // Parameters_
+    //
+    // [in]  name   Must be a null terminated string.
+    //              e.g., www.proxy.com OR 128.698.321.000. Pass 0
+    //              to clear the proxy setting. 
+    // [in]  port   e.g., 8080. Defaults to 80.
+    //
+    // Status_ Functional
+    */
+    @message void SetProxy(const char *name, dword port /* = 80 */);
+
+    /*////////
+    //
+    // Set load image option. 
+    //
+    // Parameters_
+    //
+    // [in]  flag   TRUE to load images in subsequent requests.
+    //              FALSE to not load images in subsequent requests.
+    //
+    // Status_ Functional
+    */
+    @message void SetLoadImage(Boolean flag);
+
+    /*////////
+    //
+    // Get a URL and display the response data.  If return code
+    // is HTMLV_OK, this will initiate background processing of 
+    // response data. If you wish to stop it, call Stop(). If a
+    // previous GetURL() or PostURL() was called and the display was
+    // not completed, calling GetURL() will stop the processing of the
+    // old request.
+    //
+    // Parameters_
+    //
+    // [in]  url          URL of document to load. If the URL has no 
+    //                    scheme (e.g., http://, file://), the default
+    //                    scheme is http://.
+    // [in]  loadMode     Indicates how the data is to be loaded.
+    //
+    // Return_value_ HTMLV_OK             Success.
+    //               HTMLV_OUT_OF_MEMORY  Not enough memory
+    //
+    // See_also_ PostURL()
+    //
+    // Status_ Functional
+    */
+    @message HTMLViewerResultCode GetURL(const char *url,
+                                	LoadMode loadMode 
+                                /* = HTMLViewer::LOAD_ANY_VERSION */);
+
+    /*////////
+    //
+    // Post a URL and display the response from Post. If return code
+    // is HTMLV_OK, this will initiate background processing of 
+    // response data. If you wish to stop it, call Stop(). If a
+    // previous GetURL() or PostURL() was called and the display is
+    // not completed, calling PostURL() will stop the processing of
+    // the old request.
+    //
+    // Parameters_
+    //
+    // [in]  url          Valid url as per RFC1738. If the URL has no
+    //                    scheme, the default scheme is http://.
+    // [in]  buffer       Form data to send. Must be encoded for 
+    //                    content-type application/x-www-form-urlencoded.
+    //                    Or path to local temporary filename.
+    // [in]  len          Length of the buffer.
+    // [in]  file         Whether to post a file. Values:
+    //                    * TRUE: Post the file whose path is specified 
+    //                      in buffer, then delete the file. 
+    //                      This is not implemented.
+    //                    * FALSE: Post the raw data in buffer.
+    //
+    // Return_value_ HTMLV_OK                  Success.
+    //               HTMLV_OUT_OF_MEMORY       Not enough memory
+    //
+    // See_also_ GetURL(), Stop()
+    //
+    // Status_ Functional, file = TRUE not implemented.
+    */
+    @message HTMLViewerResultCode PostURL(const char *url, 
+					  const byte *buffer,
+					  const dword len,
+					  Boolean file /* = FALSE */);
+
+    /*////////
+    //
+    // When the Library loads a URL internally (for example, as a
+    // result of following a link), this method is called by the Library
+    // to inform the application what the URL is. This allows the
+    // application to change the title or its "Open Location" field to
+    // reflect the new URL. The application should use this method 
+    // to open the URL as the Library is opening the URL and loading
+    // it in this viewer.
+    //
+    // Parameters_
+    //
+    // [in]  url          URL of the document.
+    //
+    // Status_ Functional
+    */
+    @message /* virtual */ void NewURL(const char * /*url*/); /* {} */
+
+    /*////////
+    //
+    // Display data in a stream. It is illegal to call NewStream()
+    // twice or more without calling DestroyStream() to wait for
+    // HTMLViewer to finish using the previous stream. You could call
+    // Stop() while blocked on DestroyStream(). Each NewStream() must
+    // have a corresponding DestroyStream() even if Stop() was called.
+    //
+    // Parameters_
+    //
+    // [in]  stream  Stream to read data from.
+    //
+    // Return_value_ HTMLV_OK             Displayed successfully.
+    //               HTMLV_STREAM_ERROR   Query stream for more details.
+    //               HTMLV_OUT_OF_MEMORY
+    //
+    // See_also_ DestroyStream()
+    //
+    // Overrides_
+    //
+    // Status_ Not implemented.
+    */
+    @message HTMLViewerResultCode NewStream(optr /* WWStream * */ stream);
+
+    /*////////
+    //
+    // Block waiting for HTMLViewer to finish reading the stream provided
+    // in NewStream(). While blocked on DestroyStream(), you could call
+    // Stop() from a different thread to unblock DestroyStream() and
+    // stop the processing. Each NewStream() must have a corresponding 
+    // DestroyStream() even if Stop() was called.
+    //
+    // Parameters_
+    //
+    // [in]  stream   Stream about to be deleted.
+    //
+    // See_also_ NewStream(), Stop()
+    //
+    // Status_ Not implemented.
+    */
+    @message void DestroyStream(optr /* WWStream * */ stream);
+    
+    /*////////
+    //
+    // Stop the processing of data initiated by GetURL(), PostURL(),
+    // and NewStream(). This method has no effect if the
+    // processing/display was completed.
+    //
+    // See_also_ GetURL(), PostURL(), NewStream()
+    //
+    // Status_ Functional
+    */
+    @message void Stop();
+
+    /*////////
+    //
+    // Ask the HTMLViewer for its position and size.
+    //
+    // Parameters_
+    //
+    // [out] *coordX, 
+    // [out] *coordY - position of the viewer.
+    // [out] *width, 
+    // [ouy] *height - width and height of the viewer.
+    //
+    // Status_ Functional
+    */
+    @message void GetBounds(word *coordX, word *coordY, 
+			    word *width,  word *height);
+
+    /*////////
+    //
+    // Accept a status report from WWW engine. By default, we 
+    // don't print the message.
+    //
+    // Parameters_
+    //
+    // [in]  msg    Null-terminated message.
+    //
+    // See_also_ Report(uint32, uint32)
+    //
+    // Overrides_ WWStatus::Report(WWStatus::StatusInfo)
+    //
+    // Status_ Functional
+    //
+
+    @message / virtual / void Report(StatusInfo msg); / {}; /
+
+    */
+
+    /*////////
+    //
+    // Accept a status report from WWW engine. By default, we 
+    // don't print the message.
+    //
+    // Parameters_
+    //
+    // [in]  loaded       Number of bytes loaded.
+    // [in]  totalLength  > 0. The length of the data to load.
+    //                    So (loaded/totalLength * 100) is the 
+    //                    percentage of data loaded. 
+    //  
+    //                    = 0. The totalLength unknown.
+    //
+    // See_also_ Report(WWStatus::StatusInfo)
+    //
+    // Overrides_ WWStatus::Report(uint32, uint32)
+    //
+    // Status_ Functional
+    //
+
+    @message / virtual / void ReportDWord(dword loaded, 
+				       dword totalLength); /  {} ; /
+    */
+
+    /*////////
+    //
+    // Accept a text status. By default, we don't print the message.
+    //
+    // Parameters_
+    //
+    // [in]  msg
+    //
+    // See_also_ Report(WWStatus::StatusInfo)
+    //
+    // Overrides_ WWStatus::Report(const TCHAR *msg)
+    //
+    // Status_ Functional
+    //
+
+    @message / virtual / void ReportTCHAR(const TCHAR * msg); / {}; /
+
+    */
+
+    /*////////
+    //
+    // Setting the viewer frame visible or not.
+    //
+    // Parameters_
+    //
+    // [in]  visible       TRUE or FALSE.
+    //
+    // Status_ Functional
+    */
+    @message void SetVisible(Boolean visible);
+
+    /*////////
+    //
+    // Get appbase.
+    //
+    // Parameters_
+    //
+    // [in]  appbase   NULL if initialize was not called.
+    //
+    // Status_ Functional
+    //
+
+    AppBase* GetAppBase() const {return _appbase;}
+
+    */
+
+    /*////////
+    //
+    // Get the request manager.
+    //
+    // Parameters_
+    //
+    // [in]  reqManager   NULL if initialize was not called.
+    //
+    // Status_ Functional
+    */
+    @message optr /* HTRequestManager * */ GetRequestManager();
+
+@ifdef DO_ERROR_CHECKING
+    /*////////
+    //
+    // Print the ui tree represented by the document.
+    // The output file is /int/html/uitree.txt".
+    //
+    // Status_ Functional
+    */
+    @message void ECPrintUITree();
+@endif
+    
+/*===========================================================================
+//
+//                       W A R N I N G 
+// 
+// THE LIBERTY EXTERNAL API IS FOUND ABOVE THIS BARRIER. ANYTHING BELOW
+// THIS NOTICE IS IMPLEMENTATION DEPENDENT AND SUBJECT TO CHANGE.
+//
+//
+//=========================================================================*/
+
+/* protected: */
+/*    friend class HTRequest; */
+
+    /*
+    // Request stream callback. This method is called from a request
+    // we've submitted. The request data is provided in the stream.
+    // If there is no stream, this method will not be called.
+    //
+    // Parameters_
+    //
+    // [in]  stream   Pointer to a wwstream for reading only.
+    // [in]  request  The request that created this stream.
+    //
+    // Return_value_ 
+    //
+    // See_also_ AcceptDone()
+    //
+    // Status_ Functional
+    */
+    @message void ViewerAcceptStream(optr /* WWStream * */ stream, 
+				     HTRequest *req);
+
+    /*
+    // Terminate request callback. The method must be thread safe. 
+    // The request will be deleted when the call returns.
+    // This method will always be called even if AcceptStream() was
+    // not called.
+    //
+    // Parameters_
+    //
+    // [in]  request  Request submitted earlier.
+    //
+    // See_also_ AcceptStream()
+    //
+    // Status_ Functional
+    */
+    @message void ViewerAcceptDone(HTRequest *request);
+
+    /*
+    // Main HTML parsing routine.
+    //
+    // Status_ Functional
+    */
+    @message void ParseHTML(optr /* WWStream * */ stream, 
+			    HTRequest *req); 
+
+    /*
+    // Main image parsing routine.
+    //
+    // Status_ Functional
+    */
+    @message void ParseImage(optr /* WWStream * */ stream, 
+			     HTRequest *req);
+
+/* protected: */
+/*    friend class HTRequestManager; */
+
+    /*
+    // Don't let users call copy the object in any way.  These methods
+    // aren't actually defined since they should never be called, but
+    // declaring them private should catch anyone who tries to call
+    // them.
+    */
+/*
+    HTMLViewer(const HTMLViewer&);
+    const HTMLViewer& operator=(const HTMLViewer&);
+*/
+
+/*    AppBase             *_appbase;          // For attaching UI and */
+    @instance optr                             __appHandle;
+    @instance optr /* FlexFrame           * */ __flexframe;
+    /* Request manager */
+    @instance optr /* HTRequestManager    * */ __reqManager;
+
+    /* WWList _frameList;
+    // Testing with one frame and one url only
+    // Need a semaphore to protect frame or framelist
+    */
+    @instance SemaphoreHandle /* Semaphore  */ __frameSem;
+    @instance optr            /* WWFrame *  */ __wwFrame;
+
+    //the position and size used to display html pages
+    @instance word                             __xPos;
+    @instance word                             __yPos;
+    @instance word                             __width;
+    @instance word                             __height;
+
+@endc;
+
+
+@endif // #ifndef _WWW_CONV_HTML_H_

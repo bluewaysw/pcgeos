@@ -1,0 +1,193 @@
+/*---------------------------------------------------------------------------
+//                
+//	Copyright (C) Geoworks 1998.  All rights reserved.
+//	GEOWORKS CONFIDENTIAL
+//
+// PROJECT:	Geos-SC WWW Library
+// MODULE:	Suffix
+// FILE:	suffix.cpp
+//
+// AUTHOR:	Kok Kin Kee: Feb 23, 1998
+//
+// REVISION HISTORY:
+//	Name		Date		Description
+//	----		----		-----------
+//	kkee    	2/23/98  	Initial version
+//
+// DESCRIPTION:
+//
+//	Map file suffix to MIME type.
+//
+//	$Id: ww2suffx.goc,v 1.2 98/08/06 16:56:12 edwin Exp $
+//
+//--------------------------------------------------------------------------*/
+
+/*
+#include <system.h>
+#include <jstring.h>
+#include <tstring.h>
+#include "suffix.h"
+#include <www/wwcore/wwstring.h>
+*/
+
+@include <stdapp.goh>
+@include <Ansi/stdlib.h>
+@include <Ansi/string.h>
+@include "WWW2/ww2mem.h"
+@include "WWW2/WW2Core/ww2string.goh"
+#include "WWW2/WW2Core/ww2suffx.h"
+
+/*
+extern "C" {
+#include <string.h>                * for strrchr *
+}
+*/
+
+/*
+// Must be in case-insensitive strcmp order.
+*/
+
+struct SuffixToMimeTypeMapStruct 
+{
+    const char *suffix;                  /* case insensitive */
+    const char *mimeType;                /* case insensitive */
+} SuffixToMimeTypeMap[] = {
+    {"gif", "image/gif"},
+    {"htm", "text/html"},
+    {"html", "text/html"},
+    {"jpe", "image/jpeg"},
+    {"jpeg", "image/jpeg"},
+    {"jpg", "image/jpeg"}
+};
+
+
+/*
+// Must be in case-insensitive strcmp order.
+*/
+struct MimeTypeToSuffixMapStruct
+{
+    const char *mimeType;                /* case insensitive */
+    const TCHAR *suffix;                 /* case insensitive */
+} MimeTypeToSuffixMap[] = {
+    {"image/gif", _TEXT("gif")},
+    {"image/jpeg", _TEXT("jpg")},
+    {"text/html", _TEXT("htm")}
+};
+
+/*---------------------------------------------------------------------------
+//		SuffixMimeType()
+//---------------------------------------------------------------------------
+// 
+// SYNOPSIS: 	Map file suffix to a MIME type.
+// SCOPE:	Public
+// RETURN:	Content-type or NULL.
+// STRATEGY:	This should be implemented using Registry to map
+//              file extension to MIME type. For now we use a static
+//              list and binary search.
+// 
+// REVISION HISTORY: 
+//	Name		Date		Description 
+//	----		----		----------- 
+//	kkee    	2/23/98 	Initial version 
+//	
+//-------------------------------------------------------------------------*/
+const char * _far _pascal
+SuffixMimeType(const char *suffix)
+{
+    sword result;
+    int i, lower=0;
+    sword upper = sizeof(SuffixToMimeTypeMap) / 
+                  sizeof(struct SuffixToMimeTypeMapStruct) - 1;
+
+    while (upper >= lower) {
+        i = (lower+upper) / 2;
+        result = WWStrCaseCmp(suffix, SuffixToMimeTypeMap[i].suffix);
+        if (result < 0) 
+            upper = i -1;
+        else if (result > 0)
+            lower = i+ 1;
+        else
+            return SuffixToMimeTypeMap[i].mimeType;
+    }
+    return NULL;
+}	/* End of SuffixMimeType() */
+
+
+/*---------------------------------------------------------------------------
+//		UrlMimeType()
+//---------------------------------------------------------------------------
+// 
+// SYNOPSIS: 	Map a url or filename to a MIME type.
+// SCOPE:	Public
+// RETURN:	MIME type if there is a map.
+// STRATEGY:	
+// 
+// REVISION HISTORY: 
+//	Name		Date		Description 
+//	----		----		----------- 
+//	kkee    	6/05/98 	Initial version 
+//	
+//-------------------------------------------------------------------------*/
+const char* _far _pascal
+UrlMimeType(const char *url)
+{
+    const char *suffix = strrchr(url, '.');
+    if (suffix) {
+        return SuffixMimeType(++suffix);
+    }
+    return NULL;
+}	/* End of UrlMimeType() */
+
+const char* _far _pascal
+UrlMimeTypeTCHAR(const TCHAR *url)
+{
+    const TCHAR *suffix = Tstrrchr(url, '.');
+    if (*++suffix) {
+        char *str = (char *)malloc(sizeof(char) * (Tstrlen(suffix)+1));
+        if (!str) {
+            return NULL;
+        }
+        Jstrcpy(str, suffix);
+        const char *ret = SuffixMimeType(str);
+        free(str);
+        return ret;
+    }
+    return NULL;
+}
+
+
+/*---------------------------------------------------------------------------
+//		MimeTypeToSuffix()
+//---------------------------------------------------------------------------
+// 
+// SYNOPSIS: 	Map mime type to suffix.
+// SCOPE:	Public
+// RETURN:	file suffix.
+// STRATEGY:	
+// 
+// REVISION HISTORY: 
+//	Name		Date		Description 
+//	----		----		----------- 
+//	kkee    	6/15/98 	Initial version 
+//	
+//-------------------------------------------------------------------------*/
+const TCHAR* _far _pascal
+MimeTypeToSuffix(const char *type)
+{
+    sword result;
+    int i, lower=0;
+    sword upper = sizeof(MimeTypeToSuffixMap) / 
+                  sizeof(struct MimeTypeToSuffixMapStruct) - 1;
+
+    while (upper >= lower) {
+        i = (lower+upper) / 2;
+        result = WWStrCaseCmp(type, MimeTypeToSuffixMap[i].mimeType);
+        if (result < 0) 
+            upper = i -1;
+        else if (result > 0)
+            lower = i+ 1;
+        else
+            return MimeTypeToSuffixMap[i].suffix;
+    }
+    return NULL;
+}	/* End of MimeTypeToSuffix() */

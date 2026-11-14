@@ -1,0 +1,686 @@
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Geoworks 1996.  All rights reserved.
+	GEOWORKS CONFIDENTIAL
+
+PROJECT:	GeoBrowser
+MODULE:		htmlft
+FILE:		htmlft.goc
+
+AUTHOR:		Kok Kin Kee, Oct 20, 1996
+
+ROUTINES:
+	Name			Description
+	----			-----------
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	kkee	10/20/96   	Initial version.
+
+DESCRIPTION:
+
+	HTML Filter resource.
+
+	$Id: htmlft.goc,v 1.13.3.6 97/12/10 21:36:02 mzhu Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+@include <WWW/sgml.goh>
+@include <WWW/htmlp.goh>
+
+/*
+ * HTMLFilterResource stores all the information we need to filter
+ * out illegal tags (or rather tags that would give us problems if
+ * we pass them on to the UI generator).
+ */
+@start HTMLFilterResource, data;
+
+/*
+**       Dummy Attribute list
+**       --------------------
+**
+**       If an element is expected but was not received, the HTML
+**       parser corrects the grammar by pushing the required element
+**       with no attributes.
+*/
+@chunk SGMLEntity emptyAttr[1] = {
+	0,    /* This means the end of the attribute list */
+	0
+};   
+
+
+
+/*
+**       HTML Content Models
+**       -------------------
+**
+**       We have our rules for setting up content model tables, and
+**       you *must* follow them:
+**
+**       1. Reduce all scopes to not use parentheses.
+**
+**       2. Finally, each content must be in the following format:
+**
+**            content_name <occurrence> <connector>
+**
+**          <occurrence> is optional but <connector> is not optional.
+*/
+
+/*
+ * Our very own default content model. Contents are the same
+ * as htmlc_content, except we took away the grammar. With this
+ * as the default content when we start parsing a HTML document,
+ * the target will not get HTMLT_HTML, HTMLT_HEAD, and HTMLT_BODY.
+ * Also, since there is no grammar, the target must be able to 
+ * disregard occurence and connector semantics.
+ *
+ */
+@chunk HTMLAtom htmlc_default_content[] = {
+     {HTMLAT_NO_GRAMMAR, 0}
+
+    ,{HTMLAT_CONTENT, @htmlc_head_content_and_misc}  /* HTMLC_HEAD content */
+    ,{HTMLAT_CONTENT, @htmlc_body_content}           /* HTMLC_BODY content */
+    ,{0, 0}
+};
+
+
+/*
+ * <!ENTITY % html.content "HEAD, BODY">. This is changed to 
+ * the default content htmlc_default_content.
+ */
+#define htmlc_content htmlc_default_content
+
+/*
+ * @chunk HTMLAtom htmlc_content[] = {
+ *     {HTMLAT_TOKEN, HTMLT_HEAD}
+ *
+ *    ,{HTMLAT_COMMA, 0}
+ *
+ *    ,{HTMLAT_TOKEN, HTMLT_BODY}
+ *    ,{0, 0}  
+ * };
+ */
+
+
+/*
+ * <!ENTITY % head.content "TITLE & ISINDEX? & BASE?"> and changed to 
+ * <!ENTITY % head.content "TITLE? & ISINDEX? & BASE?"> as requested by
+ * Edwin.
+ */
+@chunk HTMLAtom htmlc_head_content[] = {
+     {HTMLAT_TOKEN, HTMLT_TITLE}
+    ,{HTMLAT_ZERO_OR_ONE, 0}
+
+    ,{HTMLAT_AND, 0}
+
+    ,{HTMLAT_TOKEN, HTMLT_ISINDEX}
+    ,{HTMLAT_ZERO_OR_ONE, 0}
+
+    ,{HTMLAT_AND, 0}
+
+    ,{HTMLAT_TOKEN, HTMLT_BASE}
+    ,{HTMLAT_ZERO_OR_ONE, 0}
+    ,{0, 0}   /* Terminate list */
+};
+
+
+/*
+ * <!ENTITY % head.misc "SCRIPT|STYLE|META|LINK">. This is of type
+ * HTMLAT_SIMPLE.
+ */
+@chunk HTMLAtom htmlc_head_misc[] = {
+     {HTMLAT_SIMPLE, 4}
+
+    ,{HTMLAT_TOKEN, HTMLT_LINK}
+    ,{HTMLAT_TOKEN, HTMLT_META}
+    ,{HTMLAT_TOKEN, HTMLT_SCRIPT}
+    ,{HTMLAT_TOKEN, HTMLT_STYLE}
+    ,{0, 0}   /* Terminate list */
+};
+
+
+/*
+ * (%head.content) +(%head.misc) and minimized to 
+ * %head.content | %head.misc.
+ */
+@chunk HTMLAtom htmlc_head_content_and_misc[] = {
+     {HTMLAT_NO_GRAMMAR, 0}
+
+    ,{HTMLAT_CONTENT, @htmlc_head_content}
+    ,{HTMLAT_CONTENT, @htmlc_head_misc}
+    ,{0, 0}   /* Terminate list */
+};
+
+
+/* 
+ * <!ENTITY % heading "H1|H2|H3|H4|H5|H6">. This is of type HTMLAT_SIMPLE.
+ */
+@chunk HTMLAtom htmlc_heading[] = {
+     {HTMLAT_SIMPLE, 6}
+
+    ,{HTMLAT_TOKEN, HTMLT_H1}
+    ,{HTMLAT_TOKEN, HTMLT_H2}
+    ,{HTMLAT_TOKEN, HTMLT_H3}
+    ,{HTMLAT_TOKEN, HTMLT_H4}
+    ,{HTMLAT_TOKEN, HTMLT_H5}
+    ,{HTMLAT_TOKEN, HTMLT_H6}
+    ,{0, 0}   /* Terminate list */
+};
+
+
+/*
+ * <!ENTITY % list "UL|OL|DIR|MENU">. This is of type HTMLAT_SIMPLE.
+ */
+@chunk HTMLAtom htmlc_list[] = {
+     {HTMLAT_SIMPLE, 4}
+
+    ,{HTMLAT_TOKEN, HTMLT_DIR}
+    ,{HTMLAT_TOKEN, HTMLT_MENU}
+    ,{HTMLAT_TOKEN, HTMLT_OL}
+    ,{HTMLAT_TOKEN, HTMLT_UL}
+    ,{0, 0}   /* Terminate list */
+};
+
+
+/* 
+ * <!ENTITY % preformatted "PRE|XMP|LISTING|PLAINTEXT">. This is of 
+ * type HTMLAT_SIMPLE.
+ */
+@chunk HTMLAtom htmlc_preformatted[] = {
+     {HTMLAT_SIMPLE, 4}
+
+    ,{HTMLAT_TOKEN, HTMLT_LISTING}      /* deprecated in DTD 3.2 */
+    ,{HTMLAT_TOKEN, HTMLT_PLAINTEXT}    /* not in DTD 3.2 */
+    ,{HTMLAT_TOKEN, HTMLT_PRE}
+    ,{HTMLAT_TOKEN, HTMLT_XMP}          /* deprecated in DTD 3.2 */
+    ,{0, 0}   /* Terminate list */
+};
+
+
+/*
+ * <!ENTITY % font "TT|I|B|U|S|BIG|SMALL|STRIKE|SUB|SUP">. This is of type
+ * HTMLAT_SIMPLE.
+ */
+@chunk HTMLAtom htmlc_font[] = {
+     {HTMLAT_SIMPLE, 10}
+
+    ,{HTMLAT_TOKEN, HTMLT_B}
+    ,{HTMLAT_TOKEN, HTMLT_BIG}
+    ,{HTMLAT_TOKEN, HTMLT_I}
+    ,{HTMLAT_TOKEN, HTMLT_S}
+    ,{HTMLAT_TOKEN, HTMLT_SMALL}
+    ,{HTMLAT_TOKEN, HTMLT_STRIKE}
+    ,{HTMLAT_TOKEN, HTMLT_SUB}
+    ,{HTMLAT_TOKEN, HTMLT_SUP}
+    ,{HTMLAT_TOKEN, HTMLT_TT}
+    ,{HTMLAT_TOKEN, HTMLT_U}
+    ,{0, 0}   /* Terminate list */
+};
+
+
+/*
+ * <!ENTITY % phrase "EM|STRONG|DFN|CODE|SAMP|KBD|VAR|CITE|Q">
+ */
+@chunk HTMLAtom htmlc_phrase[] = {
+     {HTMLAT_SIMPLE, 9}
+
+    ,{HTMLAT_TOKEN, HTMLT_CITE}
+    ,{HTMLAT_TOKEN, HTMLT_CODE}
+    ,{HTMLAT_TOKEN, HTMLT_DFN}
+    ,{HTMLAT_TOKEN, HTMLT_EM}
+    ,{HTMLAT_TOKEN, HTMLT_KBD}
+    ,{HTMLAT_TOKEN, HTMLT_Q}
+    ,{HTMLAT_TOKEN, HTMLT_SAMP}
+    ,{HTMLAT_TOKEN, HTMLT_STRONG}
+    ,{HTMLAT_TOKEN, HTMLT_VAR}
+    ,{0, 0}   /* Terminate list */
+};
+
+
+/*
+ * <!ENTITY % special "A|IMG|APPLET|OBJECT|FONT|BASEFONT|BR|SCRIPT|
+ *                     STYLE|MAP|SPAN|BDO">
+ * This is of type HTMLAT_SIMPLE.
+ */
+@chunk HTMLAtom htmlc_special[] = {
+     {HTMLAT_SIMPLE, 13}
+
+    ,{HTMLAT_TOKEN, HTMLT_A}
+    ,{HTMLAT_TOKEN, HTMLT_APPLET}
+    ,{HTMLAT_TOKEN, HTMLT_BASEFONT}
+    ,{HTMLAT_TOKEN, HTMLT_BDO}
+    ,{HTMLAT_TOKEN, HTMLT_BR}
+    ,{HTMLAT_TOKEN, HTMLT_FONT}
+    ,{HTMLAT_TOKEN, HTMLT_IMG}
+    ,{HTMLAT_TOKEN, HTMLT_MAP}
+    ,{HTMLAT_TOKEN, HTMLT_NOBR}
+    ,{HTMLAT_TOKEN, HTMLT_OBJECT}
+    ,{HTMLAT_TOKEN, HTMLT_SCRIPT}
+    ,{HTMLAT_TOKEN, HTMLT_SPAN}
+    ,{HTMLAT_TOKEN, HTMLT_STYLE}
+    ,{0, 0}   /* Terminate list */
+};
+
+
+/*
+ * <!ENTITY % form "INPUT|SELECT|TEXTAREA|LABEL">
+ * This is of type HTMLAT_SIMPLE.
+ *
+ * Though not specified in the DTD, all these *must* be in a form
+ * element.
+ */
+@chunk HTMLAtom htmlc_form[] = {
+     {HTMLAT_SIMPLE, 4}
+
+    ,{HTMLAT_TOKEN, HTMLT_INPUT}
+    ,{HTMLAT_TOKEN, HTMLT_LABEL}
+    ,{HTMLAT_TOKEN, HTMLT_SELECT}
+    ,{HTMLAT_TOKEN, HTMLT_TEXTAREA}
+    ,{0, 0}   /* Terminate list */
+};
+
+/* 
+ * <!ENTITY % text "#PCDATA | %font | %phrase | %special | %form">
+ *
+ * and **changed** to 
+ *
+ * <!ENTITY % text "#PCDATA | %font | %phrase | %special | %form |
+ *                  %block">
+ *
+ * based on Edwin's UI Generator recommendation.
+ *
+ * PCDATA is handled by SGML. The parsed data is pushed to us via
+ * MSG_HT_STREAM_PUT_BLOCK. 
+ */
+@chunk HTMLAtom htmlc_text[] = {
+     {HTMLAT_NO_GRAMMAR, 0}
+
+    ,{HTMLAT_CONTENT, @htmlc_font}
+    ,{HTMLAT_CONTENT, @htmlc_phrase}
+    ,{HTMLAT_CONTENT, @htmlc_special}
+    ,{HTMLAT_CONTENT, @htmlc_form} 
+    ,{HTMLAT_CONTENT, @htmlc_block}
+    ,{0, 0}   /* Terminate list */
+};
+
+		      
+/*
+ * <!ENTITY % block "P | %list | %preformatted | DL | DIV | CENTER | 
+ *                   BLOCKQUOTE | FORM | ISINDEX | HR | TABLE">
+ *
+ * Note that we moved all %list and %preformatted elements here so that 
+ * we can use HTMLAT_SIMPLE to improve performance!! ;)
+ */
+@chunk HTMLAtom htmlc_block[] = {
+     {HTMLAT_SIMPLE, 18}
+
+    ,{HTMLAT_TOKEN,   HTMLT_BLOCKQUOTE}
+    ,{HTMLAT_TOKEN,   HTMLT_CENTER}
+    ,{HTMLAT_TOKEN,   HTMLT_DIR}         /* %list */
+    ,{HTMLAT_TOKEN,   HTMLT_DIV}
+    ,{HTMLAT_TOKEN,   HTMLT_DL}
+    ,{HTMLAT_TOKEN,   HTMLT_FORM}
+    ,{HTMLAT_TOKEN,   HTMLT_HR}
+    ,{HTMLAT_TOKEN,   HTMLT_ISINDEX}
+    ,{HTMLAT_TOKEN,   HTMLT_LISTING}     /* %preformatted */
+    ,{HTMLAT_TOKEN,   HTMLT_MENU}        /* %list */
+    ,{HTMLAT_TOKEN,   HTMLT_OL}          /* %list */
+    ,{HTMLAT_TOKEN,   HTMLT_P}
+    ,{HTMLAT_TOKEN,   HTMLT_PLAINTEXT}   /* %preformatted */
+    ,{HTMLAT_TOKEN,   HTMLT_PRE}         /* %preformatted */
+    ,{HTMLAT_TOKEN,   HTMLT_TABLE}
+    ,{HTMLAT_TOKEN,   HTMLT_UL}          /* %list */
+    ,{HTMLAT_TOKEN,   HTMLT_XMP}         /* %preformatted */
+    ,{0, 0}   /* Terminate list */
+};
+
+
+/*
+ * <!ENTITY % flow "(%text | %block)*"> and reduced & expressed in our 
+ * syntax as:
+ * <!ENTITY % flow "%text"> as %block in %text.
+ */
+#define htmlc_flow htmlc_text
+
+/*
+ * <!ENTITY %body.content "(%heading | %text | %block | ADDRESS)*">  and
+ * reduced & expressed in our syntax as:
+ * <!ENTITY %body.content "%heading | %text | ADDRESS"> as %block is in 
+ * %text.
+ */
+@chunk HTMLAtom htmlc_body_content[] = {
+     {HTMLAT_NO_GRAMMAR, 0}
+
+    ,{HTMLAT_TOKEN,   HTMLT_BODY}
+    ,{HTMLAT_CONTENT, @htmlc_heading}
+    ,{HTMLAT_CONTENT, @htmlc_text}
+    ,{HTMLAT_TOKEN,   HTMLT_ADDRESS}
+    ,{0, 0}   /* Terminate list */
+};
+
+
+/*
+ * <!ENTITY % address.content "((%text;) | P)*">. 
+ *
+ * I don't understand the semicolon. So I am assuming:
+ * <!ENTITY % address.content "(%text | P)*"> and reduced & expressed 
+ * in our syntax as:
+ * <!ENTITY % address.content "P | %text)">
+ */
+@chunk HTMLAtom htmlc_address_content[] = {
+     {HTMLAT_NO_GRAMMAR, 0}
+
+    ,{HTMLAT_TOKEN,   HTMLT_P}
+    ,{HTMLAT_CONTENT, @htmlc_text}
+    ,{0, 0}   /* Terminate list */
+};
+
+
+/*
+**
+**   Specific element contents
+**   -------------------------
+**   The followings are contents for specific tags.
+**
+**
+*/
+
+/* 
+ * <!ELEMENT A - - (%text)* -(A)> and minimized to 
+ * <!ELEMENT A - - %text* -A> and expressed in our syntax as
+ * <!ELEMENT A - - %text -A>.
+ * 
+ */
+#define htmlc_a htmlc_text
+
+
+/*
+ * <!ELEMENT MAP - - (AREA)*> and miminized to 
+ * <!ELEMENT MAP - - AREA*> and reduced and expressed in our syntax as:
+ * <!ELEMENT MAP - - AREA>
+ */
+@chunk HTMLAtom htmlc_map[] = {
+     {HTMLAT_TOKEN, HTMLT_AREA}
+    ,{HTMLAT_ZERO_OR_MORE, 0}
+    ,{0, 0}   /* Terminate list */
+};
+
+
+/*
+ * <!ELEMENT DL - - (DT|DD)*> and expressed in our syntax as:
+ * <!ELEMENT DL - - DT|DD)>
+ */
+@chunk HTMLAtom htmlc_dl[] = {
+     {HTMLAT_NO_GRAMMAR, 0}
+
+    ,{HTMLAT_TOKEN, HTMLT_DT}
+    ,{HTMLAT_TOKEN, HTMLT_DD}
+    ,{0, 0}   /* Terminate list */
+};
+
+
+/*
+ * <!ELEMENT (DIR|MENU) - - (LI*) -(%block)> and minimized to 
+ * <!ELEMENT (DIR|MENU) - - LI* -%block> and expressed in our 
+ */
+@chunk HTMLAtom htmlc_dir[] = {
+     {HTMLAT_TOKEN, HTMLT_LI}
+    ,{HTMLAT_ZERO_OR_MORE, 0}
+    ,{0, 0}   /* Terminate list */
+};
+
+#define htmlc_menu htmlc_dir
+
+#define htmlc_ol htmlc_dir
+
+
+/*
+ * <!ELEMENT LABEL - - (%text)* -(LABEL)> and minimized to 
+ * <!ELEMENT LABEL - - %text* -LABEL> and expressed in our syntax as:
+ * <!ELEMENT LABEL - - %text -LABEL>
+ */
+#define htmlc_label htmlc_text
+
+
+/*
+ * <!ELEMENT SELECT - - (OPTION+)> and minimized to 
+ * <!ELEMENT SELECT - - OPTION+>
+ */
+@chunk HTMLAtom htmlc_select[] = {
+     {HTMLAT_TOKEN, HTMLT_OPTION}
+    ,{HTMLAT_ONE_OR_MORE, 0}
+    ,{0, 0}   /* Terminate list */
+};
+
+
+/*
+ * <!ELEMENT TITLE - - (#PCDATA)* -(%head.misc)> and changed to 
+ * <!ELEMENT TITLE - - -%all>  to indicate that no tags allowed.
+ *
+ * PCDATA is parsed by SGML and pushed to HTML via 
+ * MSG_HT_STREAM_PUT_BLOCK.
+ */
+
+
+/*
+ * <!ELEMENT table -- (caption?), tr+>
+ * and minimized to 
+ * <!ELEMENT table -- caption?, tr+>
+ * 7/14/97. At the request of Edwin Yu, I added htmlc_form.
+ */
+@chunk HTMLAtom htmlc_table[] = {
+     {HTMLAT_TOKEN, HTMLT_CAPTION}
+    ,{HTMLAT_ZERO_OR_ONE, 0}
+
+    ,{HTMLAT_COMMA, 0}
+
+    ,{HTMLAT_TOKEN, HTMLT_TR}
+    ,{HTMLAT_ONE_OR_MORE, 0}
+
+    ,{0, 0}   /* Terminate list */
+};
+
+
+/*
+ * <!ELEMENT tr  - 0 (th|td)*> and changed to:
+ * <!ELEMENT tr  - 0 th+|td+> as requested by Edwin.
+ */
+@chunk HTMLAtom htmlc_tr[] = {
+     {HTMLAT_TOKEN, HTMLT_TH}
+    ,{HTMLAT_ZERO_OR_MORE, 0}
+    
+    ,{HTMLAT_OR, 0}
+
+    ,{HTMLAT_TOKEN, HTMLT_TD}
+    ,{HTMLAT_ZERO_OR_MORE, 0}
+
+     /* try to allow form inside table - mzhu */
+    ,{HTMLAT_TOKEN, HTMLT_FORM}
+    ,{0, 0}   /* Terminate list */
+};
+
+
+#define htmlc_ul htmlc_ol
+
+
+/*
+ * <!ELEMENT FORM - - %body.content -(FORM)> and minimized to 
+ * <!ELEMENT FORM - - %body.content -FORM>
+ */
+#define htmlc_form2 htmlc_body_content
+
+
+/*
+**
+**   Minus contents
+**   --------------
+**   The followings are contents not allowed for specific elements.
+**
+*/
+
+@chunk HTMLAtom minus_a[] = {
+     {HTMLAT_TOKEN, HTMLT_A}
+    ,{0, 0}
+};
+
+
+@chunk HTMLAtom minus_label[] = {
+     {HTMLAT_TOKEN, HTMLT_LABEL}
+    ,{0, 0}
+};
+
+
+@chunk HTMLAtom minus_form[] = {
+     {HTMLAT_TOKEN, HTMLT_FORM}
+    ,{0, 0}
+};
+
+
+@chunk HTMLAtom minus_all[] = {
+     {HTMLAT_ALL, 0}
+    ,{0, 0}
+};
+
+/*
+**
+**     HTML Tag Allowed & DisAllowed Content Models
+**     --------------------------------------------
+**
+**     This table *MUST* be kept up to date with the HTMLToken table
+**     in htmlDTD.goh. The order of the table *MUST BE* the same 
+**     as the HTMLToken table (as we do not search, we simply index 
+**     into this table using the token value). Require endTag is FALSE
+**     if the SGML content model is SGMLC_EMPTY. See htmlDTD.goc table
+**     htmlTags[]. Allowed contents have grammar associated with them.
+**     Disallowed contents do not. The startScope value *SHOULD* be the
+**     same as that of the endScope defined in htmlDTD.goc.
+**
+**     HTML Tag  startTag, endtag   Allowed (0 no content, -1 not supported)  Disallowed  startScope
+**     ========  ================   ========================================  ==========  ==========
+**
+*/  
+
+@chunk HTMLTag htmlContainment[] = {
+     {HTMLT_XXX_INVALID, 0, 0, 0, 3}
+    ,{HTMLT_A,		HTML_START_TAG_REQUIRED | HTML_END_TAG_REQUIRED | HTML_ACCEPT_WHITESPACE,  @htmlc_a, @minus_a, 2}
+    ,{HTMLT_ABBREV,	HTML_START_TAG_REQUIRED | HTML_END_TAG_REQUIRED,  -1, 0, 3}  /* Not supported & not in DTD 3.2 */
+    ,{HTMLT_ABSTRACT,	HTML_START_TAG_REQUIRED | HTML_END_TAG_REQUIRED,  -1, 0, 3}  /* Not supported & not in DTD 3.2 */
+    ,{HTMLT_ACRONYM,	HTML_START_TAG_REQUIRED | HTML_END_TAG_REQUIRED,  -1, 0, 3}  /* Not supported & not in DTD 3.2 */
+    ,{HTMLT_ADDED,	HTML_START_TAG_REQUIRED | HTML_END_TAG_REQUIRED,  -1, 0, 3}  /* Not supported & not in DTD 3.2 */
+    ,{HTMLT_ADDRESS,	HTML_START_TAG_REQUIRED | HTML_END_TAG_REQUIRED,  @htmlc_address_content, 0, 3}
+    ,{HTMLT_APPLET,	HTML_START_TAG_REQUIRED | HTML_END_TAG_REQUIRED,  -1, 0, 3}  /* Not supported */
+    ,{HTMLT_AREA,	HTML_START_TAG_REQUIRED, 0, 0, 3}  /* No content */
+    ,{HTMLT_ARG,	HTML_START_TAG_REQUIRED | HTML_END_TAG_REQUIRED,  -1, 0, 3}  /* Not supported & not in DTD 3.2 */
+    ,{HTMLT_B,		HTML_START_TAG_REQUIRED | HTML_END_TAG_REQUIRED | HTML_ACCEPT_WHITESPACE,  @htmlc_text, 0, 3}
+    ,{HTMLT_BASE,	HTML_START_TAG_REQUIRED, 0, 0, 3}  /* No content */
+    ,{HTMLT_BASEFONT,	HTML_START_TAG_REQUIRED, 0, 0, 3}  /* No content */
+    ,{HTMLT_BDO,	HTML_START_TAG_REQUIRED | HTML_END_TAG_REQUIRED,  @htmlc_text, 0, 3}
+    ,{HTMLT_BGSOUND,	HTML_START_TAG_REQUIRED | HTML_END_TAG_REQUIRED,  -1, 0, 3}  /* Not supported & not in DTD 3.2 */
+    ,{HTMLT_BIG,	HTML_START_TAG_REQUIRED | HTML_END_TAG_REQUIRED | HTML_ACCEPT_WHITESPACE,  @htmlc_text, 0, 3}
+    ,{HTMLT_BLOCKQUOTE,	HTML_START_TAG_REQUIRED | HTML_END_TAG_REQUIRED,  @htmlc_body_content, 0, 3}
+    ,{HTMLT_BODY,	HTML_START_TAG_REQUIRED, @htmlc_body_content, 0, 1}
+    ,{HTMLT_BR,		HTML_START_TAG_REQUIRED, 0, 0, 3}  /* No content */
+    ,{HTMLT_CAPTION,	HTML_START_TAG_REQUIRED | HTML_END_TAG_REQUIRED, @htmlc_text, 0, 2}
+    ,{HTMLT_CENTER,	HTML_START_TAG_REQUIRED | HTML_END_TAG_REQUIRED, @htmlc_body_content, 0, 3}
+    ,{HTMLT_CHANGED,	HTML_START_TAG_REQUIRED | HTML_END_TAG_REQUIRED, -1, 0, 3}  /* Not supported & not in DTD 3.2 */
+    ,{HTMLT_CITE,	HTML_START_TAG_REQUIRED | HTML_END_TAG_REQUIRED, @htmlc_text, 0, 3}
+    ,{HTMLT_CODE,	HTML_START_TAG_REQUIRED | HTML_END_TAG_REQUIRED | HTML_ACCEPT_WHITESPACE, @htmlc_text, 0, 3}
+    ,{HTMLT_COL,	HTML_START_TAG_REQUIRED, -1, 0, 3}  /* not supported */
+    ,{HTMLT_COLGROUP,	HTML_START_TAG_REQUIRED, -1, 0, 3} /* @htmlc_colgroup, not supported */
+    ,{HTMLT_COMMENT,	HTML_START_TAG_REQUIRED | HTML_END_TAG_REQUIRED, 0, 0, 3} /* SGMLC_IGNORE */
+    ,{HTMLT_DD,		HTML_START_TAG_REQUIRED, @htmlc_flow, 0, 3}
+    ,{HTMLT_DFN,	HTML_START_TAG_REQUIRED | HTML_END_TAG_REQUIRED, @htmlc_text, 0, 3}
+    ,{HTMLT_DIR,	HTML_START_TAG_REQUIRED | HTML_END_TAG_REQUIRED, @htmlc_dir, 0, 3} /* -@htmlc_block? */
+    ,{HTMLT_DIV,	HTML_START_TAG_REQUIRED | HTML_END_TAG_REQUIRED, @htmlc_body_content, 0, 3}
+    ,{HTMLT_DL,		HTML_START_TAG_REQUIRED | HTML_END_TAG_REQUIRED, @htmlc_dl, 0, 3}
+    ,{HTMLT_DOCTYPE,	HTML_START_TAG_REQUIRED | HTML_END_TAG_REQUIRED, -1, 0, 3}  /* Not supported */
+    ,{HTMLT_DT,		HTML_START_TAG_REQUIRED, @htmlc_text, 0, 3}
+    ,{HTMLT_EM,		HTML_START_TAG_REQUIRED | HTML_END_TAG_REQUIRED | HTML_ACCEPT_WHITESPACE, @htmlc_text, 0, 3}
+    ,{HTMLT_EMBED,	HTML_START_TAG_REQUIRED | HTML_END_TAG_REQUIRED, -1, 0, 3}  /* Not supported & not in DTD 3.2 */
+    ,{HTMLT_FIELDSET,	HTML_START_TAG_REQUIRED | HTML_END_TAG_REQUIRED, -1, 0, 3}  /* Not supported & not in DTD 3.2 */
+    ,{HTMLT_FIG,	HTML_START_TAG_REQUIRED | HTML_END_TAG_REQUIRED, -1, 0, 3}  /* Not supported & not in DTD 3.2 */
+    ,{HTMLT_FONT,	HTML_START_TAG_REQUIRED | HTML_END_TAG_REQUIRED | HTML_ACCEPT_WHITESPACE, @htmlc_text, 0, 3}
+    ,{HTMLT_FORM,	HTML_START_TAG_REQUIRED | HTML_END_TAG_REQUIRED, @htmlc_form2, @minus_form, 3}
+    ,{HTMLT_FRAME,	HTML_START_TAG_REQUIRED | HTML_END_TAG_REQUIRED, -1, 0, 1} /* Not supported & not in DTD 3.2 */
+    ,{HTMLT_FRAMESET,	HTML_START_TAG_REQUIRED | HTML_END_TAG_REQUIRED, -1, 0, 1}  /* Not supported & not in DTD 3.2 */
+    ,{HTMLT_H1,		HTML_START_TAG_REQUIRED | HTML_END_TAG_REQUIRED | HTML_ACCEPT_WHITESPACE, @htmlc_text, 0, 3}
+    ,{HTMLT_H2,		HTML_START_TAG_REQUIRED | HTML_END_TAG_REQUIRED | HTML_ACCEPT_WHITESPACE, @htmlc_text, 0, 3}
+    ,{HTMLT_H3,		HTML_START_TAG_REQUIRED | HTML_END_TAG_REQUIRED | HTML_ACCEPT_WHITESPACE, @htmlc_text, 0, 3}
+    ,{HTMLT_H4,		HTML_START_TAG_REQUIRED | HTML_END_TAG_REQUIRED | HTML_ACCEPT_WHITESPACE, @htmlc_text, 0, 3}
+    ,{HTMLT_H5,		HTML_START_TAG_REQUIRED | HTML_END_TAG_REQUIRED | HTML_ACCEPT_WHITESPACE, @htmlc_text, 0, 3}
+    ,{HTMLT_H6,		HTML_START_TAG_REQUIRED | HTML_END_TAG_REQUIRED | HTML_ACCEPT_WHITESPACE, @htmlc_text, 0, 3}
+    ,{HTMLT_HEAD,	0, @htmlc_head_content_and_misc, 0, 2}
+    ,{HTMLT_HR,		HTML_START_TAG_REQUIRED, 0, 0, 3}  /* No content */
+    ,{HTMLT_HTML,	0, @htmlc_default_content, 0, 3} /* replaces @htmlc_content */
+    ,{HTMLT_I,		HTML_START_TAG_REQUIRED | HTML_END_TAG_REQUIRED | HTML_ACCEPT_WHITESPACE, @htmlc_text, 0, 3}
+    ,{HTMLT_IMAGE,	HTML_START_TAG_REQUIRED | HTML_END_TAG_REQUIRED, -1, 0, 3}  /* Not supported & not in DTD 3.2 */
+    ,{HTMLT_IMG,	HTML_START_TAG_REQUIRED, 0, 0, 3}  /* No content */
+    ,{HTMLT_INPUT,	HTML_START_TAG_REQUIRED, 0, 0, 3}  /* No content */
+    ,{HTMLT_ISINDEX,	HTML_START_TAG_REQUIRED, 0, 0, 3}  /* No content */
+    ,{HTMLT_KBD,	HTML_START_TAG_REQUIRED | HTML_END_TAG_REQUIRED, @htmlc_text, 0, 3}
+    ,{HTMLT_L,		HTML_START_TAG_REQUIRED | HTML_END_TAG_REQUIRED, -1, 0, 3}  /* Not supported & not in DTD 3.2 */
+    ,{HTMLT_LABEL,	HTML_START_TAG_REQUIRED | HTML_END_TAG_REQUIRED, @htmlc_label, @minus_label, 3}
+    ,{HTMLT_LI,		HTML_START_TAG_REQUIRED, @htmlc_flow, 0, 3}
+    ,{HTMLT_LINK,	HTML_START_TAG_REQUIRED, 0, 0, 3}  /* No content */
+    ,{HTMLT_LISTING,	HTML_START_TAG_REQUIRED | HTML_END_TAG_REQUIRED, @htmlc_text, 0, 3}  /* SGMLC_LITERAL */
+    ,{HTMLT_LIT,	HTML_START_TAG_REQUIRED | HTML_END_TAG_REQUIRED, -1, 0, 3}  /* Not supported & not in DTD 3.2 */
+    ,{HTMLT_MAP,	HTML_START_TAG_REQUIRED | HTML_END_TAG_REQUIRED, @htmlc_map, 0, 3}
+    ,{HTMLT_MARGIN,	HTML_START_TAG_REQUIRED | HTML_END_TAG_REQUIRED, -1, 0, 3}  /* Not supported & not in DTD 3.2 */
+    ,{HTMLT_MARQUEE,	HTML_START_TAG_REQUIRED | HTML_END_TAG_REQUIRED, -1, 0, 3}  /* Not supported & not in DTD 3.2 */
+    ,{HTMLT_MATH,	HTML_START_TAG_REQUIRED | HTML_END_TAG_REQUIRED, -1, 0, 3}  /* Not supported & not in DTD 3.2 */
+    ,{HTMLT_MENU,	HTML_START_TAG_REQUIRED | HTML_END_TAG_REQUIRED, @htmlc_menu, 0, 3} /* -@htmlc_block? */
+    ,{HTMLT_META,	HTML_START_TAG_REQUIRED, 0, 0, 3}  /* No content */
+    ,{HTMLT_NEXTID,	HTML_START_TAG_REQUIRED | HTML_END_TAG_REQUIRED, -1, 0, 3}  /* Not supported & not in DTD 3.2 */
+    ,{HTMLT_NOBR,	HTML_START_TAG_REQUIRED | HTML_END_TAG_REQUIRED, @htmlc_body_content, 0, 3}  /* Supported, but non-standard */
+    ,{HTMLT_NOFRAMES,	HTML_START_TAG_REQUIRED | HTML_END_TAG_REQUIRED, -1, 0, 3}  /* Not supported & not in DTD 3.2 */
+    ,{HTMLT_NOTE,	HTML_START_TAG_REQUIRED | HTML_END_TAG_REQUIRED, -1, 0, 3}  /* Not supported & not in DTD 3.2 */
+    ,{HTMLT_OBJECT,	HTML_START_TAG_REQUIRED | HTML_END_TAG_REQUIRED, -1, 0, 3}  /* Not supported */
+    ,{HTMLT_OL,		HTML_START_TAG_REQUIRED | HTML_END_TAG_REQUIRED, @htmlc_ol, 0, 3} /* -@htmlc_block? */
+    ,{HTMLT_OPTION,	HTML_START_TAG_REQUIRED, 0, 0, 1}  /* PCDATA */
+    ,{HTMLT_OVER,	HTML_START_TAG_REQUIRED | HTML_END_TAG_REQUIRED, -1, 0, 3}  /* Not supported & not in DTD 3.2 */
+    ,{HTMLT_P,		HTML_START_TAG_REQUIRED, 0, 0, 3}  /* Changed from @htmlc_text to 0 */
+    ,{HTMLT_PARAM,	HTML_START_TAG_REQUIRED, 0, 0, 3}  /* No content */
+    ,{HTMLT_PERSON,	HTML_START_TAG_REQUIRED | HTML_END_TAG_REQUIRED, -1, 0, 3}  /* Not supported & not in DTD 3.2 */
+    ,{HTMLT_PLAINTEXT,	HTML_START_TAG_REQUIRED | HTML_ACCEPT_WHITESPACE, 0, 0, 3}  /* SGMLC_LITERAL */
+    ,{HTMLT_PRE,	HTML_START_TAG_REQUIRED | HTML_END_TAG_REQUIRED | HTML_ACCEPT_WHITESPACE, @htmlc_text, 0, 3}  /* SGMLC_LITERAL */
+    ,{HTMLT_Q,		HTML_START_TAG_REQUIRED | HTML_END_TAG_REQUIRED, @htmlc_text, 0, 3}
+    ,{HTMLT_QUOTE,	HTML_START_TAG_REQUIRED | HTML_END_TAG_REQUIRED, 0, 0, 3}
+    ,{HTMLT_REMOVED,	HTML_START_TAG_REQUIRED | HTML_END_TAG_REQUIRED, -1, 0, 3}  /* Not supported & not in DTD 3.2 */
+    ,{HTMLT_RENDER,	HTML_START_TAG_REQUIRED | HTML_END_TAG_REQUIRED, -1, 0, 3} /* Not supported & not in DTD 3.2 */
+    ,{HTMLT_S,		HTML_START_TAG_REQUIRED | HTML_END_TAG_REQUIRED | HTML_ACCEPT_WHITESPACE, @htmlc_text, 0, 3}
+    ,{HTMLT_SAMP,	HTML_START_TAG_REQUIRED | HTML_END_TAG_REQUIRED | HTML_ACCEPT_WHITESPACE, @htmlc_text, 0, 3}
+    ,{HTMLT_SCRIPT,	HTML_START_TAG_REQUIRED | HTML_END_TAG_REQUIRED | HTML_ACCEPT_WHITESPACE, -1, 0, 3} /* Not supported, CDATA */
+    ,{HTMLT_SELECT,	HTML_START_TAG_REQUIRED | HTML_END_TAG_REQUIRED, @htmlc_select, 0, 1}
+    ,{HTMLT_SMALL,	HTML_START_TAG_REQUIRED | HTML_END_TAG_REQUIRED | HTML_ACCEPT_WHITESPACE, @htmlc_text, 0, 3}
+    ,{HTMLT_SPAN,	HTML_START_TAG_REQUIRED | HTML_END_TAG_REQUIRED | HTML_ACCEPT_WHITESPACE, @htmlc_text, 0, 3}
+    ,{HTMLT_STRIKE,	HTML_START_TAG_REQUIRED | HTML_END_TAG_REQUIRED | HTML_ACCEPT_WHITESPACE, @htmlc_text, 0, 3}
+    ,{HTMLT_STRONG,	HTML_START_TAG_REQUIRED | HTML_END_TAG_REQUIRED | HTML_ACCEPT_WHITESPACE, @htmlc_text, 0, 3}
+    ,{HTMLT_STYLE,	HTML_START_TAG_REQUIRED | HTML_END_TAG_REQUIRED | HTML_ACCEPT_WHITESPACE, 0, 0, 3}  /* CDATA */
+    ,{HTMLT_SUB,	HTML_START_TAG_REQUIRED | HTML_END_TAG_REQUIRED | HTML_ACCEPT_WHITESPACE, @htmlc_text, 0, 3}
+    ,{HTMLT_SUP,	HTML_START_TAG_REQUIRED | HTML_END_TAG_REQUIRED | HTML_ACCEPT_WHITESPACE, @htmlc_text, 0, 3}
+    ,{HTMLT_TAB,	HTML_START_TAG_REQUIRED | HTML_END_TAG_REQUIRED, -1, 0, 3} /* Not supported & not in DTD 3.2 */
+    ,{HTMLT_TABLE,	HTML_START_TAG_REQUIRED | HTML_END_TAG_REQUIRED, @htmlc_table, 0, 1}
+    ,{HTMLT_TBODY,	0, -1, 0, 3} /* @htmlc_tbody, not supported */
+    ,{HTMLT_TD,		HTML_START_TAG_REQUIRED, @htmlc_body_content, 0, 1}
+    ,{HTMLT_TEXTAREA,	HTML_START_TAG_REQUIRED | HTML_END_TAG_REQUIRED, 0, 0, 1}  /* PCDATA */
+    ,{HTMLT_TEXTFLOW,	0, -1, 0, 3}  /* Not supported & not in DTD 3.2 */
+    ,{HTMLT_TFOOT,	HTML_START_TAG_REQUIRED, -1, 0, 1} /* @htmlc_tfoot, not supported */
+    ,{HTMLT_TH,		HTML_START_TAG_REQUIRED, @htmlc_body_content, 0, 1}
+    ,{HTMLT_THEAD,	HTML_START_TAG_REQUIRED, -1, 0, 1} /* @htmlc_thead, not supported */
+    ,{HTMLT_TITLE,	HTML_START_TAG_REQUIRED | HTML_END_TAG_REQUIRED, 0, @minus_all, 3}  /* PCDATA */
+    ,{HTMLT_TR,		HTML_START_TAG_REQUIRED, @htmlc_tr, 0, 1}
+    ,{HTMLT_TT,		HTML_START_TAG_REQUIRED | HTML_END_TAG_REQUIRED, @htmlc_text, 0, 3}
+    ,{HTMLT_U,		HTML_START_TAG_REQUIRED | HTML_END_TAG_REQUIRED, @htmlc_text, 0, 3}
+    ,{HTMLT_UL,		HTML_START_TAG_REQUIRED | HTML_END_TAG_REQUIRED, @htmlc_ul, 0, 3} /* -@htmlc_block */
+    ,{HTMLT_VAR,	HTML_START_TAG_REQUIRED | HTML_END_TAG_REQUIRED, @htmlc_text, 0, 3}
+    ,{HTMLT_WBR,	HTML_START_TAG_REQUIRED | HTML_END_TAG_REQUIRED, -1, 0, 3}  /* Not supported & not in DTD 3.2 */
+    ,{HTMLT_XMP,	HTML_START_TAG_REQUIRED | HTML_END_TAG_REQUIRED, 0, 0, 3}  /* SGMLC_LITERAL */
+    ,{HTMLT_XXX_NULL, 0, 0, 0, 3}
+};
+
+
+
+@end HTMLFilterResource;
+
+

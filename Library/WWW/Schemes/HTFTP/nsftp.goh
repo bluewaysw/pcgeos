@@ -1,0 +1,310 @@
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Geoworks 1998.  All rights reserved.
+	GEOWORKS CONFIDENTIAL
+
+PROJECT:        Geobrowser	
+MODULE:		ftp
+FILE:		nsftp.goh
+
+AUTHOR:		Jeremy Broestl, Jul 19, 1998
+
+ROUTINES:
+	Name			Description
+	----			-----------
+
+REVISION HISTORY:
+	Name		Date		Description
+	----		----		-----------
+	jeremyb 	7/19/98   	Initial version.
+
+DESCRIPTION:
+
+        This file holds all the structure definitions required for FTP.
+	It is adapted from the Netscape version.  Once the project is
+	mostly complete, these structures can be pared down greatly.
+
+	$Id: nsftp.goh,v 1.1.1.3 98/08/04 14:45:41 jeremyb Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+
+
+
+/* -*- Mode: C; tab-width: 4; indent-tabs-mode: nil; c-basic-offset: 2 -*-
+ *
+ * The contents of this file are subject to the Netscape Public License
+ * Version 1.0 (the "NPL"); you may not use this file except in
+ * compliance with the NPL.  You may obtain a copy of the NPL at
+ * http://www.mozilla.org/NPL/
+ *
+ * Software distributed under the NPL is distributed on an "AS IS" basis,
+ * WITHOUT WARRANTY OF ANY KIND, either express or implied. See the NPL
+ * for the specific language governing rights and limitations under the
+ * NPL.
+ *
+ * The Initial Developer of this code under the NPL is Netscape
+ * Communications Corporation.  Portions created by Netscape are
+ * Copyright (C) 1998 Netscape Communications Corporation.  All Rights
+ * Reserved.
+ */
+
+#ifndef MKGETURL_H
+#define MKGETURL_H
+
+@include <stdapp.goh>
+@include <WWW/htftp.goh>
+@include <WWW/HTCore/htreq.goh>
+@include <WWW/HTCore/htreqMan.goh>
+@include <WWW/HTCore/htpolicy.goh>
+@include <WWW/HTCore/htnet.goh>
+@include <WWW/HTCore/htstring.goh>
+@include <WWW/HTCore/hturi.goh>
+@include <WWW/HTCore/htsock.goh>
+#include <WWW/htmem.h>
+@include <WWW/HTCore/htsuffix.goh>
+@include "htfatals.goh"
+#include <Ansi/string.h>
+#include <Ansi/stdio.h>
+#include <Ansi/stdlib.h>
+#include <initfile.h>
+#include <timer.h>
+
+/* Please declare all functions called across code modules here.  Things 
+ * will silently work without it, until you realize caller grabs a return 
+ * value from the stack that the function never pushed.  jeremyb 7/30/98
+ */
+extern int ftp_control_connect(HTMemHandle ftpConHandle, HTNetThread *net,
+			       HTSocketAddress *address);
+
+extern int ftp_send_username(HTMemHandle ftpConHandle);
+extern int ftp_send_username_response(HTMemHandle ftpConHandle);
+extern int ftp_send_password(HTMemHandle ftpConHandle) ;
+extern int ftp_send_password_response(HTMemHandle ftpConHandle);
+extern int ftp_get_password(HTMemHandle ftpConHandle) ;
+
+extern int ftp_send_syst(HTMemHandle ftpConHandle) ;
+extern int ftp_send_syst_response(HTMemHandle ftpConHandle);
+extern int ftp_send_port_response(HTMemHandle ftpConHandle);
+extern int ftp_send_port(HTMemHandle ftpConHandle, HTNetThread *net);
+extern int ftp_send_rest_zero(HTMemHandle ftpConHandle);
+extern int ftp_send_rest_zero_response(HTMemHandle ftpConHandle);
+
+extern int ftp_figure_out_what_to_do(HTMemHandle ftpConHandle);
+
+extern int ftp_send_pwd(HTMemHandle ftpConHandle);
+extern int ftp_send_pwd_response(HTMemHandle ftpConHandle);
+
+extern int ftp_send_pasv_response(HTMemHandle ftpConHandle, HTNetThread *net);
+extern int ftp_send_pasv(HTMemHandle ftpConHandle);
+extern int ftp_get_file_type(HTMemHandle ftpConHandle);
+extern int ftp_send_bin(HTMemHandle ftpConHandle);
+extern int ftp_send_ascii(HTMemHandle ftpConHandle);
+extern int ftp_send_bin_or_ascii_response(HTMemHandle ftpConHandle);
+extern int ftp_get_file_size(HTMemHandle ftpConHandle);
+extern int ftp_get_file_size_response(HTMemHandle ftpConHandle);
+extern int ftp_get_file(HTMemHandle ftpConHandle);
+extern int ftp_send_retr(HTMemHandle ftpConHandle);
+extern int ftp_send_retr_response(HTMemHandle ftpConHandle);
+extern int ftp_setup_stream(HTMemHandle ftpConHandle);
+extern int ftp_wait_for_accept(HTMemHandle ftpConHandle);
+extern int ftp_start_read_file(HTMemHandle ftpConHandle);
+extern int ftp_read_file(HTMemHandle ftpConHandle) ;
+extern int ftp_start_read_directory(HTMemHandle ftpConHandle);
+extern int ftp_done (HTMemHandle *ftpConHandle, HTNetThread *net);
+extern int ftp_logout_and_done (HTMemHandle ftpConHandle);
+extern int ftp_pasv_data_connect(HTMemHandle ftpConHandle);
+
+#define TIME_STRING_LENGTH 19
+
+#define FTP_GENERIC_TYPE     0
+#define FTP_UNIX_TYPE        1
+#define FTP_DCTS_TYPE        2
+#define FTP_NCSA_TYPE        3
+#define FTP_PETER_LEWIS_TYPE 4
+#define FTP_MACHTEN_TYPE     5
+#define FTP_CMS_TYPE         6
+#define FTP_TCPC_TYPE        7
+#define FTP_VMS_TYPE         8
+#define FTP_NT_TYPE          9
+
+#define OUTPUT_BUFFER_SIZE 128
+
+#define FTP_MODE_UNKNOWN 0
+#define FTP_MODE_ASCII 1
+#define FTP_MODE_BINARY 2
+
+#define FTP_PORT 21 
+#define FTP_PORT_DATA 20
+
+#define HT_MAX_URL_FIELD_LENGTH 512 
+
+#define GET_ALL_PARTS              127
+#define GET_PASSWORD_PART	   64
+#define GET_USERNAME_PART	   32
+#define GET_PROTOCOL_PART          16
+#define GET_HOST_PART               8
+#define GET_PATH_PART               4
+#define GET_HASH_PART               2
+#define GET_SEARCH_PART             1
+
+#define PC_FTP_PASSWORD_KEY "pass"
+#define PC_FTP_MODULE_KEY   "ftp"
+
+/* define the states of the machine 
+ */
+typedef enum _FTPStates {
+FTP_WAIT_FOR_RESPONSE,
+FTP_CONTROL_CONNECT, /* no more FTP_CONTROL_CONNECT_WAIT*/
+FTP_SEND_USERNAME,
+FTP_SEND_USERNAME_RESPONSE,
+FTP_GET_PASSWORD,
+FTP_GET_PASSWORD_RESPONSE,
+FTP_SEND_PASSWORD,
+FTP_SEND_PASSWORD_RESPONSE,
+FTP_SEND_ACCT,
+FTP_SEND_ACCT_RESPONSE,
+FTP_SEND_REST_ZERO,
+FTP_SEND_REST_ZERO_RESPONSE,
+FTP_SEND_SYST,
+FTP_SEND_SYST_RESPONSE,
+FTP_SEND_MAC_BIN,
+FTP_SEND_MAC_BIN_RESPONSE,
+FTP_SEND_PWD,
+FTP_SEND_PWD_RESPONSE,
+FTP_SEND_PASV,
+FTP_SEND_PASV_RESPONSE,
+FTP_PASV_DATA_CONNECT,
+FTP_PASV_DATA_CONNECT_WAIT,
+FTP_FIGURE_OUT_WHAT_TO_DO,
+FTP_SEND_DELETE_FILE,
+FTP_SEND_DELETE_FILE_RESPONSE,
+FTP_SEND_DELETE_DIR,
+FTP_SEND_DELETE_DIR_RESPONSE,
+FTP_SEND_MKDIR,
+FTP_SEND_MKDIR_RESPONSE,
+FTP_SEND_PORT,
+FTP_SEND_PORT_RESPONSE,
+FTP_GET_FILE_TYPE,
+FTP_SEND_BIN,
+FTP_SEND_BIN_RESPONSE,
+FTP_SEND_ASCII,
+FTP_SEND_ASCII_RESPONSE,
+FTP_GET_FILE_SIZE,
+FTP_GET_FILE_SIZE_RESPONSE,
+FTP_GET_FILE_MDTM,
+FTP_GET_FILE_MDTM_RESPONSE,
+FTP_GET_FILE,
+FTP_BEGIN_PUT,
+FTP_BEGIN_PUT_RESPONSE,
+FTP_DO_PUT,
+FTP_SEND_REST,
+FTP_SEND_REST_RESPONSE,
+FTP_SEND_RETR,
+FTP_SEND_RETR_RESPONSE,
+FTP_SEND_CWD,
+FTP_SEND_CWD_RESPONSE,
+FTP_SEND_LIST_OR_NLST,
+FTP_SEND_LIST_OR_NLST_RESPONSE,
+FTP_SETUP_STREAM,
+FTP_WAIT_FOR_ACCEPT,
+FTP_START_READ_FILE,
+FTP_READ_CACHE,
+FTP_READ_FILE,
+FTP_START_READ_DIRECTORY,
+FTP_READ_DIRECTORY,
+FTP_PRINT_DIR,
+FTP_LOGOUT_AND_DONE, /* jeremyb added*/
+FTP_DONE,
+FTP_ERROR_DONE,
+FTP_FREE_DATA
+} FTPStates;
+
+typedef enum _FTPFileType {
+FTP_FILE_TYPE_TEXT,
+FTP_FILE_TYPE_BIN
+} FTPFileType;
+
+typedef struct _FTPConData {
+
+    HTMemHandle addressHandle;            /* the URL part */
+    dword    content_length;              /* length of the incoming data */
+
+    int            status;          /* current status */
+    dword          bytes_received;  /* number of bytes received so far */
+
+    HTMemHandle hostnameHandle;
+    HTSocketHandle csock;          /* control socket */
+    int     server_type;    /* type of server */
+    Boolean no_restart;     /* do we know that restarts don't work? */
+
+    FTPStates     next_state;        /* the next state of the machine */
+
+    HTStreamHandle stream;               /* outgoing meaning from us to the 
+					  * file being written. */
+
+    HTMemHandle   cc;  /* information about the control connection */
+    
+    /* Placed both of these in globals for persistence*/
+    HTSocketHandle listen_sock;          /* socket to listen on */
+
+    /* But SocketAccept returns a connected socket, gotta keep it somewhere*/
+    Socket connected_listen_sock;
+    HTSocketHandle pasvSockHandle;      /* used only for pasv connections*/
+
+    Boolean    pasv_mode;            /* using pasv mode? */
+
+    FTPStates   next_state_after_response;  /* the next state after 
+					     * full response recieved */
+    int         response_code;              /* code returned in response */
+    HTMemHandle return_msg_handle;
+    int         return_msg_length;
+    int         cont_response;              /* a continuation code */
+
+    HTMemHandle filenameHandle;   /* name of the file we are getting */ 
+
+    HTMemHandle path_handle;
+    int     fileType;                 /* a type indicator for the file */
+    HTMemHandle usernameHandle;
+    HTMemHandle passwordHandle;
+
+    HTMemHandle   cwd_message_handle;     /* used to print out server 
+					   * help messages */
+    HTMemHandle   login_message_handle;   /* used to print out server 
+					   * help messages */
+    Boolean       use_default_path;
+    
+} FTPConData;
+
+/* forward decls */
+HTMemHandle FTPParseURL (HTMemHandle urlHandle, int parts_requested, 
+			  int *length);
+
+#define MK_OUT_OF_MEMORY -207
+#define MK_UNABLE_TO_LOGIN -210
+#define MK_UNABLE_TO_SEND_PORT_COMMAND -214
+#define MK_UNABLE_TO_CREATE_SOCKET -243
+#define MK_CONNECTED 101
+#define MK_UNABLE_TO_CHANGE_FTP_MODE -212
+#define MK_UNABLE_TO_LOCATE_FILE -215
+#define MK_UNABLE_TO_CONVERT -208
+#define MK_UNABLE_TO_ACCEPT_SOCKET -245
+#define MK_DATA_LOADED 1
+
+#define MAXHOSTNAMELEN 256
+
+/* function prototypes
+ */
+
+extern void _pascal
+FTPGetAddress (HTRequestHandle request, HTSocketAddress *htAddress);
+extern HTMemHandle FTPInitStructures(HTNetThread *net) ;
+extern void myitoa(int num, TCHAR *str);
+extern SocketError 
+	     _pascal SOCKETGETMYADDRESS(char *domain,
+					    byte *buffer,
+					    int *bufsize,
+					    MediumAndUnit *mau);
+
+#endif /* not MKGetURL_H */
+

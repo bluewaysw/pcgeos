@@ -1,0 +1,538 @@
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Geoworks 1996 -- All Rights Reserved
+
+PROJECT:	
+MODULE:		
+FILE:		utility.goc
+
+AUTHOR:		Edwin Yu, Apr 29, 1996
+
+ROUTINES:
+	Name			Description
+	----			-----------
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	EY	4/29/96   	Initial version.
+
+DESCRIPTION:
+	This file defines some utility functions for ui generator.
+
+	One of the main data structure in this file is the format 
+	stack.
+
+	Why do we need a format stack?
+	1) Suppose currently no text object is created.  When some
+	   text formatting elements, like <B>, are encountered, we
+	   want to record the format token in the stack.  Thus when a 
+	   text object is created, we apply all the formatting tokens
+	   in the stack to the text object.
+	2) Stack data structure is chosen for data storage is
+	   because the HTML is written in the first-in-last-out
+	   fashion.
+	3) If we want to check the balance of HTML elements, it can
+	   be done easy with stack too.
+	4) Stack can handle nested element structures easily.
+
+	$Id: utility.goc,v 1.1 97/04/07 11:49:38 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+@include <WWW/uigenera.goh>
+@include <WWW/pmanager.goh>
+@include "uifatals.goh"
+#include <Ansi/string.h>        /* strlen define */
+
+int  sum_of_widths_of_previous_siblings = 0;
+int  width_of_current_oject = 0;
+int  height_of_current_oject = 0;
+int  max_height;
+optr current_object;
+
+
+/***********************************************************************
+ *		MapAttrSizeToPointSize
+ ***********************************************************************
+ * SYNOPSIS:	
+ * CALLED BY:	
+ * RETURN:	
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	EY	5/ 5/96   	Initial Revision
+ *
+ ***********************************************************************/
+void MapAttrSizeToPointSize (int size, WWFixed *number)
+{
+  /*
+   *  Make sure the size is within the limit: 1 <= n <= 7
+   */
+  if ( size < 1 )
+    size = 1;
+  else if ( size > 7 )
+    size = 7;
+
+  switch(size) {
+    case 1:
+	number->WWF_int = STYLE_FONT_1;
+	break;
+    case 2:
+	number->WWF_int = STYLE_FONT_2;
+	break;
+    case 3:
+	number->WWF_int = STYLE_FONT_3;
+	break;
+    case 4:
+	number->WWF_int = STYLE_FONT_4;
+	break;
+    case 5:
+	number->WWF_int = STYLE_FONT_5;
+	break;
+    case 6:
+	number->WWF_int = STYLE_FONT_6;
+	break;
+    case 7:
+	number->WWF_int = STYLE_FONT_7;
+	break;
+    }
+    number->WWF_frac= 0;
+}	/* End of MapAttrSizeToPointSize.	*/
+
+
+/***********************************************************************
+ *		MapPointSizeToAttrSize
+ ***********************************************************************
+ *
+ * SYNOPSIS:	
+ * CALLED BY:	
+ * RETURN:	
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	edwin	9/ 3/96   	Initial Revision
+ *
+ ***********************************************************************/
+int
+MapPointSizeToAttrSize (int number)
+{
+  /*
+   *  Make sure the size is within the limit: 1 <= n <= 7
+   */
+  if ( number < STYLE_FONT_1 )
+    return 1;
+  else if ( number > STYLE_FONT_7 )
+    return 7;
+
+  switch(number) {
+    case STYLE_FONT_1:
+	return 1;
+    case STYLE_FONT_2:
+	return 2;
+    case STYLE_FONT_3:
+	return 3;
+    case STYLE_FONT_4:
+	return 4;
+    case STYLE_FONT_5:
+	return 5;
+    case STYLE_FONT_6:
+	return 6;
+    case STYLE_FONT_7:
+	return 7;
+  }
+  return 3;
+}	/* End of MapPointSizeToAttrSize.	*/
+
+
+
+/***********************************************************************
+ *		AddSpaceSeparator
+ ***********************************************************************
+ * SYNOPSIS:	If the current object is a text object, add passed 
+ *			number of line breaks.  (Max is 3, Min is 1).
+ *		If the current object is not a text object, mark the 
+ *			object done and insert a dummy ui object as 
+ *			a space separator.
+ * CALLED BY:	Internal, so numLine MUST be within the limit.
+ * RETURN:	
+ * SIDE EFFECTS:
+ *		No protection if numLine is negative
+ * STRATEGY:
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	EY	5/ 7/96   	Initial Revision
+ *
+ ***********************************************************************/
+void
+AddSpaceSeparator(ObjInfo *Obj, int numLine, Boolean blankLine)
+{
+  char ptr[4];
+  int i;
+  static Boolean blankLineMode = FALSE;
+  static int counter = 0;
+  
+  EC_ERROR_IF(numLine < 1 , UIG_INVALID_INPUT);
+  EC_ERROR_IF(numLine > 3 , UIG_INVALID_INPUT);
+  /*
+   * If we already inserted a blank line to the text object, we
+   * don't need to insert more.  Note, there is no single HTML element
+   * (at least at this moment) that will do the work of two <BR>s.
+   */
+  if (blankLine == TRUE && blankLineMode == FALSE) {
+    blankLineMode == TRUE;
+    counter = 2;
+  }
+  else if (blankLineMode == TRUE) {
+    if (numLine > counter)
+	numLine = counter;
+  }
+  if (Obj->obj && Obj->class == (ClassStruct *)&HTGenTextClass) {
+    /* Add a new line */
+    for (i=0; i < numLine; i++)
+	ptr[i] = C_ENTER;
+    @call Obj->obj::MSG_VIS_TEXT_APPEND_PTR(ptr, numLine);
+    @call Obj->obj::MSG_GEN_TEXT_UPDATE_MAX_LEN_AND_RESET_ACC_LEN();
+    counter -= numLine;
+  }
+  else {
+    /* Add a new dummy ui-object seperator */
+  }
+  if (counter < 1) {
+    counter = 0;
+    blankLineMode == FALSE;
+  }
+  return;
+}	/* End of AddSpaceSeparator.	*/
+void
+AddNewLine(ObjInfo *Obj, int numLine, optr pmanager, optr content)
+{
+  char ptr[4];
+  int i;
+  Boolean NewObj = FALSE;
+  GStateHandle gstate;
+  
+  if (Obj->obj && Obj->class == (ClassStruct *)&HTGenTextClass) {
+    /* Add a new line */
+    if (@call Obj->obj::MSG_VIS_TEXT_GET_TEXT_SIZE() >= 4000) {
+      NewObj = TRUE;
+      if (numLine > 1)
+	numLine--;
+    }
+    for (i=0; i < numLine; i++)
+      ptr[i] = C_ENTER;
+    if (i > 0) {
+      @call Obj->obj::MSG_VIS_TEXT_APPEND_PTR(ptr, numLine);
+      @call Obj->obj::MSG_GEN_TEXT_UPDATE_MAX_LEN_AND_RESET_ACC_LEN();
+    }
+    if (NewObj == TRUE) {
+      EC_WARNING(UIG_TEXT_SPLITS_AT_4K_BYTES);
+      @call pmanager::MSG_PM_TAKE_FINISHED_UI_OBJ(Obj->obj);
+      Obj->obj = @call pmanager::MSG_PM_OBJECT_INSTANTIATE(&HTGenTextClass);
+      gstate = @call Obj->obj::MSG_GEN_TEXT_INITIALIZE();
+      if (content != NULL)
+	@call content::MSG_GEN_HTML_CONTENT_FORMAT_TEXT_OBJECT
+	  (Obj->obj, gstate);
+    }
+  }
+  else {
+    /* Add a new dummy ui-object seperator */
+    ;
+  }
+
+  return;
+}	/* End of AddSpaceSeparator.	*/
+
+
+
+/***********************************************************************
+ *		SetTabsForListGroup
+ ***********************************************************************
+ * SYNOPSIS:	Set an anchor tab for the list headers so all the list
+ *		headers are right aligned.
+ * CALLED BY:	
+ * RETURN:	
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:	After setting an anchor tab, reset the next tab to be
+ *		left-aligned.  This is necessary because any previous
+ *		ended list may have set this position to be the anchor 
+ *		tab.
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	EY	5/10/96   	Initial Revision
+ *
+ ***********************************************************************/
+void
+SetTabsForListGroup (int level, optr obj)
+{
+  Tab	nextTab;
+
+  nextTab.T_position	= TAB_SIZE * (level + 1);
+  nextTab.T_attr	= TL_NONE | TT_ANCHORED;
+  nextTab.T_lineWidth	= nextTab.T_lineSpacing	=
+			  nextTab.T_grayScreen	= 0;
+  nextTab.T_anchor = C_TAB;			/* anchor char */
+  @send obj::MSG_VIS_TEXT_SET_TAB(nextTab,
+				TEXT_ADDRESS_PAST_END,
+				TEXT_ADDRESS_PAST_END);
+/*  nextTab.T_position	= TAB_SIZE * (level + 2);	* reset the *
+  nextTab.T_attr	= TL_NONE | TT_LEFT;		    * next tab. *
+  @call obj::MSG_VIS_TEXT_SET_TAB(nextTab,		
+				TEXT_ADDRESS_PAST_END,	
+				TEXT_ADDRESS_PAST_END); */
+
+}	/* End of SetTabsForListGroup.	*/
+
+
+/***********************************************************************
+ *		MyVisTextFormatNumber
+ ***********************************************************************
+ * SYNOPSIS:	
+ * CALLED BY:	MSG_UI_GENERATOR_CREATE_ORDERED_LIST_ITEM
+ * RETURN:	
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	EY	5/10/96   	Initial Revision
+ *
+ ***********************************************************************/
+void reverse(char s[])
+{
+  int c, i, j;
+  for (i = 0, j = strlen(s)-1; i < j; i++, j--) {
+	c = s[i];
+	s[i] = s[j];
+	s[j] = c;
+  }
+} 
+void MyVisTextFormatNumber(char *temp, int counter, VisTextNumberType type)
+{
+  char	base;
+  int	i = 0;
+
+  if (type == VTNT_LETTER_UPPER_A)
+	base = 'A';
+  else
+	base = 'a';
+  do {
+	temp[i++] = (counter-1) % 26 + base;
+  } while ((counter = ((counter-1) / 26)) > 0);
+
+  temp[i] = '\0';
+  reverse(temp);
+
+  return;
+}	/* End of MyVisTextFormatNumber.	*/
+
+
+/***********************************************************************
+ *		FormatSetTextBQ
+ ***********************************************************************
+ * SYNOPSIS:	
+ * CALLED BY:	
+ * RETURN:	
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	EY	5/21/96   	Initial Revision
+ *
+ ***********************************************************************/
+void
+FormatSetTextBQ (optr text, optr content)
+{
+  StyleType groupType;
+  int counter, level, i;
+  char displayType, tab[1] = { C_TAB };
+
+  /*
+   * Get the list group info before creating the list item.
+   */
+  @call content::MSG_GEN_HTML_CONTENT_GET_LIST_GROUP
+     (&groupType, &counter, &displayType, &level);
+  EC_WARNING_IF(groupType != STYLE_DL, UIG_UNBALANCED_LIST_STACK);
+  /*
+   * Set the left margin so the item text wraps around at the right place
+   */
+  @send text::MSG_VIS_TEXT_SET_LEFT_MARGIN(
+				TAB_SIZE * ( level + 1 ),
+				VIS_TEXT_RANGE_SELECTION,
+				VIS_TEXT_RANGE_SELECTION);
+  /*
+   * Since the new line break brought the cursor to position 1, we
+   * need to tab to the right position for the list item.
+   */
+  for(i = 0; i <= level; i++)
+      @call text::MSG_VIS_TEXT_APPEND_PTR(tab, 1);
+
+  return;
+}	/* End of FormatSetTextBQ	*/
+
+
+
+/***********************************************************************
+ *		UpdateItsPotentialPosition
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Figure out the object's new x pos in the current row.
+ * CALLED BY:	internal
+ * RETURN:	int - position of the object in the *row.
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	edwin	10/25/96   	Initial Revision
+ *
+ ***********************************************************************/
+int
+UpdateItsPotentialPosition (optr obj, SizeAsDWord size, int *row)
+{
+  int prevREdge;
+  CompSizeHintArgs sizeArgs;
+  /*
+   *  Find the obj's content object.
+   */
+  optr content = @call obj::MSG_GEN_FIND_PARENT();
+  /*
+   *  Find the parent's size.
+   */
+  sizeArgs.CSHA_width = 0;
+  while(1) {
+    if (@call content::MSG_META_IS_OBJECT_IN_CLASS(&HTGenHtmlContentClass)) {
+      /*
+       *  Good, the parent is a content object!
+       */
+      @call content::MSG_META_GET_VAR_DATA(HINT_FIXED_SIZE, 
+					sizeof(sizeArgs), &sizeArgs);
+      EC_WARNING_IF(sizeArgs.CSHA_width == 0, UIG_WRONG_ASSUMPTION);
+      break;
+    }
+    else if (@call content::MSG_META_IS_OBJECT_IN_CLASS(
+             &PresentationManagerClass)) {
+      /*
+       *  Oh, the parent is a PManager object itself!
+       */
+      @call content::MSG_META_GET_VAR_DATA(HINT_FIXED_SIZE, 
+					sizeof(sizeArgs), &sizeArgs);
+      EC_WARNING_IF(sizeArgs.CSHA_width == 0, UIG_WRONG_ASSUMPTION);
+      content = @call content::MSG_PM_GET_CONTENT_OBJECT();
+      break;
+    }
+    else
+      content = @call content::MSG_GEN_FIND_PARENT();
+  }
+  /*
+   *  Get the right edge coordinate of the previous sibling object.
+   */
+  prevREdge = @call content::MSG_GEN_HTML_CONTENT_GET_PREV_SIBLING_R_EDGE
+    (obj, size, row);
+
+  if (prevREdge>MARGIN && prevREdge+DWORD_WIDTH(size) > sizeArgs.CSHA_width){
+    prevREdge = @call content::MSG_GEN_HTML_CONTENT_START_NEW_ROW
+      (size, row);
+  }
+  else {
+    @call content::MSG_GEN_HTML_CONTENT_UPDATE_MAX_HEIGHT();
+  }
+
+  return prevREdge;
+}	/* End of UpdateItsPotentialPosition.	*/
+
+
+/***********************************************************************
+ *		GetItsPotentialHeight
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Calculate the top coordinate of the row in question.
+ * CALLED BY:	internal
+ * RETURN:	int - y document coordinate of the top edge of the row.
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	edwin	10/25/96   	Initial Revision
+ *
+ ***********************************************************************/
+int
+GetItsPotentialHeight (optr obj, int row)
+{
+  int rowHeight;
+  SizeAsDWord size;
+
+  optr content = @call obj::MSG_GEN_FIND_PARENT();
+  /*
+   *  Find a content object.
+   */
+  while(!@call content::MSG_META_IS_OBJECT_IN_CLASS(&HTGenHtmlContentClass)) {
+    if(@call content::MSG_META_IS_OBJECT_IN_CLASS(&PresentationManagerClass)){
+      content = @call content::MSG_PM_GET_CONTENT_OBJECT();
+      break;
+    }
+    content = @call content::MSG_GEN_FIND_PARENT();
+  }
+  rowHeight = @call content::MSG_GEN_HTML_CONTENT_GET_ROW_HEIGHT(row);
+  if (rowHeight == 0)
+    return 0;
+  size = @call obj::MSG_VIS_GET_SIZE();
+
+  return rowHeight - DWORD_HEIGHT(size) - MARGIN;
+}	/* End of GetItsPotentialHeight.	*/
+
+
+
+/***********************************************************************
+ *		ResetSiblingAbsoluteWidth
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Reset this file's global variables used to calculate
+ *              objects' position in document coordinates.
+ * CALLED BY:	internal
+ * RETURN:	none
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	edwin	10/24/96   	Initial Revision
+ *
+ ***********************************************************************/
+void
+ResetSiblingAbsoluteWidth (optr content)
+{
+  sum_of_widths_of_previous_siblings = 0;
+  width_of_current_oject = 0;
+  height_of_current_oject = 0;
+  current_object = NULL;
+  /*  @call content::MSG_CONTENT_UPDATE_HEIGHT_IN_ROW(max_height); */
+  max_height = 0;
+  return;
+}	/* End of ResetSiblingAbsoluteWidth.	*/
+
+

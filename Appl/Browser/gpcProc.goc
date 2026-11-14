@@ -1,0 +1,577 @@
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Geoworks 1996.  All rights reserved.
+	GEOWORKS CONFIDENTIAL
+
+PROJECT:	
+MODULE:		
+FILE:		
+
+AUTHOR:		
+
+ROUTINES:
+	Name			Description
+	----			-----------
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	
+
+DESCRIPTION:
+
+	This file has all the code for the process object and the
+	application object, and some other functions.
+
+
+	$Id: gpcProc.goc,v 1.3 98/08/18 16:11:40 edwin Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+@include "gpcDecl.goh"
+@include "gpcUI.goh"
+
+VMFileHandle      ISBookmarkFileHandle = NullHandle;
+
+/*
+ * Declarations of classes
+ */
+
+@classdecl	GPCProcessClass, neverSaved;
+@classdecl 	ISTextClass;
+@classdecl 	ISPrintCtrClass;
+@classdecl	ISGenViewClass;
+@classdecl      BrowserHTMLViewerClass;
+
+
+/*
+ *  The following are the process's instance data.  Brian said that 
+ *  the process class can't have instance data, so I put them in the
+ *  dgroup, i.e. the global variables.
+ */
+optr	_processViewer = NULL;
+
+
+@extern method GPCProcessClass, MSG_GPC_BACK;
+@extern method GPCProcessClass, MSG_GPC_FORWARD;
+@extern @method GPCProcessClass, MSG_GPC_FORCE_RELOAD;
+@extern method GPCProcessClass, MSG_GPC_OPEN_LOCATION_BEFORE;
+@extern method GPCProcessClass, MSG_GPC_OPEN_URL_FROM_URLBAR;
+@extern method GPCProcessClass, MSG_GPC_OPEN_LOCATION_CLOSE;
+@extern method GPCProcessClass, MSG_GPC_HISTORY_BEFORE;
+@extern method GPCProcessClass, MSG_GPC_HISTORY_CLOSE;
+@extern method GPCProcessClass, MSG_GPC_HISTORY_LIST_MONIKER_QUERY;
+@extern method GPCProcessClass, MSG_GPC_DOCUMENT_INFORMATION;
+@extern method GPCProcessClass, MSG_GPC_LOCAL_PREFERENCE_BEFORE;
+@extern method GPCProcessClass, MSG_GPC_LOCAL_PREFERENCE_CLOSE;
+@extern method GPCProcessClass, MSG_GPC_LP_PREV;
+@extern method GPCProcessClass, MSG_GPC_LP_NEXT;
+@extern method GPCProcessClass, MSG_GPC_CLEAR_CACHE;
+@extern method GPCProcessClass, MSG_GPC_SET_HOME_PAGE_BEFORE;
+@extern method GPCProcessClass, MSG_GPC_SET_HOME_PAGE_CLOSE;
+@extern method GPCProcessClass, MSG_GPC_GOTO_HOME_PAGE;
+@extern method GPCProcessClass, MSG_GPC_SET_CACHE_SIZE_BEFORE;
+@extern method GPCProcessClass, MSG_GPC_SET_CACHE_SIZE_CLOSE;
+@extern method GPCProcessClass, MSG_GPC_SET_PROXY_SERVER_BEFORE;
+@extern method GPCProcessClass, MSG_GPC_SET_PROXY_SERVER_CLOSE;
+@extern method GPCProcessClass, MSG_GPC_SET_PROXY_SERVER_UPDATE;
+@extern method GPCProcessClass, MSG_GPC_SET_IMAGES_PREFS_FROM_MENUS;
+
+
+
+/***********************************************************************
+ *		MSG_GEN_PROCESS_OPEN_APPLICATION for GPCProcessClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    
+ * PARAMETERS:	    
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:	    
+ *
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	edwin   	8/13/98   	Initial Revision
+ *	
+ ***********************************************************************/
+@method GPCProcessClass, MSG_GEN_PROCESS_OPEN_APPLICATION
+{
+    @callsuper();
+    /*
+     *  Create the HTML Viewer
+     */
+    _processViewer = ObjInstantiate(/* HandleOf(GeodeGetOptrNS(@GPCGenView))*/
+			    OptrToHandle(@GPCGenView), &BrowserHTMLViewerClass);
+    if (_processViewer) {
+	SizeAsDWord size = @call GPCGenView::MSG_VIS_GET_SIZE();
+	@call _processViewer::HTMLViewer(0,
+				 0,
+				 DWORD_WIDTH(size),
+				 DWORD_HEIGHT(size));
+	@send _processViewer::ViewerInitialize(oself, @GPCGenView);
+    }
+    return;
+}	/* End of MSG_GEN_PROCESS_OPEN_APPLICATION.	*/
+
+
+/***********************************************************************
+ *		MSG_GEN_PROCESS_CLOSE_APPLICATION for GPCProcessClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    
+ * PARAMETERS:	    
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:	    
+ *
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	edwin   	8/13/98   	Initial Revision
+ *	
+ ***********************************************************************/
+@method GPCProcessClass, MSG_GEN_PROCESS_CLOSE_APPLICATION
+{
+    @call _processViewer::MSG_META_OBJ_FREE();
+    return @callsuper();
+}
+
+
+/***********************************************************************
+ *		MSG_PROCESS_CREATE_UI_THREAD for GPCProcessClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    Increase stack size.
+ * PARAMETERS:	    
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	edwin	10/21/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method GPCProcessClass, MSG_PROCESS_CREATE_UI_THREAD
+{
+  stackSize = 3000;     /* print controller need more stack size */
+  return @callsuper();
+}
+	/* End of MSG_PROCESS_CREATE_UI_THREAD.	*/
+
+
+
+
+/***********************************************************************
+ *		MSG_GPC_OPEN_URL for GPCProcessClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    
+ * PARAMETERS:	    void (HTMemHandle sreqHtmh, URLSourceType source)
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:	Submits a request to WWW Library. 
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	mzhu	10/ 7/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method GPCProcessClass, MSG_GPC_OPEN_URL
+{
+}	/* End of MSG_GPC_OPEN_URL.	*/
+
+
+
+/***********************************************************************
+ *		MSG_GPC_LOAD_ALL_IMAGE for GPCProcessClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    Load all the images in the current page.
+ * PARAMETERS:	    
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:	    Basically, this is a function to resume the loading.
+ *
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	mzhu    	3/31/97   	Initial Revision
+ *	
+ ***********************************************************************/
+@method GPCProcessClass, MSG_GPC_LOAD_ALL_IMAGE
+{
+}	/* End of MSG_GPC_LOAD_ALL_IMAGE.	*/
+
+
+/***********************************************************************
+ *		MSG_GPC_LOAD_IMAGE for GPCProcessClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    To load a single image.
+ * PARAMETERS:	    
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:	    
+ *
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	mzhu    	3/31/97   	Initial Revision
+ *	
+ ***********************************************************************/
+@method GPCProcessClass, MSG_GPC_LOAD_IMAGE
+{
+}	/* End of MSG_GPC_LOAD_IMAGE.	*/
+
+
+/***********************************************************************
+ *		MSG_GPC_STOP for GPCProcessClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    Stop the current request
+ * PARAMETERS:	    nothing
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:	    
+ *
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	mzhu    	2/26/97   	Initial Revision
+ *	
+ ***********************************************************************/
+@method GPCProcessClass, MSG_GPC_STOP
+{
+}
+
+
+
+/***********************************************************************
+ *		MSG_GPC_DISPLAY_BOOKMARKS for GPCProcessClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    GenDynamicList query message.
+ * PARAMETERS:	    int item - item to be put up
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	ambrose	8/27/97   	Initial Revision
+ *
+ ***********************************************************************/
+@method GPCProcessClass, MSG_GPC_DISPLAY_BOOKMARKS
+{
+
+}	/* End of MSG_GPC_DISPLAY_BOOKMARKS.	*/
+
+
+
+
+/***********************************************************************
+ *		MSG_PRINT_START_PRINTING for GPCProcessClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    Print UI tree.
+ * PARAMETERS:	    (optr printControlOD, GStateHandle gstate)
+ * SIDE EFFECTS:
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	edwin	12/ 6/96   	Initial Revision
+ *	sean	11/10/97	Fix for #72158
+ *
+ ***********************************************************************/
+@method GPCProcessClass, MSG_PRINT_START_PRINTING
+{
+  return;
+}	/* End of MSG_PRINT_START_PRINTING.	*/
+
+
+
+/***********************************************************************
+ *		MSG_PRINT_GET_DOC_NAME for GPCProcessClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    Report to the spooler the name of the print job
+ * PARAMETERS:	    (optr printControlOD)
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	edwin	12/ 6/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method GPCProcessClass, MSG_PRINT_GET_DOC_NAME
+{
+  @send ISLIPrintButton::MSG_PRINT_CONTROL_SET_DOC_NAME
+	("Internet");
+  return;
+}	/* End of MSG_PRINT_GET_DOC_NAME.	*/
+
+
+
+/***********************************************************************
+ *	MSG_PRINT_CONTROL_CHECK_IF_DO_WILL_FIT for ISPrintCtrClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    Don't call super to prompt a confirmation dialog.
+ * PARAMETERS:	    Boolean (Boolean warning)
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	edwin	12/ 9/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method ISPrintCtrClass, MSG_PRINT_CONTROL_CHECK_IF_DOC_WILL_FIT
+{
+@if 0
+  TempPrintCtrlInstance *print;
+  JobParameters *job;
+  print = (TempPrintCtrlInstance *)
+    ObjVarFindData(oself, TEMP_PRINT_CONTROL_INSTANCE);
+  job = MemLock(print->TPCI_jobParHandle);
+  job->JP_spoolOpts = job->JP_spoolOpts & ~SO_SCALE;
+  MemUnlock(print->TPCI_jobParHandle);
+@endif
+  return TRUE;
+}	/* End of MSG_PRINT_CONTROL_CHECK_IF_DO_WILL_FIT.	*/
+
+
+
+/***********************************************************************
+ *		MSG_SEARCH for GPCProcessClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    Pass the search message to PManager.
+ * PARAMETERS:	    (MemHandle searchInfo)
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	edwin	12/12/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method GPCProcessClass, MSG_SEARCH
+{
+}	/* End of MSG_SEARCH.	*/
+
+
+
+/***********************************************************************
+ *		MSG_META_CLIPBOARD_COPY for GPCProcessClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    Copy all text in the document to global paste buffer
+ * PARAMETERS:	    void ()
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	edwin	12/24/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method GPCProcessClass, MSG_META_CLIPBOARD_COPY
+{
+}	/* End of MSG_META_CLIPBOARD_COPY.	*/
+
+
+
+
+/***********************************************************************
+ *		MSG_GPC_OPEN_LOCAL_FILE for GPCProcessClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    
+ * PARAMETERS:	    
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:	    Launched by OK in the File Selector, this method 
+ * 			grabs the file name from the selector and opens
+ * 			the page.
+ *
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	jeremyb 	11/ 7/97   	Initial Revision
+ *	
+ ***********************************************************************/
+@method GPCProcessClass, MSG_GPC_OPEN_LOCAL_FILE
+{    
+
+}	/* End of MSG_GPC_OPEN_LOCAL_FILE.	*/
+
+/***********************************************************************
+ *		MSG_GPC_LOCAL_FILE_OPEN for GPCProcessClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    
+ * PARAMETERS:	    
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:	    
+ *
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	jeremyb 	12/ 1/97   	Initial Revision
+ *	
+ ***********************************************************************/
+@method GPCProcessClass, MSG_GPC_LOCAL_FILE_OPEN
+{
+
+}	/* End of MSG_GPC_LOCAL_FILE_OPEN.	*/
+
+
+
+/***********************************************************************
+ *		MSG_GPC_SAVE_LOCAL_FILE for GPCProcessClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    
+ * PARAMETERS:	    
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:   - Figure out if current file is in cache (no? then quit)
+ *             - Ask file selector what the current path is
+ *             - Use FileCopy to copy the disk cached version to dest.
+ *
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	jeremyb 	11/11/97   	Initial Revision
+ *	
+ ***********************************************************************/
+@method GPCProcessClass, MSG_GPC_SAVE_LOCAL_FILE
+{
+}	/* End of MSG_GPC_SAVE_LOCAL_FILE.	*/
+
+
+/***********************************************************************
+ *		MSG_GPC_SAVE_IMAGE for GPCProcessClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    
+ * PARAMETERS:	    
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:	    
+ *
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	jeremyb 	11/17/97   	Initial Revision
+ *	
+ ***********************************************************************/
+@method GPCProcessClass, MSG_GPC_SAVE_IMAGE
+{
+}	/* End of MSG_GPC_SAVE_IMAGE.	*/
+
+/***********************************************************************
+ *		MSG_GPC_COPY_ALL_TEXT for GPCProcessClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    
+ * PARAMETERS:	    
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:	    Copy all the text in the current document
+ *
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	jeremyb 	11/25/97   	Initial Revision
+ *	
+ ***********************************************************************/
+@method GPCProcessClass, MSG_GPC_COPY_ALL_TEXT
+{
+}	/* End of MSG_GPC_COPY_ALL_TEXT.	*/
+
+/***********************************************************************
+ *		MSG_GPC_INITIALIZE_SAVE_IMAGE_BOX for GPCProcessClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    
+ * PARAMETERS:	    
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:	    Copy all the text in the current document
+ *
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	jeremyb 	11/25/97   	Initial Revision
+ *	
+ ***********************************************************************/
+@method GPCProcessClass, MSG_GPC_INITIALIZE_SAVE_IMAGE_BOX
+{   	
+} /* end MSG_GPC_INITIALIZE_SAVE_IMAGE_BOX */
+
+
+/***********************************************************************
+ *		MSG_GPC_FIND_NEXT for GPCProcessClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    
+ * PARAMETERS:	    
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:	    Bring up box, then hit find next.
+ *
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	jeremyb 	12/30/97   	Initial Revision
+ *	
+ ***********************************************************************/
+@method GPCProcessClass, MSG_GPC_FIND_NEXT
+{
+}
+
+/***********************************************************************
+ *		MSG_GPC_FTP_ACCEPTED_FILENAME for GPCProcessClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    
+ * PARAMETERS:	    
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:	    Check medium to see if there's enough storage spac
+ *                  If so, send the filename back to ftp in a handle
+ *                  ( But who frees it??)
+ *
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	jeremyb 	7/15/98   	Initial Revision
+ *	
+ ***********************************************************************/
+@method GPCProcessClass, MSG_GPC_SAVE_FTP_FILE
+{
+    
+}	/* End of MSG_GPC_FTP_ACCEPTED_FILENAME.	*/
+
+
+
+

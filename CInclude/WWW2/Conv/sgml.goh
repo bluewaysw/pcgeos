@@ -1,0 +1,475 @@
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Geoworks 1996.  All rights reserved.
+	GEOWORKS CONFIDENTIAL
+
+PROJECT:	WWW Library
+MODULE:		SGML
+FILE:		sgml.goh
+
+AUTHOR:		Kok Kin Kee: Feb 13, 1998
+
+ROUTINES:
+	Name			Description
+	----			-----------
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	kkee   	2/13/98		Initial version
+
+DESCRIPTION:
+
+	SGML.
+
+	$Id: sgml.goh,v 1.1 98/08/04 17:28:43 edwin Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+@ifndef _SGML_H_
+@define _SGML_H_
+
+@include "WWW2/Conv/htmldtd.goh"
+@include "WWW2/WW2Core/ww2strm.goh"
+
+/***************************************************************************
+CLASS
+    Target
+
+    Defines 3 methods for the streaming of tags and data.
+
+KEYWORDS
+    
+
+CLASS TREE
+<pre>
+    Target
+</pre>
+****************************************************************************/
+@class TargetClass, MetaClass; 
+
+/* public: */
+
+    /*////////
+    //
+    // Destructor.
+    //
+    // Parameters_
+    //
+    // [out] 
+    // [in]  
+    //
+    // Return_value_ 
+    //
+    // See_also_ 
+    //
+    // Overrides_
+    //
+    // Status_ Functional.
+    //
+
+    virtual ~Target() {};
+
+    */
+
+    /*////////
+    //
+    // Accept a start element.
+    //
+    // Parameters_
+    //
+    // [out] 
+    // [in]  token   HTMLToken
+    // [in]  entity  Array of SGMLEntity, which are the attributes
+    //               of token. The entity array is terminated by
+    //               entity[i].SGMLE_token = 0.
+    //
+    // Return_value_ TRUE ok, FALSE to stop.
+    //
+    // See_also_ 
+    //
+    // Overrides_
+    //
+    // Status_ Functional.
+    */
+    @message Boolean PutStartElement(const HTMLToken token,
+                                     const SGMLEntity entity[]); /* = 0; */
+
+    /*////////
+    //
+    // Accept an end element.
+    //
+    // Parameters_
+    //
+    // [out] 
+    // [in]  token   HTMLToken
+    //
+    // Return_value_ TRUE ok, FALSE to stop.
+    //
+    // See_also_ 
+    //
+    // Overrides_
+    //
+    // Status_ Functional.
+    */
+    @message Boolean PutEndElement(const HTMLToken token); /*  = 0; */
+
+    /*////////
+    //
+    // Accept a block html data.
+    //
+    // Parameters_
+    //
+    // [out] 
+    // [in]  data    Buffer containing data.
+    // [in]  length  Size of data.
+    //
+    // Return_value_ TRUE ok, FALSE to stop.
+    //
+    // See_also_ 
+    //
+    // Overrides_
+    //
+    // Status_ Functional.
+    */
+    @message Boolean PutBlock(const byte *data, word length); /* = 0; */
+
+/* protected: */
+
+    /*////////
+    //
+    // Constructor.
+    //
+    // Parameters_
+    //
+    // [out] 
+    // [in]  
+    //
+    // Return_value_ 
+    //
+    // See_also_ 
+    //
+    // Overrides_
+    //
+    // Status_ Functional.
+    */
+    @message void Target();
+
+@endc;
+
+    /*////////
+    //
+    // SGMLResultCode
+    //
+    // [] SGML_OK
+    // [] SGML_OUT_OF_MEMORY
+    */
+typedef enum {
+    SGML_OK,    
+    SGML_OUT_OF_MEMORY
+} SGMLResultCode;
+
+    /*////////
+    //
+    // SGML scanner tokens.
+    //
+    // [] SGMLT_CLOSE_BRACKET                >
+    // [] SGMLT_EQUAL                        =
+    // [] SGMLT_DOUBLE_QUOTE                 "
+    // [] SGMLT_SINGLE_QUOTE                 '
+    // [] SGMLT_STRING                       A string
+    // [] SGMLT_XXX_EOF                      End of file
+    */
+typedef enum {
+    /* SGML Tokens */
+
+     SGMLT_CLOSE_BRACKET                     /* > */
+    ,SGMLT_EQUAL                             /* = */
+    ,SGMLT_DOUBLE_QUOTE                      /* " */
+    ,SGMLT_SINGLE_QUOTE                      /* ' */
+    ,SGMLT_STRING                            /* an sgml string */
+
+    /* Data indicators */
+
+    ,SGMLT_XXX_EOF              /* End of file (or data) */
+
+} SGMLToken;
+
+/*
+ * Max number of attributes per element. Is 20 reasonable? Yes.
+ * And its tunable as well.
+ */
+#define MAX_SGML_ATTRIBUTES                   20
+
+/* 
+ * If we can process data faster than the network can provide, 
+ * this buffer should be small. The HTSocket buffer is 512 bytes.
+ * So I am estimating that the network is about 4 times faster
+ * than processing. Well, no...The main reason why I made this buffer 
+ * 4 times bigger than socket's buffer is because we don't want 
+ * the Library to block in pumping data to the client as the Library
+ * is a single thread serving multiple requests.
+ */
+
+#define SGML_SCANNER_QUEUE_SIZE               1024  /* tunable */
+#define SGML_TEXT_BUFFER_SIZE                 512   /* tunable */
+#define SGML_MAX_NUMBER_UNGET_CHARS           256   /* a safer size */
+#define SGML_MAX_ELEMENT_NESTING_LEVEL        100
+
+/*
+ * The SGMLParseReference routine parses the entity or character
+ * reference and returns one of the following types of references.
+ * The type of reference determines what other information is 
+ * returned by this routine.
+ */
+typedef enum {
+	PARSE_REF_ENTITY_REF,		/* char ref e.g. "&auml"  */
+	PARSE_REF_CHAR_REF,             /* char ref e.g. "&#123"  */
+	PARSE_REF_WHITE_SPACE,		/* nothing  e.g. "& "     */
+	PARSE_REF_LEFT_BRACKET,  	/* left bracket e.g. "&<" */
+	PARSE_REF_NON_REFERENCE, 	/* not a ref e.g. "&abc%" */
+} ParseRefType;
+
+/*
+ * ElementError for SGMLPushEndElement
+ */
+typedef enum {
+    ELEMENT_ACCEPTED=0,
+    ELEMENT_OUT_OF_SCOPE,
+    ELEMENT_REJECTED
+} ElementError;
+
+
+
+/* Shortcuts */
+#define TAGLIST            _dtd->SGMLD_tagList
+#define NUMOFTAGS          _dtd->SGMLD_numOfTags
+#define ENTITYLIST         _dtd->SGMLD_entityList
+#define ENTITYTRANSLATE    _dtd->SGMLD_entityTranslate
+/* #define CHARACTERTRANSLATE _dtd->SGMLD_characterTranslate */
+#define NUMOFENTITIES      _dtd->SGMLD_numOfEntities
+
+
+/***************************************************************************
+CLASS
+    Sgml
+
+    The code is ported from Geos SGML parser.
+
+KEYWORDS
+    SGML, HTML
+
+CLASS TREE
+<pre>
+    Sgml
+</pre>
+****************************************************************************/
+@class SgmlClass, MetaClass;
+
+/* public: */
+
+    /*////////
+    //
+    // Constructor.
+    //
+    // Parameters_
+    //
+    // [out] 
+    // [in]
+    //
+    // Return_value_ 
+    //
+    // See_also_ 
+    //
+    // Overrides_
+    //
+    // Status_ Functional
+    */
+    @message void Sgml();
+    
+    /*////////
+    //
+    // Destructor.
+    //
+    // Parameters_
+    //
+    // [out] 
+    // [in]  
+    //
+    // Return_value_ 
+    //
+    // See_also_ 
+    //
+    // Overrides_
+    //
+    // Status_ Functional
+    //
+
+    ~Sgml();
+
+    */
+
+    /*////////
+    //
+    // Parse sgml data in stream. Rules for parsing is defined
+    // by the dtd. Parsed data in pushed to target.
+    //
+    // Parameters_
+    //
+    // [out] 
+    // [in]  stream   WWStream to read data object from. The data
+    //                object must be of type text/html or text/plain.
+    // [in]  dtd      DTD of data to parse. For example, HTML DTD3.2
+    // [in]  target   Target to accept data via methods:
+    //                    Target::PutStartElement()
+    //                    Target::PutEndElement()
+    //                    Target::PutBlock()
+    //
+    // Return_value_ SGML_OUT_OF_MEMORY
+    //               SGML_OK
+    //
+    // See_also_ 
+    //
+    // Overrides_
+    //
+    // Status_ Functional
+    */
+    @message SGMLResultCode Parse 
+      (optr /* WWStream * */stream, SGMLDTD *dtd, optr /* Target * */ target);
+    
+/*===========================================================================
+//
+//                       W A R N I N G 
+// 
+// THE LIBERTY EXTERNAL API IS FOUND ABOVE THIS BARRIER. ANYTHING BELOW
+// THIS NOTICE IS IMPLEMENTATION DEPENDENT AND SUBJECT TO CHANGE.
+//
+//
+//=========================================================================*/
+
+/* private: */
+    /*
+    // Don't let users call copy the object in any way.  These methods
+    // aren't actually defined since they should never be called, but
+    // declaring them private should catch anyone who tries to call
+    // them.
+    */
+/*
+    Sgml(const Sgml&);
+    const Sgml& operator=(const Sgml&);
+*/
+    
+/*===========================================================================
+//
+// Parser methods
+//
+//=========================================================================*/
+
+    @message Boolean SGMLHandleStartElement(const SGMLTag *tptr);
+    @message ElementError SGMLPushEndElement(const SGMLTag *tptr);
+    @message void SGMLHandleEndElement(const SGMLTag *tptr);
+    @message void SGMLHandleText();
+    @message void SGMLParseLiteral();
+/*    void SGMLParsePreformatted();       can't find the handler */
+    @message void SGMLParseIgnore();
+    @message Boolean SGMLParseOpenBracket();
+    @message void SGMLParseComment();
+    @message void SGMLParseText();
+    @message Boolean SGMLParseStartElement();
+    @message void SGMLParseEndElement();
+    @message void SGMLParseElementAttrs(const SGMLTag *tptr);
+    @message void SGMLIgnoreElementCommon();
+    @message void SGMLIgnoreStartElement();
+    @message void SGMLIgnoreEndElement();
+    @message void SGMLPutTokenText();
+    @message void SGMLGarbageCollectStack (const SGMLTag *tptr);
+    @message void SGMLIgnoreAttr();
+    
+/*===========================================================================
+//
+// Scanner methods
+//
+//=========================================================================*/
+
+    @message byte SGMLScanGetChar();
+    @message byte SGMLScanGetReduceWhiteChar();
+    @message byte SGMLScanGetNonWhiteChar();
+    @message void SGMLScanUngetChar(byte chr);
+    @message void SGMLScanGobbleSym();
+    @message void SGMLScanGobbleValue(byte *buffer);
+    @message void SGMLScanGobbleQuotedValue(byte *buffer, byte quote);
+    @message sword SGMLSearchTag(const SGMLTag *tptr, word numOfTags, byte *thisWord);
+    @message sword SGMLSearchEntity(const char **entity, word numOfEntities, 
+                           byte *thisWord);
+    @message sword SGMLSearchAttr(const SGMLAttr *attrs, word numOfAttrs, 
+                         byte *thisWord);
+    @message ParseRefType SGMLParseReference(byte *refChar);
+
+
+/*===========================================================================
+//
+// Instance data.
+//
+//=========================================================================*/
+
+    /* Stream for reading data and dtd for deciding how to parse. */
+    @instance optr /* WWStream * */ __stream;
+
+    /* 
+     * The word gobbled in the last call to SGMLScanGobbleSym if 
+     * SGMLS_thisSym = SGMLT_STRING.
+     */
+    @instance byte __thisWord[MAX_SGML_NAME_LENGTH];
+
+    /*
+     * The token gobbled in last call to SGMLScanGobbleSym.
+     */
+    @instance SGMLToken __thisSym;
+
+    /*
+     * Element stack. Keeps track of elements parsed and do some
+     * error checking for illegal nesting of tags. We optimize
+     * by using a fixed array. Dynamic array is too slow. But...
+     * how big is good enough?
+     */
+    @instance const SGMLTag *__elementStack[SGML_MAX_ELEMENT_NESTING_LEVEL];
+    @instance byte __stackPos;  /* Points to next empty slot */
+    @instance SGMLContent __content;  /* current content */
+
+    /*
+     * Delayed end element stack. The stack maintains end elements that
+     * come in the wrong scope. The tags will be corrected when we get back
+     * to the right scope.
+     */
+    @instance const SGMLTag *__delayStack[SGML_MAX_ELEMENT_NESTING_LEVEL];
+    @instance byte __delayPos;  /* Point to next empty slot */
+    
+    /*
+     * TRUE when there is no more data to read.
+     */
+    @instance Boolean __endOfFile;
+
+    /* The DTD structure that determines the scanning/parsing process */
+    @instance SGMLDTD *__dtd;
+	
+    /* Target for pushing structured data */
+    @instance optr /* Target * */ __target;
+
+    /* For ungetting characters */
+    @instance byte __ungottenChar[SGML_MAX_NUMBER_UNGET_CHARS];
+    @instance byte __numOfUngotten;
+
+    /* Buffering text */
+    @instance byte __textBuffer[SGML_TEXT_BUFFER_SIZE]; 
+    @instance word __textLength;
+    @instance Boolean __hasTrailingWhiteSpace;
+
+    /* Buffering the attributes of an element */
+    @instance SGMLEntity __attr[MAX_SGML_ATTRIBUTES];
+
+@endc;
+
+
+
+
+@endif /* _SGML_H_ */

@@ -1,0 +1,892 @@
+/***********************************************************************
+ *
+ *	Copyright (c) Geoworks 1998.  All rights reserved.
+ *	GEOWORKS CONFIDENTIAL
+ *
+ * PROJECT:	  Geos-SC WWW Library
+ * MODULE:	  HTML frame
+ * FILE:	  htframe.h
+ *
+ * AUTHOR:  	  Mingzhe Zhu: Feb 02, 1998
+ *
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	mzhu    	2/02/98		Initial version
+ *	kkee    	3/16/98		Changed to use HTGlyph
+ *
+ * DESCRIPTION:
+ *
+ *	HTML Frame. A document can have multiple frames.
+ *      //depot/liberty/project/ellery/980805/library/www/html/htframe.h#1
+ *
+ * 	$Id: htframe.goh,v 1.2 98/09/02 11:17:12 edwin Exp $
+ *
+ ***********************************************************************/
+@ifndef _HTFRAME_H_
+@define _HTFRAME_H_
+
+/*
+#include <kernel/sema4.h>
+#include <kernel/log.h>
+#include <toolkit/adpmouse.h>
+#include <toolkit/adpmsmtn.h>
+#include <toolkit/adpkey.h>
+#include <toolkit/evtmouse.h>
+#include <toolkit/lisadjmt.h>
+
+#include <www/conv/sgml.h>
+#include <www/wwcore/wwlist.h>
+#include <www/conv/htmldtd.h>
+#include <www/wwmem.h>
+#include "wwframe.h"
+#include "htglyph.h"
+#include "htcomp.h"
+#include "anchor.h"	// Added by ClassView
+#include "htcolumn.h"
+#include "htmap.h"
+#include "ctlist.h"
+#include "htimg.h"
+#include "htfont.h"
+
+class FlexPanel;
+class FlexScrollbar;
+class HTFormat;               // #include "htformat.h"
+class File;
+class HTForm;
+class HTUITree;      // In this same file
+class DummyUI;
+class HTGlyphContext;
+class HTFormatContext;
+class HTPreformatContext;
+class HTRequestManager;
+
+*/
+
+@include "WWW2/Conv/wwframe.goh"
+@include "WWW2/ww2mem.h"
+
+@define NOT_DEFINED_YET 0
+
+    // Mapping of functions
+//    typedef Boolean (HTFrame::*StartFunc) (const SGMLEntity[]);
+//    typedef Boolean (HTFrame::*EndFunc) ();
+
+    typedef Boolean (*StartFunc) (const SGMLEntity[]);
+    typedef Boolean (*EndFunc) ();
+
+    typedef struct {
+        HTMLToken   token;
+        StartFunc   startFunc;
+        EndFunc     endFunc;
+    } UIFunctionMap;
+
+    typedef struct {
+        sbyte nestingLevel; // If zero, won't accept table related tags
+    } HTTableCorrection;
+
+/***************************************************************************
+CLASS
+    HTFrame
+
+    HTML frame, corresponding to HTML <FRAME> tag. A document can have
+    multiple frames.
+
+KEYWORDS
+
+
+CLASS TREE
+<pre>
+    WWFrame
+       |
+       +---HTFrame
+
+    Target
+       |
+       +---HTFrame
+
+    WWListElement
+       |
+       +---HTFrame
+</pre>
+****************************************************************************/
+@class HTFrameClass, WWFrameClass;
+//                public Target,
+//                public WWListElement,
+//                public MouseAdapter,
+//                public MouseMotionAdapter,
+//                public KeyAdapter,
+//                public AdjustmentListenerInterface
+
+// public:
+    //////////
+    //
+    // Constructor
+    //
+    // Parameters_
+    //
+    // [in]  requestManager
+    // [in]  urlH      This will be deleted by HTFrame later.
+    // [in]  coordX    Position of screen at x coordinate
+    // [in]  coordY    Position of screen at y coordinate
+    // [in]  width     Width of screen
+    // [in]  height    Height of screen
+    //
+    // Return_value_
+    //
+    // See_also_
+    //
+    // Overrides_
+    //
+    // Status_ Functional
+    //
+    @message void HTFrame(optr /* HTRequestManager * */ reqManager,
+			  WWMemHandle urlH,
+			  word coordX, word coordY,
+			  word width, word height);
+
+    //////////
+    //
+    // Destructor.
+    //
+    // Parameters_
+    //
+    // Return_value_
+    //
+    // See_also_
+    //
+    // Overrides_
+    //
+    // Status_ Functional
+    //
+//    ~HTFrame();
+
+    //////////
+    //
+    // Initialize a frame. This method must be called before other
+    // methods can be used.
+    //
+    // Parameters_
+    //
+    // Return_value_ TRUE if initialized
+    //               FALSE if failed to initialize due to lack of memory.
+    //
+    // See_also_
+    //
+    // Overrides_
+    //
+    // Status_ Functional
+    //
+    @message Boolean FrameInitialize();
+
+    //////////
+    //
+    // Set the bounds of a HTFrame.
+    //
+    // Parameters_
+    //
+    // [out] 
+    // [in]  
+    //
+    // Return_value_ 
+    //
+    // See_also_ 
+    //
+    // Overrides_
+    //
+    // Status_ Functional
+    //
+    @message void HTFrameSetBounds(const HTCoord *bounds);
+
+    //////////
+    //
+    // Draw a frame
+    //
+    // Parameters_
+    //
+    // Return_value_ 
+    //
+    // See_also_ 
+    //
+    // Overrides_
+    //
+    // Status_ Functional
+    //
+    @message void DrawFrame();
+    @message void DrawText();
+
+    //////////
+    //
+    // Draw a htglyph under a frame. The glyph must be in the uitree
+    // of the frame for it to be drawn.
+    //
+    // Parameters_
+    //
+    // [in]  glyph           The glyph to draw.
+    // [in]  absCoord        The absolute coords of the glyph.
+    //
+    // See_also_ Draw()
+    //
+    // Status_ Functional
+    //
+    @message void DrawGlyph(optr /* HTGlyph * */ glyph, const HTCoord *absCoord);
+
+    //////////
+    //
+    // Accept a request to draw from a glyph in the uitree.
+    //
+    // Parameters_
+    //
+    // [in]  glyph     The glyph that needs to draw
+    // [in]  absCoord  The absolute coords of the glyph.
+    //
+    // Status_ Functional
+    //
+    @message /* virtual */ void HTFrameRequestDraw
+                (optr /* HTGlyph * */ glyph, const HTCoord *absCoord);
+
+    @message Boolean IsProgressiveDisplay(); // const 
+//    {
+//        return _progressiveDisplay;
+//    }
+
+    //////////
+    //
+    // We are done getting all the tokens and data. This allows
+    // HTFrame to cleanup data allocated during formatting.
+    //
+    // Parameters_
+    //
+    // Return_value_ Nothing
+    //
+    // See_also_
+    //
+    // Overrides_ WWFrame::Done()
+    //
+    // Status_ Functional
+    //
+    @message /* virtual */ void HTFrameDone();
+
+
+    //////////
+    //
+    // Local version of GetURL.
+    //
+    // Parameters_
+    // 
+    // [in]  url
+    // [in]  loadMode
+    // [in]  target            For receiving response stream.
+    //
+    // Return_value_ TRUE if ok, FALSE if out of memory.
+    //
+    // See_also_ PostURL()
+    //
+    // Status_ Functional
+    //
+    @message void HTFrameGetURL(const char *url,
+                      LoadMode loadMode /* = LOAD_ANY_VERSION */,
+                      optr /* RequestResponse * */ target /* = NULL */);
+
+    // Get URL and notify the viewer.
+    @message void HTFrameGetURLNotify(const char *url,
+			       LoadMode loadMode /* = LOAD_ANY_VERSION */,
+			       optr /* RequestResponse * */ target /* =NULL*/);
+
+    //////////
+    //
+    // Local version of PostURL().
+    //
+    // Parameters_
+    // 
+    // [in]  url          Valid url as per RFC1738. If the URL has no
+    //                    scheme, the default scheme is http://.
+    // [in]  buffer       Form data to send. Must be encoded for 
+    //                    content-type application/x-www-form-urlencoded.
+    //                    Or path to local temporary filename.
+    // [in]  len          Length of the buffer.
+    // [in]  file         Whether to post a file. Values:
+    //                    * TRUE: Post the file whose path is specified 
+    //                      in buffer, then delete the file. 
+    //                      This is not implemented.
+    //                    * FALSE: Post the raw data in buffer.
+    //
+    // Return_value_ TRUE if ok, FALSE if out of memory.
+    //
+    // See_also_ PostURL()
+    //
+    // Status_ Functional
+    //
+    @message void HTFramePostURL(const char *url,
+			  const byte *buffer,
+			  const dword len,
+			  Boolean file /* = FALSE */);
+
+    // Post URL and notify viewer.
+    @message void PostURLNotify(const char *url,
+                    const byte *buffer,
+                    const dword len,
+                    Boolean file /* = FALSE */ );
+
+    //////////
+    //
+    // Get request manager.
+    //
+    // Return_value_ request manager.
+    //
+    // Status_ Functional
+    //
+    @message optr /* HTRequestManager* */ HTFrameGetRequestManager(); // const {return _reqManager;}
+
+    //////////
+    //
+    // Get base URL.
+    //
+    // Parameters_
+    //
+    // Return_value_
+    //
+    // See_also_
+    //
+    // Overrides_
+    //
+    // Status_ Functional
+    //
+    @message WWMemHandle GetBaseUrlH(); // {return _baseUrlH;};
+
+    //////////
+    //
+    // Get URL.
+    //
+    // Parameters_
+    //
+    // Return_value_
+    //
+    // See_also_
+    //
+    // Overrides_
+    //
+    // Status_ Functional
+    //
+    @message WWMemHandle GetUrlH(); // {return _urlH;};
+
+    //////////
+    //
+    // Get Anchor List
+    //
+    // Parameters_
+    //
+    // Return_value_
+    //
+    // See_also_
+    //
+    // Overrides_
+    //
+    // Status_ Functional
+    //
+    @message optr /* HTMLAnchorList * */ GetAnchorList(); // {return &_anchorList;};
+
+    //////////
+    //
+    // Ask the frame to find the matching anchor object.
+    //
+    // Parameters_ char* name.
+    //
+    // Return_value_ TRUE if Found, FALSE otherwise.
+    //
+    // See_also_
+    //
+    // Overrides_
+    //
+    // Status_ Functional
+    //
+    @message optr /* HTMLAnchorItem* */ HTFrameFindNameAnchor(char *name);
+
+    //////////
+    //
+    // Scroll the document to bring the passed coordinate onto the screen.
+    //
+    // Parameters_ HTCoord
+    //
+    // Return_value_ 
+    //
+    // See_also_
+    //
+    // Overrides_
+    //
+    // Status_ Functional
+    //
+    @message void DisplayPosition(HTCoord *rect);
+
+    //////////
+    //
+    // Append a message to the ui message queue to scroll the document to 
+    // bring the passed coordinate onto the screen.
+    //
+    // Parameters_ HTCoord
+    //
+    // Return_value_ 
+    //
+    // See_also_  DisplayAnchorPosition, which is the callback function.
+    //
+    // Overrides_
+    //
+    // Status_ Functional
+    //
+    @message void DisplayPositionOnUIThread(HTCoord *rect);
+
+    //////////
+    //
+    // Setting the frame's visibility.
+    //
+    // Parameters_ visible: TRUE/FALSE
+    //
+    // Return_value_ 
+    //
+    // See_also_  
+    //
+    // Overrides_
+    //
+    // Status_ Functional
+    //
+    @message void HTFrameSetVisible(Boolean visible);
+
+    @message WWMemHandle GetUseMapHrefAt(const char *name, HTPoint point);
+//    {
+//        return _mapList.GetHrefFromMapAt(name, point);
+//    };
+
+@if 0
+    // Inherited listener functions
+    void MousePressed(MouseEvent& event);
+    void KeyPressed(KeyEvent& event);
+    void FocusGained(FocusEvent& event);
+    void AdjustmentValueChanged(AdjustmentEvent& event);
+
+    // Inherited methods from HTTarget
+    virtual Boolean PutStartElement(const HTMLToken token,
+                                    const SGMLEntity entity[]);
+    virtual Boolean PutEndElement(const HTMLToken token);
+    virtual Boolean PutBlock(const uint8 *data, uint16 length);
+
+@endif
+
+    // Increment no of glyphs with no size.
+    @message void IncNoSizeGlyph();
+    // Decrement no of glyphs with no size.
+    @message void DecNoSizeGlyph();
+    // Get number of no size glyphs.
+    @message sword GetNumNoSizeGlyph();
+
+    // Get basetextstate
+    @message /* const */ HTTextState GetBaseTextState(); // const;
+
+    // Debugging, ask frame to print itself and all its children
+    // glyphs. The output file is in /int/html/uitree.txt
+#ifdef ERROR_CHECK
+//    virtual void ECPrintUITree();
+#endif
+
+ //===========================================================================
+ //
+ //                       W A R N I N G
+ //
+ // THE LIBERTY EXTERNAL API IS FOUND ABOVE THIS BARRIER. ANYTHING BELOW
+ // THIS NOTICE IS IMPLEMENTATION DEPENDENT AND SUBJECT TO CHANGE.
+ //
+ //
+ //===========================================================================
+// public:
+    @message Boolean StartAnchor(const SGMLEntity entity[]);
+    @message Boolean StartApplet(const SGMLEntity entity[]);
+    @message Boolean StartAddress(const SGMLEntity entity[]);
+//    {USE_IT(entity); return TRUE;};
+#ifdef GR_NATIVE16
+    @message Boolean StartBody(const SGMLEntity entity[]);
+#endif
+    @message Boolean CreateArea(const SGMLEntity entity[]);
+    @message Boolean StartBold(const SGMLEntity entity[]);
+//    {USE_IT(entity); return TRUE;};
+    @message Boolean StartBase(const SGMLEntity entity[]);
+    @message Boolean StartBaseFont(const SGMLEntity entity[]);
+    @message Boolean ChangeBigFont(const SGMLEntity entity[]);
+//    {USE_IT(entity); return TRUE;};
+    @message Boolean StartBlockQuote(const SGMLEntity entity[]);
+//    {USE_IT(entity); return TRUE;};
+    @message Boolean StartBR(const SGMLEntity entity[]);
+    @message Boolean StartCaption(const SGMLEntity entity[]);
+//    {USE_IT(entity); return TRUE;};
+    @message Boolean StartCenter(const SGMLEntity entity[]);
+    @message Boolean StartItalic(const SGMLEntity entity[]);
+//    {USE_IT(entity); return TRUE;};
+    @message Boolean StartFixedWidthFont(const SGMLEntity entity[]);
+//    {USE_IT(entity); return TRUE;};
+    @message Boolean CreateDefinitionDD(const SGMLEntity entity[]);
+//    {USE_IT(entity); return TRUE;};
+    @message Boolean StartBoldItalic(const SGMLEntity entity[]);
+//    {USE_IT(entity); return TRUE;};
+    @message Boolean StartUL(const SGMLEntity entity[]);
+    @message Boolean StartDiv(const SGMLEntity entity[]);
+//    {USE_IT(entity); return TRUE;};
+    @message Boolean StartDefinitionList(const SGMLEntity entity[]);
+//    {USE_IT(entity); return TRUE;};
+    @message Boolean CreateDefinitionDT(const SGMLEntity entity[]);
+//    {USE_IT(entity); return TRUE;};
+    @message Boolean StartFont(const SGMLEntity entity[]);
+    @message Boolean StartForm(const SGMLEntity entity[]);
+    @message Boolean StartHeader6(const SGMLEntity entity[]);
+    @message Boolean StartHeader5(const SGMLEntity entity[]);
+    @message Boolean StartHeader4(const SGMLEntity entity[]);
+    @message Boolean StartHeader3(const SGMLEntity entity[]);
+    @message Boolean StartHeader2(const SGMLEntity entity[]);
+    @message Boolean StartHeader1(const SGMLEntity entity[]);
+    @message Boolean CreateHR(const SGMLEntity entity[]);
+    @message Boolean StartImage(const SGMLEntity entity[]);
+    @message Boolean CreateInput(const SGMLEntity entity[]);
+    @message Boolean StartKBD(const SGMLEntity entity[]);
+//    {USE_IT(entity); return TRUE;};
+    @message Boolean StartListItem(const SGMLEntity entity[]);
+    @message Boolean StartPre(const SGMLEntity entity[]);
+//    {USE_IT(entity); return TRUE;};
+    @message Boolean StartMap(const SGMLEntity entity[]);
+    @message Boolean StartMeta(const SGMLEntity entity[]);
+//    {USE_IT(entity); return TRUE;};
+    @message Boolean StartNobr(const SGMLEntity entity[]);
+//    {USE_IT(entity); return TRUE;};
+    @message Boolean StartOL(const SGMLEntity entity[]);
+    @message Boolean CreateOption(const SGMLEntity entity[]);
+    @message Boolean StartP(const SGMLEntity entity[]);
+    @message Boolean StartStrike(const SGMLEntity entity[]);
+//    {USE_IT(entity); return TRUE;};
+    @message Boolean StartSelect(const SGMLEntity entity[]);
+    @message Boolean ChangeSmallFont(const SGMLEntity entity[]);
+//    {USE_IT(entity); return TRUE;};
+    @message Boolean StartSubscript(const SGMLEntity entity[]);
+//    {USE_IT(entity); return TRUE;};
+    @message Boolean StartSuperscript(const SGMLEntity entity[]);
+//    {USE_IT(entity); return TRUE;};
+    @message Boolean StartTable(const SGMLEntity entity[]);
+    @message Boolean StartTD(const SGMLEntity entity[]);
+    @message Boolean StartTextArea(const SGMLEntity entity[]);
+    @message Boolean StartTH(const SGMLEntity entity[]);
+    @message Boolean StartTR(const SGMLEntity entity[]);
+    @message Boolean StartTitle(const SGMLEntity entity[]);
+    @message Boolean CreateIndex(const SGMLEntity entity[]);
+
+    //end tokens
+    @message Boolean EndAnchor();
+    @message Boolean EndApplet();
+    @message Boolean EndFormat(); // {return TRUE;};
+    @message Boolean EndHeader();
+    @message Boolean EndCenter();
+    @message Boolean EndFont();
+    @message Boolean EndOL();
+    @message Boolean EndUL();
+    @message Boolean EndAddress(); // {return TRUE;};
+    @message Boolean EndCaption(); // {return TRUE;};
+    @message Boolean EndFormatTwice(); // {return TRUE;};
+    @message Boolean EndForm();
+    @message Boolean EndMap();
+    @message Boolean EndNobr(); // {return TRUE;};
+    @message Boolean EndTD();
+    @message Boolean EndTR();
+    @message Boolean EndTable();
+    @message Boolean EndSelect();
+    @message Boolean EndTextArea();
+    @message Boolean EndTitle();
+    @message Boolean EndSetIgnoreLWS();
+//    {
+        // Ignore LWS that follows
+//        SetIgnoreLWS(TRUE);
+//        return TRUE;
+//    }
+
+    //ignore leading white spaces that follow
+    @message void SetIgnoreLWS(Boolean flag);
+//    {
+//        _ignoreLWS = flag;
+//    }
+
+    @message Boolean IsIgnoreLWS(); // const
+//    {
+//        return _ignoreLWS;
+//    }
+
+    @message word IgnoreLWS(const uint8 *data, uint16 length);
+
+
+#if defined(_MSC_VER)
+// Turn off warning about alignment, since it doesn't matter to us
+// here. This warning is caused by UIFunctionMap.
+#pragma warning(disable : 4121)
+#endif
+
+
+#if defined(_MSC_VER)
+// Return the warning to its default setting
+#pragma warning(default : 4121)
+#endif
+
+// private:
+//    friend class HTUITree;
+
+    // Reformat the uitree. Grabs semaphore and call
+    // ReformatLow().
+    @message Boolean Reformat();
+    @message Boolean ReformatLow();
+    // Check if we can format now.
+    @message Boolean OkToFormat();
+
+    @message optr /* HTComposite* */ HTFrameGetCurrentCompositeTarget();
+//    {
+//        return _compositeTargetList->GetCurrentCompositeTarget();
+//    }
+
+    @message Boolean HTFrameSetCurrentCompositeTarget
+                                       (optr /* HTComposite * */composite);
+//    {
+//        return _compositeTargetList->SetCurrentCompositeTarget(composite);
+//    }
+
+    @message Boolean HTFrameAppendToCurrentCompositeTarget(optr /* HTGlyph * */glyph);
+//    {
+//        return _compositeTargetList->AppendToCurrentCompositeTarget(glyph);
+//    }
+
+    @message void HTFrameMoveCurrentCompositeTargetTo(HTMLToken compositeToken);
+//    {
+//        _compositeTargetList->
+//            MoveCurrentCompositeTargetTo(compositeToken);
+//    }
+
+    @message void HTFrameMoveCurrentCompositeTargetToBefore(HTMLToken compositeToken);
+//    {
+//        _compositeTargetList->
+//            MoveCurrentCompositeTargetToBefore(compositeToken);
+//    }
+
+    @message optr /* HTComposite * */HTFrameFindCompositeTarget(HTMLToken compositeToken) ;
+//    {
+//        return _compositeTargetList->FindCompositeTarget(compositeToken); 
+//    }
+
+    @message optr /* HTComposite * */HTFrameFindCompositeTargetWithToken(HTMLToken compositeToken,
+                                     HTMLToken searchUntilToken);
+//    {
+//        return _compositeTargetList->
+//            FindCompositeTarget(compositeToken, searchUntilToken); 
+//    }
+
+    //
+    // Check if the _composition is the current composite target.
+    //
+    // Parameters_
+    //
+    // Return_value_ TRUE if _composition is the current composite
+    //               target, FALSE otherwise.
+    //
+    // See_also_
+    //
+    // Overrides_
+    //
+    // Status_ Functional
+    //
+    @message Boolean IsCompositionTarget();
+
+// private:
+    @instance optr /* HTRequestManager  * */ __reqManager;
+    // The root of our UI tree.
+    @instance optr /* HTUITree * */          __uitree;
+
+    // Targets for text and tokens
+    //
+    // Text target list is a FIFO list; mirroring the way
+    // SGML and HTML parsers spit out tokens to us.
+    // Must use WWList.Prepend() on _textTargetList, DO NOT
+    // use WWList.Append() as it is a FIFO list.
+    @instance optr /* WWList      */         __textTargetList;
+
+    // FIFO order of composite targets for append glyphs to.
+    @instance optr /* CompositeTargetList * */ __compositeTargetList;
+
+    // Compositor that does the actual formatting
+    @instance optr /* HTFormat    * */         __compositor;
+    @instance optr /* HTFormatContext * */     __formatContext;
+    @instance optr /* HTPreformatContext * */  __preformatContext;
+    @instance Boolean                          __finishFormat;
+    @instance Boolean                          __needToReformat;
+    @instance SemaphoreHandle                  __formatSem;
+
+    // To allow us to wait for glyphs with no size to be loaded
+    // before we format them.
+    @instance sword                            __noSizeGlyph;
+    @instance SemaphoreHandle                  __noSizeGlyphSem;
+
+    // The composition, the glyhps to be formatted by
+    // the _compositor.
+    @instance optr /* HTComposition */         __composition;
+
+    // Stores all the anchors of the page.
+    @instance optr /* HTMLAnchorList */        __anchorList;
+
+    // stores all the maps
+    @instance optr /* HTMapList */             __mapList;
+
+    // the list of all the forms inside this page.
+    @instance optr /* WWList    */             __formList;
+    @instance optr /* HTForm      * */         __currentForm;
+
+    // The drawing context
+    @instance optr /* HTGlyphContext   * */    __glyphContext;
+    // The progressive display flag, which tells us to draw when 
+    // we update our bounds.
+    @instance Boolean                          __progressiveDisplay;
+
+    // Frame document information
+    @instance TCHAR * __title;   // Has to be fixed memory as Goes UI 
+                                 // expects it to avoid garbage title
+    @instance WWMemHandle                      __urlH;
+    @instance WWMemHandle                      __baseUrlH;
+
+    // The exposed part of the virtual document that is
+    // currently visible on screen.
+    // _exposed.offset is negated from the scollbar positions.
+    // _exposed.size is the size of the window starting from (0,0).
+    @instance HTOffsetAndSize                  __exposed;
+
+    // This is the physical window for drawing everything.
+    // Its drawing coordinates go from (0,0) to its (width, height).
+    @instance optr /* FlexPanel * */           __panel;
+    @instance optr /* DummyUI   * */           __dummy;
+    @instance optr /* FlexPanel * */           __outerPanel;
+    @instance optr /* FlexScrollbar * */       __vScrollbar;
+    @instance optr /* FlexScrollbar * */       __hScrollbar;
+
+    // Ignore leading LWS
+    @instance Boolean                          __ignoreLWS;
+
+    // Table correction to fit our UI tree and formatting algorithm.
+    // Table nesting level. If this is zero, we won't allow
+    // TR, TD, THEAD, etc.
+    @instance HTTableCorrection                __tableCorrection;
+
+@if NOT_DEFINED_YET
+    // Info generated from body level tags; <basefont>, <body>
+    @instance HTTextState                      __baseTextState;
+@endif
+
+
+#ifdef GR_NATIVE16
+    HTBGImage   *_backgroundImage;
+    Colorant _bgColor;
+    Colorant _linkColor;
+#endif
+
+
+#ifdef ERROR_CHECK
+    @instance Boolean                          __initialized;
+//    File *_uitreeFile;
+#endif
+
+#ifdef EC_LOG
+    void LogStartElement(const HTMLToken token, const SGMLEntity entity[]);
+    void LogEndElement(const HTMLToken token);
+    void LogBlock(const uint8 *data, uint32 length);
+
+    File *_logFile;
+#endif
+
+@endc;
+
+
+@if 0
+/***************************************************************************
+CLASS
+    HTUITree
+
+    The root our HTML ui tree.
+
+KEYWORDS
+    
+
+CLASS TREE
+<pre>
+    HTColumn
+       |
+       +---HTUITree
+</pre>
+****************************************************************************/
+@class HTUITreeClass, HTColumnClass
+
+// public:
+    HTUITree(HTFrame *frame) : _frame(frame) 
+        {PARAM_ASSERT(frame);};
+
+    virtual ~HTUITree() {};
+
+    // Inherited methods from HTGlyph & HTComposite. We use this tell 
+    // HTFrame we are changing bounds.
+    virtual void SetBounds(const HTCoord *bounds);
+    // Accept a request draw from child and pass it on to the frame
+    virtual void RequestDrawFromChild(HTGlyph *child, 
+                                      HTCoord absCoord) 
+    {
+        PARAM_ASSERT(child);
+        _frame->RequestDraw(child, &absCoord);
+    };
+    // Accept a request for new size from child. We use this info
+    // to reformat the uitree.
+    virtual void RequestSize() 
+    {
+        _frame->Reformat();
+    }
+
+// protected:
+    // The frame where this UI tree sits.
+    HTFrame *_frame;
+
+@endc;
+
+
+/***************************************************************************
+CLASS
+    DummyUI
+
+    This class defines a dummy ui object, which will be added to the ui
+    tree under HTFrame::_panel. All this class does is that receiving a
+    paint() message when we add a new FlexComponent to the _panel, and
+    send draw message to HTFrame.
+
+KEYWORDS
+    
+
+CLASS TREE
+<pre>
+    FlexComponent
+       |
+       +---DummyUI
+</pre>
+****************************************************************************/
+class DummyUI : public FlexComponent
+{
+public:
+    DummyUI(HTFrame *frame) : _frame(frame) 
+        {PARAM_ASSERT(frame);};
+
+    //
+    // This is override the system method, so we can ask the frame to
+    // redraw the screen.
+    void Paint(void)
+    {
+        _frame->DrawText();
+    };
+
+private:
+    HTFrame	*_frame;
+};
+
+@endif // if 0
+
+@endif /* _HTFRAME_H_ */
+
+

@@ -1,0 +1,396 @@
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Geoworks 1997.  All rights reserved.
+	GEOWORKS CONFIDENTIAL
+
+PROJECT:	Geos WWW Library
+MODULE:		htsmtp
+FILE:		htsmtp.goh
+
+AUTHOR:		Kok Kin Kee, Apr 30, 1997
+
+ROUTINES:
+	Name			Description
+	----			-----------
+
+REVISION HISTORY:
+	Name		Date		Description
+	----		----		-----------
+	kkee    	4/30/97   	Initial version.
+
+DESCRIPTION:
+
+	RFC821 Simple Mail Transfer Protocol
+
+	$Id: htsmtp.goh,v 1.7.5.1 97/09/05 10:11:03 jeremyb Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+@ifndef __HT_SMTP_GOH__
+@define __HT_SMTP_GOH__
+
+@deflib htsmtp
+
+@include <WWW/HTCore/htstream.goh>
+@include <WWW/HTCore/htreq.goh>
+@include <WWW/HTCore/htsock.goh>
+@include <WWW/HTCore/htcbf.goh>    /* CharConverterCallback */
+
+
+/* --------------------------------------------------------------------------
+ * 		I. FREQUENTLY ASKED QUESTIONS - FAQ
+ * --------------------------------------------------------------------------*/
+
+/* --------------------------------------------------------------------------
+ * 		A. HTSMTP CLASS
+ * --------------------------------------------------------------------------*/
+
+/****************************************************************************
+
+  The HTSMTPClass is inherited from HTProtocolClass defined in htstream.goh.
+  It is implmented as a protocol loaded and run by Library/WWW/HTCore.
+
+  We intercept all the methods in the class to implement the protocol. The most
+  important method is MSG_HT_PROTOCOL_LOAD. The method is implemented in a
+  finite-state machine manner, i.e., HTSMTP keeps track of its execution state
+  so that it knows where to resume execution when it is scheduled to run 
+  again. Scheduling a protocol is done in the Net Manager, see API 
+  HTNetNewClient in file htnet.goh{goc}.
+
+  All intercepted methods must return codes defined in WWW/CInclude/htreq.goh.
+
+ ****************************************************************************/
+
+/* --------------------------------------------------------------------------
+ * 		B. REFERENCES
+ * --------------------------------------------------------------------------*/
+
+/****************************************************************************
+  
+ The SMTP protocol is implemented from:
+ 
+              RFC821  SIMPLE MAIL TRANSFER PROTOCOL
+
+ ****************************************************************************/
+
+/* 
+ * HTSMTP states. 
+ */
+typedef enum {
+    HTSMTP_BEGIN,
+    HTSMTP_CONNECT,
+    HTSMTP_HELO,                      /* HELO command */
+    HTSMTP_MAIL,                      /* MAIL command */
+    HTSMTP_RCPT,                      /* RCPT command */
+    HTSMTP_DATA,                      /* DATA command */
+    HTSMTP_DATAI,                     /* Pushing data to server */
+    HTSMTP_QUIT,                      /* QUIT command */
+    HTSMTP_CHECK_COMMAND_RESPONSE,
+    HTSMTP_PUSH_RESP,                 /* Push response to HTSMTP */
+    HTSMTP_CONNECTION_CLOSED,         /* 421 */
+    HTSMTP_SERVER_OUT_OF_SPACE,       /* 452 */
+    HTSMTP_MAILBOX_NOT_FOUND,
+    HTSMTP_COMMAND_ERROR,             /* My fault */
+    HTSMTP_ERROR,
+    HTSMTP_INVALID_STATE
+} HTSMTPState;
+
+@class HTSMTPClass, HTProtocolClass;
+
+/* --------------------------------------------------------------------------
+ * 		Instance Data.
+ * --------------------------------------------------------------------------*/
+
+/*
+ * HTSMTP current and next states. These decide the execution of the FSM.
+ */
+@instance HTSMTPState HTSMTPI_previousState;  /* What we did in 
+						 previous state is used in
+						 current state to expect 
+						 certain response */
+@instance HTSMTPState HTSMTPI_currentState;
+@instance HTSMTPState HTSMTPI_nextState;
+
+/*
+ * SMTP response parser state.
+ */
+@instance int HTSMTPI_parseState;
+@instance int HTSMTPI_responseCode;           /* Three digit code */
+@instance char HTSMTPI_codeBuf[4];            /* 3 digits and NULL */
+@instance int HTSMTPI_codeIndex;              /* index into codeBuf, valid
+						 from 0-3 */
+
+/*
+ * Number of receivers of a message and index to current receiver.
+ */
+@instance int HTSMTPI_numReceiver;
+@instance int HTSMTPI_currentReceiver;       /* Index of numReceiver */
+@instance int HTSMTPI_numFailedReceiver;
+@endc
+
+
+/* --------------------------------------------------------------------------
+ * 		C. SMTPMessage CLASS
+ * --------------------------------------------------------------------------*/
+
+/****************************************************************************
+
+  The SMTPMessageClass is inherited from HTStreamClass defined in htstream.goh.
+  Only public methods should be called from client. (Geos does not have the
+  concept of PUBLIC and PRIVATE method handlers).
+
+  All intercepted methods must return codes defined in WWW/CInclude/htreq.goh.
+
+ ****************************************************************************/
+
+/* --------------------------------------------------------------------------
+ * 		D. REFERENCES
+ * --------------------------------------------------------------------------*/
+
+/****************************************************************************
+
+  The SMTPMessageClass implements the parsing of RFC822 messages.
+
+ ****************************************************************************/
+
+/*
+ * Type addresses; To:, Cc:, or Bcc:.
+ */
+typedef enum {
+    SMTPAR_INVALID,                /* For range checking, do not use */
+    SMTPAR_TO,
+    SMTPAR_CC,
+    SMTPAR_BCC,
+    SMTPAR_NULL                    /* For range checking, do not use */
+} SMTPAddressRole;
+
+
+/*
+ * Encoding type.
+ */
+typedef enum {
+    ENCODE_QUOTED_PRINTABLE,        /* RFC1521 and RFC1522 */
+    ENCODE_BASE64,                  /* RFC1521 */
+    ENCODE_US_ASCII,                /* US-ASCII encoding */
+    ENCODE_NONE                     /* No encoding was done */
+} SMTPEncodingType;
+
+
+@class SMTPMessageClass, HTStreamClass;
+
+/*
+**--------------------------------------------------------------------------
+** PUBLIC MESSAGES. Too bad we don't have PUBLIC method qualifier.
+**--------------------------------------------------------------------------
+*/
+
+/*
+ * Put the sender address. There is only one sender. Must be called once.
+ * Subsequent call will replace the old sender name.
+ *
+ * Context:	Send message
+ * Source:	Client
+ * Destination:	SMTPMessage thru postCallback.
+ * Interception:No.
+ *
+ * Passed strings must be NULL terminated.
+ * Returns HT_OK or HT_NO.
+ */
+@message int MSG_SMTPM_PUT_SENDER(const char *name, const char *addr);
+
+
+/*
+ * Put the receiver address. This can be called multiple times. 
+ *
+ * Context:	Send message
+ * Source:	Client
+ * Destination:	SMTPMessage thru postCallback
+ * Interception:No.
+ *
+ * Passed strings must be NULL terminated.
+ * Returns HT_OK or HT_NO.
+ */
+@message int MSG_SMTPM_PUT_RECEIVER(const char *name, const char *addr,
+				    SMTPAddressRole role);
+
+/*
+ * Put the subject of the message. There is only one subject and can only
+ * be called once. Subsequent call will replace the old subject.
+ *
+ * Context:	Send message
+ * Source:	Client
+ * Destination:	SMTPMessage thru postCallback
+ * Interception:No.
+ *
+ * Passed strings must be NULL terminated.
+ * Returns HT_OK or HT_NO.
+ */
+@message int MSG_SMTPM_PUT_SUBJECT(const char *subject);
+
+
+/*
+ * Put the message body as a filename. There is only one message body.
+ * Subsequent call will replace the old body. Pass a character converter
+ * callback function if the characters need to converted to ISO character
+ * sets before being sent. Note this callback does not include encoding
+ * such as Base64 and Quoted-Printable. If you are not sure, pass NULL.
+ *
+ * Context:	Send message
+ * Source:	Client
+ * Destination:	SMTPMessage thru postCallback
+ * Interception:No
+ *
+ * Passed strings must be NULL terminated.
+ * Returns HT_OK or HT_NO.
+ */
+@message int MSG_SMTPM_PUT_BODY_FILENAME(const char *filename,
+					 CharConverterCallback cbf);
+
+/*
+ * To put a message body by callback. This allows client to push data
+ * in memory instead of saving to file and using API 
+ * MSG_SMTPM_PUT_BODY_FILENAME. Your cbf will be called to push
+ * the message body. In your callback, you must push data using 
+ * MSG_HT_STREAM_PUT_BLOCK. Make sure to pass vfptr for cbf!
+ *
+ * Context:	Send message
+ * Source:	Client
+ * Destination:	SMTPMessage thru postCallback
+ * Interception:
+ *
+ * Returns HT_OK or HT_NO.
+ */
+@message int MSG_SMTPM_PUT_BODY_CALLBACK(HTPostCallback cbf);
+
+
+/*
+ * Put an attachment to the message. There can be multiple attachments.
+ *
+ * Context:	Send message
+ * Source:	Client
+ * Destination:	SMTPMessage thru postCallback
+ * Interception:No
+ *
+ * Passed strings must be NULL terminated.
+ * Returns HT_OK or HT_NO.
+ */
+@message int MSG_SMTPM_PUT_ATTACHMENT(const char *filename, 
+				      const char *contentType,
+				      const char *name,
+				      CharConverterCallback cbf);
+
+
+/*
+**-------------------------------------------------------------------------
+** INTERNAL MESSAGES, not to be used by client. Too bad we don't
+** have PRIVATE method qualifier.
+**-------------------------------------------------------------------------
+*/
+
+/*
+ * Put the sender email address on the target.
+ *
+ * Context:	Command mode.
+ * Source:	Internal, by HTSMTPClass.
+ * Destination:	SMTPMessage that implements RFC822 messaging.
+ * Interception:No.
+ * 
+ * Return whatever return code from pushing data to target; target is
+ * a HTSocketClass.
+ */
+@message int MSG_SMTPM_PUSH_SENDER();
+
+
+/*
+ * Recalculate the number of receivers of current message. This 
+ * API is used along with MSG_SMTPM_PUSH_SENDER to iterate and
+ * push all receivers of a message to target.
+ *
+ * Context:	Send message
+ * Source:	Internal, by HTSMTPClass.
+ * Destination:	SMTPMessage that implements RFC822 messaging.
+ * Interception:No.
+ * 
+ * Returns the number of receivers of a message.
+ */
+@message int MSG_SMTPM_GET_RECEIVER_COUNT();
+
+/*
+ * Put a receiver email address on the target. The num ranges from 0 to
+ * (count-1) returned by MSG_SMTPM_GET_COUNT.
+ *
+ * Context:	Command mode.
+ * Source:	Internal, by HTSMTPClass.
+ * Destination:	SMTPMessage that implements RFC822 messaging.
+ * Interception:No.
+ *
+ * Return whatever return code from pushing data to target; target is
+ * a HTSocketClass.
+ */
+@message int MSG_SMTPM_PUSH_RECEIVER(int num);
+
+/*
+ * Put the complete message to be sent. The data to put is a full
+ * RFC822 + RFC1051 + RFC 1052 message (includes headers, body, etc).
+ *
+ * Context:	Data mode.
+ * Source:	Internal, by HTSMTPClass.
+ * Destination:	SMTPMessage that implements RFC822 messaging.
+ * Interception:No.
+ */
+@message int MSG_SMTPM_PUSH_MESSAGE();
+
+
+/* --------------------------------------------------------------------------
+ * 		Instance Data.
+ * --------------------------------------------------------------------------*/
+
+/*
+ * Current message to be sent. All these data instances inspired by 
+ * Martin Hagelin@Ericsson.
+ */
+@instance    HTMemHandle      SMTPMI_senderEmail;
+@instance    HTMemHandle      SMTPMI_sender;
+@instance    SMTPEncodingType SMTPMI_senderEnc;
+@instance    HTListHandle     SMTPMI_to;
+@instance    HTListHandle     SMTPMI_cc;
+@instance    HTListHandle     SMTPMI_bcc;
+@instance    HTMemHandle      SMTPMI_subject;
+@instance    SMTPEncodingType SMTPMI_subjectEnc;
+@instance    HTMemHandle      SMTPMI_bodyFile;   /* If sending from a file */
+@instance    HTPostCallback   SMTPMI_bodyCbf;    /* If sending from memory */
+@instance    CharConverterCallback SMTPMI_charCodeCbf;
+@instance    HTListHandle     SMTPMI_attachment;
+
+/* 
+ * Length of SMTPMI_to, SMTPMI_cc, and SMTPMI_bcc lists. Used to interate
+ * through the three lists in MSG_SMTPM_PUT_RECEIVER.
+ */
+@instance word SMTPMI_toCount;
+@instance word SMTPMI_ccCount;
+@instance word SMTPMI_bccCount;
+
+/*
+ * Boundary for multipart messages.
+ */
+@instance HTMemHandle SMTPMI_boundary;
+
+/*
+ * Main message body processing state for transparency of "<CRLF>.<CRLF>".
+ */
+@instance int SMTPMI_parseState;
+
+/*
+ * Encoding streams.
+ */
+@instance HTStreamHandle SMTPMI_quotedPrintable;
+@instance HTStreamHandle SMTPMI_base64;
+
+@endc
+
+
+@endlib
+
+@endif  /* __HT_SMTP_GOH__ */
+
+

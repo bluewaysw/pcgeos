@@ -1,0 +1,88 @@
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Geoworks 1996.  All rights reserved.
+	GEOWORKS CONFIDENTIAL
+
+PROJECT:	Geos WWW Library.
+MODULE:		htsuffix
+FILE:		htsuffix.goc
+
+AUTHOR:		Kok Kin Kee, Oct  1, 1996
+
+ROUTINES:
+	Name			Description
+	----			-----------
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	kkee	10/ 1/96   	Initial version.
+
+DESCRIPTION:
+
+	Use suffix to create a stream object.
+
+	$Id: htsuffix.goc,v 1.1 97/04/07 11:49:00 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+@include <WWW/HTCore/htsuffix.goh>
+@include <WWW/HTCore/htpolicy.goh>
+@include <WWW/HTCore/htreqMan.goh>
+#include <initfile.h>
+
+
+/***********************************************************************
+ *		HTSUFFIXCREATE
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Create a create stack based on suffix.
+ * CALLED BY:	HTTP, HTFile, etc.
+ * RETURN:	HTStreamHandle, NullOptr if can't locate a stream stack.
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:    Read from ini file settings.
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	kkee	10/ 1/96   	Initial Revision
+ *
+ ***********************************************************************/
+HTStreamHandle _far _pascal
+HTSUFFIXCREATE (const char* suffix, HTRequestHandle request)
+{
+    HTStringHandle str = NULL;
+    HTStreamHandle stream = NullOptr;
+    word datasize;
+    MemHandle block;
+    char *name;
+    const char *key;
+
+EC( ECCheckRequest(request);                                            )
+
+    PUSHDS;
+    SET_DS_LIB_DGROUP;
+
+    if (!suffix || !(*suffix)) 
+	key = "*";                      /* default */
+    else 
+	key = suffix;
+
+    if (!InitFileReadStringBlock("wwwLibrary",
+				 key,
+				 &block,
+				 IFRF_READ_ALL,
+				 &datasize)) {
+	name = (char *) MemLock(block);
+	str = HTStringFor(name); 
+	MemFree(block);
+
+    }
+				 
+    stream = HTPolicyStreamStack(str, NULL, NullOptr, request, FALSE);
+
+    POPDS;
+
+    return stream;
+}	/* End of HTSUFFIXCREATE.	*/

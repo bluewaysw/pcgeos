@@ -1,0 +1,839 @@
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Geoworks 1997.  All rights reserved.
+	GEOWORKS CONFIDENTIAL
+
+PROJECT:	Geos WWW Library
+MODULE:		htancCk
+FILE:		htancCk.goc
+
+AUTHOR:		Kok Kin Kee, Oct 30, 1997
+
+ROUTINES:
+	Name			Description
+	----			-----------
+
+REVISION HISTORY:
+	Name		Date		Description
+	----		----		-----------
+	kkee    	10/30/97   	Initial version.
+
+DESCRIPTION:
+
+	Cookies (HTTP persistent information) of a data object. 
+	This file implements functions that manages cookies.
+	Please refer to 
+	http://home.netscape.com/newsref/std/cookie_spec.htm.
+	and
+	RFC2109 HTTP State Management Mechanism	
+
+	Unexpired cookies are saved in file cookies.txt.
+
+	$Id: htancCk.goc,v 1.1.2.3 97/11/21 17:11:31 kkee Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+
+@include <WWW/HTCore/htancMan.goh>
+@include <WWW/HTCore/htutils.goh>
+@include <WWW/HTCore/htstring.goh>
+@include <WWW/HTCore/hturi.goh>
+@include "htfatals.goh"
+#include <Ansi/string.h>             /* memcpy */
+#include <Ansi/stdlib.h>             /* atoi */
+#include <sem.h>
+
+#define COOKIES_ENABLED
+
+extern SemaphoreHandle anchorSem;    /* In htanchor.goc */
+
+static FileHandle cookieFile = 0;    /* SP_PRIVATE/cookies.txt */
+static HTListHandle cookieList = 0;  /* List of CookieStruct */
+
+static const char HTCOOKIE_FILE[] = "cookies.txt";
+
+/* Netscape HTTP cookie */
+typedef struct { 
+    HTMemHandle      CS_name;
+    HTMemHandle      CS_value;
+    TimerDateAndTime CS_expires;
+    HTMemHandle      CS_path;
+    HTMemHandle      CS_domain;
+    Boolean          CS_secure;
+} CookieStruct;
+
+/* Cookies must be sorted in descending path length */
+typedef struct {
+    HTMemHandle CS_cookie;
+    int CS_pathLength;
+} CookieSort;
+
+
+/***********************************************************************
+ *		GobbleValue
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Scan a value and save in v. Advances pp to the next
+ *              token.
+ * CALLED BY:	HTAnchorInitCookies
+ * RETURN:	v
+ *	
+ * STRATEGY:	
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	kkee    	11/ 3/97   	Initial Revision
+ *	
+ ***********************************************************************/
+static void _pascal
+GobbleValue (char **pp, HTMemHandle *v)
+{
+    char *p = *pp, *f = *pp;
+    *v = 0;
+
+    while (*p && ISWHITE(*p)) {
+	f++; p++;
+    }
+    while (*p && !ISWHITE(*p)) p++;
+    if (f != p) {
+	*p++ = 0;
+	*v = HTStrAllocCopyWID(HTMID_HTCOOKIE, f);
+    }
+    *pp = p;
+}	/* End of GobbleValue.	*/
+
+
+/***********************************************************************
+ *		GobbleBoolean
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Gobble a boolean value. Advances pp to the next token.
+ * CALLED BY:	HTAnchorInitCookies
+ * RETURN:	v
+ *	
+ * STRATEGY:	
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	kkee    	11/ 3/97   	Initial Revision
+ *	
+ ***********************************************************************/
+static void _pascal
+GobbleBoolean (char **pp, Boolean *v)
+{
+    char *p = *pp, *f = *pp;
+    *v = FALSE;
+    
+    while (*p && ISWHITE(*p)) {
+	f++; p++;
+    }
+    while (*p && !ISWHITE(*p)) p++;
+    if (f != p) {
+	*p++ = 0;
+	if (strncasecmp("FALSE", f, 5)) {
+	    *v = TRUE;
+	}
+    }
+    *pp = p;
+}	/* End of GobbleBoolean.	*/
+
+
+/***********************************************************************
+ *		GobbleTime
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Scan Geos date and time. Advances pp to the next token.
+ *              NOT fully implemented. I simply skip the date and time.
+ * CALLED BY:	HTAnchorInitCookies
+ * RETURN:	t
+ *	
+ * STRATEGY:	
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	kkee    	11/ 3/97   	Initial Revision
+ *	
+ ***********************************************************************/
+static void _pascal
+GobbleTime (char **pp, TimerDateAndTime *t)
+{
+    char *f = *pp, *p = *pp;
+
+    while (*p && ISWHITE(*p)) {
+	f++; p++;
+    }
+    while (*p && !ISWHITE(*p)) p++;
+    /* Ignore date and time for now */
+    if (f != p) {
+	*p++ = 0;
+	/* XXX Not implemented */
+    }
+    *pp = p;
+}	/* End of GobbleTime.	*/
+
+
+/***********************************************************************
+ *		DomainMatch
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Check to see if a domain-matches b as described by 
+ *              RFC2109.
+ * CALLED BY:	HTAnchorFindCookies
+ * RETURN:	TRUE if a domain-matches b, else FALSE.
+ *	
+ * STRATEGY:	Host A domain matches B if one of the following is TRUE:
+ *             1 - both A and and B are IP address and their host strings
+ *                match exactly.
+ *             2 - both A and B are FQDN (fully qualified domain names)
+ *                and they match exactly.
+ *             3 - A is a FQDN string and has the form NB, where N is a 
+ *                non-empty name string, B has the form .B', and B' is 
+ *                a FQDN string. (So, x.y.com domain-matches .y.com but
+ *                not y.com).
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	kkee    	11/ 4/97   	Initial Revision
+ *	
+ ***********************************************************************/
+static Boolean _pascal
+DomainMatch (const char *a, const char *b)
+{
+    int diff;
+    /* Cases 1 and 2 */
+    if (!strcasecmp(a, b)) return TRUE;
+    
+    /* Case 3 */
+    diff = strlen(a) - strlen(b);
+    if (diff > 0) /* && (*b == '.') && strchr(b+1, '.')) */ {
+	/* Tail match domain name */
+	if (!strcasecmp(a+diff, b)) return TRUE;
+    }
+    return FALSE;
+}	/* End of DomainMatch.	*/
+
+
+
+/***********************************************************************
+ *		HTAnchorInitCookies
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Initialize list of cookies by reading from file.
+ * CALLED BY:   HTAnchorLibraryEntry
+ * RETURN:	Nothing
+ *	
+ * STRATEGY:	Open cookies.txt. Parse and save cookies in cookieList.
+ *              cookies.txt has the following format (same as netscape's
+ *              cookies.txt):
+ *                
+ *                 domain flag path secure expiration name value
+ *     
+ *              where 
+ *                domain - The domain that created and that can read the 
+ *                         variable.
+ *                flag - TRUE/FALSE indicating if all machines within a 
+ *                       given domain can access the variable. NOT used.
+ *                path - The path within the domain that the variable is 
+ *                       valid for.
+ *                secure - TRUE/FALSE indicating if a secure channel with
+ *                         the domain is needed to access variable. In
+ *                         this case, its HTTPS.
+ *                expiration - Geos time in GMT.
+ *                name - The name of the variable.
+ *                value - The value of the variable.
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	kkee    	11/ 3/97   	Initial Revision
+ *	
+ ***********************************************************************/
+#ifdef COOKIES_ENABLED
+
+void _far _pascal
+HTAnchorInitCookies (void)
+{
+    FilePushDir();
+    FileSetStandardPath(SP_PRIVATE_DATA);
+    cookieList = HTListNewWID(HTMID_HTCOOKIE);
+    cookieFile = FileOpen(HTCOOKIE_FILE, FILE_DENY_W | FILE_ACCESS_RW);
+    if (!cookieFile) {
+	cookieFile = FileCreate(HTCOOKIE_FILE, FCF_NATIVE | 
+				FILE_CREATE_TRUNCATE |
+				FILE_DENY_RW | FILE_ACCESS_RW, 
+				FILE_ATTR_NORMAL);
+    } else {
+	/* Load cookies from file */
+	HTMemHandle htmh, v, cs=0;
+	CookieStruct *cp;
+	word sz = FileSize(cookieFile);
+	char *p = HTMemAllocAndLockWID(HTMID_HTCOOKIE, &htmh, sz+5);
+	FileRead(cookieFile, p, sz, FALSE);
+
+	/* Parse the cookie file */
+	do {
+	    cp = HTMemAllocAndLockWID(HTMID_HTCOOKIE, &cs, 
+				      sizeof(CookieStruct));
+	    GobbleValue(&p, &(cp->CS_domain));
+	    if (!cp->CS_domain) {
+		break;
+	    }
+	    GobbleBoolean(&p, NULL);   /* We don't want this flag */
+	    GobbleValue(&p, &(cp->CS_path));
+	    if (!cp->CS_path) {
+		break;
+	    }
+	    GobbleBoolean(&p, &(cp->CS_secure));
+	    GobbleTime(&p, &(cp->CS_expires));
+	    GobbleValue(&p, &(cp->CS_name));
+	    if (!cp->CS_name) {
+		break;
+	    }
+	    GobbleValue(&p, &(cp->CS_value));
+	    if (!cp->CS_value) {
+		break;
+	    }
+	    HTMemUnlock(cs);
+	    HTListAppend(cookieList, &cs, sizeof(HTMemHandle));
+	    cs = 0;  /* Appended to cookieList */
+	} while (1);
+
+	HTMemUnlockAndFree(htmh);
+
+	if (cs) {
+	    /* This cookie was not loaded as it was corrupted */
+	    if (cp->CS_name) HTMemFree(cp->CS_name);
+	    if (cp->CS_value) HTMemFree(cp->CS_value);
+	    if (cp->CS_path) HTMemFree(cp->CS_path);
+	    if (cp->CS_domain) HTMemFree(cp->CS_domain);
+	    HTMemUnlockAndFree(cs);
+	}
+    }
+    FilePopDir();
+    if (cookieFile) {
+	/* 
+	 * Make cookie handle owner. Otherwise will crash if caller 
+	 * geode (zmanager) exits before cookies does.
+	 */
+	HandleModifyOwner(cookieFile, GeodeGetCodeProcessHandle());
+    }
+}	/* End of HTAnchorInitCookies.	*/
+
+#else /* #ifdef COOKIES_ENABLED */
+
+void _far _pascal
+HTAnchorInitCookies (void)
+{
+}
+
+#endif
+
+
+/***********************************************************************
+ *		HTCookieFree
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Free data in a cookie structure.
+ * CALLED BY:	HTRemoveCookie
+ * RETURN:	HTAnchorCleanupCookies
+ *	
+ * STRATEGY:	
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	kkee    	11/ 3/97   	Initial Revision
+ *	
+ ***********************************************************************/
+static void _pascal
+HTCookieFree (CookieStruct *c)
+{
+    if (c->CS_name) HTMemFree(c->CS_name);
+    if (c->CS_value) HTMemFree(c->CS_value);
+    if (c->CS_path) HTMemFree(c->CS_path);
+    if (c->CS_domain) HTMemFree(c->CS_domain);
+}	/* End of HTCookieFree.	*/
+
+
+
+/***********************************************************************
+ *		HTAnchorCleanupCookies
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Save all valid cookies to file cookies.txt and delete
+ *              those that are expired.
+ * CALLED BY:	HTAnchorLibraryEntry
+ * RETURN:	Nothing
+ *	
+ * STRATEGY:	
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	kkee    	11/ 3/97   	Initial Revision
+ *	
+ ***********************************************************************/
+#ifdef COOKIES_ENABLED
+
+void _far _pascal
+HTAnchorCleanupCookies (void)
+{
+    /* Write all cookies back to cookies.txt */
+    HTMemHandle cs;
+    CookieStruct *cp;
+    char *p;
+
+    int i, count = HTListGetCount(cookieList);
+
+    /* Replace the old cookies.txt file */
+    if (cookieFile) {
+	FileTruncate(cookieFile, 0, FALSE);
+    }
+
+    for (i=0; i<count; i++) {
+	HTListRemoveItem(cookieList, 0, &cs, sizeof(HTMemHandle));
+	cp = (CookieStruct *) HTMemLock(cs);
+
+	if (!cookieFile) {
+	    HTMemFree(cp->CS_domain);
+	    HTMemFree(cp->CS_path);
+	    HTMemFree(cp->CS_name);
+	    HTMemFree(cp->CS_value);
+	    HTMemUnlockAndFree(cs);
+	    continue;
+	}
+
+	/* Save information to cookie file *.
+	/* Domain */
+	p = HTMemLock(cp->CS_domain);
+	FileWrite(cookieFile, p, strlen(p), FALSE);
+	FileWrite(cookieFile, "\t", 1, FALSE); /* Use TAB like Netscape */
+	HTMemUnlockAndFree(cp->CS_domain);
+
+	/* Flag */
+	FileWrite(cookieFile, "FALSE\t", 6, FALSE); /* Flag not used */
+
+	/* Path */
+	p = HTMemLock(cp->CS_path);
+	FileWrite(cookieFile, p, strlen(p), FALSE);
+	FileWrite(cookieFile, "\t", 1, FALSE);
+	HTMemUnlockAndFree(cp->CS_path);
+
+	/* Secure */
+	if (cp->CS_secure) {
+	    FileWrite(cookieFile, "TRUE\t", 5, FALSE);
+	} else {
+	    FileWrite(cookieFile, "FALSE\t", 6, FALSE);
+	}
+	
+	/* Expiration */
+	/* XXX Not saved */
+	FileWrite(cookieFile, "EXPIRES\t", 8, FALSE);
+
+	/* Name */
+	p = HTMemLock(cp->CS_name);
+	FileWrite(cookieFile, p, strlen(p), FALSE);
+	FileWrite(cookieFile, "\t", 1, FALSE);
+	HTMemUnlockAndFree(cp->CS_name);
+
+	/* Value */
+	p = HTMemLock(cp->CS_value);
+	FileWrite(cookieFile, p, strlen(p), FALSE);
+	FileWrite(cookieFile, "\n", 1, FALSE);
+	HTMemUnlockAndFree(cp->CS_value);
+
+	HTMemUnlockAndFree(cs);
+    }
+    HTListDelete(cookieList);
+    FileClose(cookieFile, FALSE);
+}	/* End of HTAnchorCleanupCookies.	*/
+
+#else  /* #ifdef COOKIES_ENABLED */
+
+void _far _pascal
+HTAnchorCleanupCookies (void)
+{
+}
+
+#endif  /* #ifdef COOKIES_ENABLED */
+
+
+/***********************************************************************
+ *		HTRemoveCookie
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Remove cookies from cookieList that have the same 
+ *              (path, name, domain).
+ * CALLED BY:	HTAnchorSetCookie
+ * RETURN:	Nothing
+ *	
+ * STRATEGY:	Case insensitive compare of (path, name, and domain).
+ *              Netscape does not indicate whether they are case 
+ *              insensitive, but RFC2109 does (see Section 4.1).
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	kkee    	11/ 3/97   	Initial Revision
+ *	
+ ***********************************************************************/
+static void _pascal
+HTRemoveCookie (CookieStruct *cp)
+{
+    HTMemHandle cs;
+    CookieStruct *p;
+    char *name, *path, *domain;
+
+    int i=0, count = HTListGetCount(cookieList);
+
+    name = HTMemLock(cp->CS_name);
+    path = HTMemLock(cp->CS_path);
+    domain = HTMemLock(cp->CS_domain);
+
+    while (i<count) {
+	HTListGetItem(cookieList, i, &cs, sizeof(HTMemHandle));
+	p = (CookieStruct *) HTMemLock(cs);
+
+	if (!strcasecmpHTMemHandle(p->CS_name, name) &&
+	    !strcasecmpHTMemHandle(p->CS_path, path) &&
+	    !strcasecmpHTMemHandle(p->CS_domain, domain)) {
+	    /* A match */
+	    HTListRemoveItem(cookieList, i, &cs, sizeof(HTMemHandle));
+	    count--;
+	    HTCookieFree(p);
+	    HTMemUnlockAndFree(cs);
+	} else {
+	    i++;
+	    HTMemUnlock(cs);
+	}	    
+    }
+
+    HTMemUnlock(cp->CS_name);
+    HTMemUnlock(cp->CS_path);
+    HTMemUnlock(cp->CS_domain);
+}	/* End of HTRemoveCookie.	*/
+
+
+/***********************************************************************
+ *		CookieExpires
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Check to see if a cookie has expired.
+ * CALLED BY:	HTAnchorFindCookies
+ * RETURN:	TRUE if expired, else FALSE.
+ *	
+ * STRATEGY:	Not implemented as it is hard to compare GMT time to 
+ *              local time.
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	kkee    	11/ 6/97   	Initial Revision
+ *	
+ ***********************************************************************/
+static Boolean _pascal
+CookieExpires (CookieStruct *cp)
+{
+    return FALSE;
+}	/* End of CookieExpires.	*/
+
+
+
+/***********************************************************************
+ *		GarbageCollectCookies
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Garbage collect cookies if there are too many.
+ * CALLED BY:	HTAnchorSetCookies
+ * RETURN:	Nothing
+ *	
+ * STRATEGY:	Make sure there not too many cookies as they take up
+ *              quite some memory.
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	kkee    	11/ 5/97   	Initial Revision
+ *	
+ ***********************************************************************/
+static void _pascal
+GarbageCollectCookies (void)
+{
+#define GARBAGE_COLLECT_COOKIE_THRESHOLD 100  /* We can't afford what
+						 is recommended by 
+						 Netscape and RFC2109
+						 which ask for 200
+						 per server. */
+    HTMemHandle ck;
+    CookieStruct *cp;
+
+    int i, count = HTListGetCount(cookieList);
+    if (count > GARBAGE_COLLECT_COOKIE_THRESHOLD) {
+	for (i=count-1; i>GARBAGE_COLLECT_COOKIE_THRESHOLD-1; i--) {
+	    HTListRemoveItem(cookieList, i, &ck, sizeof(HTMemHandle));
+	    cp = (CookieStruct *) HTMemLock(ck);
+	    HTCookieFree(cp);
+	    HTMemUnlockAndFree(ck);
+	}
+    }
+}	/* End of GarbageCollectCookies.	*/
+
+
+/***********************************************************************
+ *		SortCookies
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Sort list of unsorted CookieSort. The passed in list is 
+ *              deleted and a new list is returned.
+ * CALLED BY:	HTAnchorFindCookies
+ * RETURN:	HTListHandle of cookies only, not CookieSort.
+ *	
+ * STRATEGY:	Cookies are sorted in descending path lengths.
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	kkee    	11/ 5/97   	Initial Revision
+ *	
+ ***********************************************************************/
+static HTListHandle _pascal
+SortCookies (HTListHandle list)
+{
+    HTListHandle ret = HTListNewWID(HTMID_HTCOOKIE);
+    CookieSort unsorted;
+
+    int i, count = HTListGetCount(list);
+    while (count) {
+	int longest=0, index=0;
+	for (i=0; i<count; i++) {
+	    HTListGetItem(list, i, &unsorted, sizeof(CookieSort));
+	    if (unsorted.CS_pathLength > longest) {
+		longest = unsorted.CS_pathLength;
+		index = i;
+	    }
+	}
+	HTListRemoveItem(list, index, &unsorted, sizeof(CookieSort));
+	HTListAppend(ret, &(unsorted.CS_cookie), sizeof(HTMemHandle)); 
+	count--;
+    }
+    HTListDelete(list);
+    return ret;
+}	/* End of SortCookies.	*/
+
+
+
+/***********************************************************************
+ *		HTANCHORSETCOOKIE
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Set a cookie of an anchor object.
+ * CALLED BY:	Client
+ * RETURN:	Nothing
+ *	
+ * STRATEGY:	Cookies are persistent information across sessions.
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	kkee    	10/30/97   	Initial Revision
+ *	
+ ***********************************************************************/
+#ifdef COOKIES_ENABLED
+
+void _far _pascal
+HTANCHORSETCOOKIE (HTAnchorHandle parent,
+		   const char *name, const char *value,
+		   const char *expires, const char *path, 
+		   const char *domain, Boolean secure)
+{
+    HTMemHandle ck;
+    CookieStruct *cp;
+    HTParentAnchor *anchor;
+
+    /* Name and value are required */
+    if (!name || !value) return;
+
+    PUSHDS;
+    SET_DS_LIB_DGROUP;
+    ThreadPSem(anchorSem);
+    anchor = (HTParentAnchor *) HTMemLock(parent);
+
+    cp = HTMemAllocAndLockWID(HTMID_HTCOOKIE, &ck, sizeof(CookieStruct));
+    cp->CS_name = HTStrAllocCopyWID(HTMID_HTCOOKIE, name);
+    cp->CS_value = HTStrAllocCopyWID(HTMID_HTCOOKIE, value);
+    if (expires) {
+	/* If no time, valid for current session only */
+	HTParseTime(expires, &(cp->CS_expires));
+    }
+
+    if (!path) {
+	/* If no path, defaults to request path */
+	HTMemHandle path = HTParseHTMemHandleURI(anchor->HTPA_url, 0, 
+			 HTURI_PARSE_PATH | HTURI_PARSE_PUNCTUATION);
+	cp->CS_path = HTStrHTMemAllocCopyWID(HTMID_HTCOOKIE, path);
+	HTMemFree(path);
+    } else {
+	cp->CS_path = HTStrAllocCopyWID(HTMID_HTCOOKIE, path);
+    }
+
+    if (!domain) {
+	/* If no domain, defaults to request domain */
+	HTMemHandle host = HTParseHTMemHandleURI(anchor->HTPA_url, 0, 
+						 HTURI_PARSE_HOST);
+	cp->CS_domain = HTStrHTMemAllocCopyWID(HTMID_HTCOOKIE, host);
+	HTMemFree(host);
+    } else {
+	cp->CS_domain = HTStrAllocCopyWID(HTMID_HTCOOKIE, domain);
+    }
+
+    cp->CS_secure = secure;
+
+    /* Remove cookies with the same (path, name, domain) */
+    HTRemoveCookie(cp);
+    HTMemUnlock(ck);
+
+    /* Add new cookie */
+    HTListAppend(cookieList, &ck, sizeof(HTMemHandle));
+
+    /* If too many cookies, do some garbage collection */
+    GarbageCollectCookies();
+
+    HTMemUnlock(parent);
+    ThreadVSem(anchorSem);
+    POPDS;
+}	/* End of HTANCHORSETCOOKIE.	*/
+
+#else /* #ifdef COOKIES_ENABLED */
+
+void _far _pascal
+HTANCHORSETCOOKIE (HTAnchorHandle parent,
+		   const char *name, const char *value,
+		   const char *expires, const char *path, 
+		   const char *domain, Boolean secure)
+{
+}
+
+#endif /* #ifdef COOKIES_ENABLED */
+
+
+/***********************************************************************
+ *		HTANCHORFINDCOOKIES
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Find all the cookies values for an anchor object.
+ * CALLED BY:	Client
+ * RETURN:	HTListHandle of HTMemHandle cookies. The cookies are 
+ *              ordered from specific paths to generic paths as per
+ *              Netscape and RFC2109. So that caller can just put
+ *              the cookies to server as ordered in the list. Caller
+ *              is responsible for deleting HTMemHandles in HTListHandle.
+ *              The list must be deleted as well.
+ *	
+ * STRATEGY:	1. All cookies must be ordered from specific to generic
+ *                 path mappings.
+ *              2. The anchor domain must domain-match the domain attribute
+ *                 of the cookie.
+ *              3. The path attribute of the cookie must match a prefix
+ *                 of the anchor request-URI (i.e., path).
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	kkee    	11/ 3/97   	Initial Revision
+ *	
+ ***********************************************************************/
+#ifdef COOKIES_ENABLED
+
+HTListHandle _far _pascal
+HTANCHORFINDCOOKIES (HTAnchorHandle parent)
+{
+    HTParentAnchor *anchor;
+    HTListHandle ret = HTListNewWID(HTMID_HTCOOKIE); /* of CookieSort */
+    CookieSort unsorted;
+    int i, count;
+    HTMemHandle domain, path, tmp;
+    char *d, *p;
+    CookieStruct *cs;
+
+EC( ECCheckHTAnchor(parent);                                             )
+
+    PUSHDS;
+    SET_DS_LIB_DGROUP;
+    ThreadPSem(anchorSem);
+    anchor = (HTParentAnchor *) HTMemLock(parent);
+
+    /* Get the anchor domain and path */
+    domain = HTParseHTMemHandleURI(anchor->HTPA_url, 0, HTURI_PARSE_HOST);
+    path =  HTParseHTMemHandleURI(anchor->HTPA_url, 0, 
+			 HTURI_PARSE_PATH | HTURI_PARSE_PUNCTUATION);
+    d = (char *) HTMemLock(domain);
+    p = (char *) HTMemLock(path);
+
+    /* Find all cookies that satisfy conditions 2 and 3 */
+    count = HTListGetCount(cookieList);
+    i = 0;
+    while (i<count) {
+	HTListGetItem(cookieList, i, &tmp, sizeof(HTMemHandle));
+	cs = (CookieStruct *) HTMemLock(tmp);
+	if (CookieExpires(cs)) {
+	    HTListRemoveItem(cookieList, i, &tmp, sizeof(HTMemHandle));
+	    count--;
+	    HTCookieFree(cs);
+	    HTMemUnlockAndFree(tmp);
+	} else {
+	    if (!strncasecmpHTMemHandle(cs->CS_path, p, 
+					strlenHTMem(cs->CS_path))) {
+		/* We have a prefix path match */
+		char *dd = HTMemLock(cs->CS_domain);
+		if (DomainMatch(d, dd)) {
+		    /* We have a domain-match */
+		    HTMemHandle cookie = HTStrHTMemAllocCopyWID(HTMID_HTCOOKIE,
+								cs->CS_name);
+		    char *c = HTMemLock(cs->CS_value);
+		    cookie = HTStrAllocCatWID(HTMID_HTCOOKIE, cookie, "=");
+		    cookie = HTStrAllocCatWID(HTMID_HTCOOKIE, cookie, c);
+
+		    unsorted.CS_pathLength = strlenHTMem(cs->CS_path);
+		    unsorted.CS_cookie = cookie;
+		    
+		    HTMemUnlock(cs->CS_value);
+		    HTListAppend(ret, &unsorted, sizeof(CookieSort));
+		}
+		HTMemUnlock(cs->CS_domain);
+	    }
+	    HTMemUnlock(tmp);
+	    i++;
+	}
+    }
+
+    HTMemUnlockAndFree(domain);
+    HTMemUnlockAndFree(path);
+    HTMemUnlock(parent);
+
+    /* Make sure we have at least cookie in list */
+    if (!HTListGetCount(ret)) {
+	HTListDelete(ret);
+	ret = 0;
+    } else {
+	/* Sort the cookies to meet condition 1 */
+	ret = SortCookies(ret);
+    }
+
+    ThreadVSem(anchorSem);
+    POPDS;
+    return ret;
+}	/* End of HTANCHORFINDCOOKIES.	*/
+
+#else /* #ifdef COOKIES_ENABLED */
+
+HTListHandle _far _pascal
+HTANCHORFINDCOOKIES (HTAnchorHandle parent)
+{
+    return NULL;
+}
+
+#endif /* #ifdef COOKIES_ENABLED */

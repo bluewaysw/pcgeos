@@ -1,0 +1,1590 @@
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Geoworks 1997.  All rights reserved.
+	GEOWORKS CONFIDENTIAL
+
+PROJECT:	Geos WWW Library
+MODULE:		parse
+FILE:		parse.goc
+
+AUTHOR:		Kok Kin Kee, May 26, 1997
+
+ROUTINES:
+	Name			Description
+	----			-----------
+
+REVISION HISTORY:
+	Name		Date		Description
+	----		----		-----------
+	kkee    	5/26/97   	Initial version.
+
+DESCRIPTION:
+
+	IMAP Parser. The general strategy is to return HT_OK for all
+        is well, HT_NO for bad request command or bad server response
+	but maintain session, and anything else for error and 
+        terminates session.
+
+	$Id: parse.goc,v 1.23.1.1 97/09/05 10:52:12 jeremyb Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+@include <stdapp.goh>
+@include <WWW/HTCore/htreq.goh>
+@include <WWW/HTCore/htstream.goh>
+@include <WWW/HTCore/htreqMan.goh>
+@include <WWW/HTCore/htstring.goh>
+@include <WWW/HTCore/htlist.goh>
+@include <WWW/htimap.goh>
+#include <WWW/htmem.h>
+#include <Ansi/string.h>                 /* strcpy, strlen */
+#include <Ansi/stdio.h>                  /* sprintf */
+#include <Ansi/stdlib.h>                 /* atoi */
+
+@include "parse.goh"
+@include "scan.goh"
+@include "const.goh"
+@include "resp.goh"
+@include "htfatals.goh"
+
+@ifdef __LOG_HTIMAP__
+@include "ilog.goh"
+@endif
+
+/* --------------------------------------------------------------------------
+ * 		IMAP Request parser.
+ * --------------------------------------------------------------------------*/
+
+#define GOBBLESYM   GobbleSym(&(p->scanner))
+#define UNGOBBLESYM UnGobbleSym(&(p->scanner))
+#define GOBBLELINE  GobbleTill(&(p->scanner), LF)
+#define GOBBLEBEFORELINE GobbleTill(&(p->scanner), CR)
+#define GOBBLETILL(b) GobbleTill(&(p->scanner), b)
+#define GOBBLEQSTRING(mode, length)\
+	GobbleQString(&(p->scanner), mode, &(p->strhtmh),\
+		      p->strTarget, length)
+#define GOBBLENSTRING(mode) GobbleNString(&(p->scanner), THISNUM, mode,\
+					  &(p->strhtmh), p->strTarget)
+#define CONSUMESTRING(str) {str = p->strhtmh; p->strhtmh = 0;}
+#define CONSUMEPARAM1(str) {str = p->param1; p->param1 = 0;}
+#define CONSUMEPARAM2(str) {str = p->param2; p->param2 = 0;}
+#define INCBODY(body)  IncBodyNumber(&(p->bodyNumber), body)
+#define DECBODY(body)  DecBodyNumber(&(p->bodyNumber), body)
+#define THISSYM     p->scanner.thisSym
+#define THISNUM     p->scanner.thisNum
+#define THISWORD    p->scanner.thisWord
+
+
+/* A body part number (e.g., 1.4.2, 3) can be at most 32 bytes */
+#define IMAP_BODY_PART_LENGTH         32
+
+/*
+ * IMAP request commands table.
+ */
+#define HTIMAP_REQ_RESERVED_WORDS      8
+IMAPKey reqReservedWords[] = {
+    /*
+     * *MUST* be organized in strcmp order.
+     * These are case insensitive. Don't forget to keep
+     * IMAP_RESERVED_WORDS up-to-date with the number of entries here.
+     */
+    {"attach",                     IMAPC_ATTACH},
+    {"body",                       IMAPC_BODY},
+    {"delete",                     IMAPC_DELETE},
+    {"list",                       IMAPC_LIST},
+    {"logon",                      IMAPC_LOGON},
+    {"logout",                     IMAPC_LOGOUT},
+    {"pattach",                    IMAPC_PATTACH},
+    {"pbody",                      IMAPC_PBODY},
+    {0,0}
+};
+
+
+/***********************************************************************
+ *		IMAPParseCommand
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Parse out command string.
+ * CALLED BY:	MSG_HT_PROTOCOL_LOAD
+ * RETURN:	IMAPRequest and URL
+ *	
+ * STRATEGY:	
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	kkee    	5/20/97   	Initial Revision
+ *	
+ ***********************************************************************/
+IMAPRequest _pascal
+IMAPParseCommand (HTRequestHandle request, HTMemHandle *params)
+{
+    IMAPRequest cmd=IMAPC_INVALID;
+    char *p, *r;
+
+    HTRequest *rptr = (HTRequest *) MemThreadGrab(request);
+    p = (char *) MemLock(rptr->HTR_uriString);
+    if ((p = strchr(p, ';'))==0) return IMAPC_INVALID;
+    if ((r = strchr(++p, '?'))!=0) {
+	*r = 0;    /* Null-terminate command string */
+	cmd = IMAPBinSearch(p, reqReservedWords, HTIMAP_REQ_RESERVED_WORDS);
+	*r = '?';  /* Must not modify the original URL */
+	*params = HTStrAllocCopy(r+1);
+    } else {
+	cmd = IMAPBinSearch(p, reqReservedWords, HTIMAP_REQ_RESERVED_WORDS);
+	*params = 0;
+    }
+
+    MemUnlock(rptr->HTR_uriString);
+    MemThreadRelease(request);
+
+    return cmd;
+}	/* End of IMAPParseCommand.	*/
+
+
+
+/***********************************************************************
+ *		NextToken
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Parse out one token from p.
+ * CALLED BY:	MSG_HT_PROTOCOL_LOAD.
+ * RETURN:	char* to token or 0 if there is no more tokens. 
+ *              Modifies p to point to the next token.
+ *	
+ * STRATEGY:	
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	kkee    	5/22/97   	Initial Revision
+ *	
+ ***********************************************************************/
+char * _pascal
+NextToken (char **p)
+{
+    char *ret = *p;
+    if (!(*p) || !(**p)) return 0;
+    while (**p) {
+	if (**p == '=' || **p == '?' || **p == '&') {
+	    **p = 0;
+	    (*p)++;           /* Advance to next token */
+	    break;
+	}
+	(*p)++;
+    }
+    return ret;
+}	/* End of NextToken.	*/
+
+
+/* --------------------------------------------------------------------------
+ * 		IMAP Response parser.
+ * --------------------------------------------------------------------------*/
+
+/*
+ * Used to determine how we number a body part.
+ */
+typedef enum {
+    IMAP_BODY_TYPE_BASIC,             /* body_type_basic */
+    IMAP_BODY_TYPE_MSG,               /* body_type_msg */
+    IMAP_BODY_TYPE_TEXT,              /* body_type_text */
+    IMAP_BODY_TYPE_MPART              /* body_type_mpart */
+} IMAPBodyType;
+
+
+static int _pascal ParseResponseDone (IMAPParser *p);
+static int _pascal ParseResponseData (IMAPParser *p);
+static int _pascal ParseCapability (IMAPParser *p);
+static int _pascal ParseRespText (IMAPParser *p);
+static int _pascal ParseSearch (IMAPParser *p);
+static int _pascal ParseFetch (IMAPParser *p);
+static int _pascal ParseFlags (IMAPParser *p);
+static int _pascal ParseEnvelope (IMAPParser *p);
+static int _pascal ParseAddresses (IMAPParser *p, IMAPRespData role);
+static int _pascal ParseBody (IMAPParser *p, Boolean incMPart);
+static int _pascal ParseBodyMPart (IMAPParser *p, Boolean inc);
+static int _pascal ParseBody1Part (IMAPParser *p);
+static int _pascal ParseBodyBasic (IMAPParser *p);
+static int _pascal ParseBodyText (IMAPParser *p);
+static int _pascal ParseBodyMsg (IMAPParser *p);
+static int _pascal ParseBodyFields (IMAPParser *p);
+static int _pascal ParseBodyFldParam (IMAPParser *p);
+static int _pascal ParseSection (IMAPParser *p);
+static int _pascal ParseSection1730 (IMAPParser *p);
+static int _pascal ParseString (IMAPParser *p, int mode, dword *length);
+static int _pascal ParseNString (IMAPParser *p, int mode, dword *length);
+static void _pascal IncBodyNumber (HTMemHandle *n, IMAPBodyType bodyType);
+static void _pascal DecBodyNumber (HTMemHandle *n, IMAPBodyType bodyType);
+
+
+/***********************************************************************
+ *		ParseNew
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Create a new parser.
+ * CALLED BY:	HTIMAP
+ * RETURN:	Pointer to new parser. Its handle in also returned in 
+ *              parser.
+ *	
+ * STRATEGY:	
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	kkee    	6/ 4/97   	Initial Revision
+ *	
+ ***********************************************************************/
+HTMemHandle _pascal
+ParseNew (void)
+{
+    HTMemHandle htmh;
+    IMAPParser *p = (IMAPParser *) HTMemAllocAndLock(&htmh, 
+						     sizeof(IMAPParser));
+    p->taggedCmdList = HTAssocListNew();
+    p->bodyNumber = HTMemAlloc(IMAP_BODY_PART_LENGTH);
+    return htmh;
+}	/* End of ParseNew.	*/
+
+
+/***********************************************************************
+ *		ParseDelete
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Delete a parser.
+ * CALLED BY:	HTIMAP
+ * RETURN:	Nothing.
+ *	
+ * STRATEGY:	
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	kkee    	6/ 4/97   	Initial Revision
+ *	
+ ***********************************************************************/
+void _pascal
+ParseDelete (HTMemHandle pp)
+{
+    IMAPParser *p = (IMAPParser *)HTMemDeref(pp);
+
+    if (p->taggedCmdList) HTAssocDwordListDelete(p->taggedCmdList);
+    if (p->resp) {
+	RespDelete(p);
+	HTMemUnlockAndFree(p->resphtmh);
+    }
+    if (p->bodyNumber) HTMemFree(p->bodyNumber);
+    if (p->retList) HTListDelete(p->retList);
+    if (p->retData) HTMemFree(p->retData);
+    if (p->strhtmh) {
+	EC_WARNING(HTIMAP_POSSIBLE_MEMORY_LEAK);
+	HTMemFree(p->strhtmh);
+    }
+    if (p->param1) {
+	EC_WARNING(HTIMAP_POSSIBLE_MEMORY_LEAK);
+	HTMemFree(p->param1);
+    }
+    if (p->param2) {
+	EC_WARNING(HTIMAP_POSSIBLE_MEMORY_LEAK);
+	HTMemFree(p->param2);
+    }
+    if (p->strTarget) @call p->strTarget::MSG_HT_STREAM_ABORT(HT_OK);
+    HTMemUnlockAndFree(pp);
+}	/* End of ParseDelete.	*/
+
+
+
+/***********************************************************************
+ *		ParseResponse
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Parse response as per RFC2060 formal syntax.
+ * CALLED BY:	HTIMAP::MSG_HT_PROTOCOL_LOAD.
+ * RETURN:	HT_OK.
+ *              HT_NO for bad command or server does not support command.
+ *              Return code from HTSocketRecv.
+ *	
+ * STRATEGY:	We are done when all our tagged responses have been 
+ *              accounted for.
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	kkee    	6/ 4/97   	Initial Revision
+ *	
+ ***********************************************************************/
+int _pascal
+ParseResponse (IMAPParser *p)
+{
+    Boolean done=FALSE;
+    int ret, finalRet=HT_OK;
+
+    if ((ret=GOBBLESYM)!=HT_OK) return ret;
+
+    do {
+	if (THISSYM == IMT_ASTERIK) {
+	    ret = ParseResponseData(p);
+	    if (ret != HT_OK) return ret;
+	} else if (THISSYM == IMT_TAG) {
+	    ret = ParseResponseDone(p);
+	    if (ret != HT_OK) return ret;
+	    done = (HTListGetCount(p->taggedCmdList)==0 ? TRUE:FALSE);
+	    if (done) return HT_OK;
+	} else if (THISSYM == IMT_PLUS) {
+	    /* I don't make requests that require continuation */
+	    EC_ERROR(HTIMAP_INVALID_RESPONSE);
+	    return HT_ERROR;
+	} else {
+	    EC_ERROR(HTIMAP_INVALID_RESPONSE);
+	    return HT_ERROR;
+	}
+	/* 
+	 * If some routine returns HT_NO, we wait for all responses to 
+	 * arrive and then return HT_NO to keep the session alive.
+	 */
+	finalRet = (ret == HT_NO) ? HT_NO : ret;
+	if ((ret=GOBBLESYM)!=HT_OK && ret!=HT_NO) return ret;
+    } while (!done);
+    return finalRet;
+}	/* End of ParseResponse.	*/
+
+
+
+/***********************************************************************
+ *		ParseResponseDone
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Parse response_done as per RFC2060. The tag has been
+ *              stripped its number is in THISNUM.
+ * CALLED BY:	ParseResponse.
+ * RETURN:	HT_OK or return code from HTSocketRecv.
+ *	
+ * STRATEGY:	
+ *
+ *              What do I do with non-IMT_OK response_done? I should not
+ *              return HT_ERROR as that would end the session, except 
+ *              when I am logging on.
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	kkee    	6/ 4/97   	Initial Revision
+ *	
+ ***********************************************************************/
+static int _pascal
+ParseResponseDone (IMAPParser *p)
+{
+    int ret;
+    dword cmd;
+
+    if (!HTAssocDwordListRemove(p->taggedCmdList, THISNUM, &cmd)) {
+	EC_ERROR(HTIMAP_TAG_MISMATCH);
+	return HT_ERROR;
+    }
+
+    if ((ret=GOBBLESYM)!=HT_OK) return ret;  /* OK, NO, or BAD */
+
+    if (THISSYM != IMT_OK) {
+	if (cmd == (dword)HTIMAP_LOGIN || cmd == (dword)HTIMAP_LOGOUT) 
+	    /* Not ok, closing session */
+	    return HT_ERROR;  /* Failed to login */	
+	else {
+	    /* Either we made a bad request or the server does not 
+	     * support the command. We need to maintain the session
+             * by returning HT_NO.
+	     */
+	    GOBBLELINE;
+	    return HT_NO;
+	}
+    }
+
+    /* IMT_OK here */
+    ret = RespPush(p, (HTIMAPState)cmd);
+    if (ret == HT_OK) ret = GOBBLELINE;  /* Ignore till CRLF */
+    return ret;
+}	/* End of ParseResponseDone.	*/
+
+
+
+/***********************************************************************
+ *		ParseResponseData
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Parse response_data as per RFC2060.
+ * CALLED BY:	ParseResponse.
+ * RETURN:	HT_OK or return code from HTSocketRecv.
+ *	
+ * STRATEGY:	
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	kkee    	6/ 4/97   	Initial Revision
+ *	
+ ***********************************************************************/
+static int _pascal
+ParseResponseData (IMAPParser *p)
+{
+    int ret;
+
+    if ((ret=GOBBLESYM)!=HT_OK) return ret;
+    if (THISSYM == IMT_OK ||
+	THISSYM == IMT_NO ||
+	THISSYM == IMT_BAD) {
+	/* resp_cond_state */
+	ret = ParseRespText(p);
+    } else if (THISSYM == IMT_BYE) {
+	/* resp_cond_bye */
+	/* Ignore */
+    } else if (THISSYM == IMT_FLAGS ||
+	       THISSYM == IMT_LIST ||
+	       THISSYM == IMT_LSUB ||
+	       THISSYM == IMT_MAILBOX ||
+	       THISSYM == IMT_STATUS) {
+	/* mailbox_data we don't want to handle */
+	/* Ignore */
+    } else if (THISSYM == IMT_SEARCH) {
+	/* mailbox_data SEARCH */
+	ret = ParseSearch(p);
+    } else if (THISSYM == IMT_NUM) {  
+	/* mailbox_data: number before EXISTS or RECENT */
+	/* message_data: number before EXPUNGE or FETCH */
+	if ((ret=GOBBLESYM)!=HT_OK) return ret;
+	if (THISSYM == IMT_EXISTS ||
+	    THISSYM == IMT_RECENT ||
+	    THISSYM == IMT_EXPUNGE) {
+	    /* we don't want to handle */
+	    /* Ignore */
+	} else if (THISSYM == IMT_FETCH) {
+	    /* message_data FETCH */
+	    ret = ParseFetch(p);
+	} else {
+	    EC_ERROR(HTIMAP_INVALID_RESPONSE_DATA);
+	    return HT_ERROR;
+	}
+    } else if (THISSYM == IMT_CAPABILITY) {
+	/* capability_data */
+	ret = ParseCapability(p);
+    } else {
+	EC_ERROR(HTIMAP_INVALID_RESPONSE_DATA);
+	return HT_ERROR;
+    }
+
+    if (ret != HT_OK) return ret;
+    return GOBBLELINE;   /* Eat till LF */
+}	/* End of ParseResponseData.	*/
+
+
+
+/***********************************************************************
+ *		ParseCapability
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Parse capability_data as RFC2060. The atom "CAPABILITY"
+ *              has been stripped.
+ * CALLED BY:	ParseResponseData.
+ * RETURN:	HT_OK or return code from HTSocketRecv.
+ *	
+ * STRATEGY:	We can only gobble up to IMT_CR, not IMT_LF. IMT_LF is 
+ *              parsed by ParseResponseData.
+ *
+ *              RFC1730:
+ *              "IMAP4" [SPACE 1#capability]
+ *
+ *              RFC2060:
+ *              [1#capability SPACE] "IMAP4rev1" [SPACE 1#capability]
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	kkee    	6/17/97   	Initial Revision
+ *	
+ ***********************************************************************/
+static int _pascal
+ParseCapability (IMAPParser *p)
+{
+    int ret;
+    
+    p->server = IMAP4_UNKNOWN_SERVER;
+    while (1) {
+	if ((ret=GOBBLESYM) != HT_OK) return ret;
+	switch (THISSYM) {
+	case IMT_IMAP4:
+	    /* Give preference to IMAP4Rev1 */
+	    if (p->server != IMAP4REV1_SERVER)
+		p->server = IMAP4_SERVER;
+	    break;
+	case IMT_IMAP4REV1:
+	    p->server = IMAP4REV1_SERVER;
+	    break;
+	case IMT_CR:
+	    return HT_OK;
+	}
+    }
+}	/* End of ParseCapability.	*/
+
+
+
+/***********************************************************************
+ *		ParseRespText
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Parse resp_text as per RFC2060.
+ * CALLED BY:	ParseResponseData.
+ * RETURN:	HT_OK or return code from HTSocketRecv.
+ *	
+ * STRATEGY:	
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	kkee    	6/ 4/97   	Initial Revision
+ *	
+ ***********************************************************************/
+static int _pascal
+ParseRespText (IMAPParser *p)
+{ 
+    int ret;
+
+    if ((ret=GOBBLESYM)!=HT_OK) return ret;
+
+    if (THISSYM == IMT_LBRACKET) {
+	if ((ret=GOBBLESYM)!=HT_OK) return ret;
+	if (THISSYM == IMT_UIDVALIDITY) {
+	    if ((ret=GOBBLESYM)!=HT_OK) return ret;
+	    RespAdd(p, IMRD_UIDVALIDITY, HTStrAllocCopy(THISWORD),0,0,0);
+	}
+    }
+    return HT_OK;
+}	/* End of ParseRespText.	*/
+
+
+
+/***********************************************************************
+ *		ParseSearch
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Parse mailbox_data SEARCH as per RFC2060.
+ * CALLED BY:	ParseResponseData.
+ * RETURN:	HT_OK or return code from HTSocketRecv.
+ *	
+ * STRATEGY:	
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	kkee    	6/ 4/97   	Initial Revision
+ *	
+ ***********************************************************************/
+static int _pascal
+ParseSearch (IMAPParser *p)
+{
+    int ret;
+    if ((ret=GOBBLESYM)!=HT_OK) return ret;
+    while (THISSYM != IMT_CR) {
+	if (THISSYM == IMT_NUM) {
+	    if (!p->retList) p->retList = HTListNew();
+	    HTListAppend(p->retList, (void*)&(THISNUM), sizeof(dword));
+	} else if (THISSYM != IMT_CR) {
+	    EC_ERROR(HTIMAP_INVALID_SEARCH);
+	    return HT_ERROR;
+	}
+	if ((ret=GOBBLESYM)!=HT_OK) return ret;
+    }
+    return HT_OK;
+}	/* End of ParseSearch.	*/
+
+
+
+/***********************************************************************
+ *		ParseFetch
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Parse message_data FETCH as per RFC2060. The nz_number
+ *              is stripped and its in THISNUM.
+ * CALLED BY:	ParseResponseData.
+ * RETURN:	HT_OK or return code from HTSocketRecv.
+ *	
+ * STRATEGY:	We parse msg_att.
+ *              Client expects on fetch response at a time, not when
+ *              we are done parsing all fetch responses.
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	kkee    	6/ 4/97   	Initial Revision
+ *	
+ ***********************************************************************/
+static int _pascal
+ParseFetch (IMAPParser *p)
+{
+    int ret;
+
+    /* Need sequence number for some requests */
+    p->retNum = THISNUM;
+
+    if ((ret=GOBBLESYM)!=HT_OK) return ret;
+
+EC( if (THISSYM != IMT_LPAREN) EC_ERROR(HTIMAP_INVALID_MSG_ATT);        )
+
+    while (1) {
+	if ((ret=GOBBLESYM)!=HT_OK) return ret;
+	if (THISSYM == IMT_BODYSTRUCTURE) {
+	    ret = ParseBody(p, TRUE);
+	    if (ret != HT_OK) return ret;
+	} else if (THISSYM == IMT_BODY) {
+	    if ((ret=GOBBLESYM)!=HT_OK) return ret;
+	    UNGOBBLESYM;
+	    if (THISSYM == IMT_LPAREN)
+		ret = ParseBody(p, TRUE);
+	    else {
+		if ((ret = ParseSection(p)) == HT_OK) {
+		    dword length;
+		    ret=ParseNString(p, PUSH_STRING, &length);
+		    RespAdd(p, IMRD_BODY_STRING_LENGTH, 0, 0, length, 0);
+		}
+	    }
+	    if (ret != HT_OK) return ret;
+	} else if (THISSYM == IMT_FLAGS) {
+	    ret = ParseFlags(p);
+	    if (ret != HT_OK) return ret;
+	} else if (THISSYM == IMT_RFC822_SIZE) {
+	    if ((ret=GOBBLESYM)!=HT_OK) return ret;
+EC(         if (THISSYM != IMT_NUM) EC_ERROR(HTIMAP_INVALID_RFC822_SIZE);)
+            RespAdd(p, IMRD_RFC822_SIZE, 0, 0, THISNUM, 0);
+	} else if (THISSYM == IMT_RFC822_HEADER) {
+	    /* Header lines need not converted */
+	    @call p->strTarget::MSG_HT_STREAM_SET_TRANSPARENT(TRUE);
+	    if ((ret=ParseNString(p, PUSH_STRING, NULL)) != HT_OK) return ret;
+	    @call p->strTarget::MSG_HT_STREAM_SET_TRANSPARENT(FALSE);
+	} else if (THISSYM == IMT_ENVELOPE) {
+	    if ((ret=ParseEnvelope(p)) != HT_OK) return ret;
+	} else if (THISSYM == IMT_RPAREN) {
+	    /* Some fetch needs to push one fetched item at a time */
+	    return RespPush(p, HTIMAP_FETCH);
+	} else if (THISSYM == IMT_UID) {
+	    if ((ret=GOBBLESYM)!=HT_OK) return ret;
+	    RespAdd(p, IMRD_UID, HTStrAllocCopy(THISWORD), 0,0,0);
+	} else if (THISSYM == IMT_NUM) {
+	    /* This is NON-standard IMAP4 implemented by most IMAP4
+	     * servers that I have connected to. This parsed string is
+             * the body section of a PARTIAL command. We are supposed 
+             * to get BODY[section], but we just get section.
+	     */
+	    dword length;
+	    if ((ret = ParseSection1730(p)) == HT_OK) {
+		ret=ParseNString(p, PUSH_STRING, &length);
+		RespAdd(p, IMRD_BODY_STRING_LENGTH, 0, 0, length, 0);
+	    }
+	} else {
+	    EC_ERROR(HTIMAP_NOT_YET_IMPLEMENTED);
+	    return HT_ERROR;
+	}
+    }
+}	/* End of ParseFetch.	*/
+
+
+
+/***********************************************************************
+ *		ParseEnvelope
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Parse envelope as per RFC2060.
+ * CALLED BY:	ParseBodyMsg, 
+ * RETURN:	HT_OK or return code from HTSocketRecv.
+ *	
+ * STRATEGY:	envelope ::= "(" env_date SPACE env_subject SPACE 
+ *                           env_from SPACE env_sender SPACE env_reply_to
+ *                           SPACE env_to SPACE env_cc SPACE env_bcc 
+ *                           SPACE env_in_reply_to SPACE env_message_id
+ *                           ")"
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	kkee    	6/ 6/97   	Initial Revision
+ *	
+ ***********************************************************************/
+static int _pascal
+ParseEnvelope (IMAPParser *p)
+{
+    int ret;
+    HTMemHandle param;
+
+    if ((ret=GOBBLESYM)!=HT_OK) return ret;
+EC( if (THISSYM != IMT_LPAREN) EC_ERROR(HTIMAP_INVALID_ENVELOPE);       )
+
+    /* env_date */
+    if ((ret=ParseNString(p, SAVE_STRING, NULL)) != HT_OK) return ret;
+    CONSUMESTRING(param);
+    RespAdd(p, IMRD_DATE, param, 0,0,0);
+
+    /* env_subject */
+    if ((ret=ParseNString(p, SAVE_STRING, NULL)) != HT_OK) return ret;
+    CONSUMESTRING(param);
+    RespAdd(p, IMRD_SUBJECT, param, 0,0,0);
+
+    /* env_from */
+    if ((ret=ParseAddresses(p, IMRD_FROM)) != HT_OK) return ret;
+
+    /* env_sender */
+    if ((ret=ParseAddresses(p, IMRD_SENDER)) != HT_OK) return ret;
+
+    /* env_reply_to */
+    if ((ret=ParseAddresses(p, IMRD_REPLY_TO)) != HT_OK) return ret;
+
+    /* env_to */
+    if ((ret=ParseAddresses(p, IMRD_TO)) != HT_OK) return ret;
+
+    /* env_cc */
+    if ((ret=ParseAddresses(p, IMRD_CC)) != HT_OK) return ret;
+
+    /* env_bcc */
+    if ((ret=ParseAddresses(p, IMRD_BCC)) != HT_OK) return ret;
+
+    /* env_in_reply_to */
+    if ((ret=ParseNString(p, SKIP_STRING, NULL)) != HT_OK) return ret; 
+
+    /* env_message_id */
+    if ((ret=ParseNString(p, SKIP_STRING, NULL)) != HT_OK) return ret; 
+    
+    if ((ret=GOBBLESYM)!=HT_OK) return ret;
+EC( if (THISSYM != IMT_RPAREN) EC_ERROR(HTIMAP_INVALID_ENVELOPE);       )
+
+   return HT_OK;
+}	/* End of ParseEnvelope.	*/
+
+
+
+/***********************************************************************
+ *		ParseAddresses
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Parse "(" 1*address ")" / nil as per RFC2060.
+ * CALLED BY:   ParseEnvelope.	
+ * RETURN:	HT_OK or return code from HTSocketRecv.
+ *	
+ * STRATEGY:	"(" 1*address ")" / nil
+ * 
+ *              address ::= "(" addr_name SPACE addr_adl SPACE 
+ *                          addr_mailbox SPACE addr_host ")"
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	kkee    	6/ 7/97   	Initial Revision
+ *	
+ ***********************************************************************/
+static int _pascal
+ParseAddresses (IMAPParser *p, IMAPRespData role)
+{
+    int ret;
+    HTMemHandle name, mailbox, host;
+
+    /* "(" or NIL */
+    if ((ret=GOBBLESYM)!=HT_OK) return ret;
+EC( if (THISSYM != IMT_LPAREN && THISSYM != IMT_NIL)                    )
+EC(     EC_ERROR(HTIMAP_INVALID_ADDRESS);                               )
+
+    if (THISSYM == IMT_NIL) return HT_OK;  /* No addresses */
+
+    while (1) {
+	if ((ret=GOBBLESYM)!=HT_OK) return ret;
+	if (THISSYM == IMT_RPAREN) break;   /* Final ")" */
+	/* The paren "(" of an address */
+EC(     if (THISSYM != IMT_LPAREN) EC_ERROR(HTIMAP_INVALID_ADDRESS);    )
+        
+        /* addr_name */
+        if ((ret=ParseNString(p, SAVE_STRING, NULL)) != HT_OK) return ret;
+	CONSUMESTRING(name);
+
+        /* addr_adl */
+        if ((ret=ParseNString(p, SKIP_STRING, NULL)) != HT_OK) return ret;
+
+        /* addr_mailbox */
+        if ((ret=ParseNString(p, SAVE_STRING, NULL)) != HT_OK) return ret;
+	CONSUMESTRING(mailbox);
+
+        /* addr_host */
+        if ((ret=ParseNString(p, SAVE_STRING, NULL)) != HT_OK) return ret;
+	CONSUMESTRING(host);
+
+	/* Combine into mailbox@host */
+	if (host) {
+	    mailbox = HTStrAllocCat(mailbox, "@");
+	    mailbox = HTStrAllocCat(mailbox, (char*)HTMemLock(host));
+	    HTMemUnlockAndFree(host);
+	}
+
+	/* Email addresses client wants */
+	RespAdd(p, role, name, mailbox, 0, 0);
+
+        /* The paren ")" of an address */
+        if ((ret=GOBBLESYM)!=HT_OK) return ret;
+EC(     if (THISSYM != IMT_RPAREN) EC_ERROR(HTIMAP_INVALID_ADDRESS);    )
+    }
+
+    return HT_OK;
+}	/* End of ParseAddresses.	*/
+
+
+
+/***********************************************************************
+ *		ParseSection
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Parse msg_att "BODY" section ... as per RFC2060. The
+ *              "BODY" has been consumed.
+ * CALLED BY:	ParseFetch.
+ * RETURN:	HT_OK or return code from HTSocketRecv.
+ *	
+ * STRATEGY:	
+ *              RFC2060 (IMAP4Rev1)
+ *              section ::= "[" [section_text / (nz_number * ["." 
+ *                          nz_number] ["." (section_text / "MIME")])] 
+ *                          "]"
+ *
+ *              IMAP4 does not have ["<" number ">"] as it is new in 
+ *              IMAP4Rev1.
+ *
+ *              We only parse section of RFC1730, where:
+ *                  section ::= "0" / nz_number ["." section]
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	kkee    	6/ 9/97   	Initial Revision
+ *	
+ ***********************************************************************/
+static int _pascal
+ParseSection (IMAPParser *p)
+{
+    int ret;
+
+    if ((ret=GOBBLESYM) != HT_OK) return ret;
+
+EC( if (THISSYM != IMT_LBRACKET) EC_ERROR(HTIMAP_LBRACKET_EXPECTED);    )
+
+    /* 
+     * @@@
+     * I only issue BODY[numbers] (RFC1730) requests and hence I 
+     * can afford to skip all of it. Only when we are issuing BODY[1.MIME]
+     * (RFC2060) requests, then I have to parse out the stuff in section.
+     */
+    return GOBBLETILL(']');  /* Skip all of it */
+}	/* End of ParseSection.	*/
+
+
+
+/***********************************************************************
+ *		ParseSection1730
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Parse section as per RFC1730.
+ * CALLED BY:	ParseFetch
+ * RETURN:	HT_OK or return code from HTSocketRecv.
+ *	
+ * STRATEGY:	
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	kkee    	6/18/97   	Initial Revision
+ *	
+ ***********************************************************************/
+static int _pascal
+ParseSection1730 (IMAPParser *p)
+{
+    /* The section is in THISWORD and GobbleTillWhite */
+    return GobbleTillWhite(&(p->scanner));
+}	/* End of ParseSection1730.	*/
+
+
+
+/***********************************************************************
+ *		ParseBody
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Parse body as per RFC2060.
+ * CALLED BY:	ParseFetch, ParseBodyMPart
+ * RETURN:	HT_OK or return code from HTSocketRecv.
+ *	
+ * STRATEGY:	"(" body_type_1part / body_type_mpart ")"
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	kkee    	6/ 4/97   	Initial Revision
+ *	
+ ***********************************************************************/
+static int _pascal
+ParseBody (IMAPParser *p, Boolean incMPart)
+{
+    int ret;
+
+    if ((ret=GOBBLESYM)!=HT_OK) return ret;
+EC( if (THISSYM != IMT_LPAREN) EC_ERROR(HTIMAP_INVALID_BODY);           )
+
+    if ((ret=GOBBLESYM)!=HT_OK) return ret;
+    UNGOBBLESYM;  /* Unget for the next routine */
+    if (THISSYM == IMT_LPAREN) {
+	/* body_type_mpart */
+	ret = ParseBodyMPart(p, incMPart);
+	if (ret != HT_OK) return ret;
+    } else if (THISSYM == IMT_DQUOTE || THISSYM == IMT_LBRACE) {
+	/* body_type_1part */
+	ret = ParseBody1Part(p);
+	if (ret != HT_OK) return ret;
+    } else {
+	EC_ERROR(HTIMAP_INVALID_BODY);
+    }
+    
+    if ((ret=GOBBLESYM)!=HT_OK) return ret;
+
+EC( if (THISSYM != IMT_RPAREN) EC_ERROR(HTIMAP_INVALID_BODY);          )
+    
+    return HT_OK;
+}	/* End of ParseBody.	*/
+
+
+
+/***********************************************************************
+ *		ParseBodyMPart
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Parse body_type_mpart as per RFC2060.
+ * CALLED BY:	ParseBody
+ * RETURN:	HT_OK or return code from HTSocketRecv.
+ *	
+ * STRATEGY:	body_type_mpart ::= 1*body SPACE media_subtype
+ *                                  [SPACE body_ext_mpart]
+ *
+ *              The part number of a mpart cannot be returned to client
+ *              because it cannot be used to access a multipart. Hence
+ *              we don't add the part number of a mpart to the response.
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	kkee    	6/ 5/97   	Initial Revision
+ *	
+ ***********************************************************************/
+static int _pascal
+ParseBodyMPart (IMAPParser *p, Boolean incMPart)
+{
+    int ret;
+    HTMemHandle subtype;
+
+    if (incMPart)
+	INCBODY(IMAP_BODY_TYPE_MPART);  /* Body tracking number */
+
+    if ((ret=GOBBLESYM)!=HT_OK) return ret;
+EC( if (THISSYM != IMT_LPAREN) EC_ERROR(HTIMAP_INVALID_BODY_TYPE_MPART);)
+
+    /* 
+     * We need to peek for the left paren to know if we are done parsing
+     * 1#body.
+     */
+    while (THISSYM == IMT_LPAREN) {
+	UNGOBBLESYM;
+	if ((ret=ParseBody(p, TRUE)) != HT_OK) return ret;
+	if ((ret=GOBBLESYM)!=HT_OK) return ret;
+    }
+    UNGOBBLESYM;
+
+    /* media_subtype */
+    if ((ret=ParseString(p, SAVE_STRING, NULL)) != HT_OK) return ret;
+    CONSUMESTRING(subtype);
+    if (subtype) HTMemFree(subtype);
+
+    /* body_ext_mpart is not implemented */
+
+    if (incMPart)
+	DECBODY(IMAP_BODY_TYPE_MPART);
+
+    return HT_OK;
+}	/* End of ParseBodyMPart.	*/
+
+
+
+/***********************************************************************
+ *		ParseBody1Part
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Parse body_type_1part as per RFC2060.
+ * CALLED BY:	ParseBody
+ * RETURN:	HT_OK or return code from HTSocketRecv.
+ *	
+ * STRATEGY:	body_type_1part ::= (body_type_basic / body_type_msg /
+ *                                  body_type_text) [SPACE body_ext_1part]
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	kkee    	6/ 5/97   	Initial Revision
+ *	
+ ***********************************************************************/
+static int _pascal
+ParseBody1Part (IMAPParser *p)
+{
+    int ret;
+
+    /* media_basic, media_message, or media_text */
+    if ((ret=ParseString(p, SAVE_STRING, NULL)) != HT_OK) return ret;
+    CONSUMESTRING(p->param1);
+    if ((ret=ParseString(p, SAVE_STRING, NULL)) != HT_OK) return ret;
+    CONSUMESTRING(p->param2);
+    
+    if (!strcasecmpHTMemHandle(p->param1, "TEXT")) {
+	/* body_type_text */
+	if ((ret=ParseBodyText(p)) != HT_OK) return ret;
+    } else if (!strcasecmpHTMemHandle(p->param1, "MESSAGE") &&
+	       !strcasecmpHTMemHandle(p->param2, "RFC822")) {
+	/* body_type_msg */
+	if ((ret=ParseBodyMsg(p)) != HT_OK) return ret;
+    } else {
+	/* body_type_basic */
+	if ((ret=ParseBodyBasic(p)) != HT_OK) return ret;
+    }
+
+    /* body_ext_1part is not implemented */
+
+    return HT_OK;
+}	/* End of ParseBody1Part.	*/
+
+
+
+/***********************************************************************
+ *		ParseBodyBasic
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Parse body_type_basic as per RFC2060. The media_basic
+ *              has been stripped and passed in p->param1 (type) and
+ *              p->param2 (subtype).
+ * CALLED BY:	ParseBody1Part.
+ * RETURN:	HT_OK or HT_? error code.
+ *	
+ * STRATEGY:	body_type_basic ::= media_basic SPACE body_fields
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	kkee    	6/ 6/97   	Initial Revision
+ *	
+ ***********************************************************************/
+static int _pascal
+ParseBodyBasic (IMAPParser *p)
+{
+    int ret;
+    HTMemHandle mtype, msubtype;
+
+    /* Create a new body part in the response */
+    RespNewBody(p);
+
+    INCBODY(IMAP_BODY_TYPE_BASIC); /* Body tracking number */
+
+    RespAdd(p, IMRD_BODY_NUMBER, HTStrHTMemAllocCopy(p->bodyNumber),0,0,0);
+    
+    /* Save the contentType */
+    CONSUMEPARAM1(mtype); CONSUMEPARAM2(msubtype);
+    RespAdd(p, IMRD_CONTENT_TYPE, mtype, msubtype, 0, 0);
+
+    ret=ParseBodyFields(p);
+
+    DECBODY(IMAP_BODY_TYPE_BASIC);
+
+    return ret;
+}	/* End of ParseBodyBasic.	*/
+
+
+
+/***********************************************************************
+ *		ParseBodyMsg
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Parse body_type_msg as per RFC2060. The media_message
+ *              has been stripped and passed in p->param1 (type) and
+ *              p->param2 (subtype).
+ * CALLED BY:	ParseBody1Part.
+ * RETURN:	HT_OK or HT_? error code.
+ *	
+ * STRATEGY:	body_type_msg ::= media_message SPACE body_fields SPACE
+ *                                envelope SPACE body SPACE 
+ *                                body_fld_lines
+ *
+ *              We filter out parameters for envelope as we don't return
+ *              the envelope parameters for message/rfc822.
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	kkee    	6/ 6/97   	Initial Revision
+ *	
+ ***********************************************************************/
+static int _pascal
+ParseBodyMsg (IMAPParser *p)
+{
+    int ret;
+    HTMemHandle mtype, msubtype;
+    IMAPRequest req;
+
+    /* Create a new body part in the response */
+    RespNewBody(p);
+    INCBODY(IMAP_BODY_TYPE_MSG);
+    RespAdd(p, IMRD_BODY_NUMBER, HTStrHTMemAllocCopy(p->bodyNumber), 0,0,0);
+
+    /* Save the contentType */
+    CONSUMEPARAM1(mtype); CONSUMEPARAM2(msubtype);
+    RespAdd(p, IMRD_CONTENT_TYPE, mtype, msubtype, 0, 0);
+
+    /* body_fields */
+    if ((ret=ParseBodyFields(p)) != HT_OK) return ret;
+
+    /* envelope */
+    req = p->wanted;
+    p->wanted = IMAPC_IGNORE; /* Don't want the envelope params of a msg */
+    if ((ret=ParseEnvelope(p)) != HT_OK) return ret;
+    p->wanted = req;
+
+    /* body */
+    /* To maintain correct body part numbering, I must not increment
+     * p->bodyNumber if we have a multipart body here.
+     */
+    if ((ret=ParseBody(p, FALSE)) != HT_OK) return ret;
+
+    /* body_fld_lines */
+    if ((ret=GOBBLESYM) != HT_OK) return ret;
+EC( if (THISSYM != IMT_NUM) EC_ERROR(HTIMAP_NUMBER_EXPECTED);           )
+    
+    DECBODY(IMAP_BODY_TYPE_MSG);
+
+    return HT_OK;
+}	/* End of ParseBodyMsg.	*/
+
+
+
+/***********************************************************************
+ *		ParseBodyText
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Parse body_type_text as per RFC2060. The media_text has
+ *              been stripped and passed in p->param1 (type) and
+ *              p->param2 (subtype).
+ * CALLED BY:	ParseBody1Part.
+ * RETURN:	HT_OK or HT_? error code.
+ *	
+ * STRATEGY:	body_type_text ::= media_text SPACE body_fields SPACE
+ *                                 body_fld_lines
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	kkee    	6/ 6/97   	Initial Revision
+ *	
+ ***********************************************************************/
+static int _pascal
+ParseBodyText (IMAPParser *p)
+{
+    int ret;
+    HTMemHandle mtype, msubtype;
+    
+    /* Create a new body */
+    RespNewBody(p);
+
+    INCBODY(IMAP_BODY_TYPE_TEXT);
+
+    RespAdd(p, IMRD_BODY_NUMBER, HTStrHTMemAllocCopy(p->bodyNumber),0,0,0);
+
+    /* Save the contentType */
+    CONSUMEPARAM1(mtype); CONSUMEPARAM2(msubtype);
+    RespAdd(p, IMRD_CONTENT_TYPE, mtype, msubtype, 0, 0);
+
+    /* body_fields */
+    if ((ret=ParseBodyFields(p)) != HT_OK) return ret;
+
+    /* body_fld_lines */
+    if ((ret=GOBBLESYM) != HT_OK) return ret;
+EC( if (THISSYM != IMT_NUM) EC_ERROR(HTIMAP_NUMBER_EXPECTED);           )
+
+    DECBODY(IMAP_BODY_TYPE_TEXT);
+    
+    return HT_OK;
+}	/* End of ParseBodyText.	*/
+
+
+
+
+/***********************************************************************
+ *		ParseBodyFields
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Parse body_fields as per RFC2060.
+ * CALLED BY:	ParseBody1Part.
+ * RETURN:	HT_OK or return code HTSocketRecv.
+ *	
+ * STRATEGY:	body_fields ::= body_fld_param SPACE body_fld_id SPACE
+ *                              body_fld_desc SPACE body_fld_enc SPACE 
+ *                              body_fld_octets
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	kkee    	6/ 5/97   	Initial Revision
+ *	
+ ***********************************************************************/
+static int _pascal
+ParseBodyFields (IMAPParser *p)
+{
+    int ret;
+    HTMemHandle param;
+
+    /* body_fld_param */
+    if ((ret=ParseBodyFldParam(p)) != HT_OK) return ret;
+
+    /* body_fld_id */
+    if ((ret=ParseNString(p, SKIP_STRING, NULL)) != HT_OK) return ret;
+
+    /* body_fld_desc */
+    if ((ret=ParseNString(p, SKIP_STRING, NULL)) != HT_OK) return ret;
+
+    /* body_fld_enc */
+    if ((ret=ParseNString(p, SAVE_STRING, NULL)) != HT_OK) return ret;
+    CONSUMESTRING(param);
+    RespAdd(p, IMRD_FLD_ENC, param, 0, 0, 0);
+
+    /* body_fld_octets */
+    if ((ret=GOBBLESYM)!=HT_OK) return ret;
+EC( if (THISSYM != IMT_NUM) EC_ERROR(HTIMAP_BODY_FLD_OCTETS_EXPECTED); )
+    RespAdd(p, IMRD_BODY_FLD_OCTETS, 0, 0, THISNUM, 0);
+
+    return HT_OK;
+}	/* End of ParseBodyFields.	*/
+
+
+
+/***********************************************************************
+ *		ParseBodyFldParam
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Parse body_fld_param as per RFC2060.
+ * CALLED BY:   ParseBodyFields.	
+ * RETURN:	HT_OK or return code from HTSocketRecv.
+ *	
+ * STRATEGY:	body_fld_param ::= "(" 1#(string SPACE string) ")" / nil
+ *	
+ *              fld params are charset and name. 
+ *
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	kkee    	6/ 5/97   	Initial Revision
+ *	
+ ***********************************************************************/
+static int _pascal
+ParseBodyFldParam (IMAPParser *p)
+{
+    int ret;
+    HTMemHandle param1, param2;
+
+    if ((ret=GOBBLESYM)!=HT_OK) return ret;
+EC( if (THISSYM != IMT_LPAREN && THISSYM != IMT_NIL)                    )
+EC(     EC_ERROR(HTIMAP_INVALID_FLAGS);                                 )
+    
+    if (THISSYM == IMT_NIL) return HT_OK;
+
+    while (1) {
+	if ((ret=GOBBLESYM)!=HT_OK) return ret;
+
+	if (THISSYM != IMT_RPAREN) {
+	    UNGOBBLESYM;
+	    if ((ret=ParseString(p, SAVE_STRING, NULL)) != HT_OK) return ret;
+	    CONSUMESTRING(param1);
+	    if ((ret=ParseString(p, SAVE_STRING, NULL)) != HT_OK) return ret;
+	    CONSUMESTRING(param2);
+	    RespAdd(p, IMRD_FLD_PARAM, param1, param2, 0, 0);
+	} else {
+	    /* Done! */
+	    return HT_OK;
+	}
+    }
+}	/* End of ParseBodyFldParam.	*/
+
+
+
+
+/***********************************************************************
+ *		ParseFlags
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Parse msg_att FLAGS as per RFC2060.
+ * CALLED BY:	ParseFetch.
+ * RETURN:	HT_OK or some error code.
+ *	
+ * STRATEGY:    "(" #(flag / "\Recent") ")"
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	kkee    	6/ 4/97   	Initial Revision
+ *	
+ ***********************************************************************/
+static int _pascal
+ParseFlags (IMAPParser *p)
+{
+    int ret;
+    if ((ret=GOBBLESYM)!=HT_OK) return ret;
+
+EC( if (THISSYM != IMT_LPAREN) EC_ERROR(HTIMAP_INVALID_FLAGS);         )
+
+    while (1) {
+	if ((ret=GOBBLESYM)!=HT_OK) return ret;
+	if (THISSYM == IMT_SEEN) {
+	    RespAdd(p, IMRD_SEEN, 0,0,0,0);
+	    GOBBLETILL(')');
+	    return HT_OK;
+	} else if (THISSYM == IMT_RPAREN) {
+	    return HT_OK;
+	}
+    }
+}	/* End of ParseFlags.	*/
+
+
+
+/***********************************************************************
+ *		ParseString
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Parse a string as per RFC2060.
+ *              mode = SAVE_STRING
+ *                 To save the complete string to p->strhtmh. Caller 
+ *                 must consume p->strhtmh and set it back to 0. If the
+ *                 string is empty (we see ""), then P->strhtmh = 0.
+ *              mode = PUSH_STRING 
+ *                 To push the string to p->strTarget. Target must
+ *                 already be set. If string is empty (we see ""), then
+ *                 we won't push anything to target.
+ *              mode = SKIP_STRING 
+ *                 To skip the string.
+ *              length = return length of string. Pass NULL if you do not
+ *                 want the length.
+ * CALLED BY:	Other parser routines in this module.
+ * RETURN:	HT_OK or return code from HTSocketRecv.
+ *	
+ * STRATEGY:	string ::= quoted / literal
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	kkee    	6/ 4/97   	Initial Revision
+ *	
+ ***********************************************************************/
+static int _pascal
+ParseString (IMAPParser *p, int mode, dword *length)
+{
+    int ret;
+EC( if (mode==SAVE_STRING && p->strhtmh) EC_ERROR(HTIMAP_MEMORY_LEAK);  )
+
+    if ((ret=GOBBLESYM)!=HT_OK) return ret;
+    if (THISSYM == IMT_DQUOTE) {
+	/* quoted string */
+	return GOBBLEQSTRING(mode, length);
+    } else if (THISSYM == IMT_LBRACE) {
+	/* literal string */
+	if ((ret=GOBBLESYM)!=HT_OK) return ret;
+EC(     if (THISSYM != IMT_NUM) EC_ERROR(HTIMAP_INVALID_STRING);        )
+	if (length) *length = THISNUM;
+EC(     if ((ret=GOBBLESYM)!=HT_OK) return ret;                         )
+EC(     if (THISSYM != IMT_RBRACE) EC_ERROR(HTIMAP_INVALID_STRING);     )
+        if ((ret=GOBBLELINE) != HT_OK) return ret;
+        return GOBBLENSTRING(mode); 
+    } else {
+	EC_ERROR(HTIMAP_INVALID_STRING);
+    }
+    return HT_OK;
+}	/* End of ParseString.	*/
+
+
+
+/***********************************************************************
+ *		ParseNString
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Parse nstring as per RFC2060. 
+ *              mode = SAVE_STRING
+ *                 To save the complete string to p->strhtmh. Caller 
+ *                 must consume p->strhtmh and set it back to 0. If 
+ *                 its NIL, then p->strhtmh = 0.
+ *              mode = PUSH_STRING 
+ *                 To push the string to p->strTarget. Target must
+ *                 already be set. If NIL, PUTBLOCK(target, 0, 0)
+ *              mode = SKIP_STRING 
+ *                 To skip the string.
+ *              length = return length of string. Pass NULL if you do not
+ *                 want the length.
+ * CALLED BY:	Other parser routines.
+ * RETURN:	HT_OK or return code from HTSocketRecv.
+ *	
+ * STRATEGY:	
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	kkee    	6/ 5/97   	Initial Revision
+ *	
+ ***********************************************************************/
+static int _pascal
+ParseNString (IMAPParser *p, int mode, dword *length)
+{
+    int ret;
+EC( if (mode==SAVE_STRING && p->strhtmh) EC_ERROR(HTIMAP_MEMORY_LEAK);  )
+    if ((ret=GOBBLESYM)!=HT_OK) return ret;
+
+    if (THISSYM == IMT_NIL) {
+	p->strhtmh = 0;
+	if (length) *length = 0;
+	return HT_OK;
+    }
+    UNGOBBLESYM;
+    return ParseString(p, mode, length);
+}	/* End of ParseNString.	*/
+
+
+
+/***********************************************************************
+ *		IncBodyNumber
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Increment body part number.
+ * CALLED BY:	ParseBody, ParseBody1Part, ParseBodyMPart, 
+ *              ParseBodyBasic, ParseBodyMsg, and ParseBodyText.
+ * RETURN:	Nothing. Changes contents of n.
+ *	
+ * STRATEGY:	Numbers for mparts cannot be used to access body parts.
+ *              They are included here for ease of implementing the 
+ *              part numbering algorithm.
+ *
+ *              The algo:
+ *              1. if (bodyType == basic || bodyType == text) {
+ *                    increment the number after the last '.' OR
+ *                    if there is no '.', increment the last number;
+ *                 }
+ *              2. if (bodyType == mpart || bodyType == msg) {
+ *                    increment the number after the last '.' OR if
+ *                    if there is no '.', increment the last number;
+ *                    append ".0";
+ *                 }
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	kkee    	6/ 5/97   	Initial Revision
+ *	
+ ***********************************************************************/
+static void _pascal
+IncBodyNumber (HTMemHandle *n, IMAPBodyType bodyType)
+{
+    char *p, *r, buf[10];
+    int num;
+
+EC( ECCheckHTMemHandle(*n);                                             )
+
+    p = (char *) HTMemLock(*n);
+
+    switch (bodyType) {
+    case IMAP_BODY_TYPE_BASIC:
+    case IMAP_BODY_TYPE_TEXT:
+	if (p[0]==0) {
+	    /* First body part is a basic/text */
+	    p[0]='1'; p[1]=0;
+	    HTMemUnlock(*n);
+	} else {
+	    if ((r = strrchr(p, '.')) != 0) r++;
+	    else r = p;
+	    num = atoi(r) + 1;
+	    sprintf(buf, "%d", num);
+	    *r = 0;  /* Replace the last number */
+	    HTMemUnlock(*n);
+	    *n = HTStrAllocCat(*n, buf);
+	}
+	break;
+
+    case IMAP_BODY_TYPE_MSG:
+    case IMAP_BODY_TYPE_MPART:
+	if (p[0]==0) {
+	    /* First body part is a mpart/msg */
+	    p[0]='0'; p[1]=0;
+	    HTMemUnlock(*n);
+	} else {
+	    /* Increment the current number and then append ".0" */
+	    if ((r = strrchr(p, '.')) != 0) r++;
+	    else r = p;
+	    num = atoi(r) + 1;
+	    sprintf(buf, "%d%s", num, ".0");
+	    *r = 0;  /* Replace the last number */
+	    HTMemUnlock(*n);
+	    *n = HTStrAllocCat(*n, buf);
+	}
+	break;
+
+    default:
+	EC_ERROR(HTIMAP_INVALID_BODY);
+	break;
+    }
+
+}	/* End of IncBodyNumber.	*/
+
+
+
+
+/***********************************************************************
+ *		DecBodyNumber
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Decrement body part number.
+ * CALLED BY:	ParseBody, ParseBody1Part, ParseBodyMPart, 
+ *              ParseBodyBasic, ParseBodyMsg, and ParseBodyText.
+ * RETURN:	Nothing. Changes contents of n.
+ *	
+ * STRATEGY:	The algo:
+ *              1. if (bodyType == basic || bodyType == text) {
+ *                    do nothing;
+ *                 } 
+ *              2. if (bodyType == mpart || bodyType == msg) {
+ *                    If there is a last '.', remove the substring
+ *                    after it, including the '.' itself;
+ *                    If there is no '.', remove the last number;
+ *                 }
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	kkee    	6/ 5/97   	Initial Revision
+ *	
+ ***********************************************************************/
+static void _pascal
+DecBodyNumber (HTMemHandle *n, IMAPBodyType bodyType)
+{
+    char *p, *r;
+
+EC( ECCheckHTMemHandle(*n);                                             )
+
+    p = (char *) HTMemLock(*n);
+
+    switch (bodyType) {
+    case IMAP_BODY_TYPE_BASIC:
+    case IMAP_BODY_TYPE_TEXT:
+	/* Do nothing */
+	break;
+    case IMAP_BODY_TYPE_MPART:
+    case IMAP_BODY_TYPE_MSG:
+	/* Remove the last ".xxx" or the last number */
+	if ((r = strrchr(p, '.')) != 0)
+	    *r = 0;
+	else *p = 0;
+	break;
+    default:
+	EC_ERROR(HTIMAP_INVALID_BODY);
+	break;
+    }
+
+    HTMemUnlock(*n);
+}	/* End of DecBodyNumber.	*/

@@ -1,0 +1,363 @@
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Geoworks 1996.  All rights reserved.
+	GEOWORKS CONFIDENTIAL
+
+PROJECT:	
+MODULE:		
+FILE:		infoServUI.goc
+
+AUTHOR:		Mingzhe Zhu, Sep 11, 1996
+
+ROUTINES:
+	Name			Description
+	----			-----------
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	mzhu	9/11/96   	Initial version.
+
+DESCRIPTION:
+
+	
+
+	$Id: bUI.goc,v 1.1 97/04/04 17:20:36 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+@include <bConst.goh>
+
+/*
+ ***************************************************************************
+ *		UI Objects
+ ***************************************************************************
+ */
+
+@start	AppResource;
+
+@object ISAppClass ISApp = {
+    GI_visMoniker = list { @ISTextMoniker }
+    GI_comp = @ISPrimary;
+    gcnList(MANUFACTURER_ID_GEOWORKS,GAGCNLT_WINDOWS) = @ISPrimary;
+}
+
+@visMoniker ISTextMoniker = "Geos Browser";
+
+@end	AppResource;
+
+@start	Interface;
+
+@object GenPrimaryClass ISPrimary = {
+    GI_comp = 	/* Local icons */
+		@ISLIOpenLocationButton,
+		@ISLIBackButton,
+		@ISLIForwardButton,
+		@ISLIHistoryButton,
+		@ISLIDocuInfoButton,
+		@ISLILoadingOptButton,
+		@ISLIPrintButton,
+		@ISNotificationDialog,
+
+		@ISOpenLocationDialog,
+		@ISHistoryDialog,
+		@ISDocuInfoDialog, 
+
+		@ISGenView;
+
+    HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+/*    HINT_WINDOW_NO_SYS_MENU;   */
+    HINT_PRIMARY_NO_FILE_MENU; 
+    HINT_CUSTOM_CHILD_SPACING = { SST_PIXELS | 0 };
+    HINT_DRAW_IN_BOX;
+}
+
+@object GenViewClass ISGenView = {
+    GVI_content = @ISGenContent;
+    GVI_horizAttrs = @default | GVDA_SCROLLABLE;
+    GVI_vertAttrs  = @default | GVDA_SCROLLABLE; /*|GVDA_KEEP_ASPECT_RATIO;*/
+    GVI_attrs      = @default | GVA_SEND_ALL_KBD_CHARS | 
+                     GVA_GENERIC_CONTENTS | GVA_SAME_COLOR_AS_PARENT_WIN;
+    HINT_DEFAULT_TARGET;
+    HINT_DEFAULT_FOCUS;
+}
+
+@end 	Interface;
+
+@start	MenuResource;
+
+/***************************************************************************
+ *	Objects for local icons
+ ***************************************************************************/
+@object GenTriggerClass ISLIBackButton = {
+    GI_visMoniker = 'B', "Back";
+    GI_states = @default & ~GS_ENABLED;
+    GTI_destination = process;
+    GTI_actionMsg = MSG_ISP_LOCAL_ICONS;
+    HINT_SEEK_MENU_BAR;
+}
+
+@object GenTriggerClass ISLIForwardButton = {
+    GI_visMoniker = 'F', "Forward";
+    GI_states = @default & ~GS_ENABLED; 
+    GTI_destination = process;
+    GTI_actionMsg = MSG_ISP_LOCAL_ICONS;
+    HINT_SEEK_MENU_BAR;
+}
+
+@object GenTriggerClass ISLIOpenLocationButton = {
+    GI_visMoniker = 'L', "Load";
+    GTI_destination = process;
+    GTI_actionMsg = MSG_ISP_LOCAL_ICONS;
+    HINT_SEEK_MENU_BAR;
+}
+
+@object GenTriggerClass ISLIHistoryButton = {
+    GI_visMoniker = 'H', "History";
+    GTI_destination = process;
+    GTI_actionMsg = MSG_ISP_LOCAL_ICONS;
+    HINT_SEEK_MENU_BAR;
+}
+
+@object GenTriggerClass ISLIDocuInfoButton = {
+    GI_visMoniker = 'D', "Document";
+    GTI_destination = process;
+    GTI_actionMsg = MSG_ISP_LOCAL_ICONS;
+    HINT_SEEK_MENU_BAR;
+}
+
+@object GenInteractionClass ISLIEditOptButton = {
+    GI_visMoniker = 'E', "Edit";
+    GI_comp = @ISLIFindButton, @ISLICopyButton;
+    GII_visibility = GIV_POPUP;
+    HINT_ORIENT_CHILDREN_HORIZONTALLY;
+}
+
+@object GenTriggerClass ISLIFindButton = {
+    GI_visMoniker = 'F', "Find";
+    GTI_destination = process;
+    GTI_actionMsg = MSG_ISP_LOCAL_ICONS;
+    HINT_SEEK_MENU_BAR;
+}
+
+@object GenTriggerClass ISLICopyButton = {
+    GI_visMoniker = 'C', "Copy";
+    GTI_destination = process;
+    GTI_actionMsg = MSG_ISP_LOCAL_ICONS;
+    HINT_SEEK_MENU_BAR;
+}
+
+@object GenInteractionClass ISLILoadingOptButton = {
+    GI_visMoniker = 'O', "Option";
+    GI_comp = @ISLILoadImageButton, @ISLILoadAllImageButton,
+		@ISLIReloadButton;
+    GII_visibility = GIV_POPUP;
+    HINT_ORIENT_CHILDREN_HORIZONTALLY;
+}
+
+@object GenTriggerClass ISLILoadImageButton = {
+    GI_visMoniker = 'I', "Load One Image";
+    GTI_destination = process;
+    GTI_actionMsg = MSG_ISP_LOCAL_ICONS;
+}
+
+@object GenTriggerClass ISLILoadAllImageButton = {
+    GI_visMoniker = 'A', "Load All Image";
+    GTI_destination = process;
+    GTI_actionMsg = MSG_ISP_LOCAL_ICONS;
+}
+
+@object GenTriggerClass ISLIReloadButton = {
+    GI_visMoniker = 'R', "Reload";
+    GTI_destination = process;
+    GTI_actionMsg = MSG_ISP_LOCAL_ICONS;
+}
+
+@object GenTriggerClass ISLIPrintButton = {
+    GI_visMoniker = 'P', "Print";
+    GTI_destination = process;
+    GTI_actionMsg = MSG_ISP_LOCAL_ICONS;
+    HINT_SEEK_MENU_BAR;
+}
+
+@end MenuResource;
+
+/***************************************************************************
+ *	GenContent + PManager
+ ***************************************************************************/
+@start Content;
+
+@object HTMLContentClass ISGenContent = {
+    GCI_genView = @ISGenView;
+    GI_comp     = @ISPManager;
+}
+
+@object ISPresentationManagerClass ISPManager = {
+    GI_states = @default;
+    HINT_FIXED_SIZE   = {
+      SST_PIXELS | X_SCREEN_SIZE, 0, 0
+    }; 
+    HINT_MAXIMUM_SIZE = {
+      SST_PIXELS | X_SCREEN_SIZE, 0, 0
+    };
+}
+
+@end Content;
+
+/***************************************************************************
+ *	UI Generator
+ ***************************************************************************/
+@start	UIGeneratorRes;
+
+@object	UIGeneratorClass UIGenerator = {
+	UIG_pmObj = @ISPManager;
+}
+
+@chunk byte H1_Chunk[] = "6";
+@chunk byte H2_Chunk[] = "5";
+@chunk byte H3_Chunk[] = "4";
+@chunk byte H4_Chunk[] = "3";
+@chunk byte H5_Chunk[] = "2";
+@chunk byte H6_Chunk[] = "1";
+
+@end	UIGeneratorRes;
+
+@start	IconsResource;
+/***************************************************************************/
+/* Objects for all the notification					   */
+/***************************************************************************/
+
+@object GenInteractionClass ISNotificationDialog = {
+    GI_comp = @ISNotificationGroup;
+    GII_visibility = GIV_DIALOG;
+    GII_type = GIT_NOTIFICATION;
+    GII_attrs = @default | GIA_MODAL | GIA_INITIATED_VIA_USER_DO_DIALOG;
+    HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+    HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
+    HINT_DRAW_IN_BOX;
+    HINT_DRAW_STYLE_3D_LOWERED; 
+}
+
+@object GenInteractionClass ISNotificationGroup = {
+    GI_comp = @ISNotificationText;
+    HINT_DRAW_IN_BOX;
+    HINT_DRAW_STYLE_3D_LOWERED; 
+    HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+    HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
+    HINT_CENTER_CHILDREN_HORIZONTALLY;
+    HINT_CENTER_CHILDREN_VERTICALLY;
+}
+
+@object GenTextClass ISNotificationText = {
+    GI_attrs = @default | GA_READ_ONLY;
+/*    ATTR_GEN_TEXT_DEFAULT_PARA_ATTR = {VTDPA_JUSTIFICATION | J_CENTER};*/
+    ATTR_GEN_TEXT_DEFAULT_PARA_ATTR = {DEF_PARA_ATTR_CENTER};
+    HINT_FIXED_SIZE = {SST_PIXELS|120, SST_LINES_OF_TEXT|5};
+}
+
+/***************************************************************************/
+/* Objects for Open Location 						   */
+/***************************************************************************/
+
+@object GenInteractionClass ISOpenLocationDialog = {
+    GI_visMoniker = "Open Location";
+    GI_comp = @LocationField;
+    GII_visibility = GIV_DIALOG;
+    GII_type = GIT_PROPERTIES;
+    GII_attrs = @default | GIA_MODAL | GIA_INITIATED_VIA_USER_DO_DIALOG;
+    HINT_INTERACTION_SINGLE_USAGE;
+    HINT_DRAW_STYLE_3D_LOWERED; 
+    HINT_DRAW_IN_BOX;
+}
+
+@object GenTextClass LocationField = {
+    GI_visMoniker = "Location";
+    GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT;
+    HINT_PLACE_MONIKER_ABOVE;
+}
+
+/***************************************************************************/
+/* Objects for History 							   */
+/***************************************************************************/
+
+@object GenInteractionClass ISHistoryDialog = {
+    GI_visMoniker = "History";
+    GI_comp = @HistoryList;
+    GII_visibility = GIV_DIALOG;
+    GII_type = GIT_PROPERTIES;
+    HINT_INTERACTION_SINGLE_USAGE;
+    GII_attrs = @default | GIA_MODAL | GIA_INITIATED_VIA_USER_DO_DIALOG;
+    HINT_DRAW_STYLE_3D_LOWERED; 
+}
+
+@object GenDynamicListClass HistoryList = {
+    GIGI_destination = @ISApp;
+    GDLI_numItems = 0;
+    GDLI_queryMsg = MSG_ISA_HISTORY_LIST_MONIKER_QUERY;
+
+    HINT_ITEM_GROUP_SCROLLABLE;	
+}
+
+/***************************************************************************/
+/* Objects for Document Info 						   */
+/***************************************************************************/
+
+@object GenInteractionClass ISDocuInfoDialog = {
+    GI_visMoniker = "Document Information";
+    GI_comp = @DIGroup;
+    GII_visibility = GIV_DIALOG;
+    GII_type = GIT_NOTIFICATION;
+    GII_attrs = @default | GIA_MODAL | GIA_INITIATED_VIA_USER_DO_DIALOG;
+    HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+    HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
+}
+
+@object GenInteractionClass DIGroup = {
+    GI_comp = @DITitleText, @DILocationText, @DIModifiedText;
+    HINT_DRAW_IN_BOX;
+    HINT_DRAW_STYLE_3D_LOWERED; 
+    HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+    HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
+    HINT_CENTER_CHILDREN_ON_MONIKERS;
+}
+
+@object GenTextClass DITitleText = {
+    GI_visMoniker = "Title";
+    GI_attrs = @default | GA_READ_ONLY;
+    GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT;
+    HINT_TEXT_FRAME;
+    HINT_DRAW_STYLE_FLAT; 
+    HINT_TEXT_WASH_COLOR = {C_WHITE};
+    HINT_TEXT_DISPLAY_FOCUSABLE;
+    HINT_FIXED_SIZE = {SST_PIXELS|160, SST_LINES_OF_TEXT|1};
+}
+
+@object GenTextClass DILocationText = {
+    GI_visMoniker = "Location";
+    GI_attrs = @default | GA_READ_ONLY;
+    HINT_TEXT_FRAME;
+    HINT_DRAW_STYLE_FLAT; 
+    HINT_TEXT_WASH_COLOR = {C_WHITE};
+    HINT_TEXT_DISPLAY_FOCUSABLE;
+    HINT_FIXED_SIZE = {SST_PIXELS|160, SST_LINES_OF_TEXT|2};
+}
+
+@object GenTextClass DIModifiedText = {
+    GI_visMoniker = "Modified";
+    GI_attrs = @default | GA_READ_ONLY;
+    GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT;
+    HINT_DRAW_STYLE_FLAT; 
+    HINT_TEXT_FRAME;
+    HINT_TEXT_WASH_COLOR = {C_WHITE};
+    HINT_TEXT_DISPLAY_FOCUSABLE;
+    HINT_FIXED_SIZE = {SST_PIXELS|160, SST_LINES_OF_TEXT|1};
+}
+
+@end IconsResource;
+
+
+
+
+
+
+
+

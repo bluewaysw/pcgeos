@@ -1,0 +1,340 @@
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Geoworks 1997.  All rights reserved.
+	GEOWORKS CONFIDENTIAL
+
+PROJECT:	Geos WWW Library
+MODULE:		htbuck
+FILE:		htbuck.goc
+
+AUTHOR:		Kok Kin Kee, May 24, 1997
+
+ROUTINES:
+	Name			Description
+	----			-----------
+
+REVISION HISTORY:
+	Name		Date		Description
+	----		----		-----------
+	kkee    	5/24/97   	Initial version.
+
+DESCRIPTION:
+
+	Memory buckets. Based on FIFO approach to managing buffers.
+        A bucket is some block of memory.
+
+	$Id: htbuck.goc,v 1.3.5.1 97/09/05 10:50:43 jeremyb Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+@include <stdapp.goh>
+#include <WWW/htmem.h>
+#include <WWW/htbuck.h>
+#include <Ansi/string.h>
+
+/***********************************************************************
+		Private Functions
+***********************************************************************/
+
+/***********************************************************************
+ *		WriteBucket
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Write as much data as possible to a bucket.
+ * CALLED BY:	HTBucketPutBlock
+ * RETURN:	Return number of bytes written, or 0 if cannot write all
+ *              all. 
+ *	
+ * STRATEGY:
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	kkee    	5/24/97   	Initial Revision
+ *	
+ ***********************************************************************/
+static word _pascal
+WriteBucket (HTBucketItem *b, const byte *data, word len)
+{
+    /* 
+     * Implements a sequential queue.
+     */
+    int fit = HTBUCKET_SIZE - b->rear;
+    fit = (len > fit) ? fit : len;
+    if (fit>0) {
+	memcpy(b->data+b->rear, data, fit);
+	b->rear += fit;
+    }
+    return fit;
+}	/* End of WriteBucket.	*/
+
+
+/***********************************************************************
+		Public Functions
+***********************************************************************/
+
+/***********************************************************************
+ *		HTBUCKETALLOC
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Allocate a memory bucket.
+ * CALLED BY:	Client
+ * RETURN:	HTBucketHandle or NULL if cannot allocate.
+ *	
+ * STRATEGY:	Optimize by always locking the bucket.
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	kkee    	5/24/97   	Initial Revision
+ *	
+ ***********************************************************************/
+HTBucketHandle _far _pascal
+HTBUCKETALLOC (void)
+{
+    HTBucketHandle ret;
+    HTMemAllocAndLock(&ret, sizeof(HTBucket));  /* Also init to zero */
+    return ret;
+}	/* End of HTBUCKETALLOC.	*/
+
+
+/***********************************************************************
+ *		HTBUCKETFREE
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Free a memory bucket.
+ * CALLED BY:	Client
+ * RETURN:	Nothing
+ *	
+ * STRATEGY:	
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	kkee    	5/24/97   	Initial Revision
+ *	
+ ***********************************************************************/
+void _far _pascal
+HTBUCKETFREE (HTBucketHandle htbuck)
+{
+    HTBucket *b = (HTBucket *) HTMemDeref(htbuck);
+    HTBucketItem *bi;
+    HTMemHandle temp, next = b->head;
+
+    while (next) {
+	if (next == b->head && next == b->tail) {
+	    /* Both are locked, but once only */
+	    HTMemUnlockAndFree(b->head);
+	    break;
+
+	} else if (next == b->head) {
+	    /* Head is locked once */
+	    temp = b->headPtr->next;
+	    HTMemUnlockAndFree(next);
+	    next = temp;
+
+	} else if (next == b->tail) {
+	    /* Tail is locked once */
+	    HTMemUnlockAndFree(next);
+	    break;
+
+	} else {
+	    bi = (HTBucketItem *) HTMemLock(next);
+	    temp = bi->next;
+	    HTMemUnlockAndFree(next);
+	    next = temp;
+	}
+    }
+    HTMemUnlockAndFree(htbuck);
+}	/* End of HTBUCKETFREE.	*/
+
+
+
+/***********************************************************************
+ *		HTBUCKETPUTBLOCK
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Put a block of data to a memory bucket. Data put in can
+ *              be removed by HTBucketGetByte; FIFO.
+ * CALLED BY:	Client
+ * RETURN:	The number of bytes put to bucket, which is >=0 and <=len.
+ *	
+ * STRATEGY:	Allocate a new HTBucketItem if there is not enough space.
+ *              Writes to HTBucket.writeBucket. 
+ *
+ *              *HACK* *IMPORTANT*
+ *              I know that HTBucketHandle is always locked until freed, 
+ *              so I can just HTMemDeref here and not have to call HTMemLock.
+ *              Also, I always leave the tail locked for optimization.
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	kkee    	5/24/97   	Initial Revision
+ *	
+ ***********************************************************************/
+word _far _pascal
+HTBUCKETPUTBLOCK (HTBucketHandle htbuck, const byte *data, word len)
+{
+    word written, orig;
+    HTMemHandle bih;             /* HTBucketItem handle */
+    HTBucketItem *bip;
+    HTBucket *b = (HTBucket *) HTMemDeref(htbuck);  /* Always locked */
+
+    if (!data || !len) return 0;
+
+    if (!b->head) {
+	b->headPtr = (HTBucketItem *) 
+	    HTMemAllocAndLock(&(b->head), sizeof(HTBucketItem));
+	if (!b->headPtr) return 0;
+	b->tail = b->head;
+	b->tailPtr = b->headPtr;           /* Always locked */
+    } 
+
+    /* 
+     * Write as much to tail bucket as possible, whatever is 
+     * leftover will be appended to a new tail bucket.
+     */
+    orig = len;
+    while (len) {
+	written = WriteBucket(b->tailPtr, data, len);
+	len -= written; data += written;
+	if (len) {
+	    bip = (HTBucketItem *) 
+		HTMemAllocAndLock(&bih, sizeof(HTBucketItem));
+	    if (bih) {
+		b->tailPtr->next=bih;
+		if (b->tail != b->head)
+		    HTMemUnlock(b->tail);   /* Old tail is no longer locked */
+		b->tail = bih;
+		b->tailPtr = bip;
+	    } else 
+		return (orig-len);
+	} 
+    }
+
+    return orig;
+}	/* End of HTBUCKETPUTBLOCK.	*/
+
+
+
+/***********************************************************************
+ *		HTBUCKETFLUSH
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Flush all data in bucket.
+ * CALLED BY:	Client
+ * RETURN:	HT_OK.
+ *	
+ * STRATEGY:	Delete all buckets except the head.
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	kkee    	5/26/97   	Initial Revision
+ *	
+ ***********************************************************************/
+void _far _pascal
+HTBUCKETFLUSH (HTBucketHandle htbuck)
+{
+    HTBucket *b = (HTBucket *) HTMemDeref(htbuck);
+    HTMemHandle temp, next;
+    HTBucketItem *bi;
+
+    if (!b->head) return;
+
+    /* Keep only one bucket */
+    b->headPtr->front = 0;
+    b->headPtr->rear = 0;
+    b->tail = b->head;
+    b->tailPtr = b->headPtr;
+
+    /* Delete the rest of the buckets */
+    next = b->headPtr->next;
+    b->headPtr->next = 0;
+
+    while (next) {
+	    bi = (HTBucketItem *) HTMemLock(next);
+	    temp = bi->next;
+	    HTMemUnlockAndFree(next);
+	    next = temp;
+    }
+}	/* End of HTBUCKETFLUSH.	*/
+
+
+
+/***********************************************************************
+ *		HTBUCKETGETBYTE
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Get one byte at a time from the bucket. Byte taken out 
+ *              will be removed from the bucket; FIFO.
+ * CALLED BY:	Client.
+ * RETURN:	TRUE if byte returned is valid, FALSE if there is no 
+ *              data.
+ *	
+ * STRATEGY:    HTBucketHandle is always locked. Once data is taken out,
+ *              it is freed so that the head always points to the bucket
+ *              for reading data.
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	kkee    	5/24/97   	Initial Revision
+ *	
+ ***********************************************************************/
+Boolean _far _pascal
+HTBUCKETGETBYTE (HTBucketHandle htbuck, byte *bt)
+{
+    HTBucket *b = (HTBucket *) HTMemDeref(htbuck);
+    
+    if (!b->head) return FALSE;
+
+    if (b->headPtr->front == b->headPtr->rear) {
+	/* Sequential queue empty, move to next bucket */
+	HTMemHandle next = b->headPtr->next;
+	if (!next) {
+	    /* The only bucket, keep it & reset vars */
+	    b->headPtr->front = 0;
+	    b->headPtr->rear = 0;
+
+	} else {
+	    /* We have to delete the bucket */
+	    HTMemUnlockAndFree(b->head);
+	    b->head = next;
+	    b->headPtr = (HTBucketItem *) HTMemLock(b->head);
+	}
+	return FALSE;
+    }
+
+    *bt = b->headPtr->data[b->headPtr->front];
+    b->headPtr->front += 1;
+    return TRUE;
+}	/* End of HTBUCKETGETBYTE.	*/
+
+
+
+
+/***********************************************************************
+ *		HTBUCKETGETCHUNK
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Get a chunk of data from bucket. The removed data will
+ *              deleted from the bucket. Pass 0 to get all data.
+ * CALLED BY:	Client
+ * RETURN:	Number of bytes gotten.
+ *	
+ * STRATEGY:	
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	kkee    	5/27/97   	Initial Revision
+ *	
+ ***********************************************************************/
+word _far _pascal
+HTBUCKETGETCHUNK (HTBucketHandle htbuck, HTMemHandle *ret, word len)
+{
+    return 0;
+}	/* End of HTBUCKETGETCHUNK.	*/
+

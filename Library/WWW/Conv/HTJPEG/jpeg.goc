@@ -1,0 +1,219 @@
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Geoworks 1997.  All rights reserved.
+	GEOWORKS CONFIDENTIAL
+
+PROJECT:	
+MODULE:		
+FILE:		jpeg.goc
+
+AUTHOR:		Mingzhe Zhu, Jan  9, 1997
+
+ROUTINES:
+	Name			Description
+	----			-----------
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	mzhu	1/ 9/97   	Initial version.
+
+DESCRIPTION:
+
+	The main entry of the jpeg converter.	
+
+	$Id: jpeg.goc,v 1.7.1.9 98/01/09 19:24:12 mzhu Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+#ifdef __HIGHC__
+#pragma Code ("JpegCodeC");
+#endif
+#ifdef __BORLANDC__
+#pragma codeseg JpegCodeC
+#endif
+
+#include <Ansi/stdio.h>
+#include <graphics.h>
+#include <vm.h>
+#include <hugearr.h>
+#include <graphics.h>
+@include <Objects/clipbrd.goh>
+@include <Objects/visC.goh>
+@include <WWW/htconv.goh>
+@include <WWW/htjpeg.goh>
+@include <WWW/html.goh>
+#include <sem.h>
+#include <sysstats.h>
+
+/*
+ * Include file for users of JPEG library.
+ * You will need to have included system headers that define at least
+ * the typedefs FILE and size_t before you can include jpeglib.h.
+ * (stdio.h is sufficient on ANSI-conforming systems.)
+ * You may also wish to include <jerror.h>.
+ */
+
+#include <jpeglib.h>
+
+/* Must match SGIT_SWAP_FREE_SIZE in Internal/heapInt.def */
+#define TOTAL_FREE_SWAP_SPACE  0x801a
+
+boolean END;
+
+GLOBAL word _pascal
+JPEGTOBITMAP(MemHandle dataHandle)
+{
+  /* This struct contains the JPEG decompression parameters and pointers to
+   * working space (which is allocated as needed by the JPEG library).
+   */
+  struct jpeg_decompress_struct cinfo;
+
+  JSAMPARRAY buffer;		/* Output row buffer */
+  int row_stride;		/* physical row width in output buffer */
+  int i, n;
+  void *vmScanPtr;
+  word vmScanSize;
+  dword vmLockRet;
+  VMFileHandle vmFile;
+  VMBlockHandle bitmap;
+  GStateHandle gstate;
+  Color colormap[256+1];	/* color map */
+
+  HTConverterStruct *htConverterData;
+  SemaphoreHandle done;
+  dword memAvail;
+
+  PUSHDS;
+  SET_DS_LIB_DGROUP;
+
+  /* Step 1: allocate and initialize JPEG decompression object */
+
+  /* Now we can initialize the JPEG decompression object. */
+  jpeg_create_decompress(&cinfo);
+
+  /* Step 2: specify data source (eg, a file) */
+
+  cinfo.struct_handle = dataHandle;
+
+  jpeg_stdio_src(&cinfo);
+
+  /* Step 3: read file parameters with jpeg_read_header() */
+
+  if (jpeg_read_header(&cinfo) != JPEG_HEADER_OK)
+    goto destroyCompress;
+
+  /* Step 4: set parameters for decompression */
+
+  /* Step 5: Start decompressor */
+
+  (void) jpeg_start_decompress(&cinfo);
+  /* We can ignore the return value since suspension is not possible
+   * with the stdio data source.
+   */
+
+  /* We may need to do some setup of our own at this point before reading
+   * the data.  After jpeg_start_decompress() we have the correct scaled
+   * output image dimensions available, as well as the output colormap
+   * if we asked for color quantization.
+   * In this example, we need to make an output work buffer of the right size.
+   */ 
+  /* JSAMPLEs per row in output buffer */
+  row_stride = cinfo.output_width * cinfo.output_components;
+
+  /* Make a one-row-high sample array that will go away when done with image */
+  buffer = alloc_sarray ((j_common_ptr) &cinfo, JPOOL_IMAGE, row_stride, 1);
+
+  /*
+   * Here we check the swap space to see if continue loading this image or not.
+   */
+  memAvail = SysGetInfo(TOTAL_FREE_SWAP_SPACE);
+  if(memAvail - 30000 > (dword) cinfo.output_width * cinfo.output_height) {
+      
+      /* connect the bitmap with the targetObject */
+      htConverterData = MemLock(cinfo.struct_handle);
+
+      vmFile = htConverterData->vmFileHandle;
+      bitmap = GrCreateBitmap(BMF_8BIT, cinfo.output_width, cinfo.output_height,
+			   vmFile, NULL, &gstate);
+      GrCreatePalette(gstate);
+
+      @send htConverterData->htobject::MSG_HTC_SET_TARGET_BITMAP
+	  (vmFile, bitmap, htConverterData->request);
+      @send htConverterData->htobject::MSG_HTC_SET_TARGET_SIZE
+	  (cinfo.output_width, cinfo.output_height);
+
+      @send htConverterData->htobject::MSG_HTC_CALL_RESIZE();
+
+      MemUnlock(cinfo.struct_handle);
+
+      if (cinfo.out_color_components == 1) {
+	  for (i = 0; i < cinfo.actual_number_of_colors; i++) {
+	      GrMapColorRGB(gstate, cinfo.colormap[0][i], cinfo.colormap[0][i],
+			    cinfo.colormap[0][i], &colormap[i]);
+	  }
+      } else {
+	  for (i = 0; i < cinfo.actual_number_of_colors; i++) {
+	      GrMapColorRGB(gstate, cinfo.colormap[0][i], cinfo.colormap[1][i],
+			    cinfo.colormap[2][i], &colormap[i]);
+	  }
+      }
+
+      /* Step 6: while (scan lines remain to be read) */
+      /*           jpeg_read_scanlines(...); */
+      
+      /* Here we use the library's state variable cinfo.output_scanline as the
+       * loop counter, so that we don't have to keep track ourselves.
+       */
+      END = FALSE;
+      while (cinfo.output_scanline < cinfo.output_height && !END) {
+	  /* jpeg_read_scanlines expects an array of pointers to scanlines.
+	   * Here the array is only one element long, but you could ask for
+	   * more than one scanline at a time if that's more convenient.
+	   */
+	  (void) jpeg_read_scanlines(&cinfo, buffer, 1);
+
+	  /* Save scanline in HugeArray. */
+	  vmLockRet = HugeArrayLock(vmFile, bitmap, cinfo.output_scanline-1,
+				    &vmScanPtr, &vmScanSize);
+	  if (HAL_COUNT(vmLockRet)) {
+	      for (i = 0; i < vmScanSize; i++)
+		  ((Color *)vmScanPtr)[i] = colormap[buffer[0][i]];
+	      HugeArrayDirty(vmScanPtr);
+	      HugeArrayUnlock(vmScanPtr);
+	  }
+	  
+      }
+
+      GrDestroyBitmap(gstate, BMD_LEAVE_DATA);
+
+      if(END) cinfo.output_scanline = cinfo.output_height ;
+
+      /* Step 7: Finish decompression */
+
+      (void) jpeg_finish_decompress(&cinfo);
+      /* We can ignore the return value since suspension is not possible
+       * with the stdio data source.
+       */
+  }
+
+ destroyCompress:
+  /* Step 8: Release JPEG decompression object */
+  jpeg_destroy_decompress(&cinfo);
+
+  /* And we're done! */
+  htConverterData = MemLock(cinfo.struct_handle);
+
+  ThreadPSem(htConverterData->done_sem);
+  htConverterData->done = TRUE;    
+  ThreadVSem(htConverterData->done_sem);
+
+  done = htConverterData->converter_exit;
+  ThreadVSem(htConverterData->buffer_empty);
+  MemUnlock(cinfo.struct_handle);
+
+  ThreadVSem(done);
+
+  POPDS;
+  return 0;
+}

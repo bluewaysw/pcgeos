@@ -1,0 +1,272 @@
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Geoworks 1996.  All rights reserved.
+	GEOWORKS CONFIDENTIAL
+
+PROJECT:	GeoBrowser
+MODULE:		text/xgw-html parser.
+FILE:		htmlp.goh
+
+AUTHOR:		Kok Kin Kee, Sep 14, 1996
+
+ROUTINES:
+	Name			Description
+	----			-----------
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	kkee	9/14/96   	Initial version.
+
+DESCRIPTION:
+
+	htmlp is text/xgw-html parser.
+
+	sgml -> htmlp -> html (application-specific) -> ui generator.
+
+	$Id: htmlp.goh,v 1.5.3.2 97/12/12 18:49:24 mzhu Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+@ifndef __HTMLP_GOH__
+@define __HTMLP_GOH__
+
+#define HTML_BUFFER_LENGTH 256
+
+@include <stdapp.goh>
+@include <WWW/HTCore/htstream.goh>
+@include <WWW/HTCore/htlist.goh>
+@include <WWW/htmlDTD.goh>
+
+
+/*
+ * A content can be a group of tags (the group is given a content name) 
+ * or it can be a single tag. Don't use 0 as it is used to terminate
+ * list.
+ *
+ * The content grammar:
+ *
+ * 1. Occurence.
+ *       + means one of more times, 
+ *       * means zero or more times,
+ *       ? means zero or one times.
+ *
+ * 2. Connector.
+ *       | means one or more in the list must occur,
+ *       & both elements must occur in any order,
+ *       , both elements must occur in specified order.
+ *
+ * 3. Scope. 
+ *       ( and ) parentheses are used to demarcate the 
+ *        scoping rules of 1 and 2. Currently we reduce all
+ *        content models to not use scopes.
+ *
+ */
+typedef enum {
+     HTMLAT_CONTENT  = 0x1        /* indicates group of tags. a group of 
+				     tags is preceded by a '%' in DTD */
+    ,HTMLAT_TOKEN                 /* indicates one tag */
+
+    /* Connectors */
+    ,HTMLAT_OR            /* | */
+    ,HTMLAT_AND           /* & */
+    ,HTMLAT_COMMA         /* , */
+ 
+    /* Occurence */
+    ,HTMLAT_ONE_OR_MORE   /* + */
+    ,HTMLAT_ZERO_OR_MORE  /* * */
+    ,HTMLAT_ZERO_OR_ONE   /* ? */
+
+     /*
+      * All tags (which also means all contents since contents
+      * are made up of tags) 
+      */
+     ,HTMLAT_ALL
+	
+     /* 
+      * An optimization. If a content model starts with 
+      * HTMLAT_SIMPLE, then all elements are HTMLAT_TOKENs and
+      * separated by |, no occurrences, no connectors, and no scopes.
+      * All the elements following that must be increasing order
+      * as we optimize with binary search.
+      */
+     ,HTMLAT_SIMPLE
+
+     /* 
+      * An optimization. If a content model starts with 
+      * HTMLAT_NO_GRAMMAR, then we don't feed it through the grammar 
+      * checker. You use this on content models where we don't
+      * have to check, usually the ones with HTMLAT_ZERO_OR_MORE 
+      * occurences and HTMLAT_OR connectors. With zero-or-more, we don't
+      * care if we get the token. With OR, we don't care how which elements
+      * and how of those we get.
+      */
+     ,HTMLAT_NO_GRAMMAR
+
+} HTMLAtomType;
+
+/*
+ * If content is a group of tags, then the tags are listed in HTMLA_content.
+ * If content is a just a tag, then it is HTMLA_token.
+ * numOfTokens indicates how many tokens for HTMLAT_SIMPLE.
+ */
+typedef union {
+    optr        HTMLAV_content;   /* a group of tags */
+    HTMLToken   HTMLAV_token;     /* a single tag */
+    word        HTMLAV_numOfTokens; /* used with HTMLAT_SIMPLE */
+} HTMLAtomValue;
+
+typedef struct {
+    HTMLAtomType HTMLA_type;
+    HTMLAtomValue HTMLA_value;
+} HTMLAtom; 
+
+
+
+/*
+ * This constant defines the largest number of the items in the 
+ * following content lists which do not begin with HTMLAT_SIMPLE
+ * and HTMLAT_NO_GRAMMAR. *MUST* be kept up to date if we
+ * update the content lists. Currently is 7, which is the content
+ * list @htmlc_head_content. See the htmlContainment table in 
+ * Library/WWW/HTMLP/htmlft.goc.
+ */
+#define MAX_HTML_CONTENT_ITEMS  8
+
+/*
+ * All bitwise exclusive and can be set individually.
+ */
+typedef enum {
+    HTML_START_TAG_REQUIRED  =    0x1,   /* 1 if start tag is required */
+    HTML_END_TAG_REQUIRED    =    0x2,   /* 1 if end tag is required */
+    HTML_ACCEPT_WHITESPACE   =    0x4    /* 1 if subsequent a leading whitespace
+  		    after the start element is to be accepted, else ignored */
+} HTMLTagMask;
+
+/*
+ * A HTMLTag. This is different from an SGMLTag, mainly they are
+ * used in different contexts. HTMLTag is used for error checking
+ * and to prevent illegal tags from breaking the UI generator.
+ *
+ */
+typedef struct {
+   
+/* 
+ * The tag itself, enumerated by HTMLToken in htmlDTD.goh. We put the
+ * tag here for error checking.
+ */
+    word HTMLT_token;
+
+    HTMLTagMask HTMLT_mask;
+
+    optr HTMLT_content;               /* Allowed content and grammar */
+
+    optr HTMLT_minus;                 /* Not allowed content, has no grammar */
+
+    int HTMLT_startScope;             /* The scope for forcing an important 
+					 tag to correct less important tags.
+					 If the content of the current tag 
+					 prevents a new start tag to be added,
+					 the startScope will be checked. If 
+					 the new tag has a lower scope than
+					 the current tag, the current tag will
+					 be corrected to allow the new tag to 
+					 be added. The correction stops if
+					 an equal scoped tag is encountered.
+					 At that point, if the new tag is not
+					 allowed (by content), than it is 
+					 rejected. So startScope is used to 
+					 make sure important tags take
+					 precedence over less important tags 
+					 by correcting less important tags to
+					 allow it. The startScope value should
+					 be the same as the endScope value in
+					 SGMLTag in sgml.goh. See htmlDTD.goc
+					 for the endScope value. */
+					 
+} HTMLTag;
+
+
+/*
+ * HTML parser state.   Keeps track of the elements allowed in the
+ * current content model. This is the state that gets pushed onto the 
+ * elementStack when a new and allowed element is encountered.
+ * HTMLS_index indexes an item of HTMLTag.HTMLT_content.
+ * index and count are used for error checking and correcting.
+ */
+typedef struct {
+    word HTMLS_elementToken;          /* the element itself */
+    int HTMLS_index;                  /* -1 for invalid */
+    byte HTMLS_count[MAX_HTML_CONTENT_ITEMS];  /* occurences of a content */
+} HTMLState;
+
+
+/*
+ * HTML parser. Its not efficient to parse using messages. Hence, we
+ * store the parser in a data structure and parse using functions.
+ */
+
+#define MAX_HTML_ALLOWED_NESTING_LEVEL 70
+#define MAX_HTML_DISALLOWED_NESTING_LEVEL 10
+
+typedef struct {
+    /* 
+     * elementStack contains elements that have contents and/or
+     * require an end element.
+     */
+    HTMLState HTMLP_elementStack[MAX_HTML_ALLOWED_NESTING_LEVEL];
+    word HTMLP_elementTop;                      /* Points to empty slot */
+    word HTMLP_minusStack[MAX_HTML_DISALLOWED_NESTING_LEVEL]; 
+    word HTMLP_minusTop;                        /* Points to empty slot */
+    HTMLTag* HTMLP_tag;                         /* Tag list */
+    MemHandle HTMLP_block;                      /* block + chunk of empty */
+    ChunkHandle HTMLP_chunk;                    /*    attr list */
+    HTStreamHandle HTMLP_target;                /* The target for pushing
+						   data */
+
+    /* 
+     * This is to make sure %form group elements can only
+     * appear in <FORM>. This is a DTD 3.2 spec bug since it 
+     * does not indicate so.
+     */
+    Boolean HTMLP_form;                         /* Initially FALSE */
+    HTMLAtom *HTMLP_formGroup;
+
+    /* 
+     * This is to make sure that we don't get the whitespaces we don't
+     * want. If TRUE, the next immediate whitespace is ignored. (Lucky
+     * for us that I've written SGML to reduce consecutive whitespaces
+     * to a single whitespace. :)
+     */
+    Boolean HTMLP_whitespaceOK;                 /* Initially FALSE */
+
+} HTMLParser;
+
+
+/****************************************************************************
+
+  The HTMLPClass is inherited from HTStreamClass defined in htstream.goh{goc}.
+
+ ****************************************************************************/
+
+@class HTMLPClass, HTStructuredClass;
+
+
+/* -------------------------------------------------------------------------
+ * 		Instance Data.
+ * ------------------------------------------------------------------------*/
+
+/* 
+ * HTMLParser structure and its pointer.
+ */
+@instance MemHandle HTMLI_parserBlock;
+@instance HTMLParser *HTMLI_parser;
+
+@endc;
+
+@endif
+
+
+
+
+

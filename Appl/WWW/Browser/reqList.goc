@@ -1,0 +1,342 @@
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Geoworks 1996.  All rights reserved.
+	GEOWORKS CONFIDENTIAL
+
+PROJECT:	
+MODULE:		
+FILE:		reqList.goc
+
+AUTHOR:		Mingzhe Zhu, Oct 16, 1996
+
+ROUTINES:
+	Name			Description
+	----			-----------
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	mzhu	10/16/96   	Initial version.
+
+DESCRIPTION:
+
+	$Id: reqList.goc,v 1.1 97/04/04 17:20:48 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+@include <WWW/HTCore/htreq.goh>
+@include "reqList.goh"
+@include "htfatals.goh"
+#include <Ansi/string.h>
+
+#define min(a, b)	(((a)<(b))?(a):(b))
+
+/**************************************************************************
+ * 		Functions for SList
+ **************************************************************************/
+void 
+ECCheckSReqList(SReqList list)
+{
+    ECCheckMemHandle(list.SRL_memHandle);
+/*    ECCheckChunkArray(list.SRL_chunkHandle); */
+}
+
+
+void _far _pascal
+SReqListNew(SReqList *list)
+{
+    /* 
+     * Creates a new memory block for the list. And locks it.
+     */
+    list->SRL_memHandle = MemAllocLMem(LMEM_TYPE_GENERAL, 
+			sizeof(LMemBlockHeader));
+    MemModifyFlags(list->SRL_memHandle, HF_SHARABLE, 0);
+
+    MemLock(list->SRL_memHandle);
+
+    /*
+     * Creates a chunk array in the block. 
+     */
+    list->SRL_chunkHandle = ChunkArrayCreate(list->SRL_memHandle,
+			sizeof(SRequest), sizeof(ChunkArrayHeader), 0);
+
+    list->SRL_titleChunk = NullChunk;
+    list->SRL_urlChunk = NullChunk;
+
+EC( ECCheckSReqList(*list);						)
+
+    MemUnlock(list->SRL_memHandle);
+}
+
+
+
+void _far _pascal
+SReqListAddRequest(SReqList list, HTRequestHandle request, optr target)
+{
+    SRequest *sreq;
+
+EC( ECCheckSReqList(list);						)
+EC( ECCheckRequest(request);						)
+EC( ECCheckOD(target);							)
+
+    /*
+     * Creats a new synchnized request.
+     */ 
+    MemPLock(list.SRL_memHandle);
+    sreq = ChunkArrayAppendHandles(list.SRL_memHandle, 
+			list.SRL_chunkHandle, sizeof(SRequest));
+			
+    sreq->SR_request = request;
+    sreq->SR_target = target;
+    sreq->SR_killed = FALSE;
+
+    MemUnlockV(list.SRL_memHandle);
+}
+
+
+void _far _pascal
+SReqListDeleteRequest(SReqList list, HTRequestHandle request)
+{
+    word count = 0, i, size;
+    SRequest *sreq;
+
+EC( ECCheckSReqList(list);						)
+EC( ECCheckRequest(request);						)
+
+    MemPLock(list.SRL_memHandle);
+    count = ChunkArrayGetCountHandles(list.SRL_memHandle,
+					list.SRL_chunkHandle);
+
+    for(i=0; i<count; i++) {
+	sreq = ChunkArrayElementToPtrHandles(list.SRL_memHandle,
+					list.SRL_chunkHandle,
+					i, &size);
+
+ 	if(sreq->SR_request == request) {
+	    ChunkArrayDeleteHandle(list.SRL_chunkHandle, sreq);
+	    MemUnlockV(list.SRL_memHandle);
+ 	    HTRequestDelete(request);
+	    return;
+	}
+    }
+
+EC( EC_ERROR( 0 );							)
+}
+
+
+void _far _pascal
+SReqListKillRequest(SReqList list, HTRequestHandle request)
+{
+    word count = 0, i, size;
+    SRequest *sreq;
+
+EC( ECCheckSReqList(list);						)
+EC( ECCheckRequest(request);						)
+
+    MemPLock(list.SRL_memHandle);
+    count = ChunkArrayGetCountHandles(list.SRL_memHandle,
+					list.SRL_chunkHandle);
+
+    for(i=0; i<count; i++) {
+	sreq = ChunkArrayElementToPtrHandles(list.SRL_memHandle,
+					list.SRL_chunkHandle,
+					i, &size);
+
+ 	if(sreq->SR_request == request) {
+	    sreq->SR_killed = TRUE;
+	    MemUnlockV(list.SRL_memHandle);
+	    HTRequestKill(request);
+	    return;
+	}
+    }
+
+EC( EC_ERROR( 0 );							)
+}
+
+
+void _far _pascal
+SReqListKillAllRequests(SReqList *list)
+{
+    word count = 0, i, size;
+    SRequest *sreq;
+    HTRequestHandle request;
+
+EC( ECCheckSReqList(*list);						)
+
+    MemPLock(list->SRL_memHandle);
+    count = ChunkArrayGetCountHandles(list->SRL_memHandle,
+					list->SRL_chunkHandle);
+    MemUnlockV(list->SRL_memHandle);
+
+    for(i=0; i<count; i++) {
+
+    	MemPLock(list->SRL_memHandle);
+	sreq = ChunkArrayElementToPtrHandles(list->SRL_memHandle,
+					list->SRL_chunkHandle,
+					i, &size);
+
+	sreq->SR_killed = TRUE;
+	request = sreq->SR_request;
+    	MemUnlockV(list->SRL_memHandle);
+
+	HTRequestKill(request);
+    }
+
+    MemPLock(list->SRL_memHandle);
+    if(list->SRL_titleChunk) {
+	LMemFreeHandles(list->SRL_memHandle, list->SRL_titleChunk);
+	list->SRL_titleChunk = NullChunk;
+    }
+
+    if(list->SRL_urlChunk) {
+	LMemFreeHandles(list->SRL_memHandle, list->SRL_urlChunk);
+ 	list->SRL_urlChunk = NullChunk;
+    }
+    MemUnlockV(list->SRL_memHandle);
+}
+
+
+optr _far _pascal
+SReqListGetRequestTarget(SReqList list, HTRequestHandle request)
+{
+    word count = 0, i, size;
+    SRequest *sreq;
+    optr target;
+
+EC( ECCheckSReqList(list);						)
+EC( ECCheckRequest(request);						)
+
+    MemPLock(list.SRL_memHandle);
+    count = ChunkArrayGetCountHandles(list.SRL_memHandle,
+					list.SRL_chunkHandle);
+
+    for(i=0; i<count; i++) {
+	sreq = ChunkArrayElementToPtrHandles(list.SRL_memHandle,
+					list.SRL_chunkHandle,
+					i, &size);
+
+ 	if(sreq->SR_request == request) {
+	    target = sreq->SR_target;
+	    MemUnlockV(list.SRL_memHandle);
+	    return target;
+	}
+    }
+
+EC( EC_ERROR( 0 );							)
+}    
+
+
+int _far _pascal
+SReqListGetRequestCount(SReqList list)
+{
+    int count = 0;
+
+EC( ECCheckSReqList(list);						)
+
+    MemPLock(list.SRL_memHandle);
+    count = ChunkArrayGetCountHandles(list.SRL_memHandle,
+					list.SRL_chunkHandle);
+    MemUnlockV(list.SRL_memHandle);
+
+    return count;
+}
+
+
+void _far _pascal
+SReqListFree(SReqList *list)
+{
+    MemPLock(list->SRL_memHandle);
+    MemFree(list->SRL_memHandle);
+    
+    list->SRL_memHandle = NullHandle;
+    list->SRL_chunkHandle = NullChunk;
+    list->SRL_titleChunk = NullChunk;
+    list->SRL_urlChunk = NullChunk;
+}
+
+
+void _far _pascal 
+SReqListSetTitle(SReqList *list, char *title)
+{
+    char *ptr;
+
+    MemPLock(list->SRL_memHandle);
+
+    if(!list->SRL_titleChunk) 
+    	list->SRL_titleChunk = LMemAlloc(list->SRL_memHandle, strlen(title)+1);
+    else 
+	LMemReAllocHandles(list->SRL_memHandle, list->SRL_titleChunk, 
+		strlen(title) + 1);
+
+    ptr = LMemDerefHandles(list->SRL_memHandle, list->SRL_titleChunk);
+    strcpy(ptr, title);
+    MemUnlockV(list->SRL_memHandle);
+}
+
+word _far _pascal 
+SReqListGetTitle(SReqList list, char *title, word size)
+{
+    char *ptr;
+    word len;
+
+    MemPLock(list.SRL_memHandle);
+
+    if(!list.SRL_titleChunk) {
+    	MemUnlockV(list.SRL_memHandle);
+	return 0;
+    }
+
+    ptr = LMemDerefHandles(list.SRL_memHandle, list.SRL_titleChunk);
+    len = min(strlen(ptr), size);
+    strncpy(title, ptr, len);
+    *(title + len) = 0;
+    MemUnlockV(list.SRL_memHandle);
+
+    return len;
+}
+
+void _far _pascal 
+SReqListSetURL(SReqList *list, char *url)
+{
+    char *ptr;
+
+    MemPLock(list->SRL_memHandle);
+
+    if(list->SRL_urlChunk) 
+	LMemReAllocHandles(list->SRL_memHandle, list->SRL_urlChunk, 
+		strlen(url) + 1);
+    else 
+        list->SRL_urlChunk = LMemAlloc(list->SRL_memHandle, strlen(url)+1);
+
+    ptr = LMemDerefHandles(list->SRL_memHandle, list->SRL_urlChunk);
+    strcpy(ptr, url);
+    MemUnlockV(list->SRL_memHandle);
+}
+
+word _far _pascal 
+SReqListGetURL(SReqList list, char *url, word size)
+{
+    char *ptr;
+    word len;
+
+    MemPLock(list.SRL_memHandle);
+
+    if(!list.SRL_urlChunk) {
+    	MemUnlockV(list.SRL_memHandle);
+	return 0;
+    }
+
+    ptr = LMemDerefHandles(list.SRL_memHandle, list.SRL_urlChunk);
+    len = min(strlen(ptr), size);
+    strncpy(url, ptr, len);
+    *(url + len) = 0;
+    MemUnlockV(list.SRL_memHandle);
+
+    return len;
+}
+
+
+
+
+
+

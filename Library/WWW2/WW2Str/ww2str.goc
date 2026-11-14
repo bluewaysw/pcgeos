@@ -1,0 +1,1993 @@
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Geoworks 1996 -- All Rights Reserved
+
+PROJECT:	WWW2 Library
+MODULE:		WW2String
+FILE:		ww2String.goc
+
+AUTHOR:		Kok Kin Kee 5/13/97
+
+ROUTINES:
+	Name			Description
+	----			-----------
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+
+DESCRIPTION:
+	
+        WWStrings are used to store and access strings. See header for more.
+
+	Note, DateTime is not ported, Japanese->Unicode is not ported
+	Parts of Geos-SC Tstring and Jstring libraries are ported.
+
+	$Id: ww2str.goc,v 1.5 98/08/07 18:22:30 edwin Exp $
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+@include <stdapp.goh>
+@include <Ansi/stdlib.h>
+@include <Ansi/string.h>
+@include "WWW2/WW2Core/ww2string.goh"
+@include "WWW2/ww2mem.h"
+@include "WWW2/WW2Core/wwutils.goh"
+#include "WWW2/wwMacro.h"
+
+int dummy;  /* This is just to get rid of compiling error that says */
+            /* "error: dgroup not a group -- cannot create geode    */
+#if 0
+
+const char * const WWTime::timeTemplate = "___, __ ___ ____ __:__:__ GMT";
+
+const char * const WWTime::wkdays[] = {"Sun",
+                                       "Mon",
+                                       "Tue",
+                                       "Wed",
+                                       "Thu",
+                                       "Fri",
+                                       "Sat"};
+
+const char * const WWTime::months[] = {"Jan",
+                                        "Feb",
+                                        "Mar",
+                                        "Apr",
+                                        "May",
+                                        "Jun",
+                                        "Jul",
+                                        "Aug",
+                                        "Sep",
+                                        "Oct",
+                                        "Nov",
+                                        "Dec"};
+
+uint16 const WWTime::daysBeforeMonthTable[] = {0,  // note this table is identical to one in
+                                               31, // datetime.cc of the kernel, but it is
+                                               59, // not accessible from here.
+                                               90,
+                                               120,
+                                               151,
+                                               181,
+                                               212,
+                                               243,
+                                               273,
+                                               304,
+                                               334};
+
+#endif
+
+void _far _pascal WWStringECCheck(WWMemHandle hString)
+{
+    ECCheckWWMemHandle(hString);
+    return;
+}
+
+/***********************************************************************
+ *			Tstrlen
+ ***********************************************************************
+ * SYNOPSIS:	    Returns the number of TCHARs in the string, not
+ *	    	    counting the terminator.
+ * CALLED BY:	    
+ * RETURN:	    
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:	    
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	mchen	9/28/95   	Initial Revision
+ *
+ ***********************************************************************/
+size_t _far _pascal Tstrlen(const TCHAR *s)
+{
+
+#ifdef DO_DBCS
+    ASSERTS( !((int32)s & 0x01), "DBCS string is not aligned on even boundary" );
+#endif
+
+    const TCHAR *start = s;
+    while(*s != 0) { 
+	s++;
+    }
+    return (s - start);
+}	/* End of Tstrlen.	*/
+
+
+/***********************************************************************
+ *			Tstrcpy
+ ***********************************************************************
+ * SYNOPSIS:	 Copies from (TCHAR) string to (TCHAR) string.
+ * CALLED BY:	     
+ * RETURN:	 A pointer to the destination (TCHAR) string    
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:	    
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	mrowlee	9/26/95   	Initial Revision
+ *
+ ***********************************************************************/
+TCHAR* _far _pascal Tstrcpy( TCHAR *s, const TCHAR *ct )
+{
+
+#ifdef DO_DBCS
+    ASSERTS( !( ((int32)s & 0x01) || ((int32)ct & 0x01)), "DBCS string not aligned on even boundary" );
+#endif
+
+    TCHAR *tmp = s;
+    while ( (*s++ = *ct++) ) {
+	;
+    }
+
+    return( tmp );
+
+}	/* End of Tstrcpy.	*/
+
+/***********************************************************************
+ *			Tstrncpy
+ ***********************************************************************
+ * SYNOPSIS:	 A strncpy function that copies (up to n) chars
+ *               from TCHAR to TCHAR     
+ * CALLED BY:	    
+ * RETURN:	 A pointer to the (modified) TCHAR string.   
+ * SIDE EFFECTS: If n > chars in source, pad destination with '\0's   
+ *
+ * STRATEGY:	 Copy at most n characters from source string to
+ *               destination string. Pad with '\0's if source string has
+ *               fewer than n characters.
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	mrowlee	9/27/95   	Initial Revision
+ *
+ ***********************************************************************/
+TCHAR* Tstrncpy( TCHAR *s, const TCHAR *ct, size_t n )
+{
+
+#ifdef DO_DBCS
+    ASSERTS( !( ((int32)s & 0x01) || ((int32)ct & 0x01)), "DBCS string not aligned on even boundary" );
+#endif
+
+    TCHAR *tmp = s;
+    while ( ( n ) && (  *s++ = *ct++ ) ) {
+        n--;	/* must do it here so that the check below is valid for
+		   size_t being unsigned */
+    }
+
+    /*
+     * If n > 0, then pad with '\0's.
+     * Is this necessary???? The
+     * current Clib function doesn't do this
+     *
+     * Changed to n > 1 because n didn't get decremented above when it
+     * copied the null character, but the string pointers did. Thus,
+     * it used to write one more character than the value passed in (n)
+     *   - dbaumann
+     */ 
+    while ( n > 1 ) {     
+        *s++ = '\0';
+	n--;
+    }
+
+
+    return( tmp );
+
+}	/* End of Tstrncpy.	*/
+
+
+/***********************************************************************
+ *			Tstrrchr
+ ***********************************************************************
+ * SYNOPSIS:	 Find last occurrence of c in string cs.   
+ * CALLED BY:	    
+ * RETURN:	 Pointer to last occurrence of c in string cs. Return
+ *               NULL if not present.
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:	    
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	mrowlee	9/27/95   	Initial Revision
+ *	lester  11/7/97         Fixed to check first character in string
+ *                              and handle searching for the null character.
+ *
+ ***********************************************************************/
+TCHAR* _far _pascal
+Tstrrchr( const TCHAR *cs, int c )
+{
+#ifdef DO_DBCS
+    ASSERTS( !((int32)cs & 0x01) ,"DBCS string is not aligned on even boundary" );
+#endif
+
+    const TCHAR *p = cs + Tstrlen(cs);
+
+    do {
+        if (*p == (TCHAR)c) {
+            return (TCHAR *)p;
+        }
+    } while (--p >= cs);
+
+    return NULL;
+
+}	/* End of Tstrrchr.	*/
+
+
+/***********************************************************************
+ *			Tstrcat
+ ***********************************************************************
+ * SYNOPSIS:	 A function that concatenates the source string to the
+ *               end of the destination string.
+ * CALLED BY:	    
+ * RETURN:	 A pointer to the (concatenated) string.    
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:	 Find the end of the destination string and append the
+ *               source string
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	mrowlee	9/27/95   	Initial Revision
+ *
+ ***********************************************************************/
+TCHAR* _far _pascal
+Tstrcat( TCHAR *s, const TCHAR *ct )
+{
+
+
+#ifdef DO_DBCS
+    ASSERTS( !( ((int32)s & 0x01) || ((int32)ct & 0x01)), "DBCS string not aligned on even boundary" );
+#endif
+
+    TCHAR *tmp = s;
+    /*
+     * Find the end of s
+     */
+    while ( *s++ ) {
+        ;
+    }
+    s--;              /*  Set s to point to '\0' value */
+    
+    /*
+     * Append ct onto end of s
+     */
+    while ( (*s++ = *ct++) ) {
+	;
+    }
+
+    return ( tmp );
+
+}	/* End of Tstrcat.	*/
+
+
+
+/***********************************************************************
+ *			Jstrcpy
+ ***********************************************************************
+ * SYNOPSIS:	 Copies from (TCHAR) string to (char) string
+ * CALLED BY:	    
+ * RETURN:	 A pointer to the (char) string.   
+ * SIDE EFFECTS: Converts full-width roman to ASCII equivalent.
+ *		 Non-mapping chars become "~".
+ *
+ * STRATEGY:	    
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	mrowlee	9/26/95   	Initial Revision
+ *
+ ***********************************************************************/
+char* _far _pascal
+Jstrcpy(TCHAR *s, const char *ct )
+{
+    TCHAR *tmp = s;
+    while ( (*s++ = ( TCHAR )*ct++) ) {
+	;
+    }
+    return( tmp );
+}
+
+#if 0
+/***********************************************************************
+ *			Jstrncpy
+ ***********************************************************************
+ * SYNOPSIS:	 A strncpy function that copies (up to n) chars
+ *               from TCHAR to TCHAR     
+ * CALLED BY:	    
+ * RETURN:	 A pointer to the (modified) TCHAR string.   
+ * SIDE EFFECTS: If n > chars in source, pad destination with '\0's   
+ *
+ * STRATEGY:	 Copy at most n characters from source string to
+ *               destination string. Pad with '\0's if source string has
+ *               fewer than n characters.
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	mrowlee	9/27/95   	Initial Revision
+ *
+ ***********************************************************************/
+char* _far _pascal
+JstrncpyToTCHAR(char *s, const TCHAR *ct, size_t n)
+{
+#ifdef DO_DBCS
+    ASSERTS( !((int32)ct & 0x01), "DBCS string not aligned on even boundary" );
+#endif
+
+    char *tmp = s;
+    while ( ( n ) && ( *s++ = ConvertDBC2SBC(*ct++) ) ) {
+        n--;	/* must do it here so that the check below is valid for
+		   size_t being unsigned */
+    }
+
+    /*
+     * If n > 0, then pad with '\0's.
+     * Is this necessary???? The
+     * current Clib function doesn't do this
+     *
+     * Changed to n > 1 because n didn't get decremented above when it
+     * copied the null character, but the string pointers did. Thus,
+     * it used to write one more character than the value passed in (n)
+     *   - dbaumann
+     */ 
+    while ( n > 1 ) {
+        *s++ = '\0';
+	n--;
+    }
+
+
+    return( tmp );
+
+}	/* End of Jstrncpy.	*/
+#endif
+        
+TCHAR* _far _pascal
+Jstrncpy(TCHAR *s, const char *ct, size_t n)
+{
+
+#ifdef DO_DBCS
+    ASSERTS( !((int32)s & 0x01), "DBCS string not aligned on even boundary" );
+#endif
+
+    TCHAR *tmp = s;
+    while ( ( n ) && (  *s++ = *ct++ ) ) {
+        n--;	/* must do it here so that the check below is valid for
+		   size_t being unsigned */
+    }
+
+    /*
+     * If n > 0, then pad with '\0's.
+     * Is this necessary???? The
+     * current Clib function doesn't do this
+     *
+     * Changed to n > 1 because n didn't get decremented above when it
+     * copied the null character, but the string pointers did. Thus,
+     * it used to write one more character than the value passed in (n)
+     *   - dbaumann
+     */ 
+    while ( n > 1 ) {
+        *s++ = '\0';
+	n--;
+    }
+
+
+    return( tmp );
+
+}	/* End of Jstrncpy.	*/
+
+
+/*--------------------------------------------------------------------------
+// WWStrCaseCmp
+//--------------------------------------------------------------------------
+//
+// DESCRIPTION:     Same as AnsiC strcmp, but case insensitive.
+//
+// SCOPE:           PUBLIC
+//
+// PARAMETERS:
+//      [in]        pString     the string to store
+//
+// RETURN:          <0 if a<b
+//                  0 if a==b
+//                  >0 if a>b
+//
+// IMPLEMENTATION:  Copied from W3C HTString.c. This is double byte and
+//                  the sematic of larger is down to the definition of
+//                  TCHAR under New Sokoto, ie the UNICODE ordering. Works
+//                  like strcmp.
+//
+//                  This would be easy with templates but we are not using
+//                  them. The browser needs access to single and double
+//                  byte versions of this code independent of the width of
+//                  TCHAR used in the build.
+//
+// REVISION HISTORY:
+//      Name        Date        Description
+//      ----        ----        -----------
+//      kkee         9/25/96    Initial Revision
+//      jsenior     10/30/97    New Sokoto Port.
+//
+//------------------------------------------------------------------------*/
+
+int _far _pascal WWStrCaseCmp(const char *pA, const char *pB) 
+{
+    int diff;
+
+    for(; *pA && *pB; pA++, pB++)
+    {
+        diff = TOLOWER(*pA) - TOLOWER(*pB);
+        if (diff)
+        {
+            return (int)diff;
+        }
+    }
+
+    if (*pA) return 1;  /* a was longer than b */
+    if (*pB) return -1; /* a was shorter than b */
+
+    return 0;           /* Exact match */
+} /* End of WWStrCaseCmp. */
+
+
+
+/*--------------------------------------------------------------------------
+// WWStrCaseCmpWWMem
+//--------------------------------------------------------------------------
+//
+// DESCRIPTION:     As WWStrCaseCmp but takes a WWMemHandle for the first
+//                  argument.
+//
+// SCOPE:           PUBLIC
+//
+// RETURN:          See WWStrCaseCmp.
+//
+// IMPLEMENTATION:  Locks the handle and passes the work to WWStrCaseCmp.
+//
+//                  This would be easy with templates but we are not using
+//                  them. The browser needs access to single and double
+//                  byte versions of this code independent of the width of
+//                  TCHAR used in the build.
+//
+//                  If pB is single byte, the string on the handle is 
+//                  assumed single byte also.
+//
+// REVISION HISTORY:
+//      Name        Date            Description
+//      ----        ----            -----------
+//      kkee        9/26/96         Initial Revision
+//      jsenior     10/28/97        New Sokoto Port.
+//
+//------------------------------------------------------------------------*/
+
+int _far _pascal WWStrCaseCmpWWMem(const WWMemHandle hA, const char *pB) 
+{
+    int result;
+
+    EC(ECCheckWWMemHandle(hA);)
+    char *pA = (char *)WWMemLock(hA);
+
+    result = WWStrCaseCmp(pA, pB);
+
+    EC(ECCheckWWMemHandle(hA);)
+    WWMemUnlock(hA);
+
+    return result;
+} /* End of WWstrcasecmpWWMem. */
+  
+
+/*--------------------------------------------------------------------------
+// WWStrNCaseCmp
+//--------------------------------------------------------------------------
+//
+// DESCRIPTION:     Same as Ansi strncmp, but case insensitive.
+//
+// SCOPE:           PUBLIC
+//
+// PARAMETERS:
+//      [in]        pString     the string to store
+//
+// RETURN:          <0 if a<b
+//                  0 if a==b
+//                  >0 if a>b
+//
+// IMPLEMENTATION:  Copied from W3C HTString.c. This is double byte and
+//                  the sematic of larger is down to the definition of
+//                  TCHAR under New Sokoto, ie the UNICODE ordering. Works
+//                  like strcmp.
+//
+//                  This would be easy with templates but we are not using
+//                  them. The browser needs access to single and double
+//                  byte versions of this code independent of the width of
+//                  TCHAR used in the build.
+//
+// REVISION HISTORY:
+//      Name        Date        Description
+//      ----        ----        -----------
+//      kkee        10/ 1/96    Initial Revision
+//      jsenior     10/30/97    New Sokoto Port.
+//
+//------------------------------------------------------------------------*/
+
+int _far _pascal WWStrNCaseCmp(const char *pA, const char *pB, int n) 
+{
+    if (!pA && pB) /* see comments in WWStrNCaseCmpWWMem below */
+    {
+        return -1;
+    }
+    if (pA && !pB)
+    {
+        return 1;
+    }
+    if (!pA && !pB)
+    {
+        return 0;
+    }
+
+    const char *pAPos, *pBPos;
+    
+    for (pAPos = pA, pBPos = pB;; pAPos++, pBPos++)
+    {   /* traverse both strings unconditionally */
+        int diff;
+
+        if (pAPos == pA + n)
+        {
+            return 0;   /*   Match up to n characters */
+        }
+        if (!(*pAPos && *pBPos)) /* reached the end  */
+        {
+            return (int)(*pAPos - *pBPos);
+        }
+        diff = TOLOWER(*pAPos) - TOLOWER(*pBPos); /* check for difference */
+        if (diff)
+        {
+            return diff;
+        }
+    }
+
+    return 0; /* for completeness */
+    /* this is nasty and hacky but it works fast. */
+} /* End of WWStrNCaseCmp. */
+
+
+
+/*--------------------------------------------------------------------------
+// WWStrCaseCmpWWMem
+//--------------------------------------------------------------------------
+//
+// DESCRIPTION:     As WWStrNCaseCmp but takes a WWMemHandle for the first
+//                  argument.
+//
+// SCOPE:           PUBLIC
+//
+// RETURN:          See WWStrCaseCmp.
+//
+// IMPLEMENTATION:  Locks the handle and passes the work to WWStrNCaseCmp.
+//
+//                  This would be easy with templates but we are not using
+//                  them. The browser needs access to single and double
+//                  byte versions of this code independent of the width of
+//                  TCHAR used in the build.
+//
+// REVISION HISTORY:
+//      Name        Date            Description
+//      ----        ----            -----------
+//      kkee         4/ 8/96        Initial Revision
+//      jsenior     10/30/97        New Sokoto Port.
+//
+//------------------------------------------------------------------------*/
+int _far _pascal 
+WWStrNCaseCmpWWMem(const WWMemHandle hA, const char *pB, int n) 
+{
+    if (!n) /* no chars match perfectly */
+    {
+        return 0;
+    }
+    if (!hA && pB) /* no A string is smaller than B string */
+    {
+        return -1;
+    }
+    if (hA && !pB) /* A string is bigger than no B string */
+    {
+        return 1;
+    }
+    if (!hA && !pB) /* no strings are the same */
+    {
+        return 0;
+    }
+
+    int result;
+
+    EC(ECCheckWWMemHandle(hA);)
+    char *pA = (char *)WWMemLock(hA);
+
+    result = WWStrNCaseCmp(pA, pB, n);
+
+    EC(ECCheckWWMemHandle(hA);)
+    WWMemUnlock(hA);
+
+    return result;
+} /* End of WWStrNCaseCmpWWMem. */
+  
+  
+/*--------------------------------------------------------------------------
+// WWStrCaseCmpWWMem
+//--------------------------------------------------------------------------
+//
+// DESCRIPTION:     Like Ansi strstr(s1, s2), but case-insensitive.
+//
+// SCOPE:           PUBLIC
+//
+// RETURN:          pointer to first occurrence of string s2 in s1, or NULL
+//                  if not present.
+//
+// IMPLEMENTATION:  Copied from W3C HTString.c
+//
+// REVISION HISTORY:
+//      Name        Date            Description
+//      ----        ----            -----------
+//      kkee        10/ 2/96        Initial Revision
+//      jsenior     10/30/97        New Sokoto Port.
+//
+//------------------------------------------------------------------------*/
+
+char * _far _pascal WWStrCaseStr(const char *pS1, const char *pS2) 
+{
+    if (!pS1 || !pS2 || !*pS2) /* this behaviour according to strstr definition */
+    {
+        return (char *)pS1; /* non const */
+    }
+
+    const char *pFirstLetter = pS1;
+
+    while (*pFirstLetter)
+    {
+        if (TOLOWER(*pFirstLetter) == TOLOWER(*pS2)) /* found a matching first letter */
+        {
+            const char *pCurPos1 = pFirstLetter + 1; /* The offset of where the first matching letter was found + 1 */
+            const char *pCurPos2 = pS2 + 1;          /* the second letter of S2 */
+
+            while (*pCurPos1 && *pCurPos2 && TOLOWER(*pCurPos1) == TOLOWER(*pCurPos2))
+            { /* check the rest of the string matches */
+                pCurPos1++;
+                pCurPos2++;
+            }
+            if (!*pCurPos2) /* only if you reach the end of S2 have you found a omplete match */
+            {
+                return (char *)pFirstLetter; /* non const */
+            }
+        }
+        pFirstLetter++;
+    }
+
+    return NULL; /* didn't find any occurences of matching strings */
+} /* End of WWStrCaseStr. */
+
+
+/*--------------------------------------------------------------------------
+// WWStrToLower
+//--------------------------------------------------------------------------
+//
+// DESCRIPTION:     Convert a string to all lower case.
+//
+// SCOPE:           PUBLIC
+//
+// RETURN:          passed in string pointer to modified parameter.
+//
+// IMPLEMENTATION:  Dependent upon New Sokoto tolower function which
+//                  operates on a single character. This function
+//                  modifies its parameter.
+//
+// REVISION HISTORY:
+//      Name        Date            Description
+//      ----        ----            -----------
+//      kkee         9/26/96        Initial Revision
+//      jsenior     10/30/97        New Sokoto Port.
+//
+//------------------------------------------------------------------------*/
+
+char * _far _pascal WWStrToLower(char *pString) 
+{
+    if (!pString)
+    {
+        return NULL;
+    }
+
+    char *pResult = pString;
+
+    for (; *pString; pString++)
+    {
+        *pString = TOLOWER(*pString);
+    }
+
+    return pResult;
+} /* End of WWStrToLower. */
+
+
+
+/*--------------------------------------------------------------------------
+// WWStrToUpper
+//--------------------------------------------------------------------------
+//
+// DESCRIPTION:     Convert a string to all upper case.
+//
+// SCOPE:           PUBLIC
+//
+// RETURN:          passed in string pointer to modified parameter.
+//
+// IMPLEMENTATION:  Dependent upon New Sokoto toupper function which
+//                  operates on a single character. This function
+//                  modifies its parameter.
+//
+// REVISION HISTORY:
+//      Name        Date            Description
+//      ----        ----            -----------
+//      kkee         9/26/96        Initial Revision
+//      jsenior     10/30/97        New Sokoto Port.
+//
+//------------------------------------------------------------------------*/
+char * _far _pascal WWStrToUpper(char *pString) 
+{
+    if (!pString)
+    {
+        return NULL;
+    }
+
+    char *pResult = pString;
+
+    for (; *pString; pString++)
+    {
+        *pString = TOUPPER(*pString);
+    }
+
+    return pResult;
+} /* End of WWStrToUpper. */
+
+
+/*---------------------------------------------------------------------------
+//		stralloccopy()
+//---------------------------------------------------------------------------
+// 
+// SYNOPSIS: 	Allocate and copy string.
+// SCOPE:	Public
+// RETURN:	string, must be freed by caller using "delete [] ..."
+//              NULL if passed str is NULL or cannot allocate.
+// STRATEGY:	
+// 
+// REVISION HISTORY: 
+//	Name		Date		Description 
+//	----		----		----------- 
+//	kkee    	3/09/98 	Initial version 
+//	
+//-------------------------------------------------------------------------*/
+char * _far _pascal 
+stralloccopy(const char *str)
+{
+    if (!str) return NULL;
+    char *ret =(char *) malloc(sizeof(char) * (strlen(str)+1));
+    if (!ret) return NULL;
+    return strcpy(ret, str);
+}	/* End of stralloccopy() */
+
+
+/*---------------------------------------------------------------------------
+//		stralloccopyTCHAR()
+//---------------------------------------------------------------------------
+// 
+// SYNOPSIS: 	Allocate and copy string.
+// SCOPE:	Public
+// RETURN:	string, must be freed by caller using "delete [] ..."
+//              NULL if passed str is NULL or cannot allocate.
+// STRATEGY:	
+// 
+// REVISION HISTORY: 
+//	Name		Date		Description 
+//	----		----		----------- 
+//	kkee    	3/09/98 	Initial version 
+//	
+//-------------------------------------------------------------------------*/
+TCHAR * _far _pascal
+stralloccopyTCHAR(const char *str)
+{
+    if (!str) return NULL;
+    TCHAR *ret = (TCHAR *)malloc(sizeof(TCHAR) * (strlen(str)+1));
+    if (!ret) return NULL;
+    return Jstrcpy(ret, str);
+}	/* End of stralloccopy() */
+
+
+
+/*---------------------------------------------------------------------------
+//		strnalloccopy()
+//---------------------------------------------------------------------------
+// 
+// SYNOPSIS: 	Allocate and copy string of n bytes.
+// SCOPE:	Public
+// RETURN:	string, must be freed by caller using "delete [] ..."
+//              NULL if passed str is NULL or cannot allocate.
+// STRATEGY:	
+// 
+// REVISION HISTORY: 
+//	Name		Date		Description 
+//	----		----		----------- 
+//	kkee    	5/11/98 	Initial version 
+//	
+//-------------------------------------------------------------------------*/
+char * _far _pascal
+strnalloccopy(const char *str, word n)
+{
+    if (!str || !n) {
+        return NULL;
+    }
+    char *ret = (char *)malloc(sizeof(char) * (n+1));
+    if (!ret) return NULL;
+    strncpy(ret, str, n);
+    ret[n] = '\0';
+    return ret;
+}	/* End of strnalloccopy() */
+
+
+/*---------------------------------------------------------------------------
+//		strnalloccopyTCHAR()
+//---------------------------------------------------------------------------
+// 
+// SYNOPSIS: 	Alloc and copy char* to TCHAR*.
+// SCOPE:	Public
+// RETURN:	TCHAR*, if not null, must be freed using "delete [] ..."
+// STRATEGY:	
+// 
+// REVISION HISTORY: 
+//	Name		Date		Description 
+//	----		----		----------- 
+//	kkee    	5/26/98 	Initial version 
+//	
+//-------------------------------------------------------------------------*/
+TCHAR * _far _pascal
+strnalloccopyTCHAR(const char *str, word n)
+{
+    if (!str || !n) {
+        return NULL;
+    }
+    TCHAR* ret = (TCHAR *)malloc(sizeof(TCHAR) * (n+1));
+    if (!ret) return NULL;
+    Jstrncpy(ret, str, n);
+    ret[n] = C_NULL;
+    return ret;
+}	/* End of strnalloccopyTCHAR() */
+
+
+/*---------------------------------------------------------------------------
+//		strncpy()
+//---------------------------------------------------------------------------
+// 
+// SYNOPSIS: 	Copy a char string to TCHAR.
+// SCOPE:	Public
+// RETURN:	Copied TCHAR string.
+// STRATEGY:	
+// 
+// REVISION HISTORY: 
+//	Name		Date		Description 
+//	----		----		----------- 
+//	mzhu    	3/19/98 	Initial version 
+//	kkee    	3/19/98 	Commented
+//	
+//-------------------------------------------------------------------------*/
+TCHAR * _far _pascal
+strncpyToTCHAR(TCHAR *s1, const byte *s2, word len)
+{
+    PARAM_ASSERT(s1 && s2);
+
+    word i;
+    for(i=0; i<len; i++) {
+        *(s1+i) = (TCHAR)*(s2+i);
+    }
+    /* Null-terminated the result string. */
+    *(s1+i) = 0;
+    return s1;
+}	/* End of strncpy() */
+
+/*---------------------------------------------------------------------------
+//              strncpy()
+//---------------------------------------------------------------------------
+//
+// SYNOPSIS:    Copy a TCHAR string to a uint8 buffer. Pad if TCHAR string
+//              less than len long.
+// SCOPE:       Public
+// RETURN:      Copied uint8 string.
+// STRATEGY:
+//
+// REVISION HISTORY:
+//      Name            Date            Description
+//      ----            ----            -----------
+//      hlee            980430          Initial version
+//
+//--------------------------------------------------------------------------*/
+byte * _far _pascal
+strncpyTCHAR(byte *s, const TCHAR *ct, size_t n)
+{
+    PARAM_ASSERT(s && ct);
+
+    size_t i = 0;
+    for (; (i < n) && (s[i] = (const byte) ct[i]); i++) ;
+    for (; (i < n); i++) 
+        s[i] = 0;
+
+    return s;
+}	/* End of strncpy() */
+
+
+
+/*--------------------------------------------------------------------------
+// WWStrLenWWMem
+//--------------------------------------------------------------------------
+//
+// DESCRIPTION:     Same as Ansi strlen, but it takes a WWMemHandle.
+//
+// SCOPE:           PUBLIC
+//
+// RETURN:          The String's length.
+//
+// IMPLEMENTATION:  Checks for valid handle and then calls strlen
+//
+// REVISION HISTORY:
+//      Name        Date            Description
+//      ----        ----            -----------
+//      kkee        12/ 6/96        Initial Revision
+//      jsenior     10/30/97        New Sokoto Port.
+//
+//------------------------------------------------------------------------*/
+size_t _far _pascal WWStrLenWWMem(const WWMemHandle hString)
+{
+EC( ECCheckWWMemHandle(hString); )
+
+    if (!hString)
+    {
+        return 0;
+    }
+    const char *pString;
+    int result = 0;
+
+    pString = (char *)WWMemLock(hString);
+    if (pString != NULL)
+    {
+        result = strlen(pString);
+    }
+
+    EC( ECCheckWWMemHandle(hString); )
+    WWMemUnlock(hString);
+    
+    return result;
+} /* End of WWStrLenWWMem. */
+
+
+size_t _far _pascal WWStringLen(const WWMemHandle hString)
+{
+    return WWStrLenWWMem(hString);
+}
+
+
+/*--------------------------------------------------------------------------
+// WWStrCpyWWMem
+//--------------------------------------------------------------------------
+//
+// DESCRIPTION:     Same as Ansi strcpy, but here we take two WWMemHandles.
+//
+// SCOPE:           PUBLIC
+//
+// RETURN:          Passed in hDest which is now a copy of hSource.
+//
+// IMPLEMENTATION:  Locks the handles and then calls strcpy to do the 
+//                  work. Allocation must take place outside this function.
+//
+// REVISION HISTORY:
+//      Name        Date            Description
+//      ----        ----            -----------
+//      kkee        12/ 6/96        Initial Revision
+//      jsenior     10/30/97        New Sokoto Port.
+//
+//------------------------------------------------------------------------*/
+WWMemHandle _far _pascal 
+WWStrCpyWWMem(const WWMemHandle hDest, const WWMemHandle hSource)
+{
+EC( ECCheckWWMemHandle(hDest); )
+EC( ECCheckWWMemHandle(hSource); )
+    if (hDest && hSource)
+    {
+        void *pDest,
+             *pSource;
+
+        pDest = WWMemLock(hDest);
+        pSource = WWMemLock(hSource);
+        
+        strcpy((char *)pDest, (char *)pSource);
+    
+        WWMemUnlock(hDest);
+        WWMemUnlock(hSource);
+    }
+
+    return (WWMemHandle)hDest; /* non const */
+} /* End of WWStrCpyWWMem. */
+
+
+
+/*--------------------------------------------------------------------------
+// WWStrCatWWMem
+//--------------------------------------------------------------------------
+//
+// DESCRIPTION:     Same as Ansi strcat, but takes two WWMemHandles.
+//
+// SCOPE:           PUBLIC
+//
+// RETURN:          Passed in hS1 which is now has hS2 concatenated on
+//                  the end.
+//
+// IMPLEMENTATION:  Locks the handles and then calls strcat to do the 
+//                  work. Allocation must take place outside this function.
+//
+// REVISION HISTORY:
+//      Name        Date            Description
+//      ----        ----            -----------
+//      kkee        12/ 6/96        Initial Revision
+//      jsenior     10/30/97        New Sokoto Port.
+//
+//------------------------------------------------------------------------*/
+WWMemHandle _far _pascal
+WWStrCatWWMem(const WWMemHandle hS1, const WWMemHandle hS2)
+{
+    if (hS1 && hS2)
+    {
+        void *pS1,
+             *pS2;
+
+        pS1 = WWMemLock(hS1);
+        pS2 = WWMemLock(hS2);
+
+        strcat((char *)pS1, (char *)pS2);
+
+        WWMemUnlock(hS1);
+        WWMemUnlock(hS2);
+    }
+
+    return (WWMemHandle)hS1; /* non const */
+} /* End of WWStrCatWWMem. */
+
+
+
+/*--------------------------------------------------------------------------
+// WWStrAllocCopy
+//--------------------------------------------------------------------------
+//
+// DESCRIPTION:     Allocate and copy a null-terminated string.
+//
+// SCOPE:           PUBLIC
+//
+// RETURN:          WWMemHandle to TCHAR or NULL if cannot allocate.
+//
+// IMPLEMENTATION:  Allocate and lock, then call strcpy to do the work.
+//
+// REVISION HISTORY:
+//      Name        Date            Description
+//      ----        ----            -----------
+//      kkee        11/29/96        Initial Revision
+//      jsenior     10/30/97        New Sokoto Port.
+//
+//------------------------------------------------------------------------*/
+WWMemHandle _far _pascal WWStrAllocCopy(const char *pString)
+{
+    if (!pString)
+    {
+        return NULL;
+    }
+
+    WWMemHandle hResult;
+    char *pResult;
+    
+    pResult = (char *)WWMemAllocAndLock(&hResult, strlen(pString) + 1);
+    if (!hResult)
+    {
+        return NULL;
+    }
+    strcpy(pResult, pString);
+
+    WWMemUnlock(hResult);
+
+    return hResult;
+} /* End of WWStrAllocCopy. */
+
+
+/*---------------------------------------------------------------------------
+//		WWStrAllocCopy()
+//---------------------------------------------------------------------------
+// 
+// SYNOPSIS: 	Allocate and copy a null terminated TCHAR string.
+// SCOPE:	Public
+// RETURN:	NULL if failed to allocated.
+// STRATEGY:	
+// 
+// REVISION HISTORY: 
+//	Name		Date		Description 
+//	----		----		----------- 
+//	kkee    	7/17/98 	Initial version 
+//	
+//-------------------------------------------------------------------------*/
+WWMemHandle _far _pascal
+WWStrAllocCopyTCHAR(const TCHAR *pString)
+{
+    if (!pString)
+    {
+        return NULL;
+    }
+
+    WWMemHandle hResult;
+    TCHAR *pResult;
+    
+    pResult = (TCHAR *)WWMemAllocAndLock(&hResult, 
+                        sizeof(TCHAR*)*(Tstrlen(pString) + 1));
+    if (!hResult)
+    {
+        return NULL;
+    }
+    Tstrcpy(pResult, pString);
+
+    WWMemUnlock(hResult);
+
+    return hResult;
+}	/* End of WWStrAllocCopy() */
+
+
+/*---------------------------------------------------------------------------
+//		WWStrNAllocCopyTCHAR()
+//---------------------------------------------------------------------------
+// 
+// SYNOPSIS: 	Copy a single byte string to a double byte string and 
+//              return a WWMemHandle.
+// SCOPE:	Public
+// RETURN:	WWMemHandle or NULL.
+// STRATEGY:	
+// 
+// REVISION HISTORY: 
+//	Name		Date		Description 
+//	----		----		----------- 
+//	kkee    	3/25/98 	Initial version 
+//	
+//-------------------------------------------------------------------------*/
+WWMemHandle _far _pascal
+WWStrNAllocCopyTCHAR(const char *pString, word length)
+{
+    WWMemHandle ret;
+    TCHAR *p = (TCHAR*) WWMemAllocAndLock(&ret, (length+1)*sizeof(TCHAR));
+    if (!ret) {
+        return NULL;
+    }
+
+    strncpy(p, pString, length);
+/*    length = SjisStringToUnicodeString((char *)pString, p, length); */
+
+    p[length] = C_NULL;
+    WWMemUnlock(ret);
+    return ret;
+}	/* End of WWStrNAllocCopyTCHAR() */
+
+
+
+/*--------------------------------------------------------------------------
+// WWStrNAllocCopy
+//--------------------------------------------------------------------------
+//
+// DESCRIPTION:     Same as strncat, but takes a WWMemHandle. 
+//                  Note 1. if no bytes are requested to be copied, ie n == 0
+//                  no alloc vill take place.
+//                  Note 2. if n is less than the length of the string + it's
+//                  null terminator the result will be a string with no null
+//                  terminator.
+//
+// SCOPE:           PUBLIC
+//
+// RETURN:          WWMemHandle to TCHAR or NULL if cannot allocate.
+//
+// IMPLEMENTATION:  Allocate and lock, then call strncpy to do the work.
+//
+// REVISION HISTORY:
+//      Name        Date            Description
+//      ----        ----            -----------
+//      kkee         6/ 5/96        Initial Revision
+//      jsenior     10/30/97        New Sokoto Port.
+//
+//------------------------------------------------------------------------*/
+WWMemHandle _far _pascal
+WWStrNAllocCopy(const char *pString, size_t n) 
+{
+    if (!pString || !n)
+    {
+        return NULL;
+    }
+
+    WWMemHandle hResult;
+    char *pResult;
+
+    pResult = (char *)WWMemAllocAndLock(&hResult, n + 1);
+
+    if (!hResult)
+    {
+        return NULL;
+    }
+    
+    strcpy(pResult, pString);
+
+    WWMemUnlock(hResult);
+
+    return hResult;
+} /* End of WWStrNAllocCopy. */
+
+
+  
+/*--------------------------------------------------------------------------
+// WWStrAllocCat
+//--------------------------------------------------------------------------
+//
+// DESCRIPTION:     Similar to strcat with auto-reallocation.
+//
+// SCOPE:           PUBLIC
+//
+// RETURN:          WWMemHandle to TCHAR or NULL if cannot allocate.
+//
+// IMPLEMENTATION:  hString is re-allocated internally, then locked before 
+//                  strcat is called to do the work.
+//
+// REVISION HISTORY:
+//      Name        Date            Description
+//      ----        ----            -----------
+//      kkee        12/10/96        Initial Revision
+//      jsenior     10/30/97        New Sokoto Port.
+//
+//------------------------------------------------------------------------*/
+WWMemHandle _far _pascal 
+WWStrAllocCat(WWMemHandle hString, const char *pAppendage) 
+{
+    if (!hString || !pAppendage) 
+    {
+        return NULL;
+    }
+
+    char *pString;
+
+    if (!WWMemRealloc(hString, 
+                      (WWStrLenWWMem(hString) + strlen(pAppendage) + 1))) 
+	{
+        /* realloc failed */
+        return NULL;
+    }
+
+    pString = (char *)WWMemLock(hString);
+    strcat(pString, pAppendage);
+
+    WWMemUnlock(hString);
+
+    return hString;
+} /* End of WWStrAllocCat. */
+
+
+
+/*--------------------------------------------------------------------------
+// WWStrNAllocCat
+//--------------------------------------------------------------------------
+//
+// DESCRIPTION:     Same as strncat, but the first paramater is a
+//                  WWMemHandle.
+//                  The passed in handle may not be locked.
+//
+// SCOPE:           PUBLIC
+//
+// RETURN:          WWMemHandle to TCHAR or NULL if cannot allocate. The
+//                  returned handle might be different to hString.
+//
+// IMPLEMENTATION:  Realloc the string, lock it and call strncat to do the
+//                  work.
+//
+// REVISION HISTORY:
+//      Name        Date            Description
+//      ----        ----            -----------
+//      kkee         6/ 4/97        Initial Revision
+//      jsenior     10/30/97        New Sokoto Port.
+//
+//------------------------------------------------------------------------*/
+
+WWMemHandle _far _pascal 
+WWStrNAllocCat(WWMemHandle hString, const char *pAppendage, int n) 
+{
+    if (!pAppendage || !n) 
+    {
+        return hString;
+    }
+    char *pString;
+
+    if (!WWMemRealloc(hString, (WWStrLenWWMem(hString) + n + 1))) 
+	{
+        /* realloc failed */
+        return NULL;
+    }
+
+    pString = (char *)WWMemLock(hString);
+    strncat(pString, pAppendage, n);
+
+    WWMemUnlock(hString);
+
+    return hString;
+} /* End of WWStrNAllocCat. */
+
+
+/*---------------------------------------------------------------------------
+//		WWStrNAllocCatTCHAR()
+//---------------------------------------------------------------------------
+// 
+// SYNOPSIS: 	Append a single byte string to a double byte string
+//              and return the resulting double byte string. The
+//              passed in strH is deleted.
+// SCOPE:	Public
+// RETURN:	WWMemHandle or NULL.
+// STRATEGY:	
+// 
+// REVISION HISTORY: 
+//	Name		Date		Description 
+//	----		----		----------- 
+//	kkee    	3/25/98 	Initial version 
+//	
+//-------------------------------------------------------------------------*/
+WWMemHandle _far _pascal
+WWStrNAllocCatTCHAR(WWMemHandle strH, const char *append, word length)
+{
+    PARAM_ASSERT(strH);
+    if (!length) {
+        return NULL;
+    }
+
+    TCHAR *p = (TCHAR*) WWMemLock(strH);
+    word oldLength = Tstrlen(p);
+    WWMemUnlock(strH);
+
+    if (!WWMemRealloc(strH, (oldLength+length+1)*sizeof(TCHAR))) {
+        /* Reallocation failed */
+        return NULL;
+    }
+
+    p = (TCHAR*) WWMemLock(strH);
+
+
+    strncpy(&p[oldLength], append, length);
+/*    length = SjisStringToUnicodeString((char *)append, &p[oldLength], length); */
+
+
+    p[oldLength+length] = C_NULL;
+    WWMemUnlock(strH);
+    return strH;
+}	/* End of WWStrNAllocCatTCHAR() */
+
+
+/*---------------------------------------------------------------------------
+//		strnalloccatTCHAR()
+//---------------------------------------------------------------------------
+// 
+// SYNOPSIS: 	Alloc and concate.
+// SCOPE:	Public
+// RETURN:	TCHAR*, if not NULL, must be freed by "delete [] ...".
+// STRATEGY:	The passed in str is consumed and maybe deleted,
+//              expanded to concate extra string.
+//
+// REVISION HISTORY: 
+//	Name		Date		Description 
+//	----		----		----------- 
+//	kkee    	5/26/98 	Initial version 
+//	
+//-------------------------------------------------------------------------*/
+TCHAR* _far _pascal
+strnalloccatTCHAR(TCHAR* str, const char *append, word length)
+{
+    PARAM_ASSERT(str);
+    if (!length || !append) return NULL;
+    word slen = Tstrlen(str);
+    TCHAR *p = (TCHAR *)malloc(sizeof(TCHAR) * (slen + length + 1));
+    if (!p) return NULL;
+    Tstrncpy(p, str, slen);
+
+    strncpy(&p[slen], append, length);
+/*    length = SjisStringToUnicodeString((char*)append, &p[slen], length); */
+
+    p[slen+length] = C_NULL;
+    return p;
+}	/* End of strnalloccatTCHAR() */
+
+
+/*--------------------------------------------------------------------------
+// WWStrAllocCopyWWMem
+//--------------------------------------------------------------------------
+//
+// DESCRIPTION:     Same as WWStrAllocCopy except we take a WWMemHandle here
+//
+// SCOPE:           PUBLIC
+//
+// RETURN:          WWMemHandle to TCHAR or NULL if cannot allocate.
+//
+// IMPLEMENTATION:  Lock passed in handle, Allocate for result and call    
+//                  strcpy to do the work.
+//
+// REVISION HISTORY:
+//      Name        Date            Description
+//      ----        ----            -----------
+//      kkee        11/29/97        Initial Revision
+//      jsenior     10/30/97        New Sokoto Port.
+//
+//-------------------------------------------------------------------------*/
+WWMemHandle _far _pascal WWStrAllocCopyWWMem(const WWMemHandle hString)
+{
+    if (!hString)
+    {
+        return NULL;
+    }
+
+    WWMemHandle hResult;
+    char *pString,
+         *pResult;
+
+    pString = (char *)WWMemLock(hString);
+    pResult = (char *)WWMemAllocAndLock(&hResult, 
+                                        sizeof(char) * (strlen(pString) + 1));
+    
+    if (!hResult)
+    {
+        WWMemUnlock(hString);
+        return NULL;
+    }
+
+    strcpy((char *)pResult, (char *)pString);
+    
+    WWMemUnlock(hString);
+    WWMemUnlock(hResult);
+
+    return hResult;
+} /* End of WWStrAllocCopyWWMem. */
+
+
+
+#if 0
+/*****************************************************************************/
+
+// The following functions were part of htwwwstr.goc
+// They are for string parsing for date & time.
+// They have been assimilated.
+
+
+            ///////////////////////////////////
+            // Time handling routines follow //
+            ///////////////////////////////////
+
+
+//--------------------------------------------------------------------------
+// WWTime::MakeNum
+//--------------------------------------------------------------------------
+//
+// DESCRIPTION:     Make a number from a two-digit string. First digit is
+//                  optional (e.g. " 9" and "14" are valid).
+//                  Note this function returns a silly value without
+//                  warning if an inappropriate string is passed in.
+//
+// SCOPE:           PRIVATE
+//
+// RETURN:          The decimal equivalent of the number in the string.
+//
+// IMPLEMENTATION:  These functions are taken from the server written by
+//                  Ari Luotonen in W3C HTWWWStr.c.
+//
+// REVISION HISTORY:
+//      Name        Date            Description
+//      ----        ----            -----------
+//      kkee        11/ 8/97        Initial Revision
+//      jsenior     11/10/97        New Sokoto Port.
+//
+//--------------------------------------------------------------------------  
+uint8 WWTime::MakeNum(const char *pString)
+{
+    if (*pString >= '0' && *pString <= '9')
+    {
+        return 10 * (*pString - '0') + *(pString + 1) - '0';
+    }
+    else
+    {
+        return *(pString + 1) - '0';
+    }
+} /* End of WWTime::MakeNum. */
+
+
+
+//--------------------------------------------------------------------------
+// WWTime::MakeWkDay
+//--------------------------------------------------------------------------
+//
+// DESCRIPTION:     Generate a weekday number from s based on DayOfTheWeek.
+//
+// SCOPE:           Removed
+//
+// RETURN:          uint8, 0-based week day.
+//
+// IMPLEMENTATION:  Inspired by MakeMonth
+//
+// REVISION HISTORY:
+//      Name        Date            Description
+//      ----        ----            -----------
+//      kkee        11/ 8/97        Initial Revision
+//      jsenior     11/10/97        New Sokoto Port.
+//
+//--------------------------------------------------------------------------  
+
+// function removed 
+// redundant since New Sokoto doesn't store the day of the week.
+/*
+uint8 WWTime::MakeWkDay(const TCHAR *pDayString)
+{
+    static TCHAR *wkdays[7] = {_TEXT("Sun"),
+                               _TEXT("Mon"),
+                               _TEXT("Tue"),
+                               _TEXT("Wed"),
+                               _TEXT("Thu"),
+                               _TEXT("Fri"),
+                               _TEXT("Sat")};
+    int currentDay = 0,
+        result = 0;
+
+    for (; currentDay < 7; currentDay++)
+    {
+        if (!WWStrNCaseCmp(wkdays[currentDay], pDayString, 3)) 
+        {
+            result = currentDay;
+            break;
+        }
+    }
+
+    return result;
+} /* End of WWTime::MakeWkDay. */
+
+
+
+//--------------------------------------------------------------------------
+// WWTime::MakeMonth
+//--------------------------------------------------------------------------
+//
+// DESCRIPTION:     Make month number from its characters.
+//
+// SCOPE:           PRIVATE
+//
+// RETURN:          uint8, 1-based month
+//
+// IMPLEMENTATION:  Ported from W3C make_month in HTWWWStr.c. Modified by 
+//                  kkee to convert to Geos month format which starts from 
+//                  1 instead 0.
+//
+// REVISION HISTORY:
+//      Name        Date            Description
+//      ----        ----            -----------
+//      kkee        11/ 8/97        Initial Revision
+//      jsenior     11/10/97        New Sokoto Port.
+//
+//--------------------------------------------------------------------------  
+uint8 WWTime::MakeMonth(const char *pMonthString)
+{
+    uint8 currentMonth = 0,
+          result = 0;
+    
+    for (; currentMonth < 12; currentMonth++)
+    {
+        if (!WWStrNCaseCmp(months[currentMonth], pMonthString, 3))
+        {
+            result = currentMonth + 1;
+            break;
+        }
+    }
+
+    return result;
+} /* End of WWTime::MakeMonth. */
+
+
+
+//--------------------------------------------------------------------------
+// WWTime::AddSeconds
+//--------------------------------------------------------------------------
+//
+// DESCRIPTION:     Take a DateTime and add some seconds to it
+//
+// SCOPE:           PRIVATE
+//
+// RETURN:          modify DateTime passed in
+//
+// IMPLEMENTATION:  Years past 65000 are not supported
+//                  Adding more than 4294967235 seconds not supported
+//  
+//                  Deal with seconds and days independently. Convert date
+//                  to days since 1600, add extra days and convert back.
+//                  More comprehensive version than New Sokoto AddSeconds.
+//                  See code comments for specifics.
+//
+// REVISION HISTORY:
+//      Name        Date            Description
+//      ----        ----            -----------
+//      jsenior     11/10/97        Initial revision.
+//
+//--------------------------------------------------------------------------  
+void WWTime::AddSeconds(uint32 addTime, DateTime *dateTime)
+{
+    if (!dateTime ||
+        !addTime ||
+        (dateTime->year > 65000) ||
+        (addTime > 4294967235))
+    {
+        return; 
+    }
+
+    // split up the days and the seconds to stay within 32 bits
+    int32 addDay = addTime / 86400; // 24 * 60 * 60
+
+    addTime %= 86400; // remove the whole days from the time part
+
+    // calculate the time
+
+    addTime += dateTime->second;
+    addTime += dateTime->minute * 60;
+    addTime += dateTime->hour * 3600;
+
+    addTime -= (dateTime->second = (addTime % 60));
+    addTime /= 60;
+    addTime -= (dateTime->minute = (addTime % 60));
+    addTime /= 60;
+    addTime -= (dateTime->hour = (addTime % 24));
+
+    if (addTime / 24) // overflow from seconds
+    {
+        addDay++;
+    }
+
+    if (!addDay) // no more processing needed
+    {
+        return;
+    }
+
+    // done the time of day, now the date (bit more complicated)
+    // first convert date to days since 1601, a convenient date mathematically
+    dateTime->year -= 1601;
+    uint32 existingDays = dateTime->year * 365;
+    existingDays += dateTime->year / 4;    // add leap years
+    existingDays -= dateTime->year / 100;  // don't leap on centuries
+    existingDays += dateTime->year / 400;  // leap on 4century boundaries
+    existingDays += daysBeforeMonthTable[dateTime->month - 1];
+    if (IsLeapYear(dateTime->year + 1601) && (dateTime->month > 2))
+    {
+        existingDays++;
+    }
+    // add days of the month remembering they start at 1
+    existingDays += dateTime->day - 1;
+
+    addDay += existingDays; // total days since 1601 - now convert back
+
+    // first calculate year (-1601)
+    addDay -= (dateTime->year = addDay / 365) * 365;
+    addDay -= dateTime->year / 4;
+    addDay += dateTime->year / 100;
+    addDay -= dateTime->year / 400;
+
+    // correct for negative days from simple algorithm
+    while (addDay < 0)
+    {
+        dateTime->year--;
+        addDay += 365;
+        if (IsLeapYear(dateTime->year + 1601))
+        {
+            addDay++;
+        }   
+    }
+
+    uint8 leapCorrectionFactor = 0;
+    if (IsLeapYear(dateTime->year + 1601))
+    {
+        leapCorrectionFactor = 1;
+    }
+
+    // calculate the month, taking into account leap years
+    dateTime->month = 1;
+    while ((dateTime->month < 12) && // it's Dec so must have finished
+        (((addDay >= daysBeforeMonthTable[dateTime->month]) && // there are enough days
+        ((dateTime->month < 2) || (!leapCorrectionFactor))) || // it's not a leap year or it's before Feb
+        ((dateTime->month >= 2) && // it's after Feb but even with the extra day
+        (addDay >= (daysBeforeMonthTable[dateTime->month] + leapCorrectionFactor))))) // there are enough days
+    {
+        dateTime->month++;
+    }
+    addDay -= daysBeforeMonthTable[dateTime->month - 1]; // take off days soaked up by previous months
+    if (dateTime->month > 2)
+    {
+        addDay -= leapCorrectionFactor;
+    }
+    // assign days left over to day of the month remebering days start at 1
+    dateTime->day = addDay + 1;
+    // correct year
+    dateTime->year += 1601;
+    
+    return;
+} /* End of WWTime::AddSeconds. */
+
+
+
+//--------------------------------------------------------------------------
+// WWTime::ParseTime
+//--------------------------------------------------------------------------
+//
+// DESCRIPTION:     Parse a str in GMT format to a local time 
+//                  DateTime representation. 
+//                  Four formats are accepted:
+//
+//                  Wkd, 00 Mon 0000 00:00:00 GMT   (rfc1123) // second
+//                  Weekday, 00-Mon-00 00:00:00 GMT (rfc850) // first
+//                  Wkd Mon 00 00:00:00 0000 GMT    (ctime) // remaining
+//                  1*DIGIT                         (delta-seconds) // delta
+//
+// SCOPE:           PUBLIC
+//
+// RETURN:          TRUE if dateTime successfully initialized.
+//                  Otherwise FALSE.
+//
+// IMPLEMENTATION:  Ported from W3C HTWWWStr.c HTParseTime which converts to
+//                  Unix's time_t format. Why doesn't Geos use time_t format
+//                  instead of the stupid TimerDateAndTime format????
+//                  Arghhhhhhhhhhh!
+//                  Now converts to similar New Sokoto format but inside a
+//                  class.
+//                  This function writes back to a DateTime Class which has
+//                  been malloce'd OUTSIDE this function. Using a class object
+//                  which may use fixed memory was decided upon after discussion
+//                  between kkee & jsenior.
+//                  This function used to compute and store the Day of the Week.
+//                  Since New Sokoto does not store this information we no
+//                  longer calculate it. The day of the week is avaliable from
+//                  New Sokoto's DayOfWeek funtion in datetime.h
+//                  Still don't take into account relaive time zones (GMT)
+//
+// REVISION HISTORY:
+//      Name        Date        Description
+//      ----        ----        -----------
+//      kkee        11/ 8/96    Initial Revision
+//      jsenior     10/10/97    New Sokoto Port.
+//
+//--------------------------------------------------------------------------  
+Boolean WWTime::ParseTime(const char *pString, DateTime *dateTime)
+{
+    if (!pString || !dateTime)
+    {
+        return FALSE;
+    }
+
+    const char *pDate;
+
+    if ((pDate = strchr(pString, ',')) != NULL) /* Thursday, 10-Jun-93 01:29:59 GMT */
+    {                                           /* or: Thu, 10 Jan 1993 01:29:59 GMT */
+        pDate++;                          
+        while (*pDate == ' ')
+        {
+            pDate++;
+        }
+        if (strchr(pDate, '-')) /* First format */
+        {                
+            if ((int)strlen(pDate) < 18)
+            {
+                EC_WARN("String too short - Date invalid\n");
+                return FALSE;
+            }
+            
+            dateTime->year = MakeNum(pDate + 7); // cope with the millenium problem
+            if (dateTime->year >= 80)
+            {
+                dateTime->year += 1900;
+            }
+            else
+            {
+                dateTime->year += 2000;
+            }
+            dateTime->month  = MakeMonth(pDate + 3);
+            dateTime->day    = MakeNum(pDate);
+            dateTime->hour   = MakeNum(pDate + 10);
+            dateTime->minute = MakeNum(pDate + 13); 
+            dateTime->second = MakeNum(pDate + 16); 
+        }
+        else    /* Second format */
+        {
+            if ((int)strlen(pDate) < 20) 
+            {   
+                EC_WARN("String too short - Date invalid\n");
+                return FALSE;
+            }
+            dateTime->year   = 100 * MakeNum(pDate + 7) +
+                                   MakeNum(pDate + 9);
+            dateTime->month  = MakeMonth(pDate + 3);            
+            dateTime->day    = MakeNum(pDate);
+            dateTime->hour   = MakeNum(pDate + 12);
+            dateTime->minute = MakeNum(pDate + 15);
+            dateTime->second = MakeNum(pDate + 18);    
+        }
+    }
+    else if (ISDIGIT(*pString)) /* Delta seconds format */
+    {
+        uint32 delta = 0;
+
+        PlatformDriver::GetRealTime(dateTime); /* Current local time */
+        while (ISDIGIT(*pString))
+        {
+            delta *= 10;
+            delta += (*pString++) - ('0');
+        }
+        AddSeconds(delta, dateTime);
+       
+        return TRUE;
+    }
+    else /* Try the remaining format:  Wed Jun  9 01:29:59 1993 GMT */
+    {        
+        pDate = pString;
+        while (*pDate == ' ')
+        {
+            pDate++;
+        }
+        if ((int)strlen(pDate) < 24)
+        {
+            EC_WARN("String too short - Date invalid\n");
+            return FALSE;
+        }
+        dateTime->year   = 100 * MakeNum(pDate + 20) +
+                               MakeNum(pDate + 22);
+        dateTime->month  = MakeMonth(pDate + 4);
+        dateTime->day    = MakeNum(pDate + 8);
+        dateTime->hour   = MakeNum(pDate + 11);
+        dateTime->minute = MakeNum(pDate + 14);
+        dateTime->second = MakeNum(pDate + 17);
+    }
+
+    if (dateTime->second > 59   || // simple checks
+        dateTime->minute > 59   ||
+        dateTime->hour   > 23   ||
+        dateTime->day    < 1    ||
+        dateTime->day    > 31   ||
+        dateTime->month  < 1    ||
+        dateTime->month  > 12   ||
+        dateTime->year   < 1980 ||
+        dateTime->year   > 2099)
+    {
+        EC_WARN("DateTime out of bounds.\n");
+        return FALSE;
+    }
+
+    return TRUE; 
+} /* End of WWTime::ParseTime. */
+
+
+
+//--------------------------------------------------------------------------
+// WWTime::Write2Digits
+//--------------------------------------------------------------------------
+//
+// DESCRIPTION:     Opposite of MakeNum - a helper function
+//
+// SCOPE:           PRIVATE
+//
+// RETURN:          void - can't really go wrong unless pString is wrong
+//                  modified pString (the whole point)
+//
+// IMPLEMENTATION:  see code - too obvoius
+//
+// REVISION HISTORY:
+//      Name        Date            Description
+//      ----        ----            -----------
+//      jsenior     11/19/97        Initial revision
+//
+//--------------------------------------------------------------------------  
+void WWTime::Write2Digits(char *pString, uint8 number)
+{
+EC( if (!pString || (number > 99))
+    {
+        EC_WARN("Bad parametes to Write2Digits function (called by CreateTime)");
+    } )
+    *pString++ = (number / 10) + '0';
+    *pString = (number % 10) + '0';
+} /* End of WWTime::Write2Digits. */
+
+
+
+//--------------------------------------------------------------------------
+// WWTime::CreateTime
+//--------------------------------------------------------------------------
+//
+// DESCRIPTION:     Convert the New Sokoto internal time format to that
+//                  specified in (rfc1123) ie: Wkd, 00 Mon 0000 00:00:00 GMT
+//
+// SCOPE:           PUBLIC
+//
+// RETURN:          TRUE if dateTime successfully converted.
+//
+// IMPLEMENTATION:  This function reads from a DateTime Class which has
+//                  been malloce'd OUTSIDE this function. The result string
+//                  is malloced inside this function and the handle returned
+//                  must be freed by the caller. The handle is to a TCHAR.
+//                  Still don't take into account relaive time zones (GMT)
+//                  Assuming New Sokoto clock is set to GMT.
+//
+// REVISION HISTORY:
+//      Name        Date            Description
+//      ----        ----            -----------
+//      jsenior     11/19/97        Initial revision
+//
+//--------------------------------------------------------------------------  
+WWMemHandle WWTime::CreateTime(const DateTime * const dateTime)
+{
+    if (!dateTime)
+    {
+        EC_WARN("Invalid pointer passed to WWCreateTime.");
+        return NULL;
+    }
+
+EC( if (!DateIsValid(dateTime->year, dateTime->month, dateTime->day) ||
+        !TimeIsValid(dateTime->hour, dateTime->minute, dateTime->second))
+    {
+        EC_WARN("Invalid dateTime passed to WWCreateTime.");
+    } )
+
+    WWMemHandle hResult;
+    char *pResult = (char *)WWMemAllocAndLock(&hResult, (strlen(timeTemplate) + 1) * sizeof(char));
+    if (!hResult)
+    {
+        EC_WARN("Malloc failed in WWCreateTime.");
+        return NULL;
+    }
+
+    strcpy(pResult, timeTemplate);
+    strncpy(pResult,
+            wkdays[DayOfWeek(dateTime->year,
+                             dateTime->month,
+                             dateTime->day)],
+            3);
+    strncpy(&pResult[8],
+            months[dateTime->month - 1],
+            3);
+    Write2Digits(&pResult[5], dateTime->day);
+    Write2Digits(&pResult[12], dateTime->year / 100);
+    Write2Digits(&pResult[14], dateTime->year % 100);
+    Write2Digits(&pResult[17], dateTime->hour);
+    Write2Digits(&pResult[20], dateTime->minute);
+    Write2Digits(&pResult[23], dateTime->second);
+
+    WWMemUnlock(hResult);
+
+    return hResult;
+} /* End of WWTime::CreateTime. */
+
+/*****************************************************************************/
+#endif

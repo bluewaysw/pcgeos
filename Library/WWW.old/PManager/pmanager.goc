@@ -1,0 +1,2016 @@
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Geoworks 1996 -- All Rights Reserved
+
+PROJECT:	Penelope
+MODULE:		Presentation Manager (PManager)
+FILE:		pmanager.goc
+
+AUTHOR:		Edwin Yu, Apr 17, 1996
+
+ROUTINES:
+	Name			Description
+	----			-----------
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	EY	4/17/96   	Initial version.
+
+DESCRIPTION:
+	This files contains message handlers for the Presentation
+	Manager Library.
+
+	$Id: pmanager.goc,v 1.1 97/04/07 11:49:24 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+@include <stdapp.goh>
+@include <WWW/pmanager.goh>
+@include <WWW/uigenera.goh>
+#include <Ansi/string.h>	/* strcpy() defined */
+@include "pmfatals.goh"
+
+@classdecl PresentationManagerClass;
+@classdecl HTMLContentClass;
+@classdecl PMSearchCtrClass;
+
+
+@extern method HTMLContentClass, MSG_META_START_SELECT;
+@extern method HTMLContentClass, MSG_META_END_SELECT;
+@extern method HTMLContentClass, MSG_META_MOUSE_PTR;
+@extern method PresentationManagerClass, MSG_PM_COPY_SELECTED_OBJECTS;
+
+/*
+ *  Define two constants for the depth first search algorithm.
+ */
+#define CONTINUE 0
+#define STOP     1
+/*
+ *  Define constants for how to search the ui tree.
+ */
+#define TEXT_ONLY 0
+#define TEXT_AND_IMAGE 1
+
+/*
+ *  Object being searched for a key word.
+ */
+optr searchObj;
+VisTextRange searchRange;
+/*
+ *  Flags used to help to see if the key word has been found.
+ */
+Boolean searchFound;
+
+RectDWord FindAndDrawFocalBound (int direction, optr object, 
+				 Rectangle *objRect, RectDWord *rect, 
+				 Rectangle *box, GStateHandle gstate, 
+				 ClassStruct *imageClass);
+void UndrawFocalBound(optr object, RectDWord *drawBound, Rectangle *box,
+		      GStateHandle gstate, optr newLink);
+
+void InitializeDepthFirstSearch (void);
+optr DepthFirstSearch (optr leaf, optr genContent, MemHandle searchInfo);
+optr SearchInText(optr text, optr genContent, MemHandle searchInfo);
+optr GetNextSiblingOrParentsSibling (optr currentObj, int direction, 
+				     int how, ClassStruct *imageClass);
+MemHandle DuplicateSearchInfo (MemHandle searchInfo);
+
+
+
+/***********************************************************************
+ *	MSG_PM_INITIALIZE for PresentationManagerClass
+ ***********************************************************************
+ * SYNOPSIS:	    Initialize PManager's instance data.
+ * PARAMETERS:	    (optr obj)
+ * SIDE EFFECTS:    none
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	EY	4/17/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method PresentationManagerClass, MSG_PM_INITIALIZE
+{
+  pself->PM_recvObj = oself;
+
+  if (pself->PM_hrefs)
+      HTListDeleteAllItems(pself->PM_hrefs);
+  else
+      pself->PM_hrefs = HTListNew();       /* Store the HREFs on the page */
+
+  if (pself->PM_anchorName)
+      HTListDeleteAllItems(pself->PM_anchorName);
+  else
+      pself->PM_anchorName = HTListNew();  /* Store the NAMEs on the page */
+
+  if (pself->PM_nameElement)
+      HTListDeleteAllItems(pself->PM_nameElement);
+  else
+      pself->PM_nameElement = HTListNew();/* Store needed info about NAMEs */
+
+  return;
+}
+
+
+
+/***********************************************************************
+ *		MSG_PM_SET_LOADING_OPTION for PresentationManagerClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    Set the loadin option
+ * PARAMETERS:	    (Boolean load)
+ *                  TRUE - load the image.
+ *                  FALSE- show a little icon instead.
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	edwin	10/23/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method PresentationManagerClass, MSG_PM_SET_LOADING_OPTION
+{
+  pself->PM_loadImage = load;
+  return;
+}	/* End of MSG_PM_SET_LOADING_OPTION.	*/
+
+
+
+/***********************************************************************
+ *	MSG_PM_TAKE_UNFINISHED_UI_OBJ for PresentationManagerClass
+ ***********************************************************************
+ * SYNOPSIS:	    Add a new ui object to the ui tree.
+ *		    This object is not ready to be displayed yet because
+ *		    more modifications will be added to this object at
+ *		    some points later.
+ * PARAMETERS:	    ErrorMsg (optr newObj)
+ * SIDE EFFECTS:    none
+ *
+ * STRATEGY:
+ *		    Add the newObj to the children list of the
+ *		    receiving object(PM_recvObj) in the ui-tree.  This
+ *		    object becomes the new receiving object.  Any future
+ *		    incoming ui objects will be added to this object's
+ *		    children list until this object is marked done
+ *		    (usable).
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	EY	4/17/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method PresentationManagerClass, MSG_PM_TAKE_UNFINISHED_UI_OBJ
+{
+  if (newObj && pself->PM_recvObj && pself->PM_recvObj != newObj) {
+	/* 
+	 * Add the new ui object to the ui tree
+	 */
+	@call pself->PM_recvObj::MSG_GEN_ADD_CHILD(newObj, CCO_LAST);
+#if 0
+	@call newObj::MSG_GEN_SET_USABLE(VUM_DELAYED_VIA_UI_QUEUE);
+#endif
+	/*
+	 * The ui object becomes the new receiving object for the next
+	 * ui object.
+	 */
+	pself = ObjDerefGen( oself );
+	pself->PM_recvObj = newObj;
+	return PM_NO_ERROR;
+  }
+  else
+	return PM_ERROR;
+}	/* End of MSG_PM_TAKE_UNFINISHED_UI_OBJ.	*/
+
+
+/***********************************************************************
+ *	MSG_PM_TAKE_FINISHED_UI_OBJ for PresentationManagerClass
+ ***********************************************************************
+ * SYNOPSIS:	    Add a new object to the ui-tree, set it usable.
+ *		    This object is ready to be rendered on the screen.
+ * PARAMETERS:	    ErrorMsg (optr newObj)
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *		    Add the new object to the children list of the
+ *		    receiving object in the ui-tree.  Mark this new
+ *		    object usable because this object will not have
+ *		    any children.  The recieving object in the ui tree
+ *		    is still the same object.
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	EY	4/22/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method PresentationManagerClass, MSG_PM_TAKE_FINISHED_UI_OBJ
+{
+  Boolean usable;
+
+  if (newObj && pself->PM_recvObj) {
+    /*
+     *  Get the usable bit.
+     */
+    usable = @call pself->PM_recvObj::MSG_GEN_GET_USABLE();
+    /* 
+     *  Add the new ui object to the ui tree
+     */
+    if (pself->PM_recvObj != oself)
+      @call pself->PM_recvObj::MSG_GEN_SET_NOT_USABLE(VUM_NOW);
+    /*
+     * Mark the new object usable.
+     */
+    @call pself->PM_recvObj::MSG_GEN_ADD_CHILD(newObj, CCO_LAST);
+    @call newObj::MSG_GEN_SET_USABLE(VUM_NOW);
+
+    if (pself->PM_recvObj != oself && usable == TRUE)
+      @call pself->PM_recvObj::MSG_GEN_SET_USABLE(VUM_NOW);
+
+    return PM_NO_ERROR;
+  }
+  else
+    return PM_ERROR;
+}	/* End of MSG_PM_TAKE_FINISHED_UI_OBJ.	*/
+
+
+/***********************************************************************
+ *	MSG_PM_MARK_RECV_OBJECT_DONE for PresentationManagerClass
+ ***********************************************************************
+ * SYNOPSIS:	    The receiving ui object in the ui tree is ready
+ *		    to be rendered on the screen.  (That means, the
+ *		    receiving object don't have any more ui children,
+ *		    and it has completely done figuring out the geometry
+ *		    of its ui children.)
+ * PARAMETERS:	    ErrorMsg ()
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *		    Set the current receiving object of the ui-tree
+ *		    usable, and set receiving object to its parent.
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	EY	4/22/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method PresentationManagerClass, MSG_PM_MARK_RECV_OBJECT_DONE
+{
+  if (!pself->PM_recvObj)
+	return PM_ERROR;
+  /*
+   * Mark the receiving object usable.
+   */
+  @call pself->PM_recvObj::MSG_GEN_SET_USABLE(VUM_DELAYED_VIA_UI_QUEUE);
+  /*
+   * Re-assign the receiving object optr to its parent.
+   */
+  pself = ObjDerefGen( oself );
+  pself->PM_recvObj = @call pself->PM_recvObj::MSG_GEN_FIND_PARENT();
+
+  if (pself->PM_recvObj) {
+    if (pself->PM_recvObj != oself) {	
+	*parent = pself->PM_recvObj;	/* the object is not PManager */
+	*class = (ClassStruct *)@call pself->PM_recvObj::MSG_META_GET_CLASS();
+    }
+    else {
+	*parent = NULL;
+	*class = NULL;
+	return PM_ERROR;
+    }
+    return PM_NO_ERROR;
+  }
+  else {
+	*parent = NULL;
+	*class = NULL;
+	return PM_ERROR;
+ }
+}	/* End of MSG_PM_MARK_RECV_OBJ_DONE.	*/
+
+
+/***********************************************************************
+ *	MSG_PM_GET_RECV_OBJ_OPTR_AND_CLASS for PresentationManagerClass
+ ***********************************************************************
+ * SYNOPSIS:	    Return the optr of the current receiving object in
+ *		    the ui tree.
+ * PARAMETERS:	    void (optr *recvObj, ClassStruct **class)
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	EY	4/23/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method PresentationManagerClass, MSG_PM_GET_RECV_OBJ_OPTR_AND_CLASS
+{
+  *recvObj = pself->PM_recvObj;
+  *class = (ClassStruct *)@call pself->PM_recvObj::MSG_META_GET_CLASS();
+  return;
+}	/* End of MSG_PM_GET_RECV_OBJ_OPTR_AND_CLASS.	*/
+
+
+
+/***********************************************************************
+ *	MSG_PM_ONE_LEVEL_DOWN_UI_TREE for PresentationManagerClass
+ ***********************************************************************
+ * SYNOPSIS:	    Go one-level down the ui tree, taking the passed 
+ *		    child object as its downward path.  Note, the 
+ *		    passed child object must be one of the children
+ *		    objects of the current recvObj.
+ * PARAMETERS:	    (optr child);
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	EY	6/28/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method PresentationManagerClass, MSG_PM_ONE_LEVEL_DOWN_UI_TREE
+{
+  EC_ERROR_IF(@call pself->PM_recvObj::MSG_GEN_FIND_CHILD(child)==-1,0);
+  pself->PM_recvObj = child;
+  return;	
+}	/* End of MSG_PM_ONE_LEVEL_DOWN_UI_TREE.	*/
+
+
+/***********************************************************************
+ * MSG_PM_CREATE_HORIZONTAL_DUMMY_CONTAINER for PresentationManagerClass
+ ***********************************************************************
+ * SYNOPSIS:	    Create a dummy GenInteraction with HINT_ORIENT_
+ *		    CHILDREN_HORIZONTALLY to contain children objects.
+ * PARAMETERS:	    none
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	EY	7/ 2/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method PresentationManagerClass, MSG_PM_CREATE_HORIZONTAL_DUMMY_CONTAINER
+{
+  optr dummy;
+
+  dummy = ObjInstantiate(OptrToHandle(oself),
+	(ClassStruct *)&GenInteractionClass);
+  @send dummy::MSG_META_ADD_VAR_DATA
+		(HINT_ORIENT_CHILDREN_HORIZONTALLY, 0, NULL);
+  @call self::MSG_PM_TAKE_UNFINISHED_UI_OBJ(dummy);
+
+  return;
+}	/* End of MSG_PM_CREATE_HORIZONTAL_DUMMY_CONTAINER.	*/
+
+
+/***********************************************************************
+ *		MSG_PM_OBJECT_INSTANTIATE for PresentationManagerClass
+ ***********************************************************************
+ * SYNOPSIS:	    Let the thread that manages the ui-tree to create an
+ *		    object of the specified class.
+ * PARAMETERS:	    (ClassStruct class
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	EY	7/15/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method PresentationManagerClass, MSG_PM_OBJECT_INSTANTIATE
+{
+ return ObjInstantiateForThread(0, (ClassStruct *)objClass);
+}	/* End of MSG_PM_OBJECT_INSTANTIATE.	*/
+
+
+/***********************************************************************
+ *		MSG_PM_PRINT_UI_TREE for PresentationManagerClass
+ ***********************************************************************
+ * SYNOPSIS:	    Draw(Print) the ui tree to the passed gstate.
+ * PARAMETERS:	    (GStateHandle gstate)
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	EY	7/30/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method PresentationManagerClass, MSG_PM_PRINT_UI_TREE
+{
+  @call self::MSG_VIS_DRAW(DF_PRINT, gstate);
+  return;
+}	/* End of MSG_PM_PRINT_UI_TREE.	*/
+
+
+
+/***********************************************************************
+ *		CreateChunkToSaveData
+ ***********************************************************************
+ * SYNOPSIS:	Allocate and return a chunk in the owner resource.
+ * CALLED BY:	
+ * RETURN:	HTMemHandle
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	EY	8/14/96   	Initial Revision
+ *
+ ***********************************************************************/
+HTMemHandle 
+CreateChunkToSaveData (char *ptr)
+{
+  HTMemHandle handle;
+  char *dest;
+  /*
+   *  Allocate a memory chunk.
+   */
+  handle = HTMemAlloc(sizeof(char) * (strlen(ptr)+1));
+EC(ECCheckHTMemHandle(handle);)
+  /*
+   *  Copy the title string over.
+   */
+  dest = (char *)HTMemLock(handle);
+  strcpy(dest, ptr);
+  HTMemUnlock(handle);
+  return handle;
+}	/* End of CreateChunkToSaveData.	*/
+
+
+/***********************************************************************
+ *		MSG_PM_SAVE_TITLE for PresentationManagerClass
+ ***********************************************************************
+ * SYNOPSIS:	    Store the title of the document.  The title is the
+ *		    text between <TITLE> and </TITLE>
+ * PARAMETERS:	    (char *ptr)
+ *			ptr - points the text.
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	EY	8/13/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method PresentationManagerClass, MSG_PM_SAVE_TITLE
+{
+  /*
+   *  If there is a title already, free it.  Actually, it's weird if it
+   *  already exists, unless the HTML source file has two <TITLE>'s.
+   */
+  if (pself->PM_title)
+	HTMemFree(pself->PM_title);
+  /*
+   *  Create a chunk in pself->PM_title to store the data.
+   */
+  pself->PM_title = CreateChunkToSaveData(ptr);
+
+  return;
+}	/* End of MSG_PM_SAVE_TITLE.	*/
+
+
+/***********************************************************************
+ *		MSG_PM_SAVE_BASE for PresentationManagerClass
+ ***********************************************************************
+ * SYNOPSIS:	    Store the base URL, which will be used to complete
+ *		    any partial URLs on the html document.
+ * PARAMETERS:	    (char *ptr)
+ *			ptr - points the text.
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	EY	8/14/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method PresentationManagerClass, MSG_PM_SAVE_BASE
+{
+  /*
+   *  If there is a base already, free it.  Actually, it's weird if it
+   *  already exists, unless the HTML source file has two <BASE HREF=>'s.
+   */
+  if (pself->PM_base)
+	HTMemFree(pself->PM_base);
+  /*
+   *  Create a chunk to store the base data in PM_base.
+   */
+  pself->PM_base = CreateChunkToSaveData(ptr);
+
+  return;
+}	/* End of MSG_PM_SAVE_BASE.	*/
+
+
+/***********************************************************************
+ *		MSG_PM_SAVE_HREF for PresentationManagerClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    Store the HREF value and return a HREF token of it.
+ * PARAMETERS:	    (char *href)
+ *
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	edwin	10/ 3/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method PresentationManagerClass, MSG_PM_SAVE_HREF
+{
+  int len, index;
+
+  len = strlen(href);
+  /*
+   *  Has the HREF existed before?  If not, store it.
+   */
+  index = HTListFindItem(pself->PM_hrefs, href, len);
+  if (index == -1)
+    index = HTListAppend(pself->PM_hrefs, href, len);
+
+  return index;
+}	/* End of MSG_PM_SAVE_HREF.	*/
+
+
+/***********************************************************************
+ *		MSG_PM_SAVE_ANCHOR_NAME for PresentationManagerClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    Store the NAME attribute value of an <A> element.
+ * PARAMETERS:	    (char *name)
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	edwin	10/ 3/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method PresentationManagerClass, MSG_PM_SAVE_ANCHOR_NAME
+{
+  NameElement elm;
+  int len, check1, check2;
+
+  len = strlen(name);
+
+  check1 = HTListAppend(pself->PM_anchorName, name, len);
+  elm.NE_object = object;
+  elm.NE_offset = offset;
+  check2 = HTListAppend(pself->PM_nameElement, &elm, sizeof(NameElement));
+  /*
+   *  PM_anchorName and PM_nameElement have one-to-one relationship.  
+   *  That is, the first element in PM_anchorName is related to the
+   *  first elment in PM_nameElement, and so on....
+   */
+  EC_WARNING_IF(check1 != check2, PM_ASSUMPTION_FAILS);
+
+  return;
+}	/* End of MSG_PM_SAVE_ANCHOR_NAME.	*/
+
+
+/***********************************************************************
+ *		MSG_PM_REFER_HYPERLINK for PresentationManagerClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    Given the hrefToken, jump to the destination, which
+ *                  could be
+ *                  1) a named place on the same page, or
+ *                  2) a different URL.
+ * PARAMETERS:	    (int hrefToken)
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:  If the refered place is 
+ *            1) a named location on the same page, scroll the view to
+ *               that place.
+ *            2) a URL, make a request to load the page.
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	edwin	10/ 7/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method PresentationManagerClass, MSG_PM_REFER_HYPERLINK
+{
+  int len, nameToken;
+  char *buffer;
+  MemHandle mem;
+  NameElement elm;
+  Rectangle rect;
+  VisTextConvertOffsetParams params;
+  /*
+   *  Find out the href string size, so we know how much space to 
+   *  allocate to get the href string.
+   */
+  len = HTListGetItemSize(pself->PM_hrefs, hrefToken);
+  mem = MemAlloc((len+1) * sizeof(char),
+		    HF_DYNAMIC, HAF_STANDARD);
+  buffer = MemLock(mem);
+  HTListGetItem(pself->PM_hrefs, hrefToken, buffer, len);
+  buffer[len] = NULL;
+  if (buffer[0] == '#') {
+    /* 
+     *  It's a reference to the same page.
+     */
+    nameToken = HTListFindItem(pself->PM_anchorName, buffer, len);
+    if (nameToken != -1) {
+      HTListGetItem(pself->PM_nameElement, nameToken,
+		    &elm,sizeof(NameElement));
+      if (elm.NE_offset == -1) {
+	/* Bring up the BOTTOM of this object on the screen. */
+	@call elm.NE_object::MSG_VIS_GET_BOUNDS(&rect);
+	@call @genParent::MSG_HTML_CONTENT_VIEW_OBJECT
+	   (rect.R_left, rect.R_bottom);
+      }
+      else if (elm.NE_offset == 0) {
+	/* Bring up the TOP of this object on the screen. */
+	@call elm.NE_object::MSG_VIS_GET_BOUNDS(&rect);
+	@call @genParent::MSG_HTML_CONTENT_VIEW_OBJECT
+	   (rect.R_left, rect.R_top);
+      }
+      else {
+	/* elm.NE_object MUST be a text object. */
+	if (elm.NE_object &&
+	    @call elm.NE_object::MSG_META_IS_OBJECT_IN_CLASS(&GenTextClass)){
+	  params.VTCOP_offset = elm.NE_offset;
+	  @call elm.NE_object::MSG_VIS_TEXT_CONVERT_OFFSET_TO_COORDINATE
+	     (&params);
+	  @call @genParent::MSG_HTML_CONTENT_VIEW_OBJECT
+	     (params.VTCOP_xPos, params.VTCOP_yPos);
+	}
+      }
+    }
+    EC_WARNING_IF(nameToken == -1, PM_ANCHOR_NAME_NOT_FOUND);
+    MemFree(mem);
+  }
+  else {
+    /*
+     *  It's a referece to another page.  Thus make a request to the 
+     *  socket library to fetch a new page.
+     */
+    if (pself->PM_linkUnderMouse)
+      MemFree(pself->PM_linkUnderMouse);
+    pself->PM_linkUnderMouse = mem;
+    MemUnlock(mem);
+  }
+  return;
+}	/* End of MSG_PM_REFER_HYPERLINK.	*/
+
+
+
+/***********************************************************************
+ *		MSG_PM_REFER_MAPLINK for PresentationManagerClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    return the mouse coordinate on the image.
+ * PARAMETERS:	    (int rel_x, rel_y, HTMemHandle src)
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	edwin	11/18/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method PresentationManagerClass, MSG_PM_REFER_MAPLINK
+{
+  pself->PM_x = rel_x;
+  pself->PM_y = rel_y;
+  pself->PM_src = src;
+}	/* End of MSG_PM_REFER_ISMAP.	*/
+
+
+
+/***********************************************************************
+ *		MSG_PM_CLEAR_HREF_LINK for PresentationManagerClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    Clear the PM_linkUnderMouse;
+ * PARAMETERS:	    
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	edwin	10/21/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method PresentationManagerClass, MSG_PM_CLEAR_HREF_LINK
+{
+  if (pself->PM_linkUnderMouse) {
+    MemFree(pself->PM_linkUnderMouse);
+    pself->PM_linkUnderMouse = NULL;
+  }
+  return;
+}	/* End of MSG_PM_CLEAR_HREF_LINK.	*/
+
+
+
+/***********************************************************************
+ *		MSG_PM_CLEAR_UI_TREE for PresentationManagerClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    Delete the ui tree.
+ * PARAMETERS:	    none.
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	edwin	10/16/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method PresentationManagerClass, MSG_PM_CLEAR_UI_TREE
+{
+  @send @genChildren::MSG_GEN_DESTROY
+     (VUM_DELAYED_VIA_UI_QUEUE,CCF_MARK_DIRTY);
+  pself->PM_recvObj = oself;
+  if (pself->PM_title) {
+    HTMemFree(pself->PM_title);
+    pself->PM_title = NULL;
+  }
+  if (pself->PM_base) {
+    HTMemFree(pself->PM_base);
+    pself->PM_base = NULL;
+  }
+  if (pself->PM_linkUnderMouse) {
+    MemFree(pself->PM_linkUnderMouse);
+    pself->PM_linkUnderMouse = NULL;
+  }
+  if (pself->PM_query) {
+    HTListDelete(pself->PM_query);
+    pself->PM_query = NULL;
+  }
+
+  if (pself->PM_hrefs)
+    HTListDeleteAllItems(pself->PM_hrefs);
+  else
+    pself->PM_hrefs = HTListNew();      /* Store the HREFs on the page */
+
+  if (pself->PM_anchorName)
+    HTListDeleteAllItems(pself->PM_anchorName);
+  else
+    pself->PM_anchorName = HTListNew(); /* Store the NAMEs on the page */
+    
+  if (pself->PM_nameElement)
+    HTListDeleteAllItems(pself->PM_nameElement);
+  else
+    pself->PM_nameElement= HTListNew(); /* Store needed info about NAMEs */
+
+  searchObj = NULL;
+  searchRange.VTR_start = searchRange.VTR_end = 0;
+
+  pself->PM_focalObj = pself->PM_referenceObj = NULL;
+  pself->PM_drawBound.RD_left = pself->PM_drawBound.RD_right = 0;
+
+  return;
+}	/* End of MSG_PM_CLEAR_UI_TREE.	*/
+
+
+
+/***********************************************************************
+ *		MSG_HTML_CONTENT_VIEW_OBJECT for HTMLContentClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    Given the y position in the document coordinate,
+ *                  scroll the view to show that position.
+ * PARAMETERS:	    (sword left, sword bottom)
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	edwin	10/ 8/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method HTMLContentClass, MSG_HTML_CONTENT_VIEW_OBJECT
+{
+  @call pself->GCI_genView::MSG_GEN_VIEW_MAKE_RECT_VISIBLE
+     (MRVF_ALWAYS_SCROLL, MRVM_100_PERCENT, MRVF_ALWAYS_SCROLL, 
+      MRVM_100_PERCENT, bottom+190, left, bottom, left);
+  /* 190 is chosen because it's the height of Penelope screen */
+  return;
+}	/* End of MSG_HTML_CONTENT_VIEW_OBJECT.	*/
+
+
+
+/***********************************************************************
+ *		MSG_HTML_CONTENT_SET_VIEW_DOC_BOUNDS for HTMLContentClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    Set the document size for the view object.
+ * PARAMETERS:	    (SizeAsDWord size)
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	edwin	12/ 3/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method HTMLContentClass, MSG_HTML_CONTENT_SET_VIEW_DOC_BOUNDS
+{
+  @call pself->GCI_genView::MSG_GEN_VIEW_SET_DOC_BOUNDS
+     (DWORD_HEIGHT(size), DWORD_WIDTH(size), 0, 0);
+}	/* End of MSG_HTML_CONTENT_SET_VIEW_DOC_BOUNDS.	*/
+
+
+
+/***********************************************************************
+ *		MSG_PM_GET_TITLE for PresentationManagerClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    Return the title optr.  NULL if there is no title.
+ * PARAMETERS:	    optr ()
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	edwin	10/20/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method PresentationManagerClass, MSG_PM_GET_TITLE
+{
+  if (pself->PM_title == NULL)
+    return NULL;
+  else
+    return pself->PM_title;
+}	/* End of MSG_PM_GET_TITLE.	*/
+
+
+/***********************************************************************
+ *		MSG_PM_SET_FORM_QUERY for PresentationManagerClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    Return the query list for form submission.
+ * PARAMETERS:	    (HTListHandle query)
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	edwin	10/21/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method PresentationManagerClass, MSG_PM_SET_FORM_QUERY
+{
+  pself->PM_query = query;
+  return;
+}	/* End of MSG_PM_SET_FORM_QUERY.	*/
+
+
+
+/***********************************************************************
+ *		MSG_PM_SET_CONTENT_OBJECT for PresentationManagerClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    Set the content object.
+ * PARAMETERS:	    (optr content)
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	edwin	10/25/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method PresentationManagerClass, MSG_PM_SET_CONTENT_OBJECT
+{
+  pself->PM_content = content;
+}	/* End of MSG_PM_SET_CONTENT_OBJECT.	*/
+
+
+/***********************************************************************
+ *		MSG_PM_GET_CONTENT_OBJECT for PresentationManagerClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    Get the content object, which has all the formating
+ *                  tokens.
+ * PARAMETERS:	    none
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	edwin	10/25/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method PresentationManagerClass, MSG_PM_GET_CONTENT_OBJECT
+{
+  return pself->PM_content;
+}	/* End of MSG_PM_GET_CONTENT_OBJECT.	*/
+
+
+
+/***********************************************************************
+ *		MSG_VIS_RECALC_SIZE for PresentationManagerClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    Figure out the postions of the child objects.
+ * PARAMETERS:	    SizeAsDWord (RecalcSizeArgs width,
+ *				 RecalcSizeArgs height)
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	edwin	10/29/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method PresentationManagerClass, MSG_VIS_RECALC_SIZE
+{
+  SizeAsDWord size;
+  int value;
+
+  size = @callsuper();
+  /*
+   *  After calling the super class, the child objects have determined
+   *  their sizes.  So now we can figure out their positions on the 
+   *  document based on their sizes.
+   */
+  /*
+   *  Clear variables that keep track of row information.
+   */
+  @call pself->PM_content::MSG_GEN_HTML_CONTENT_RESET_ROW_COUNTER();
+  /*
+   *  Ask the children to figure out their positions.
+   */
+  @send @genChildren::MSG_META_UIG_CALC_POSITION();
+  /*
+   *  Sum up the row heights.  The sum is the height of this PManager.
+   */
+  height = @call pself->PM_content::MSG_GEN_HTML_CONTENT_SUM_ROW_HEIGHTS();
+  size = MAKE_SIZE_DWORD(DWORD_WIDTH(size), height);
+  /*
+   *  Dump the row information of the last row into the height array.
+   */
+  @call pself->PM_content::MSG_GEN_HTML_CONTENT_START_NEW_ROW(0, &value);
+#if 1
+  @call self::MSG_VIS_SET_SIZE(DWORD_WIDTH(size), height);
+  @call @genParent::MSG_VIS_SET_SIZE(DWORD_WIDTH(size), height);
+  @call @genParent::MSG_HTML_CONTENT_SET_VIEW_DOC_BOUNDS(size);
+  /*  @send self::MSG_VIS_MARK_INVALID
+     (VOF_IMAGE_INVALID, VUM_DELAYED_VIA_UI_QUEUE);  */
+#endif
+  return size;
+}	/* End of MSG_VIS_RECALC_SIZE.	*/
+
+
+/***********************************************************************
+ *		GetLeftMostLeaf  GetRightMostLeaf
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Give a object, find its first leaf(left bottom-most)
+ *              object.
+ * CALLED BY:	
+ * RETURN:	first left leaf object
+ *	
+ * STRATEGY:	
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	edwin   	3/20/97   	Initial Revision
+ *	
+ ***********************************************************************/
+optr
+GetLeftMostLeaf (optr parent)
+{
+  optr child;
+  /*
+   *  Get the left-most(topest) leaf.
+   */
+  child = @call parent::MSG_GEN_FIND_CHILD_AT_POSITION(0);
+  while(child) {
+      parent = child;
+      child = @call parent::MSG_GEN_FIND_CHILD_AT_POSITION(0);
+  }
+  return parent;
+}	/* End of GetLeftMostLeaf.	*/
+
+optr
+GetRightMostLeaf (optr parent)
+{
+  int cnt;
+  optr child;
+  /*
+   *  Get the right-most(bottomest) leaf.
+   */
+  cnt = @call parent::MSG_GEN_COUNT_CHILDREN();
+  child = @call parent::MSG_GEN_FIND_CHILD_AT_POSITION(cnt-1);
+  while(child) {
+      parent = child;
+      cnt = @call child::MSG_GEN_COUNT_CHILDREN();
+      child = @call parent::MSG_GEN_FIND_CHILD_AT_POSITION(cnt-1);
+  }
+  return parent;
+}	/* End of GetRightMostLeaf.	*/
+
+
+/***********************************************************************
+ *		MSG_SEARCH for PresentationManagerClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    Search a word in the UI tree.
+ * PARAMETERS:	    (MemHandle searchInfo)
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	edwin	12/12/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method PresentationManagerClass, MSG_SEARCH
+{
+  optr parent, genContent, temp;
+  SearchReplaceStruct *srs;
+  MemHandle dup;
+  int direction;
+
+  genContent = @call self::MSG_GEN_FIND_PARENT();
+  /*
+   *  Check to see if it's START FROM TOP.
+   */
+  srs = (SearchReplaceStruct *)MemLock(searchInfo);
+  if (srs->params & SO_START_FROM_TOP) {
+    searchObj = NULL;
+    searchRange.VTR_start = searchRange.VTR_end = 0;
+  }
+  if (srs->params & SO_BACKWARD_SEARCH)
+    direction = SEARCH_BACKWARD;
+  else
+    direction = SEARCH_FORWARD;
+  MemUnlock(searchInfo);
+
+  if (searchObj) {
+    /*
+     *  If there exists an object for us to search, do it now.
+     */
+    dup = DuplicateSearchInfo(searchInfo);
+    if (SearchInText(searchObj, genContent, searchInfo) == STOP) {
+      /* Found it!  Thus, return */
+      MemFree(dup);
+      temp = searchObj;
+    }
+    else {
+      /*
+       *  Not found, search the next sibing object.
+       */
+      searchInfo = dup;
+      temp = GetNextSiblingOrParentsSibling(searchObj,direction,TEXT_ONLY,0);
+      if (temp)
+	temp = DepthFirstSearch(temp, genContent, searchInfo);
+    }
+  }
+  else {
+    /*
+     *  Search from the top of the page.
+     */
+    parent = NULL;
+    /*
+     *  Get the first most-left leaf.
+     */
+    parent = GetLeftMostLeaf(oself);
+
+    if (!parent)
+      /*
+       *  PManager doesn't have any children.
+       */
+      return;
+    else if (@call parent::MSG_META_IS_OBJECT_IN_CLASS(&GenTextClass))
+      @call parent::MSG_VIS_TEXT_SELECT_START();
+    temp = DepthFirstSearch(parent, genContent, searchInfo);
+  }
+
+  if (temp) {
+    /*
+     *  matching string is found.
+     */
+    searchObj = temp;
+    @send self::MSG_PM_SEARCH_FOUND(direction);
+  }
+  else if (!searchObj)
+    /*
+     *  string is not found anywhere in the ui tree.
+     */
+    @send self::MSG_PM_SEARCH_NOT_FOUND();
+  else
+    /*
+     *  string has been found before but no more is found.
+     */
+    @send self::MSG_PM_SEARCH_NO_MORE_FOUND(direction);
+
+  return;
+}	/* End of MSG_SEARCH.	*/
+
+
+/***********************************************************************
+ *		MSG_PM_GET_BASE_OPTR for PresentationManagerClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    
+ * PARAMETERS:	    
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:	    
+ *
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	mzhu    	2/ 7/97   	Initial Revision
+ *	
+ ***********************************************************************/
+@method PresentationManagerClass, MSG_PM_GET_BASE_OPTR
+{
+    return @self->PM_base;
+}	/* End of MSG_PM_GET_BASE_OPTR.	*/
+
+
+
+/***********************************************************************
+ *	MSG_SRC_SEARCH_STRING_NOT_FOUND_FOR_SEARCH for PMSearchCtrClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    Disable the default warning dialog box by not 
+ *                  calling super class.
+ * PARAMETERS:	    none
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	edwin	12/16/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method PMSearchCtrClass, MSG_SRC_SEARCH_STRING_NOT_FOUND_FOR_SEARCH
+{
+  /*
+   *  Don't callsuper, disabling the default warning dialog box.
+   */
+  searchFound = FALSE;
+  return;
+}	/* End of MSG_SRC_SEARCH_STRING_NOT_FOUND_FOR_SEARCH.	*/
+
+
+/***********************************************************************
+ *		MSG_PM_ENTER_CAPTION_MODE for PresentationManagerClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    Switch the PManager's receiving object.  Let 
+ *                  caption be the receiving object temporarily.
+ * PARAMETERS:	    (ClassStruct *table, char align, optr caption)
+ *
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:	    
+ *
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	edwin   	3/12/97   	Initial Revision
+ *	
+ ***********************************************************************/
+@method PresentationManagerClass, MSG_PM_ENTER_CAPTION_MODE
+{
+  int count;
+  /*
+   *  Back up the current receiving object.  Later on we'll switch it back.
+   */
+  pself->PM_recvObjBackup = pself->PM_recvObj;
+  /*
+   *  Traverse up the ui tree and find the table object which the 
+   *  caption should belong to.
+   */
+  while(1) {
+    if (@call pself->PM_recvObj::MSG_META_IS_OBJECT_IN_CLASS(table)) {
+      /*
+       *  Add the caption object before or after the table object, 
+       *  depending on the align attribute.
+       */
+      pself->PM_recvObj = @call pself->PM_recvObj::MSG_GEN_FIND_PARENT();
+      count = @call pself->PM_recvObj::MSG_GEN_COUNT_CHILDREN();
+      if (align == 0)
+	@call pself->PM_recvObj::MSG_GEN_ADD_CHILD(caption, count-1);
+      else
+	@call pself->PM_recvObj::MSG_GEN_ADD_CHILD(caption, CCO_LAST);
+
+      break;
+    }
+    else
+      pself->PM_recvObj = @call pself->PM_recvObj::MSG_GEN_FIND_PARENT();
+
+    EC_ERROR_IF(pself->PM_recvObj == NULL, PM_ASSUMPTION_FAILS);
+  }
+
+  /*
+   *  Now make the caption object be the receiving object.
+   */
+  pself->PM_recvObj = caption;
+  return;
+}	/* End of MSG_PM_ENTER_CAPTION_MODE.	*/
+
+
+/***********************************************************************
+ *		MSG_PM_EXIT_CAPTION_MODE for PresentationManagerClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    Switch back to whatever the receiving object was
+ *                  before entering the caption mode.
+ * PARAMETERS:	    void.
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:	    
+ *
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	edwin   	3/12/97   	Initial Revision
+ *	
+ ***********************************************************************/
+@method PresentationManagerClass, MSG_PM_EXIT_CAPTION_MODE
+{
+  pself->PM_recvObj = pself->PM_recvObjBackup;
+  pself->PM_recvObjBackup = NULL;
+
+  return;
+}	/* End of MSG_PM_EXIT_CAPTION_MODE.	*/
+
+
+/***********************************************************************
+ *		DoesItHaveLinkInVisibleRegion
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Check to see if the object has a hyperlink in the given
+ *              region or not.
+ * CALLED BY:	
+ * RETURN:	Boolean, TRUE or FALSE.
+ *	
+ * STRATEGY:	
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	edwin   	3/24/97   	Initial Revision
+ *	
+ ***********************************************************************/
+Boolean
+DoesItHaveLinkInVisibleRegion 
+(optr object, RectDWord rect, int direction, ClassStruct *imageClass)
+{
+  if (@call object::MSG_META_IS_OBJECT_IN_CLASS(&GenTextClass))
+      return @call object::MSG_GEN_TEXT_FIND_LINK_IN_RECT(rect, direction);
+  else if (@call object::MSG_META_IS_OBJECT_IN_CLASS(imageClass))
+      return @call object::MSG_GEN_IMAGE_FIND_LINK_IN_RECT(rect);
+}	/* End of DoesItHaveLinkInVisibleRegion.	*/
+
+
+/***********************************************************************
+ *		IsThereLinkInOtherHorizColumn
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Given a visible rect region and search direction, find
+ *              if there is any further object that is in the visible
+ *              region as well.  Search starts from the given object.
+ * CALLED BY:	
+ * RETURN:	The returned boolean tells the caller that it returns
+ *              an object in *parent that in the visible region.
+ *	
+ * STRATEGY:	
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	edwin   	3/23/97   	Initial Revision
+ *	
+ ***********************************************************************/
+Boolean
+IsThereLinkInOtherHorizColumn
+(optr *parent, optr pmanager, int direction, RectDWord rect, ClassStruct *imageClass)
+{
+  int cnt, limit, cont = TRUE;
+  optr grandMa, tmp = *parent;
+  Rectangle retval;
+
+  while(1) {
+    if (tmp == pmanager) {
+	*parent = NULL;
+	break;
+    }
+    grandMa = @call tmp::MSG_GEN_FIND_PARENT();
+    limit = @call grandMa::MSG_GEN_COUNT_CHILDREN();
+    cnt = @call grandMa::MSG_GEN_FIND_CHILD(tmp);
+    /*
+     *  This inner loop checks the children in the grandma
+     */
+    while(1) {
+	if (direction == SEARCH_FORWARD) {
+	    if (cnt+1 == limit)
+		break;  /* no more siblings in this level, break */
+	    tmp = @call grandMa::MSG_GEN_FIND_CHILD_AT_POSITION(++cnt);
+	    @call tmp::MSG_VIS_GET_BOUNDS(&retval);
+	    if (retval.R_bottom > rect.RD_top &&
+		retval.R_top < rect.RD_bottom) {
+		/*
+		 *  It has a portion within the visible region.
+		 */
+		tmp = GetLeftMostLeaf(tmp);
+		if (DoesItHaveLinkInVisibleRegion(tmp, rect, 
+						  direction, imageClass) 
+		    == TRUE) {
+		    *parent = tmp;  /* found */
+		    cont = FALSE;
+		    break;
+		}
+		else {
+		    grandMa = @call tmp::MSG_GEN_FIND_PARENT();
+		    limit = @call grandMa::MSG_GEN_COUNT_CHILDREN();
+		    cnt = @call grandMa::MSG_GEN_FIND_CHILD(tmp);
+		}
+	    }
+	}
+	else {
+	    if (cnt-1 < 0)
+		break;  /* no more siblings in this level, break */
+	    tmp = @call grandMa::MSG_GEN_FIND_CHILD_AT_POSITION(--cnt);
+	    @call tmp::MSG_VIS_GET_BOUNDS(&retval);
+	    if (retval.R_top < rect.RD_bottom &&
+		retval.R_bottom > rect.RD_top) {
+		/*
+		 *  It has a portion within the visible region.
+		 */
+		tmp = GetRightMostLeaf(tmp);
+		if (DoesItHaveLinkInVisibleRegion(tmp, rect, 
+						  direction, imageClass) 
+		    == TRUE) {
+		    *parent = tmp;  /* found */
+		    cont = FALSE;
+		    break;
+		}
+		else {
+		    grandMa = @call tmp::MSG_GEN_FIND_PARENT();
+		    limit = @call grandMa::MSG_GEN_COUNT_CHILDREN();
+		    cnt = @call grandMa::MSG_GEN_FIND_CHILD(tmp);
+		}
+	    }
+	}
+    }
+    if (cont == FALSE)
+	break;
+    tmp = grandMa;  /* go up one level */
+  }
+
+  return cont;
+}	/* End of IsThereLinkInOtherHorizColumn.	*/
+
+
+/***********************************************************************
+ *	MSG_PM_SHOW_FOCUS_IN_VISIBLE_RECT for PresentationManagerClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Show the next focus object in the visible rectangle region
+ * PARAMETERS:  (RectDWord rect, int direction, ClassStruct *imageClass)
+ *              direction = 1 if view is scrolling downward.
+ *                        = 0 if view is scrolling upward.
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:	    The reason I pass image class because PManager
+ *                  can't include uigenera library for the image class.
+ *
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	edwin   	3/18/97   	Initial Revision
+ *	
+ ***********************************************************************/
+@method PresentationManagerClass, MSG_PM_SHOW_FOCUS_IN_VISIBLE_RECT
+{
+  Rectangle objRect, box;
+  optr parent = NULL;
+  WindowHandle win;
+  GStateHandle gstate;
+  RectDWord drawBound;
+  Boolean cont = TRUE;
+
+  if (pself->PM_focalObj) {
+    /*
+     *  There was an object containining hyperlink in the visible 
+     *  screen area.  If it is still in the current visible area, 
+     *  keep it in focus.  Do nothing and return.
+     */
+    if (pself->PM_drawBound.RD_top > rect.RD_top && 
+	pself->PM_drawBound.RD_left >rect.RD_left &&
+	pself->PM_drawBound.RD_right < rect.RD_right &&
+	pself->PM_drawBound.RD_bottom < rect.RD_bottom)
+      return;
+    parent = pself->PM_focalObj;
+  }
+  else if (direction == SEARCH_FORWARD) {
+    if (pself->PM_referenceObj)
+	parent = pself->PM_referenceObj;
+    else
+	parent = GetLeftMostLeaf(oself);
+  }
+  else { /* direction == SEARCH_BACKWARD */
+    if (pself->PM_referenceObj)
+	parent = pself->PM_referenceObj;
+    else
+	parent = GetRightMostLeaf(oself);
+  }
+
+  if (!parent || parent == oself)
+      return;
+  /*
+   *  Create a gstring to draw the focal outline around the hyperlink.
+   */
+  win = @call parent::MSG_VIS_QUERY_WINDOW();
+  gstate = GrCreateState(win);
+  GrSetLineMaskSys( gstate, SDM_50 );
+  GrSetLineColor(gstate, CF_INDEX, C_LIGHT_GREY, 0, 0);
+  GrSetMixMode(gstate, MM_XOR);
+
+  while(parent) {
+    @call parent::MSG_VIS_GET_BOUNDS(&objRect);
+    if (direction == SEARCH_FORWARD) {
+      if (objRect.R_top >= rect.RD_bottom) {
+	/* 
+	 *  Though the object is below the visible region already, 
+	 *  there might be some object in the next column if the next
+	 *  column exits.  Thus, we need to check further in the ui tree
+	 *  to see if there is such column.  If so, search that column.
+	 */
+	cont = IsThereLinkInOtherHorizColumn
+	    (&parent, oself, direction, rect, imageClass);
+
+	if (parent == NULL)
+	    break;  /* no more on the visible region. */
+      }
+      else if (objRect.R_bottom > rect.RD_top) {
+	/*
+	 *  A portion of the object's bound is in the visible area.
+	 *  Now we check if there is a hyperlink in that visible portion.
+	 */
+	drawBound = FindAndDrawFocalBound(direction, parent, &objRect, 
+					  &rect, &box, gstate, imageClass);
+	if (drawBound.RD_right && drawBound.RD_right != drawBound.RD_left) {
+	    break;  /* break if it has hyperlink in the visible portion */
+	}
+      }
+    }
+    else {
+      if (objRect.R_bottom <= rect.RD_top) {
+	cont = IsThereLinkInOtherHorizColumn
+	    (&parent, oself, direction, rect, imageClass);
+	if (parent == NULL)
+	    break;  /* no more on the visible region. */
+      }
+      else if (objRect.R_top < rect.RD_bottom) {
+	/*
+	 *  A portion of the object's bound is in the visible area.
+	 *  Now we check if there is a hyperlink in that visible portion.
+	 */
+	drawBound = FindAndDrawFocalBound(direction, parent, &objRect, 
+					  &rect, &box, gstate, imageClass);
+	if (drawBound.RD_right && drawBound.RD_right != drawBound.RD_left) {
+	    break;  /* break if it has hyperlink in the visible portion */
+	}
+      }
+    }
+    if (cont == FALSE) {
+	cont = TRUE;
+	continue;
+    }
+    parent = GetNextSiblingOrParentsSibling
+	(parent, direction, TEXT_AND_IMAGE, imageClass);
+  }
+  /*
+   *  Erase the previous focus drawing.
+   */
+  if (pself->PM_focalObj && 
+      (pself->PM_drawBound.RD_left != drawBound.RD_left ||
+       pself->PM_drawBound.RD_top  != drawBound.RD_top  ||
+       pself->PM_drawBound.RD_right != drawBound.RD_right ||
+       pself->PM_drawBound.RD_bottom != drawBound.RD_bottom))
+      UndrawFocalBound(pself->PM_focalObj, &(pself->PM_drawBound), 
+		       &pself->PM_drawbox,
+		       gstate, parent);
+  /*
+   *  Update the new object(can be NULL) that has hyperlink in visible
+   *  region.
+   */
+  if (pself->PM_focalObj)
+      pself->PM_referenceObj = pself->PM_focalObj;
+  pself->PM_focalObj = parent;
+  pself->PM_drawBound = drawBound;
+  pself->PM_drawbox = box;
+  
+  GrDestroyState(gstate);
+
+  return;
+}	/* End of MSG_PM_SHOW_FOCUS_IN_VISIBLE_RECT.	*/
+
+/***********************************************************************
+ *		FindAndDrawFocalBound
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Given an object, find its hyperlink in the given rect
+ *              region.  Return the drawing rectangle(A,B,C,D) of the 
+ *              hyperlink.  It it's a text object that has link crossing
+ *              mulitple lines, the *box contains the rectangle (a,b,c,d)
+ *              of the inner box:
+ *                                      (A,B)
+ *                                        +---------+
+ *                          (a,b)         |         |
+ *                            +-----------+         |
+ *                            |                     |
+ *                            |                     |
+ *                            |        +------------+ (c, d)
+ *                            |        |         
+ *                            +--------+
+ *                                   (C, D)
+ * 
+ * CALLED BY:	(optr object, Rectangle *objRect, RectDWord *rect,
+ *               GStateHandle gstate, ClassStruct *imageClass)
+ * RETURN:	Return the actual drawing region around the link.
+ *	
+ * STRATEGY:	
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	edwin   	3/18/97   	Initial Revision
+ *	
+ ***********************************************************************/
+RectDWord
+FindAndDrawFocalBound (int direction, optr object, Rectangle *objRect, 
+		       RectDWord *rect, Rectangle *box, GStateHandle gstate, 
+		       ClassStruct *imageClass)
+{
+  RectDWord ret;
+
+  if (@call object::MSG_META_IS_OBJECT_IN_CLASS(&GenTextClass))
+      @call object::MSG_GEN_TEXT_DRAW_FOCUS(direction, gstate, objRect, 
+					    rect, &ret, box);
+  else if (@call object::MSG_META_IS_OBJECT_IN_CLASS(imageClass)) {
+      if (objRect->R_top >= rect->RD_top && objRect->R_left >= rect->RD_left 
+	  && objRect->R_right <= rect->RD_right
+	  && objRect->R_bottom <= rect->RD_bottom)
+	  @call object::MSG_GEN_IMAGE_DRAW_FOCUS(gstate, objRect, &ret);
+      else 
+	  ret.RD_right = ret.RD_left = 0;
+
+      box->R_right = box->R_left = box->R_top = box->R_bottom = 0;
+  }
+  else {
+      ret.RD_right = ret.RD_left = 0;
+      box->R_right = box->R_left = box->R_top = box->R_bottom = 0;
+  }
+
+  return ret;
+}	/* End of FindAndDrawFocalBound.	*/
+
+/***********************************************************************
+ *		UndrawFocalBound
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Erase the outline drawing of the current hyperlink of 
+ *              the given object.
+ * CALLED BY:	
+ * RETURN:	
+ *	
+ * STRATEGY:	
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	edwin   	3/19/97   	Initial Revision
+ *	
+ ***********************************************************************/
+void
+UndrawFocalBound 
+(optr object, RectDWord *drawBound, Rectangle *box, 
+GStateHandle gstate, optr newLink)
+{
+  if (@call object::MSG_META_IS_OBJECT_IN_CLASS(&GenTextClass))
+      @call object::MSG_GEN_TEXT_UNDRAW_FOCUS(gstate, drawBound, box, newLink);
+  else
+      @call object::MSG_GEN_IMAGE_UNDRAW_FOCUS(gstate);
+
+  return;
+}	/* End of UndrawFocalBound.	*/
+
+
+/***********************************************************************
+ *		MSG_PM_SHOW_FOCUS for PresentationManagerClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    Find the next/previous focusable hyperlink.
+ * PARAMETERS:	    (int direction, ClassStruct *imageClass);
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:	    
+ *
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	edwin   	3/25/97   	Initial Revision
+ *	
+ ***********************************************************************/
+@method PresentationManagerClass, MSG_PM_SHOW_FOCUS
+{
+  optr currentObj;
+  Rectangle objRect, box;
+  RectDWord rect;
+  RectDWord drawBound;
+  WindowHandle win;
+  GStateHandle gstate;
+  EventHandle msg;
+
+  if (pself->PM_focalObj) {
+      currentObj = pself->PM_focalObj;
+      if (@call currentObj::MSG_META_IS_OBJECT_IN_CLASS(imageClass))
+	  currentObj = GetNextSiblingOrParentsSibling
+	      (currentObj, direction, TEXT_AND_IMAGE, imageClass);
+  }
+  else if (direction == SEARCH_FORWARD)
+      currentObj = GetLeftMostLeaf(oself);
+  else  /* direction == SEARCH_BACKWARD */
+      currentObj = GetRightMostLeaf(oself);
+
+  if (currentObj == oself)
+      return;
+  /*
+   *  Create a gstring to draw the focal outline around the hyperlink.
+   */
+  win = @call currentObj::MSG_VIS_QUERY_WINDOW();
+  gstate = GrCreateState(win);
+  GrSetLineMaskSys( gstate, SDM_50 );
+  GrSetLineColor(gstate, CF_INDEX, C_LIGHT_GREY, 0, 0);
+  GrSetMixMode(gstate, MM_XOR);
+
+  while(currentObj) {
+    @call currentObj::MSG_VIS_GET_BOUNDS(&objRect);
+    rect.RD_left = objRect.R_left;
+    rect.RD_top  = objRect.R_top;
+    rect.RD_right= objRect.R_right;
+    rect.RD_bottom = objRect.R_bottom;
+
+    drawBound = FindAndDrawFocalBound(direction, currentObj, &objRect, 
+				      &rect, &box, gstate, imageClass);
+    if (drawBound.RD_right && drawBound.RD_right != drawBound.RD_left) {
+	if (drawBound.RD_right > drawBound.RD_left)
+	  msg = @record GenViewClass::MSG_GEN_VIEW_MAKE_RECT_VISIBLE
+		    (MRVF_USE_MARGIN_FROM_TOP_LEFT, MRVM_0_PERCENT, 
+		     MRVF_USE_MARGIN_FROM_TOP_LEFT, MRVM_0_PERCENT, 
+		     drawBound.RD_bottom, drawBound.RD_right, 
+		     drawBound.RD_top, drawBound.RD_left);
+	else
+	  msg = @record GenViewClass::MSG_GEN_VIEW_MAKE_RECT_VISIBLE
+		    (MRVF_USE_MARGIN_FROM_TOP_LEFT, MRVM_0_PERCENT, 
+		     MRVF_USE_MARGIN_FROM_TOP_LEFT, MRVM_0_PERCENT, 
+		     drawBound.RD_bottom, drawBound.RD_left, 
+		     drawBound.RD_top, drawBound.RD_right);
+	@send currentObj::MSG_VIS_VUP_SEND_TO_OBJECT_OF_CLASS(msg);
+	break;  /* break if it has hyperlink in the visible portion */
+    }
+    currentObj = GetNextSiblingOrParentsSibling
+	(currentObj, direction, TEXT_AND_IMAGE, imageClass);
+  }
+  if (!currentObj) {
+      GrDestroyState(gstate);
+      return;
+  }
+  /*
+   *  Update the new object(can be NULL) that has hyperlink in visible
+   *  region.
+   */
+  if (pself->PM_focalObj && 
+      (pself->PM_drawBound.RD_left != drawBound.RD_left ||
+       pself->PM_drawBound.RD_top  != drawBound.RD_top  ||
+       pself->PM_drawBound.RD_right != drawBound.RD_right ||
+       pself->PM_drawBound.RD_bottom != drawBound.RD_bottom))
+      UndrawFocalBound(pself->PM_focalObj, &(pself->PM_drawBound), 
+		       &pself->PM_drawbox,
+		       gstate, currentObj);
+
+  if (pself->PM_focalObj)
+      pself->PM_referenceObj = pself->PM_focalObj;
+  pself->PM_focalObj = currentObj;
+  pself->PM_drawBound = drawBound;
+  pself->PM_drawbox = box;
+  
+  GrDestroyState(gstate);
+
+  return;
+}	/* End of MSG_PM_SHOW_FOCUS.	*/
+
+
+
+/***********************************************************************
+ *		SearchInText
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Search the key word in the passed text object.
+ * CALLED BY:	(optr text, optr pmanager, MemHandle searchInfo)
+ * RETURN:	
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	edwin	12/16/96   	Initial Revision
+ *
+ ***********************************************************************/
+optr
+SearchInText (optr text, optr genContent, MemHandle searchInfo)
+{
+  VisTextRange range;
+  VisTextConvertOffsetParams params;
+  static optr previousObj;
+  int direction;
+  SearchReplaceStruct *srs;
+
+  /*
+   *  Find the current search direction.
+   */
+  srs = (SearchReplaceStruct *)MemLock(searchInfo);
+  if (srs->params & SO_BACKWARD_SEARCH)
+    direction = SEARCH_BACKWARD;
+  else
+    direction = SEARCH_FORWARD;
+  MemUnlock(searchInfo);
+  /*
+   *  Search the word in the cuurent text object.
+   */
+  searchFound = TRUE;
+  @call text::MSG_SEARCH(searchInfo);
+  @call text::MSG_VIS_TEXT_GET_SELECTION_RANGE(&range);
+  /*
+   *  If not found, tell the caller to continue the search for the 
+   *  next text object.  If found, scroll the view to see the word.
+   */
+  if (text == previousObj && direction == SEARCH_FORWARD 
+      && searchRange.VTR_start >= range.VTR_start
+      && searchRange.VTR_end >= range.VTR_end)
+    return CONTINUE;
+  else if (text == previousObj && direction == SEARCH_BACKWARD 
+      && searchRange.VTR_start <= range.VTR_start
+      && searchRange.VTR_end <= range.VTR_end)
+    return CONTINUE;
+  if (searchFound == TRUE && range.VTR_start != range.VTR_end) {
+    params.VTCOP_offset = range.VTR_start;
+    @call text::MSG_VIS_TEXT_CONVERT_OFFSET_TO_COORDINATE(&params);
+    @call genContent::MSG_HTML_CONTENT_VIEW_OBJECT
+       (params.VTCOP_xPos, params.VTCOP_yPos);
+    searchRange.VTR_start = range.VTR_start;
+    searchRange.VTR_end   = range.VTR_end;
+    previousObj = text;
+    return STOP;
+  }
+  return CONTINUE;
+}	/* End of SearchInText.	*/
+
+
+/***********************************************************************
+ *		GetNextSiblingOrParentsSibling
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Given the current object, find the next sibling object
+ *              in the ui tree.
+ * CALLED BY:	
+ * RETURN:	optr - next sibling text object.  NULL if no more.
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:
+ *              At any time, searchObj must be a leaf.  It can not be 
+ *              a node in the middle of tree!
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	edwin	12/16/96   	Initial Revision
+ *
+ ***********************************************************************/
+optr
+GetNextSiblingOrParentsSibling 
+    (optr currentObj, int direction, int how, ClassStruct *imageClass)
+{
+  optr parent;
+  int index;
+  /*
+   *  Get the child index of the current searchObj.
+   */
+  parent = @call currentObj::MSG_GEN_FIND_PARENT();
+  index  = @call parent::MSG_GEN_FIND_CHILD(currentObj);
+  /*
+   *  Find the leaf of the next subtree.
+   */
+  while (1) {
+    if (direction == SEARCH_FORWARD)
+      currentObj = @call parent::MSG_GEN_FIND_CHILD_AT_POSITION(++index);
+    else
+      currentObj = @call parent::MSG_GEN_FIND_CHILD_AT_POSITION(--index);
+
+    if (!currentObj) {
+      /*
+       *  No more siblings.  Thus go one level up the tree.
+       */
+      currentObj = parent;
+      if (@call currentObj::MSG_META_IS_OBJECT_IN_CLASS
+      (&PresentationManagerClass)) {
+	return NULL;
+      }
+      parent = @call currentObj::MSG_GEN_FIND_PARENT();
+      index  = @call parent::MSG_GEN_FIND_CHILD(currentObj);
+    }
+    else {
+      /*
+       *  Got the next subtree.
+       */
+      if (direction == SEARCH_FORWARD) {
+	/*
+	 *  Find the left-most leaf.
+	 */
+	currentObj = GetLeftMostLeaf(currentObj);
+      }
+      else {
+	/*
+	 *  Find the right-most leaf
+	 */
+	currentObj = GetRightMostLeaf(currentObj);
+      }
+      /*
+       *  If searchObj is a text object.  Return it to caller.
+       *  If searchObj is a graphic object and graphi is also what the
+       *  caller is interested in, return to caller.
+       */
+      if (@call currentObj::MSG_META_IS_OBJECT_IN_CLASS(&GenTextClass)) {
+	if (direction == SEARCH_FORWARD)
+	  @call currentObj::MSG_VIS_TEXT_SELECT_START();
+	else
+	  @call currentObj::MSG_VIS_TEXT_SELECT_END();
+	break;
+      }
+      else if (how == TEXT_AND_IMAGE &&
+	       @call currentObj::MSG_META_IS_OBJECT_IN_CLASS(imageClass))
+	break;
+      else {
+	/*
+	 *  Loop to find the next sibling of currentObj.
+	 */
+	parent = @call currentObj::MSG_GEN_FIND_PARENT();
+	index  = @call parent::MSG_GEN_FIND_CHILD(currentObj);
+      }
+    }
+  }
+  searchRange.VTR_start = searchRange.VTR_end = 0;
+  return currentObj;
+}	/* End of GetNextSiblingOrParentsSibling.	*/
+
+
+
+/***********************************************************************
+ *		DepthFirstSearch
+ ***********************************************************************
+ *
+ * SYNOPSIS:    Do a depth first search.
+ * CALLED BY:	
+ * RETURN:	optr - the optr of the leaf chlid, NULL if no more.
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	edwin	12/16/96   	Initial Revision
+ *
+ ***********************************************************************/
+optr
+DepthFirstSearch (optr leaf, optr genContent, MemHandle searchInfo)
+{
+  MemHandle dup;
+  optr temp;
+  SearchReplaceStruct *src;
+  int direction;
+
+  src = (SearchReplaceStruct *)MemLock(searchInfo);
+  if (src->params & SO_BACKWARD_SEARCH)
+    direction = SEARCH_BACKWARD;
+  else
+    direction = SEARCH_FORWARD;
+  MemUnlock(searchInfo);
+
+  while (1) {  /* loops as long as there is an object for searching */
+    if (@call leaf::MSG_META_IS_OBJECT_IN_CLASS(&GenTextClass)) {
+      dup = DuplicateSearchInfo(searchInfo);
+      if (SearchInText(leaf, genContent, searchInfo) == STOP) {
+	MemFree(dup);
+	return leaf;  /* found it, return the object */
+      }
+      searchInfo = dup;
+    }
+    temp = GetNextSiblingOrParentsSibling(leaf, direction, TEXT_ONLY, 0);
+    if (!temp)
+      break;  /* no more text object for searching. */
+    leaf = temp;
+  }
+  MemFree(searchInfo);
+  return NULL;
+}	/* End of DepthFirstSearch.	*/
+
+
+/***********************************************************************
+ *		DuplicateSearchInfo
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Duplicate the searchInfo.
+ * CALLED BY:	
+ * RETURN:	MemHandle of the duplicate.
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	edwin	12/17/96   	Initial Revision
+ *
+ ***********************************************************************/
+MemHandle 
+DuplicateSearchInfo (MemHandle searchInfo)
+{
+  SearchReplaceStruct *srs, *copy;
+  MemHandle copyHan;
+
+  srs = (SearchReplaceStruct *)MemLock(searchInfo);
+  copyHan = MemAlloc(sizeof(SearchReplaceStruct) + srs->searchSize, 
+		     HF_SHARABLE | HF_SWAPABLE,
+		     HAF_NO_ERR);
+  copy = (SearchReplaceStruct *)MemLock(copyHan);
+  *copy = *srs;
+  strcpy((char *)copy+sizeof(SearchReplaceStruct), 
+	 (char *)srs+sizeof(SearchReplaceStruct));
+  MemUnlock(copyHan);
+  MemUnlock(searchInfo);
+
+  return copyHan;
+}	/* End of DuplicateSearchInfo.	*/
+
+

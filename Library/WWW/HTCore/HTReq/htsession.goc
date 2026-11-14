@@ -1,0 +1,327 @@
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Geoworks 1997.  All rights reserved.
+	GEOWORKS CONFIDENTIAL
+
+PROJECT:	WWW Geos Library
+MODULE:		htsession
+FILE:		htsession.goc
+
+AUTHOR:		Kok Kin Kee, Apr 10, 1997
+
+ROUTINES:
+	Name			Description
+	----			-----------
+
+REVISION HISTORY:
+	Name		Date		Description
+	----		----		-----------
+	kkee    	4/10/97   	Initial version.
+
+DESCRIPTION:
+
+	Session-based client management. Information valid through
+        all requests issued by a client, except when overwritten by
+	the client in the request itself. 
+
+	$Id: htsession.goc,v 1.4.3.1 97/09/05 10:48:17 jeremyb Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+@include <stdapp.goh>
+@include <WWW/HTCore/htutils.goh>
+@include <WWW/HTCore/htassoc.goh>
+@include <WWW/HTCore/htreqMan.goh>
+@include "HTReq/htsession.goh"
+#include <sem.h>
+#include <Ansi/string.h>
+@include "HTNet/htnetMan.goh"         /* HTNetKillAll */
+
+static SemaphoreHandle sessionSem = 0;
+static HTAssocList sessionList = 0;
+
+
+/***********************************************************************
+ *		HTSessionLibraryEntry
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Initialization.
+ * CALLED BY:	HTCoreLibraryEntry
+ * RETURN:	0, required by Kernel.
+ *	
+ * STRATEGY:	
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	kkee    	4/10/97   	Initial Revision
+ *	
+ ***********************************************************************/
+int _far _pascal
+HTSessionLibraryEntry (LibraryCallType ty, GeodeHandle client)
+{
+    if (ty == LCT_ATTACH) {
+	PUSHDS;
+	SET_DS_LIB_DGROUP;
+	sessionSem = ThreadAllocSem(1);
+	HandleModifyOwner(sessionSem, GeodeGetCodeProcessHandle());
+	sessionList = HTAssocListNew();
+	POPDS;
+
+    } else if (ty == LCT_DETACH) {
+	PUSHDS;
+	SET_DS_LIB_DGROUP;
+	ThreadFreeSem(sessionSem);
+	HTAssocDwordListDelete(sessionList);
+
+	sessionSem = 0;
+	sessionList = 0;
+	POPDS;
+    }
+
+    return 0;
+}	/* End of HTSessionLibraryEntry.	*/
+
+
+/***********************************************************************
+ *		HTSessionNotify
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Notify clients of a system event. 
+ * CALLED BY:	HTNet
+ * RETURN:	Nothing
+ *	
+ * STRATEGY:	
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	kkee    	7/24/97   	Initial Revision
+ *	
+ ***********************************************************************/
+void _far _pascal
+HTSessionNotify (int status)
+{
+    int count, i;
+    HTMemHandle htmh;
+    HTLibEnv *client;
+
+    PUSHDS;
+    SET_DS_LIB_DGROUP;
+    ThreadPSem(sessionSem);
+    count = HTListGetCount(sessionList);
+    for (i=0; i<count; i++) {
+	htmh = (HTMemHandle) HTAssocDwordListGetValue(sessionList, i);
+	client = (HTLibEnv *) HTMemLock(htmh);
+	if (client->HTLE_notification) 
+	    ProcCallFixedOrMovable_pascal(status, 
+					  client->HTLE_notification);
+	HTMemUnlock(htmh);
+    }
+    ThreadVSem(sessionSem);
+    POPDS;
+}	/* End of HTSessionNotify.	*/
+
+
+
+
+/* --------------------------------------------------------------------------
+ * 		PUBLIC ROUTINES
+ * --------------------------------------------------------------------------*/
+
+
+/***********************************************************************
+ *		HTREGISTER
+ ***********************************************************************
+ * SYNOPSIS:	Initialize the Library by registering the client 
+ * 	        application.
+ * CALLED BY:	Client. Must be called!
+ * PASS:	HTLibEnv
+ * RETURN:	HT_OK = initialization ok, application can proceed.
+ *		HT_NO = not ok, application should not proceed.
+ * SIDE EFFECTS:
+ * STRATEGY:	
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	kkee	5/22/96   	Initial Revision
+ *
+ ***********************************************************************/
+int _far _pascal
+HTREGISTER (HTLibEnv *env)
+{
+    HTMemHandle htmh;
+    HTLibEnv *p;
+
+EC( ECCheckProcessHandle(env->HTLE_client);                            )
+
+    p = (HTLibEnv *) HTMemAllocAndLock(&htmh, sizeof(HTLibEnv));
+    memcpy(p, env, sizeof(HTLibEnv));
+    HTMemUnlock(htmh);
+
+    PUSHDS;
+    SET_DS_LIB_DGROUP;
+
+    ThreadPSem(sessionSem);
+    HTAssocDwordListAdd(sessionList, (dword)env->HTLE_client, htmh);
+    ThreadVSem(sessionSem);
+
+    POPDS;
+
+    return HT_OK;
+}	/* End of HTREGISTER.	*/
+
+
+
+
+/***********************************************************************
+ *		HTUNREGISTER
+ ***********************************************************************
+ * SYNOPSIS:	Unregister a client by perrforming the necessary garbage
+ *              collection.
+ * CALLED BY:	Client. Must be called!
+ * PASS		client - client GeodeHandle.
+ * RETURN:	HT_OK - termination ok.
+ *		HT_NO - termination not ok.
+ * SIDE EFFECTS:None
+ *	
+ * STRATEGY:	
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	kkee	5/22/96   	Initial Revision
+ *
+ ***********************************************************************/
+int _far _pascal
+HTUNREGISTER (GeodeHandle client)
+{
+    HTMemHandle htmh;
+    HTLibEnv *env;
+
+
+EC( ECCheckProcessHandle(client);                                       )
+
+    PUSHDS;
+    SET_DS_LIB_DGROUP;   
+
+     /* In case there are live requests pending */
+    HTNetKillAll(client, HT_INTERRUPTED);
+    ThreadPSem(sessionSem);
+    HTAssocDwordListRemove(sessionList, (dword)client, (dword *)&htmh);
+    env = (HTLibEnv *) HTMemLock(htmh);
+    if (env->HTLE_userAgent) HTMemFree(env->HTLE_userAgent);
+    HTMemUnlockAndFree(htmh);
+    ThreadVSem(sessionSem);
+
+    POPDS;
+
+    return HT_OK;
+}	/* End of HTUNREGISTER.	*/
+
+
+
+/***********************************************************************
+ *		HTSESSIONLOOKUP
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Lookup a session client by its GeodeHandle.
+ * CALLED BY:	Internal
+ * RETURN:	HTMemHandle, which must be dereferenced into HTLibEnv.
+ *              OR NULL if not found.
+ *	
+ * STRATEGY:	
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	kkee    	4/10/97   	Initial Revision
+ *	
+ ***********************************************************************/
+HTMemHandle _far _pascal
+HTSESSIONLOOKUP (GeodeHandle client)
+{
+    HTMemHandle ret;
+
+    PUSHDS;
+    SET_DS_LIB_DGROUP;
+    
+    ThreadPSem(sessionSem);
+    if (!HTAssocDwordListLookup(sessionList, (dword)client, (dword *)&ret)) 
+	ret = NULL;
+    ThreadVSem(sessionSem);
+
+    POPDS;
+
+    return ret;
+}	/* End of HTSESSIONLOOKUP.	*/
+
+
+/***********************************************************************
+ *		HTSESSIONLOOKUPREQUEST
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Same as HTSessionLookup, but takes a request.
+ * CALLED BY:	Internal
+ * RETURN:	HTMemHandle, which must be dereferenced into HTLibEnv.
+ *              OR NULL if not found.
+ *	
+ * STRATEGY:	
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	kkee    	4/10/97   	Initial Revision
+ *	
+ ***********************************************************************/
+HTMemHandle _far _pascal
+HTSESSIONLOOKUPREQUEST (HTRequestHandle request)
+{
+    HTRequest *rptr;
+    HTMemHandle ret;
+
+    rptr = (HTRequest *) MemThreadGrab(request);
+    ret = HTSessionLookup(rptr->HTR_client);
+    MemThreadRelease(request);
+
+    return ret;
+}	/* End of HTSESSIONLOOKUPREQUEST.	*/
+
+
+
+/***********************************************************************
+ *		HTSESSIONUSECACHE
+ ***********************************************************************
+ *
+ * SYNOPSIS:	See if a client uses cache for the current session.
+ * CALLED BY:	Internal.
+ * RETURN:	TRUE or FALSE.
+ *	
+ * STRATEGY:	
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	kkee    	4/10/97   	Initial Revision
+ *	
+ ***********************************************************************/
+Boolean _far _pascal
+HTSESSIONUSECACHE (GeodeHandle client)
+{ 
+    HTMemHandle htmh;
+    HTLibEnv *e;
+    Boolean ret = FALSE;
+
+    htmh = HTSessionLookup(client);
+    if (htmh) {
+	e = (HTLibEnv *) HTMemLock(htmh);
+	ret = e->HTLE_useCache;
+	HTMemUnlock(htmh);
+    }
+
+    return ret;
+}	/* End of HTSESSIONUSECACHE.	*/
+
+
+

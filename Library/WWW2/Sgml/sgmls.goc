@@ -1,0 +1,711 @@
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Geoworks 1996 -- All Rights Reserved
+
+PROJECT:	WWW2 Library
+MODULE:		SGML
+FILE:		sgmls.goc
+
+AUTHOR:		Kok Kin Kee: Feb 13, 1998
+
+ROUTINES:
+	Name			Description
+	----			-----------
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	kkee    	2/13/98  	Initial version
+
+DESCRIPTION:
+	
+	SGML. All the code here is ported from Geos Library/WWW/Conv/SGML/
+	and back to Geos
+
+	$Id: sgmls.goc,v 1.2 98/09/03 03:47:47 allen Exp $
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+/*
+#include <system.h>
+#include <string.h>             // strcmp()
+#include <stdlib.h>             // atoi()
+*/
+
+@include <stdapp.goh>
+@include <Ansi/string.h>
+@include <Ansi/stdlib.h>
+@include "WWW2/WW2Core/ww2string.goh"
+@include "WWW2/WW2Core/ww2strm.goh"
+@include "WWW2/Conv/sgml.goh"
+@include "WWW2/wwMacro.h"
+
+#define _stream		pself->__stream
+#define _thisWord	pself->__thisWord
+#define _thisSym	pself->__thisSym
+#define _elementStack	pself->__elementStack
+#define _stackPos	pself->__stackPos
+#define _content	pself->__content
+#define _delayStack	pself->__delayStack
+#define _delayPos	pself->__delayPos
+#define _endOfFile	pself->__endOfFile
+#define _dtd		pself->__dtd
+#define _target		pself->__target
+#define _ungottenChar	pself->__ungottenChar
+#define _numOfUngotten	pself->__numOfUngotten
+#define _textBuffer	pself->__textBuffer
+#define _textLength	pself->__textLength
+#define _hasTrailingWhiteSpace pself->__hasTrailingWhiteSpace
+#define _attr		pself->__attr
+
+
+/***********************************************************************
+ *	        IsDelimiter
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Returns TRUE if a character is a valid SGML delimiter.
+ * CALLED BY:	SGMLScanGobbleSym
+ * RETURN:	TRUE or FALSE
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:    A SGML tag name is a letter followed by letters, digits,
+ *              periods, or hyphens. So these should *not* be considered 
+ *              as delimiters.
+ *
+ *              Should be implemented as a macro to improve speed.
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	kkee	9/21/96   	Initial Revision
+ *      kkee    2/17/98         Ported from Geos to Geos-SC
+ *
+ ***********************************************************************/
+#define IsDelimiter(chr) \
+    ((ISWHITE(chr) || (chr == '<')  || (chr == '>') ||  \
+     (chr == '\"') || (chr == '\'') || (chr == '=')) ?  \
+     TRUE : FALSE)
+
+
+/***********************************************************************
+ *		SGMLScanGetChar
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Remove a character from scanner's stream.
+ *              If _endOfFile == TRUE, the returned character is
+ *              invalid. Hence, you should 
+ *              _endOfFile after calling this routine.
+ * CALLED BY:	sgml.goc
+ * RETURN:	char
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:    
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	kkee	9/18/96   	Initial Revision
+ *      kkee    2/17/98         Ported from Geos to Geos-SC
+ *
+ ***********************************************************************/
+@extern method /* uint8 */ SgmlClass, SGMLScanGetChar /* () */
+{
+    /* Check for ungotten chars first */
+    if (_numOfUngotten)
+	return _ungottenChar[--_numOfUngotten];
+
+    byte readByte;
+    WWStreamResultCode rc;
+    do {
+        rc = @call _stream::ReadByte(&readByte, TRUE, 0 /* TIMEOUT_FOREVER */);
+        if (rc == WWSTREAM_OK) {
+            return readByte;
+        }
+    } while (rc == WWSTREAM_WOULD_BLOCK ||
+             rc == WWSTREAM_TIMEOUT);
+    
+    _endOfFile = TRUE;
+    return 0;  /* Keep compiler happy */
+}	/* End of SGMLScanGetChar.	*/
+
+
+/***********************************************************************
+ *		SGMLScanGetReduceWhiteChar
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Same as SGMLScanGetChar. Except that a string of white 
+ *              characters is gobbled and returned as a space (' ')
+ *              character. You should check _endOfFile after 
+ *              calling this routine.
+ * CALLED BY:	
+ * RETURN:	
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:    Should be implemented as a macro to improve speed.
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	kkee	10/ 3/96   	Initial Revision
+ *      kkee    2/17/98         Ported from Geos to Geos-SC
+ *
+ ***********************************************************************/
+@extern method /* uint8 */ SgmlClass, SGMLScanGetReduceWhiteChar /* () */
+{
+    byte chr;
+
+    chr = @call self::SGMLScanGetChar();
+
+    if (ISWHITE(chr)) {
+
+	/* Gobble all subsequent white spaces */
+	do {
+	    chr = @call self::SGMLScanGetChar();
+	}
+	while (ISWHITE(chr));
+
+	/* We have read one character ahead, rewind */
+	@call self::SGMLScanUngetChar(chr);
+	return ' ';
+    }
+
+    return chr;
+}	/* End of SGMLScanGetReduceWhiteChar<.	*/
+
+
+/***********************************************************************
+ *		SGMLScanGetNonWhiteChar
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Same as SGMLScanGetChar. Except that all white chars
+ *              are skipped and the first nonwhite char is returned. 
+ *              You should check _endOfFile after calling 
+ *              this routine.
+ * CALLED BY:	
+ * RETURN:	
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:    Should be implemented as a macro to improve speed.
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	kkee	10/ 3/96   	Initial Revision
+ *      kkee    2/17/98         Ported from Geos to Geos-SC
+ *
+ ***********************************************************************/
+@extern method /* uint8 */ SgmlClass, SGMLScanGetNonWhiteChar /* () */
+{
+    byte chr;
+
+    do {
+	chr = @call self::SGMLScanGetChar();
+    } while (ISWHITE(chr) && (!_endOfFile));
+
+    return chr;
+}	/* End of SGMLScanGetNonWhiteChar.	*/
+
+
+
+
+/***********************************************************************
+ *		SGMLScanGobbleSym
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Swallow a token. If you add new token, don't forget to 
+ *              update the printing of token in SGMLPutTokenText in 
+ *              sgml.goc.
+ * CALLED BY:	SGMLParseElementAttrs
+ * RETURN:	SGMLToken
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:    After every call to SGMLScanGetChar(), don't forget 
+ *              to see if (_endOfFile == TRUE). If its TRUE,
+ *              we are done parsing and the returned character from
+ *              SGMLScanGetChar() must be ignored.
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	kkee	9/16/96   	Initial Revision
+ *      kkee    2/17/98         Ported from Geos to Geos-SC
+ *
+ ***********************************************************************/
+@extern method /* void */ SgmlClass, SGMLScanGobbleSym /* () */
+{
+    byte chr;
+    word i;
+
+    chr = @call self::SGMLScanGetChar();
+
+    /* This is one big switch loop that builds a SGML token */
+    _thisWord[0] = '\0';
+    while (1) {
+
+	if (ISALNUM(chr) || (chr == '+') || (chr == '-')) {
+	    /*
+	     * Build up a string (a combination of alpha numerals)
+	     */
+	    i = 0;
+	    do {
+	        if (i < MAX_SGML_NAME_LENGTH-1) {
+		    _thisWord[i++] = chr;
+	        }
+#if ERROR_CHECK
+	        else {
+		    EC_WARN("Sgml::SGMLScanGobbleSym() thisWord not big enough");
+  	        }
+#endif
+		chr = @call self::SGMLScanGetChar();
+		/* Check ->endOfFile after while loop */
+
+	    } while ((!IsDelimiter(chr)) && (!_endOfFile));
+
+	    _thisWord[i] = '\0';
+	    
+	    /* We have read one character ahead */
+	    @call self::SGMLScanUngetChar(chr);
+
+	    if (!_endOfFile)
+		_thisSym = SGMLT_STRING;
+
+	    else
+		_thisSym = SGMLT_XXX_EOF;
+	
+	    return;
+
+	} else 
+
+	    switch (chr) {
+	    case '>':
+		_thisSym = SGMLT_CLOSE_BRACKET;
+		return;
+
+	    case '=':
+		_thisSym = SGMLT_EQUAL;
+		return;
+
+	    case '\"':
+		_thisSym = SGMLT_DOUBLE_QUOTE;
+		return;
+
+	    case '\'':
+		_thisSym = SGMLT_SINGLE_QUOTE;
+		return;
+
+	    default:
+               /* ignore the character */
+                chr = @call self::SGMLScanGetChar();
+		if (_endOfFile) {
+		    _thisSym = SGMLT_XXX_EOF;
+		    return;
+		}
+		break;
+
+	    }
+    }
+}	/* End of SGMLScanGobbleSym.	*/
+
+
+
+/***********************************************************************
+ *		SGMLScanGobbleValue
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Gobble an attribute value. 
+ * CALLED BY:	sgml.goc.
+ * RETURN:	The value is gobbled into the passed in buffer. The 
+ *              buffer is assumed to be of size MAX_SGML_NAME_LENGTH.
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	kkee	10/ 6/96   	Initial Revision
+ *      kkee    2/17/98         Ported from Geos to Geos-SC
+ *
+ ***********************************************************************/
+@extern method /* void */ SgmlClass, SGMLScanGobbleValue /* (uint8 *buffer) */
+{
+    byte chr;
+    word i;
+
+    buffer[0] = '\0';
+    i = 0;
+
+    chr = @call self::SGMLScanGetChar();
+
+    while (!ISWHITE(chr) && (chr != '>') && !_endOfFile) {
+
+	if (i < MAX_SGML_NAME_LENGTH-1)
+	    buffer[i++] = chr;
+	chr = @call self::SGMLScanGetChar();
+	/* Check _endOfFile after while loop */
+    }
+
+    buffer[i] = '\0';
+	    
+    /* We have read one character ahead */
+    @call self::SGMLScanUngetChar( chr);
+
+}	/* End of SGMLScanGobbleValue.	*/
+
+
+
+/***********************************************************************
+ *		SGMLScanGobbleQuotedValue
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Gobble an attribute value demarcated by a pair of quotes.
+ *              When this routine is called, the opening quote has been
+ *              gobbled. The quotes are not included in the value. 
+ * CALLED BY:	sgml.goc.
+ * RETURN:	The value is gobbled into the passed in buffer. The 
+ *              buffer is assumed to be of size MAX_SGML_NAME_LENGTH.
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	kkee	10/ 6/96   	Initial Revision
+ *      kkee    2/17/98         Ported from Geos to Geos-SC
+ *
+ ***********************************************************************/
+@extern method /* void */ SgmlClass, SGMLScanGobbleQuotedValue /* ( uint8 *buffer, uint8 quote) */
+{
+    byte chr, refChar, ct;
+    word i;
+    int result;
+
+    buffer[0] = '\0';
+    i = 0;
+
+    chr = @call self::SGMLScanGetChar();
+
+    while ((chr != quote) && !_endOfFile) {
+
+        if (i < MAX_SGML_NAME_LENGTH-1) {
+
+            if (chr == '&') {
+                result = @call self::SGMLParseReference( &refChar);
+                switch (result) {
+		        case PARSE_REF_ENTITY_REF:
+                case PARSE_REF_CHAR_REF:
+                     buffer[i++] = refChar;
+                     break;
+                case PARSE_REF_WHITE_SPACE:
+                     buffer[i++] = '&';
+                     buffer[i++] = ' ';
+                     break;
+                case PARSE_REF_LEFT_BRACKET:
+                case PARSE_REF_NON_REFERENCE:
+                     buffer[i++] = '&';
+                     break;
+                default:
+		     break;    
+                }
+            } else {
+                if (chr >= 0xA0) {
+                    /* ct = CHARACTERTRANSLATE[chr-0xA0][0]; */
+                    ct = chr;
+                    if (ct > 0)
+                        buffer[i++] = ct;
+                    else
+                        buffer[i++] = chr;
+                } else {
+                    buffer[i++] = chr;
+                }
+            }
+        }
+
+	chr = @call self::SGMLScanGetChar();
+	if ((chr == '<') || (chr == '>')) {
+	    @call self::SGMLScanUngetChar( chr);
+	    break;
+	}
+
+	/* Check ->endOfFile after while loop */
+    } 
+
+    buffer[i] = '\0';
+	    
+    /* We don't care to unget the double quote */
+
+}	/* End of SGMLScanGobbleQuotedValue.	*/
+
+
+/***********************************************************************
+ *		SGMLSearchTag
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Search for a tag in a taglist.
+ * CALLED BY:	sgml.goc
+ * RETURN:	-1 if not found, else valid index into 
+ *              dtd->SGMLD_tagList.
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:    Use a binary search algo. Table must be ordered 
+ *              alphabetically.
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	kkee	9/22/96   	Initial Revision
+ *      kkee    2/17/98         Ported from Geos to Geos-SC
+ *
+ ***********************************************************************/
+@extern method /* int16 */ SgmlClass, SGMLSearchTag 
+	/* (const SGMLTag *tptr, uint16 numOfTags, uint8 *thisWord) */
+{
+    int result;
+    sword i, lower = 0;
+    sword upper = numOfTags - 1;
+
+    while (upper >= lower) {
+	i = (lower + upper) / 2;
+
+	/* Case insensitive compare */
+	result = WWStrCaseCmp((char*)thisWord, tptr[i].SGMLT_name);
+
+	if (result < 0)
+	    upper = i - 1;
+
+	else if (result > 0)
+	    lower = i + 1;
+
+	else
+	    return i;
+    }
+
+    return -1;
+} 	/* End of SGMLSearchTag.	*/
+
+
+
+/***********************************************************************
+ *		SGMLSearchAttr
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Search a list of attributes for an attribute name match.
+ * CALLED BY:	SGMLParseElementAttr
+ * RETURN:	> 0 if found and token contains a valid attr token.
+ *              else -1.
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:    
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	kkee	10/ 4/96   	Initial Revision
+ *      kkee    2/17/98         Ported from Geos to Geos-SC
+ *
+ ***********************************************************************/
+@extern method /* int16 */ SgmlClass, SGMLSearchAttr 
+	/* (const SGMLAttr *attrs, uint16 numOfAttrs, uint8 *thisWord) */
+{
+    int result;
+    sword i, lower = 0;
+    sword upper = numOfAttrs - 1;
+
+    while (upper >= lower) {
+	i = (lower + upper) / 2;
+
+	/* Case insensitive compare */
+	result = WWStrCaseCmp((char*)thisWord, attrs[i].SGMLA_name);
+
+	if (result < 0)
+	    upper = i - 1;
+
+	else if (result > 0)
+	    lower = i + 1;
+
+	else
+	    return i;
+    }
+
+    return -1;
+}	/* End of SGMLSearchAttr.	*/
+
+
+/***********************************************************************
+ *		SGMLSearchEntity
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Search the DTD list of entities for a match.
+ * CALLED BY:	sgml.goc
+ * RETURN:	If a match is found return is > -1.
+ *              If not found, then return is -1.
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	kkee	10/ 8/96   	Initial Revision
+ *      kkee    2/17/98         Ported from Geos to Geos-SC
+ *
+ ***********************************************************************/
+@extern method /* int16 */ SgmlClass, SGMLSearchEntity 
+	/* (const char **entity, uint16
+                              numOfEntities, 
+                              uint8 *thisWord) */
+{
+    int result;
+    sword i, lower = 0;
+    sword upper = numOfEntities - 1;
+    sword ret = -1;
+
+    while (upper >= lower) {
+	i = (lower + upper) / 2;
+
+	/* Case sensitive compare! */
+	result = strcmp((char*)thisWord, entity[i]);
+
+	if (result < 0)
+	    upper = i - 1;
+
+	else if (result > 0)
+	    lower = i + 1;
+
+	else {
+	    ret = i;
+	    break;
+	}
+    }
+
+    return ret;
+}	/* End of SGMLSearchEntity.	*/
+
+
+
+/***********************************************************************
+ *		SGMLParseReference
+ ***********************************************************************
+ *
+ * SYNOPSIS:	We have seen '&'. Parse character or entity reference.
+ * CALLED BY:	SGMLParserThread.
+ * RETURN:	ParseRefType
+ * SIDE EFFECTS:
+ *		If returning PARSE_REF_ENTITY_REF or PARSE_REF_CHAR_REF,
+ *              the reference character is passed back in *refChar.
+ * STRATEGY:
+ *              Example of a character reference is &#258;
+ *              Example of an entity reference is &gt;
+ *              (The terminating semicolon is optional as whitespace
+ *               can also terminate a char or entity reference)
+ *
+ *              It seems most people write &ltxxx to mean <xxx with no
+ *              space and semicolon. So I allow this.
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	kkee	10/ 8/96   	Initial Revision
+ *	grisco	11/10/97	Returns reference type & ref char
+ *      kkee    2/17/98         Ported from Geos to Geos-SC
+ *
+ ***********************************************************************/
+@extern method /* ParseRefType */ SgmlClass, SGMLParseReference /* ( uint8 *refChar) */
+{
+    sword i, value;
+    byte c;
+
+    i = 0;
+
+    /* Character reference */
+    if ((c = @call self::SGMLScanGetChar()) == '#') {
+
+	c = @call self::SGMLScanGetChar();
+	while (ISDIGIT(c) && i < MAX_SGML_NAME_LENGTH-1) {
+	    _thisWord[i++] = c;
+	    c = @call self::SGMLScanGetChar();
+	}
+
+	_thisWord[i] = '\0';
+
+	if (c != ';')
+	    @call self::SGMLScanUngetChar( c);
+
+	/* Translate the character reference to native representiation */
+	*refChar = atoi((char*)_thisWord);
+        /* XXX
+        // This is a patch to make sure the value does not
+        // exceed x80, if it does, we change it to x2e to 
+        // avoid tripping SJIS conversion. */
+        if (!(*refChar) || *refChar >= 0x80) {
+            *refChar = 0x2e;
+        }
+        /* End of patch */
+
+	return(PARSE_REF_CHAR_REF);
+	
+    } else if (ISWHITE(c)) {
+
+	return(PARSE_REF_WHITE_SPACE);
+
+    } else if (c == '<') {
+
+	@call self::SGMLScanUngetChar( c);
+	return(PARSE_REF_LEFT_BRACKET);
+    }
+
+    /* Entity reference */
+    do {
+	_thisWord[i++] = c;
+	_thisWord[i] = 0;
+	
+	/* 
+	 * Don't expect to get a space or semicolon that 
+	 * terminates the reference as most people won't bother
+	 * putting it there.
+	 */
+	if ((value = @call self::SGMLSearchEntity(ENTITYLIST,
+				      NUMOFENTITIES,
+				      _thisWord)) >= 0) {
+
+            *refChar = ENTITYTRANSLATE[value][0];
+
+            /* XXX
+            // This is a patch to make sure the value does not
+            // exceed x80, if it does, we change it to x2e to 
+            // avoid tripping SJIS conversion. */
+            if (!(*refChar) || *refChar >= 0x80) {
+                *refChar = 0x2e;
+            }
+            /* End of patch */
+
+	    /* If next char is semicolon, we have to swallow it */
+	    if ((c = @call self::SGMLScanGetChar()) != ';')
+		@call self::SGMLScanUngetChar( c);
+
+	    return(PARSE_REF_ENTITY_REF);
+	}
+	
+	c = @call self::SGMLScanGetChar();
+    } while ((ISALPHA(c) || ISDIGIT(c)) &&  i < MAX_SGML_NAME_LENGTH-1);
+    
+    /* 
+     * Otherwise we put _thisWord as text.
+     */
+
+    @call self::SGMLScanUngetChar( c);
+    for (value=i-1; value>=0; value--) {
+        @call self::SGMLScanUngetChar( _thisWord[value]);
+    }
+    return (PARSE_REF_NON_REFERENCE);
+}	/* End of SGMLParseReference.	*/
+
+
+@extern method /* void */ SgmlClass, SGMLScanUngetChar /* (uint8 chr)  */
+{
+    ASSERTS(_numOfUngotten < SGML_MAX_NUMBER_UNGET_CHARS,
+            "Sgml::SGMLUngetChar() unget buffer not big enough");
+    _ungottenChar[_numOfUngotten++] = chr;
+}

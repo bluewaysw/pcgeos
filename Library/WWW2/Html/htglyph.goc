@@ -1,0 +1,1656 @@
+//---------------------------------------------------------------------------
+//                
+//	Copyright (C) Geoworks 1998.  All rights reserved.
+//	GEOWORKS CONFIDENTIAL
+//
+// PROJECT:	Geos-SC WWW Library
+// MODULE:	HTGlyph
+// FILE:	htglyph.cpp
+//
+// AUTHOR:	Kok Kin Kee: Mar 17, 1998
+//
+// REVISION HISTORY:
+//	Name		Date		Description
+//	----		----		-----------
+//	kkee    	3/17/98  	Initial version
+//
+// DESCRIPTION:
+//
+//	HTGlyph, the base class of all HTML visible and structural
+//      objects in a HTML document.
+//      //depot/liberty/project/ellery/980805/library/www/html/htglyph.cpp#1
+//
+//	$Id: htglyph.goc,v 1.1 98/08/19 20:45:51 edwin Exp $
+//
+//---------------------------------------------------------------------------
+
+/*
+#include <system.h>
+#include <www/wwmem.h>
+#include <www/wwcore/wwuri.h>
+#include "htglyph.h"
+#include "anchor.h"
+#include "htframe.h"
+#include "reqmgr.h"
+*/
+
+@include <stdapp.goh>
+@include "WWW2/Conv/htglyph.goh"
+@include "WWW2/Conv/reqmgr.goh"
+@include "WWW2/wwMacro.h"
+@include "WWW2/Scheme/wwfile.goh"
+#include "htconst.h"
+
+#if ERROR_CHECK
+@include <Ansi/stdio.h>   /* sprintf */
+@include <Ansi/string.h>  /* strlen  */
+#endif
+
+@classdecl	HTGlyphClass, neverSaved;
+@classdecl	HTBoundedGlyphClass, neverSaved;
+@classdecl	HTCompositeClass, neverSaved;
+@classdecl      HTLeafClass, neverSaved;
+@classdecl      HTAnchoredLeafClass, neverSaved;
+@classdecl      HTTokenClass, neverSaved;
+@classdecl      MinMaxAccumulatorClass, neverSaved;
+
+
+#define	_flags	    (pself->__flags)
+#define	_sibling    (pself->__sibling)
+#define _coord      (pself->__coord)
+#define _firstChild (pself->__firstChild)
+#define _lastChild  (pself->__lastChild)
+#define _anchor     (pself->__anchor)
+#define _min        (pself->__min)
+#define _max        (pself->__max)
+#define _runningMin (pself->__runningMin)
+#define _runningMax (pself->__runningMax)
+#define _indentLevel (pself->__indentLevel)
+
+
+//---------------------------------------------------------------------------
+//		HTGlyph::HTGlyph()
+//---------------------------------------------------------------------------
+// 
+// SYNOPSIS: 	Constructor.
+// SCOPE:	Protected.
+// RETURN:	Nothing
+// STRATEGY:	
+// 
+// REVISION HISTORY: 
+//	Name		Date		Description 
+//	----		----		----------- 
+//	kkee    	3/18/98 	Initial version 
+//	
+//---------------------------------------------------------------------------
+@method HTGlyphClass, HTGlyph // (HTGlyph *parent)
+{
+    if (parent) {
+        _sibling = parent;
+        _flags.pointToParent = 1;
+    } else {
+        _sibling = NULL;
+        _flags.pointToParent = 0;
+    }
+
+    _flags.geometryValid = 0;
+    _flags.sizeValid = 0;
+}	/* End of HTGlyph::HTGlyph() */
+
+
+//---------------------------------------------------------------------------
+//		HTGlyph::SetGeometryValid()
+//---------------------------------------------------------------------------
+// 
+// SYNOPSIS: 	Set the geometry of a glyph to be valid or invalid.
+//              A glyph with invalid geometry will be formatted.
+// SCOPE:	Public
+// RETURN:	Nothing
+// STRATEGY:	
+// 
+// REVISION HISTORY: 
+//	Name		Date		Description 
+//	----		----		----------- 
+//	kkee    	4/27/98 	Initial version 
+//	
+//---------------------------------------------------------------------------
+@method // void
+HTGlyphClass, SetGeometryValid // (Boolean flag)
+{
+    _flags.geometryValid = (flag == TRUE ? 1 : 0);
+}	/* End of HTGlyph::SetGeometryValid() */
+
+
+//---------------------------------------------------------------------------
+//		HTGlyph::IsGeometryValid()
+//---------------------------------------------------------------------------
+// 
+// SYNOPSIS: 	Check to see if the geometry is valid
+// SCOPE:	Public
+// RETURN:	TRUE if it is, FALSE otherwise.
+// STRATEGY:	
+// 
+// REVISION HISTORY: 
+//	Name		Date		Description 
+//	----		----		----------- 
+//	kkee    	4/27/98 	Initial version 
+//	
+//---------------------------------------------------------------------------
+@method // Boolean
+HTGlyphClass, IsGeometryValid // ()
+{
+    return (_flags.geometryValid ? TRUE : FALSE);
+}	/* End of HTGlyph::IsGeometryValid() */
+
+
+//---------------------------------------------------------------------------
+//		HTGlyph::InsertSibling()
+//---------------------------------------------------------------------------
+// 
+// SYNOPSIS: 	Insert a sibling after a glyph. The sibling will have
+//              the same parent as the glyph. If the passed in glyph
+//              is NULL, it will be insert after the callee glyph.
+// SCOPE:	Public
+// RETURN:	Nothing
+// STRATEGY:	
+// 
+// REVISION HISTORY: 
+//	Name		Date		Description 
+//	----		----		----------- 
+//	kkee    	3/28/98 	Initial version 
+//	
+//---------------------------------------------------------------------------
+@method // void
+HTGlyphClass, InsertSibling // (HTGlyph *sibling, HTGlyph *glyph)
+{
+    PARAM_ASSERT(sibling);
+
+    if (!glyph) {
+        // Its ok to modify as it is passed by value
+        glyph = oself;
+    }
+    
+    // Make sure glyph is linked to the UI tree. This is 
+    // checked by making sure the glyph has a parent.
+    ASSERTS(@call glyph::GetParent() != NULL,
+            "HTGlyph::InsertSibling() glyph not linked to HTML uitree");
+
+    optr temp = @call glyph::GetSiblingGlyph();
+    @call sibling::SetSiblingGlyph(temp);
+
+    @call glyph::SetSiblingGlyph(sibling);
+    if (@call glyph::DoesPointToParent()) {
+        @call glyph::SetPointToParent(0);
+        @call sibling::SetPointToParent(1);
+    }
+}	/* End of HTGlyph::InsertSibling() */
+
+
+
+//---------------------------------------------------------------------------
+//		HTGlyph::GetParent()
+//---------------------------------------------------------------------------
+// 
+// SYNOPSIS: 	Get the parent of a glyph. Returns NULL if no parent.
+// SCOPE:	Public
+// RETURN:	HTGlyph*
+// STRATEGY:	
+// 
+// REVISION HISTORY: 
+//	Name		Date		Description 
+//	----		----		----------- 
+//	kkee    	3/17/98 	Initial version 
+//	
+//---------------------------------------------------------------------------
+@method // HTGlyph*
+HTGlyphClass, GetParent // () const
+{
+    optr /* HTGlyph * */ temp = /* (HTGlyph*)this */ oself;
+    while (temp && !@call temp::DoesPointToParent()) {
+        temp = @call temp::GetSiblingGlyph();
+    }
+
+#if ERROR_CHECK
+    if (temp && !@call temp::DoesPointToParent()) {
+        EC_FAIL("HTGlyph::GetParent() invalid parent");
+    }
+#endif
+
+    return (temp == NULL ? NULL : @call temp::GetSiblingGlyph());
+}	/* End of HTGlyph::GetParent() */
+
+
+//---------------------------------------------------------------------------
+//		HTGlyph::HandleMouseEvent()
+//---------------------------------------------------------------------------
+// 
+// SYNOPSIS: 	By default, a glyph does not intercept a mouse event.
+// SCOPE:	Public
+// RETURN:	FALSE
+// STRATEGY:	
+// 
+// REVISION HISTORY: 
+//	Name		Date		Description 
+//	----		----		----------- 
+//	kkee    	4/23/98 	Initial version 
+//	
+//---------------------------------------------------------------------------
+/*
+@method / Boolean
+HTGlyphClass, HandleMouseEvent * (MouseEvent& event,
+			    HTPoint point,
+			    HTFrame* frame) *
+{
+    return FALSE;
+}	* End of HTGlyph::HandleMouseEvent() 
+*/
+
+
+//---------------------------------------------------------------------------
+//		HTGlyph::SetAnchor()
+//---------------------------------------------------------------------------
+// 
+// SYNOPSIS: 	By default a glyph has no anchor.
+// SCOPE:	Public
+// RETURN:	Nothing
+// STRATEGY:	
+// 
+// REVISION HISTORY: 
+//	Name		Date		Description 
+//	----		----		----------- 
+//	kkee    	4/23/98 	Initial version 
+//	
+//---------------------------------------------------------------------------
+@method // void
+HTGlyphClass, SetAnchor // (HTMLAnchorItem* anchor)
+{
+}	/* End of HTGlyph::SetAnchor() */
+
+
+//---------------------------------------------------------------------------
+//		HTGlyph::GetAnchor()
+//---------------------------------------------------------------------------
+// 
+// SYNOPSIS: 	By default a glyph has no anchor.
+// SCOPE:	Public
+// RETURN:	NULL
+// STRATEGY:	
+// 
+// REVISION HISTORY: 
+//	Name		Date		Description 
+//	----		----		----------- 
+//	kkee    	4/23/98 	Initial version 
+//	
+//---------------------------------------------------------------------------
+@method // HTMLAnchorItem*
+HTGlyphClass, GetAnchor // () const
+{
+    return NULL;
+}	/* End of HTGlyph::GetAnchor() */
+
+
+@method // HTGlyph* 
+HTGlyphClass, GetSibling // () const
+{
+    return (_flags.pointToParent ? NULL : _sibling);
+}
+
+
+@method // Boolean
+HTGlyphClass, IsSizeValid // () const
+{
+    return (_flags.sizeValid ? TRUE : FALSE);
+}	
+
+
+@method // void
+HTGlyphClass, SetSizeValid // (Boolean flag)
+{
+    _flags.sizeValid = (flag == TRUE ? 1 : 0);
+}
+
+
+@method // inline void
+HTGlyphClass, RequestSize // ()
+{
+    _flags.sizeValid = 0;
+    optr /* HTGlyph * */ parent = @call self::GetParent();
+    if (parent) {
+        @call parent::RequestSize();
+    }
+}
+
+
+@method // Boolean
+HTGlyphClass, IsChild // (HTGlyph * glyph) 
+{
+    return FALSE;
+}
+
+@method // Boolean
+HTGlyphClass, DoesPointToParent
+{
+    return _flags.pointToParent;
+}
+
+@method 
+HTGlyphClass, SetPointToParent
+{
+    _flags.pointToParent = state;
+}
+
+
+@method HTGlyphClass, GetAlignment
+{
+        return HTALIGN_BOTTOM;
+}
+
+
+@method HTGlyphClass, SetSiblingGlyph
+{
+        _sibling = glyph;
+}
+
+
+@method HTGlyphClass, GetSiblingGlyph
+{
+        return _sibling;
+}
+
+
+//---------------------------------------------------------------------------
+//		HTBoundedGlyph::HTBoundedGlyph()
+//---------------------------------------------------------------------------
+// 
+// SYNOPSIS: 	Constructor.
+// SCOPE:	Protected
+// RETURN:	Nothing
+// STRATEGY:	
+// 
+// REVISION HISTORY: 
+//	Name		Date		Description 
+//	----		----		----------- 
+//	kkee    	4/23/98 	Initial version 
+//	
+//---------------------------------------------------------------------------
+@method /* void */ HTBoundedGlyphClass, HTBoundedGlyph // ()
+{
+    _coord.x0 = 0;
+    _coord.y0 = 0;
+    _coord.x1 = 0;
+    _coord.y1 = 0;
+}	/* End of HTBoundedGlyph::HTBoundedGlyph() */
+
+
+//---------------------------------------------------------------------------
+//		HTBoundedGlyph::RequestDraw()
+//---------------------------------------------------------------------------
+// 
+// SYNOPSIS:    For a glyph to request to be drawn.
+// SCOPE:	Public
+// RETURN:	Nothing
+// STRATEGY:	
+// 
+// REVISION HISTORY: 
+//	Name		Date		Description 
+//	----		----		----------- 
+//	kkee    	5/04/98 	Initial version 
+//	
+//---------------------------------------------------------------------------
+@method /* void */
+HTBoundedGlyphClass, RequestDraw // ()
+{
+    if (_flags.geometryValid) {
+        // Draw only if geometry is valid
+        optr /* HTGlyph * */ parent = @call self::GetParent();
+        if (parent) {
+            @call parent::RequestDrawFromChild(oself, _coord);
+        }
+    }
+}	/* End of HTBoundedGlyph::RequestDraw() */
+
+
+//---------------------------------------------------------------------------
+//		HTBoundedGlyph::RequestDrawFromChild()
+//---------------------------------------------------------------------------
+// 
+// SYNOPSIS: 	Accept a request to draw from a child.
+// SCOPE:	Public
+// RETURN:	Nothing
+// STRATEGY:	We add our bounds to coord and pass it on to our
+//              parent. This process repeats itself until it reaches a
+//              glyph that knows when to display, normally this is the
+//              root of the uitree. So the root glyph would intercept
+//              this method to draw the child.
+// 
+//              Note: what happen if my geometry is invalid while the
+//              child's geometry is valid? Do i still pass the request
+//              draw to my parent?
+//
+// REVISION HISTORY: 
+//	Name		Date		Description 
+//	----		----		----------- 
+//	kkee    	5/05/98 	Initial version 
+//	
+//---------------------------------------------------------------------------
+@method /* void */
+HTBoundedGlyphClass, RequestDrawFromChild // (HTGlyph *child, HTCoord absCoord)
+{
+    PARAM_ASSERT(child);
+    
+    optr /* HTGlyph * */ parent = @call self::GetParent();
+    if (parent) {
+        coord.x0 += _coord.x0;
+        coord.y0 += _coord.y0;
+        coord.x1 += _coord.x1;
+        coord.y1 += _coord.y1;
+        @call parent::RequestDrawFromChild(child, coord);
+    }
+}	/* End of HTBoundedGlyph::RequestDrawFromChild() */
+
+
+//---------------------------------------------------------------------------
+//		HTBoundedGlyph::SetBounds()
+//---------------------------------------------------------------------------
+// 
+// SYNOPSIS: 	Set the bounds of a object.
+// SCOPE:	Public
+// RETURN:	Nothing
+// STRATEGY:	
+// 
+// REVISION HISTORY: 
+//	Name		Date		Description 
+//	----		----		----------- 
+//	kkee    	3/19/98 	Initial version 
+//	
+//---------------------------------------------------------------------------
+@method // void
+HTBoundedGlyphClass, SetBounds // (const HTCoord *bounds)
+{
+    PARAM_ASSERT(bounds);
+    ASSERT(bounds->x0 >= 0);
+    ASSERT(bounds->y0 >= 0);
+    ASSERT(bounds->x1 >= 0);    
+    ASSERT(bounds->y1 >= 0);
+
+    _coord = *bounds;
+    @call self::SetSizeValid(TRUE);
+}	/* End of HTBoundedGlyph::SetBounds() */
+
+
+
+//---------------------------------------------------------------------------
+//		HTBoundedGlyph::GetBounds()
+//---------------------------------------------------------------------------
+// 
+// SYNOPSIS: 	Get the bounds of a glyph.
+// SCOPE:	Public
+// RETURN:	Nothing
+// STRATEGY:	
+// 
+// REVISION HISTORY: 
+//	Name		Date		Description 
+//	----		----		----------- 
+//	kkee    	3/18/98 	Initial version 
+//	
+//---------------------------------------------------------------------------
+@method // void
+HTBoundedGlyphClass, GlyphGetBounds // (HTCoord *rect) const
+{
+    PARAM_ASSERT(bounds);
+    *bounds = _coord;
+}	/* End of HTBoundedGlyph::GetBounds() */
+
+
+//---------------------------------------------------------------------------
+//		HTBoundedGlyph::GetAbsoluteBounds()
+//---------------------------------------------------------------------------
+// 
+// SYNOPSIS: 	Get the document bounds of a glyph.
+// SCOPE:	Public
+// RETURN:	Nothing
+// STRATEGY:	
+// 
+// REVISION HISTORY: 
+//	Name		Date		Description 
+//	----		----		----------- 
+//	edwin   	4/20/98 	Initial version 
+//	
+//---------------------------------------------------------------------------
+@method /* void  */
+HTBoundedGlyphClass, GetAbsoluteBounds // (HTCoord *rect)
+{
+    optr /* HTGlyph * */ parent;
+    HTCoord prect;
+
+    *rect = _coord;
+    parent = oself;
+
+    while((parent = @call parent::GetParent())) {
+        // Add the offset of the parent as going up the ui tree.
+        @call parent::GlyphGetBounds(&prect);
+        rect->x0 += prect.x0;
+        rect->y0 += prect.y0;
+        rect->x1 += prect.x0;
+        rect->y1 += prect.y0;
+    }
+
+    return;
+}
+
+
+//---------------------------------------------------------------------------
+//		HTBoundedGlyph::GetSize()
+//---------------------------------------------------------------------------
+// 
+// SYNOPSIS: 	Get the width and height.
+// SCOPE:	Public
+// RETURN:	Nothing
+// STRATEGY:	
+// 
+// REVISION HISTORY: 
+//	Name		Date		Description 
+//	----		----		----------- 
+//	kkee    	3/31/98 	Initial version 
+//	
+//---------------------------------------------------------------------------
+@method // void
+HTBoundedGlyphClass, GetSize // (HTSize *size) const
+{
+    PARAM_ASSERT(size);
+    size->width = _coord.x1 - _coord.x0;
+    size->height = _coord.y1 - _coord.y0;
+}	/* End of HTBoundedGlyph::GetSize() */
+
+
+//---------------------------------------------------------------------------
+//		HTBoundedGlyph::SetSize()
+//---------------------------------------------------------------------------
+// 
+// SYNOPSIS: 	Change of the bounds to reflect the new size relative to 
+//              position (0,0) and invalidates the geometry.
+// SCOPE:	Public
+// RETURN:	Nothing
+// STRATEGY:	
+// 
+// REVISION HISTORY: 
+//	Name		Date		Description 
+//	----		----		----------- 
+//	kkee    	3/31/98 	Initial version 
+//	
+//---------------------------------------------------------------------------
+@method // inline void
+HTBoundedGlyphClass, SetSize // (sword width, sword height)
+{
+    PARAM_ASSERT(width>=0);
+    PARAM_ASSERT(height>=0);
+
+    @call self::SetGeometryValid(FALSE);
+    @call self::SetSizeValid(TRUE);
+    
+    _coord.x0 = 0;
+    _coord.y0 = 0;
+    _coord.x1 = width;
+    _coord.y1 = height;
+}	/* End of HTBoundedGlyph::SetSize() */
+
+
+@method // sword
+HTBoundedGlyphClass, GetWidth // () const 
+{
+    return (_coord.x1 - _coord.x0);
+}
+
+
+@method // sdword
+HTBoundedGlyphClass, GetHeight // () const
+{
+    return (_coord.y1 - _coord.y0);
+}
+
+
+@method // Boolean
+HTBoundedGlyphClass, HasSize // () const
+{
+    return ((_coord.y1 - _coord.y0 > 0) ||
+        (_coord.x1 - _coord.x0 > 0) ? TRUE : FALSE);
+}
+
+
+
+//---------------------------------------------------------------------------
+//		HTBoundedGlyph::Intersects()
+//---------------------------------------------------------------------------
+// 
+// SYNOPSIS: 	Check to see a virtual window point intersects a glyph.
+// SCOPE:	Public
+// RETURN:	HTGLYPH_ABOVE_BOUNDS Glyph is above point.
+//              HTGLYPH_IN_BOUNDS    Glyph overlaps with point.
+//              HTGLYPH_BELOW_BOUNDS Glyph is below point.
+//              HTGLYPH_OUT_BOUNDS   None of the above.
+// STRATEGY:	
+// 
+// REVISION HISTORY: 
+//	Name		Date		Description 
+//	----		----		----------- 
+//	kkee    	3/18/98 	Initial version 
+//	
+//---------------------------------------------------------------------------
+@method // HTGlyphBoundsCheck
+HTBoundedGlyphClass, Intersects // (const HTPoint *point)
+{
+    PARAM_ASSERT(point);
+    // The fastest way to check for intersection is to 
+    // check for non-intersection.
+    if (point->y < _coord.y0) {
+        return HTGLYPH_BELOW_BOUNDS;
+    } else if (point->y > _coord.y1) {
+        return HTGLYPH_ABOVE_BOUNDS;
+    } else if (point->x < _coord.x0 || point->x > _coord.x1) {
+        return HTGLYPH_OUT_BOUNDS;
+    }
+    return HTGLYPH_IN_BOUNDS;
+}	/* End of HTBoundedGlyph::Intersects() */
+
+
+//---------------------------------------------------------------------------
+//		HTBoundedGlyph::Overlap()
+//---------------------------------------------------------------------------
+// 
+// SYNOPSIS: 	Check for overlapping.
+// SCOPE:	Public
+// RETURN:	HTGLYPH_IN_BOUNDS
+//              HTGLYPH_ABOVE_BOUNDS
+//              HTLGYPH_BELOW_BOUNDS
+//              HTGLYPH_OUT_BOUNDS
+// STRATEGY:	
+// 
+// REVISION HISTORY: 
+//	Name		Date		Description 
+//	----		----		----------- 
+//	kkee    	3/19/98 	Initial version 
+//	
+//---------------------------------------------------------------------------
+@method // HTGlyphBoundsCheck
+HTBoundedGlyphClass, Overlap // (const HTOffsetAndSize *exposed)
+{
+    PARAM_ASSERT(exposed);
+
+    // The following explains the algorithm, but implemented 
+    // differently to make it efficient
+#if 0
+    // Normalize my coordinates by adding exposed offset.
+    HTCoord myCoord = {_coord.x0 + exposed->offset.x,
+                       _coord.y0 + exposed->offset.y,
+                       _coord.x1 + exposed->offset.x,
+                       _coord.y1 + exposed->offset.y};
+    // The fastest way to check for overlapping is to eliminate
+    // all non-overlapping cases.
+    if (myCoord.y1 < 0 ||
+        exposed->size.height < myCoord.y0 ||
+        myCoord.x1 < 0 ||
+        exposed->size.width < myCoord.x0) {
+        // Fullfill all non-overlapping conditions
+        return FALSE;
+    }
+    return TRUE;
+#endif
+     // This is the implementation 
+    if (!_coord.y1 ||   // Zero height (size) 
+        (_coord.y1 + exposed->offset.y <= 0)) {
+        return HTGLYPH_ABOVE_BOUNDS;
+    } else if ((exposed->size.height <= (_coord.y0 +
+                                         exposed->offset.y))) {
+        return HTGLYPH_BELOW_BOUNDS;
+    } else if ((_coord.x1 + exposed->offset.x <= 0) ||
+               (exposed->size.width <= (_coord.x0 +
+                                        exposed->offset.x))) {
+        // x0 and x1 can't tell us about whether one is above
+        // or below another.
+        return HTGLYPH_OUT_BOUNDS;
+    }
+    return HTGLYPH_IN_BOUNDS;
+}	/* End of HTBoundedGlyph::Overlap() */
+
+
+@method HTCompositeClass, HTComposite
+{
+    _firstChild = NULL;
+    _lastChild  = NULL;
+}
+
+
+//---------------------------------------------------------------------------
+//		HTComposite::~HTComposite()
+//---------------------------------------------------------------------------
+// 
+// SYNOPSIS: 	Delete children.
+// SCOPE:	Public
+// RETURN:	Nothing
+// STRATEGY:	
+// 
+// REVISION HISTORY: 
+//	Name		Date		Description 
+//	----		----		----------- 
+//	kkee    	3/26/98 	Initial version 
+//	
+//---------------------------------------------------------------------------
+@method 
+HTCompositeClass, MSG_META_FINAL_OBJ_FREE  // ::~HTComposite()
+{
+    optr /* HTGlyph * */ child, head = _firstChild;
+    while (head) {
+        if (head == oself) {
+            // end of list
+            break;
+        }
+        child = head;
+        head = @call child::GetSiblingGlyph();
+        @call child::MSG_META_OBJ_FREE();
+    }
+}	/* End of HTComposite::~HTComposite() */
+
+
+
+//---------------------------------------------------------------------------
+//		HTComposite::Draw()
+//---------------------------------------------------------------------------
+// 
+// SYNOPSIS: 	Draw self and then draw children.
+// SCOPE:	Public
+// RETURN:	Nothing
+// STRATEGY:	context is optional. If no context, use default 
+//              context.
+//
+// REVISION HISTORY: 
+//	Name		Date		Description 
+//	----		----		----------- 
+//	kkee    	3/18/98 	Initial version 
+//	
+//---------------------------------------------------------------------------
+@method // void
+HTCompositeClass, Draw /* (FlexPanel *panel, HTOffsetAndSize exposed, 
+                  HTGlyphContext *context) */
+{
+    PARAM_ASSERT(panel);
+
+    @call self::DrawSelf(panel, exposed, context);
+    // Draw all its children
+    optr /* HTGlyph * */ child = _firstChild;
+
+     // Add my offset to the exposed region as all children
+     // _coord are relative to the parent.
+     //
+    exposed.offset.x += _coord.x0;
+    exposed.offset.y += _coord.y0;
+
+    HTGlyphBoundsCheck boundsCheck;
+    
+    while (child) {
+        if (@call child::IsGeometryValid() &&
+            (boundsCheck = @call child::Overlap(&exposed)) ==
+            HTGLYPH_IN_BOUNDS) {
+            @call child::Draw(panel, exposed, context);
+        } 
+        // Note: This else statement causes some glyphs not 
+        // to be drawn. So I commented it out -kkee.
+        //
+        // else if (boundsCheck == HTGLYPH_BELOW_BOUNDS) {
+        // No need to check further as the rest of the glyphs
+        // will be below the exposed region.
+        // break;
+        // }
+
+        if (@call child::DoesPointToParent()) {
+            ASSERTS(@call child::GetSiblingGlyph() == oself,
+                    "HTComposite::Draw() sibling to parent linkage corrupted");
+            break;
+        }
+        child = @call child::GetSiblingGlyph();
+
+        ASSERTS(child != oself,
+                 "HTComposite::Draw() sibling to parent linkage corrupted");
+    }
+}	/* End of HTComposite::Draw() */
+
+
+//---------------------------------------------------------------------------
+//		HTComposite::GetMinMaxWidth()
+//---------------------------------------------------------------------------
+// 
+// SYNOPSIS: 	Get the min and max of the children of the
+//              composite. The composite min and max is determined bu
+//              its children glyphs.
+// SCOPE:	Public
+// RETURN:	TRUE if ok, FALSE otherwise.
+// STRATEGY:	
+// 
+// REVISION HISTORY: 
+//	Name		Date		Description 
+//	----		----		----------- 
+//	kkee    	4/18/98 	Initial version 
+//	
+//---------------------------------------------------------------------------
+@method // Boolean
+HTCompositeClass, GetMinMaxWidth // (MinMaxAccumulator *minmax)
+{
+    PARAM_ASSERT(minmax);
+    optr /* HTGlyph * */ child = _firstChild;
+
+    while (child) {
+        if (!@call child::GetMinMaxWidth(minmax)) {
+            return FALSE;
+        }
+
+        if (@call child::DoesPointToParent()) {
+            ASSERTS(@call child::GetSiblingGlyph() == oself,
+            "HTComposite::GetMinMaxWidth() parent linkage corrupted");
+            break;
+        }
+        child = @call child::GetSiblingGlyph();
+
+        ASSERTS(child != oself,
+        "HTComposite::GetMinMaxWidth() parent linkage corrupted");
+    }
+    return TRUE;
+}	/* End of HTComposite::GetMinMaxWidth() */
+
+
+@method /* inline HTGlyph* */ HTCompositeClass, FirstChild // () const
+{
+    return _firstChild;
+}
+
+@method /* inline HTGlyph* */ HTCompositeClass, LastChild // () const
+{
+    return _lastChild;
+}
+
+
+//---------------------------------------------------------------------------
+//		HTComposite::Append()
+//---------------------------------------------------------------------------
+// 
+// SYNOPSIS: 	Add a child. This and Get() implements FIFO.
+// SCOPE:	Public
+// RETURN:	TRUE if ok, FALSE if out of memory.
+// STRATEGY:	1. break link to parent
+//              2. use the code WWList::Append()
+//              3. Restore link to parent
+// 
+// REVISION HISTORY: 
+//	Name		Date		Description 
+//	----		----		----------- 
+//	kkee    	3/18/98 	Initial version 
+//	
+//---------------------------------------------------------------------------
+@method // Boolean
+HTCompositeClass, Append // (HTGlyph *glyph)
+{
+    PARAM_ASSERT(glyph != NULL);
+    
+    @call glyph::SetSiblingGlyph(NULL);
+
+    // Break the last child link to parent
+    if (_lastChild) {
+        ASSERTS(@call _lastChild::GetSiblingGlyph() == oself,
+                "HTComposite::Append() corrupted _sibling linkage");
+        ASSERTS(@call _lastChild::DoesPointToParent() == 1,
+                "HTComposite::Append() corrupted _sibling linkage");
+        @call _lastChild::SetSiblingGlyph(NULL);
+        @call _lastChild::SetPointToParent(0);
+    }
+    
+    if (!_firstChild) {
+        _firstChild = glyph;
+        _lastChild = glyph;
+    } else {
+        @call _lastChild::SetSiblingGlyph(glyph);
+        _lastChild = glyph;
+    }
+
+    // Restore last child link to parent
+    if (_lastChild) {
+        ASSERTS(@call _lastChild::GetSiblingGlyph() == NULL,
+                "HTComposite::Append() sibling parent linkage corrupted");
+        @call _lastChild::SetSiblingGlyph(oself);
+        @call _lastChild::SetPointToParent(1);
+    }
+
+    return TRUE;
+}	/* End of HTComposite::Append() */
+
+
+//---------------------------------------------------------------------------
+//		HTComposite::Get()
+//---------------------------------------------------------------------------
+// 
+// SYNOPSIS: 	Remove the first child. This and Append() implements FIFO.
+// SCOPE:	Public
+// RETURN:	HTCompositeElement or NULL
+// STRATEGY:	1. break link to parent
+//              2. use the code WWList::Get()
+//              3. Restore link to parent
+// 
+// REVISION HISTORY: 
+//	Name		Date		Description 
+//	----		----		----------- 
+//	kkee    	1/28/98 	Initial version 
+//	
+//---------------------------------------------------------------------------
+@method // HTGlyph*
+HTCompositeClass, GlyphGet // ()
+{
+    optr /* HTGlyph * */ ret = _firstChild;
+
+    if (!ret) {
+        return NULL;
+    }
+
+    // Temporary break the link to parent to deal with a
+    // null-terminated list
+    if (_lastChild) {
+        ASSERTS(@call _lastChild::GetSiblingGlyph() == oself,
+                "HTComposite::Get() corrupted _sibling linkage");
+        ASSERTS(@call _lastChild::DoesPointToParent() == 1,
+                "HTComposite::Get() corrupted _sibling linkage");
+        @call _lastChild::SetSiblingGlyph(NULL);
+        @call _lastChild::SetPointToParent(0);
+    }
+    
+    _firstChild = @call ret::GetSiblingGlyph();
+    @call ret::SetSiblingGlyph(NULL);
+
+    if (ret == _lastChild) {
+        _lastChild = NULL;
+    }
+
+    // Restore the last child link to parent
+    if (_lastChild) {
+        ASSERTS(@call _lastChild::GetSiblingGlyph() == NULL,
+                "HTComposite::Remove() sibling parent linkage corrupted");
+        @call _lastChild::SetSiblingGlyph(oself);
+        @call _lastChild::SetPointToParent(1);
+    }
+    
+    return ret;
+}	/* End of HTComposite::Get() */
+
+
+//---------------------------------------------------------------------------
+//		HTComposite::Remove()
+//---------------------------------------------------------------------------
+// 
+// SYNOPSIS: 	Remove a child.
+// SCOPE:	Public
+// RETURN:	HTGlyph or NULL if glyph not a child.
+// STRATEGY:	1. break link to parent
+//              2. use the code WWList::Remove()
+//              3. Restore link to parent
+// 
+// REVISION HISTORY: 
+//	Name		Date		Description 
+//	----		----		----------- 
+//	kkee    	1/28/98 	Initial version 
+//	
+//---------------------------------------------------------------------------
+@method // HTGlyph*
+HTCompositeClass, GlyphRemove // (HTGlyph *glyph)
+{
+    optr /* HTGlyph * */ prev = NULL, tmp = _firstChild;
+
+    // Temporarily break the lastChild's link to parent so that
+    // we can search a NULL-terminated list.
+    if (_lastChild) {
+        ASSERTS(@call _lastChild::GetSiblingGlyph() == oself,
+                "HTComposite::Remove() sibling parent linkage corrupted");
+        ASSERTS(@call _lastChild::DoesPointToParent() == 1,
+                "HTComposite::Remove() corrupted _sibling linkage");
+        @call _lastChild::SetSiblingGlyph(NULL);
+        @call _lastChild::SetPointToParent(0);
+    }
+    
+    while (tmp) {
+        if (tmp == glyph) {
+            break;
+        }
+        prev = tmp;
+        tmp = @call tmp::GetSiblingGlyph();
+    }
+
+    // There is a match
+    if (tmp) {  
+        if (tmp == _firstChild) {
+            _firstChild = @call tmp::GetSiblingGlyph();
+        }
+        if (tmp == _lastChild) {
+            _lastChild = prev;
+        }
+        if (prev) {
+            optr temp = @call tmp::GetSiblingGlyph();
+            @call prev::SetSiblingGlyph(temp);
+        }
+        @call tmp::SetSiblingGlyph(NULL);
+    }
+
+    // Restore link to parent
+    if (_lastChild) {
+        ASSERTS(@call _lastChild::GetSiblingGlyph() == NULL,
+                "HTComposite::Remove() sibling parent linkage corrupted");
+        @call _lastChild::SetSiblingGlyph(oself);
+        @call _lastChild::SetPointToParent(1);
+    }
+    
+    return tmp;
+}	/* End of HTComposite::Remove() */
+
+
+//---------------------------------------------------------------------------
+//		HTComposite::HandleMouseEvent()
+//---------------------------------------------------------------------------
+// 
+// SYNOPSIS: 	Pass the mouse event down to the ui object that is under the
+//              mouse click.
+// SCOPE:	Public
+// RETURN:      TRUE if handled, FALSE otherwise.
+// STRATEGY:
+// 
+// REVISION HISTORY: 
+//	Name		Date		Description 
+//	----		----		----------- 
+//	edwin    	4/08/98 	Initial version 
+//      kkee            4/15/98         Changed to return Boolean
+//	
+//---------------------------------------------------------------------------
+@if 0
+Boolean
+HTComposite::HandleMouseEvent(MouseEvent & event, HTPoint point, 
+                              HTFrame *frame)
+{
+    PARAM_ASSERT(frame);
+
+    HTGlyph *child = _firstChild;
+
+    // Add my offset to the exposed region as all children
+    // _coord are relative to the parent.
+    //
+    point.x -= _coord.x0;
+    point.y -= _coord.y0;
+
+    HTGlyphBoundsCheck boundsCheck;
+    
+    while (child) {
+        if (child->IsGeometryValid() &&
+            (boundsCheck = child->Intersects(&point)) 
+            == HTGLYPH_IN_BOUNDS) {
+            if (child->HandleMouseEvent(event, point, frame)) {
+                return TRUE;
+            }
+        }
+        // Note: We could miss some glyphs that actually
+        // overlap with the following else statement. So 
+        // I commented it out -kkee
+        //
+        // else if (boundsCheck == HTGLYPH_BELOW_BOUNDS) {
+        // Stop checking since none of the glyphs will
+        // overlap the point as they are all below point.
+        // return FALSE;
+        // }
+        
+        if (child->_flags.pointToParent) {
+            ASSERTS(child->_sibling == this,
+            "HTComposite::HandleMouseEvent() parent linkage corrupted");
+            break;
+        }
+        child = child->_sibling;
+
+        ASSERTS(child != this,
+        "HTComposite::HandleMouseEvent() parent linkage corrupted");
+    }
+    return FALSE;
+}
+@endif
+
+//---------------------------------------------------------------------------
+//		HTComposite::IsChild()
+//---------------------------------------------------------------------------
+// 
+// SYNOPSIS: 	Check is a glyph is a direct or indirect child.
+// SCOPE:	Public
+// RETURN:	TRUE/FALSE
+// STRATEGY:	
+// 
+// REVISION HISTORY: 
+//	Name		Date		Description 
+//	----		----		----------- 
+//	kkee    	6/16/98 	Initial version 
+//	
+//---------------------------------------------------------------------------
+@method // Boolean
+HTCompositeClass, IsChild // (HTGlyph *glyph)
+{
+    PARAM_ASSERT(glyph);
+
+    optr /* HTGlyph * */ child = _firstChild;
+
+    while (child) {
+        if (glyph == child || @call self::IsChild(glyph)) {
+            return TRUE;
+        }
+
+        if (@call child::DoesPointToParent()) {
+            ASSERTS(@call child::GetSiblingGlyph() == oself,
+                    "HTComposite::IsChild() sibling to parent linkage corrupted");
+            break;
+        }
+        child = @call child::GetSiblingGlyph();
+
+        ASSERTS(child != oself,
+                 "HTComposite::IsChild() sibling to parent linkage corrupted");
+    }
+    return FALSE;
+}	/* End of HTComposite::IsChild() */
+
+
+@method HTLeafClass, HTLeaf
+{
+}
+
+//---------------------------------------------------------------------------
+//		HTLeaf::Append()
+//---------------------------------------------------------------------------
+// 
+// SYNOPSIS: 	Not allowed for a HTLeaf. Will each crash.
+// SCOPE:	Not allowed.
+// RETURN:	FALSE
+// STRATEGY:	
+//
+// REVISION HISTORY: 
+//	Name		Date		Description 
+//	----		----		----------- 
+//	kkee    	3/19/98 	Initial version 
+//	
+//---------------------------------------------------------------------------
+@method // Boolean
+HTLeafClass, Append // (HTGlyph * glyph)
+{
+    EC_FAIL("HTLeaf::Append() method not allowed for HTLeaf");
+    return FALSE;
+}	/* End of HTLeaf::Append() */
+
+
+
+//---------------------------------------------------------------------------
+//		HTLeaf::Get()
+//---------------------------------------------------------------------------
+// 
+// SYNOPSIS: 	Not allowed for a HTLeaf. Will each crash.
+// SCOPE:	Not allowed.
+// RETURN:	Nothing
+// STRATEGY:	
+// 
+// REVISION HISTORY: 
+//	Name		Date		Description 
+//	----		----		----------- 
+//	kkee    	3/19/98 	Initial version 
+//	
+//---------------------------------------------------------------------------
+@method // HTGlyph*
+HTLeafClass, GlyphGet // ()
+{
+    EC_FAIL("HTLeaf::Get() method not allowed for HTLeaf");
+    return NULL;
+}	/* End of HTLeaf::Get() */
+
+
+
+//---------------------------------------------------------------------------
+//		HTLeaf::Remove()
+//---------------------------------------------------------------------------
+// 
+// SYNOPSIS: 	Not allowed for a HTLeaf. Will each crash.
+// SCOPE:	Not allowed.
+// RETURN:	Nothing
+// STRATEGY:	
+// 
+// REVISION HISTORY: 
+//	Name		Date		Description 
+//	----		----		----------- 
+//	kkee    	3/19/98 	Initial version 
+//	
+//---------------------------------------------------------------------------
+@method // HTGlyph*
+HTLeafClass, GlyphRemove // (HTGlyph * glyph)
+{
+    EC_FAIL("HTLeaf::Remove() method not allowed for HTLeaf");
+    return NULL;
+}	/* End of HTLeaf::Remove() */
+
+
+
+@method HTAnchoredLeafClass, HTAnchoredLeaf // ()
+{
+    _anchor = NULL;
+}
+
+@if 0
+//---------------------------------------------------------------------------
+//		HTAnchoredLeaf::HandleMouseEvent()
+//---------------------------------------------------------------------------
+// 
+// SYNOPSIS: 	Handle the mouse event.
+// SCOPE:	Public
+// RETURN:	TRUE if the event is handled, else FALSE.
+// STRATEGY:	If there is a link, go to the link.
+// 
+// REVISION HISTORY: 
+//	Name		Date		Description 
+//	----		----		----------- 
+//	edwin    	4/12/98 	Initial version 
+//	kkee    	4/15/98 	Moved to HTAnchoredLeaf so that not
+//                                      all derived leaf objects need not
+//                                      provide code to handle common events.
+//  kkee        5/1/98      Child does not always exist.
+//	
+//---------------------------------------------------------------------------
+Boolean
+HTAnchoredLeaf::HandleMouseEvent(MouseEvent &event, HTPoint point, HTFrame *frame)
+{
+    USE_IT(event);
+    USE_IT(point);
+    
+    if (_anchor /* && event._eventType == MOUSE_PRESSED */) {
+        //
+        // Hyperlink. Get the absolute URL and load that document.
+        //
+        WWMemHandle relUrlH = _anchor->GetHref();
+
+        if (relUrlH) {
+            // check to see if it's a reference to the current page
+            char *ref = (char *)WWMemLock(relUrlH);
+            if (ref[0] == '#') {
+                HTMLAnchorItem *item;
+                // scroll the document to the matching #NAME position.
+                item = frame->FindNameAnchor(ref);
+                if (item) {
+                    HTCoord rect;
+                    // Found a matching anchor object.
+                    // Now Find the first child's coordinate.
+                    HTGlyph *child = item->GetFirstChild();
+                    if (child) {
+                        // Possible not to have a child
+                        child->GetAbsoluteBounds(&rect);
+                        frame->DisplayPosition(&rect);
+                    }
+                }
+                WWMemUnlock(relUrlH);
+                return TRUE;
+            }
+            WWMemUnlock(relUrlH);
+            //
+            // Else, it's not a reference to the current page.
+            //
+            WWMemHandle baseUrlH = frame->GetBaseUrlH();
+            if (!baseUrlH) {
+                baseUrlH = frame->GetUrlH();
+            }
+            ASSERTS(baseUrlH != NULL, "HTFrame must have a url");
+
+            char *url = WWParseURI(relUrlH, baseUrlH);
+            if (!url) {
+                return FALSE;
+            }
+            
+            // Make a request for the URL document and target it 
+            // to the viewer. We don't care if it fails to load.
+            frame->GetURLNotify(url);
+
+            free(url);
+
+            return TRUE;
+        }
+    }
+    return FALSE;
+}	/* End of HTAnchoredLeaf::HandleMouseEvent() */
+@endif
+
+
+//---------------------------------------------------------------------------
+//		HTAnchoredLeaf::SetAnchor()
+//---------------------------------------------------------------------------
+// 
+// SYNOPSIS: 	Set the anchor.
+// SCOPE:	Public
+// RETURN:	Nothing
+// STRATEGY:	
+// 
+// REVISION HISTORY: 
+//	Name		Date		Description 
+//	----		----		----------- 
+//	kkee    	4/23/98 	Initial version 
+//	
+//---------------------------------------------------------------------------
+@method // inline void
+HTAnchoredLeafClass, SetAnchor // (HTMLAnchorItem* anchor)
+{
+    _anchor = anchor;
+}	
+/* End of HTAnchoredLeaf::SetAnchor() */
+
+
+//---------------------------------------------------------------------------
+//		HTAnchoredLeaf::GetAnchor()
+//---------------------------------------------------------------------------
+// 
+// SYNOPSIS: 	Get the anchor.
+// SCOPE:	Public
+// RETURN:	HTMLAnchorItem
+// STRATEGY:	
+// 
+// REVISION HISTORY: 
+//	Name		Date		Description 
+//	----		----		----------- 
+//	kkee    	4/23/98 	Initial version 
+//	
+//---------------------------------------------------------------------------
+@method // inline HTMLAnchorItem*
+HTAnchoredLeafClass, GetAnchor // () const
+{
+    return _anchor;
+}/* End of HTAnchoredLeaf::GetAnchor() */
+
+
+
+@method // virtual void 
+HTTokenClass, Draw 
+{
+    EC_FAIL("HTToken::Draw() not allowed");
+}
+
+@method // virtual Boolean 
+HTTokenClass, GetMinMaxWidth
+{
+    return TRUE;
+}
+
+    
+//---------------------------------------------------------------------------
+//		HTToken::GetBounds()
+//---------------------------------------------------------------------------
+// 
+// SYNOPSIS: 	Token has no bounds.
+// SCOPE:	Public
+// RETURN:	Nothing
+// STRATEGY:	
+// 
+// REVISION HISTORY: 
+//	Name		Date		Description 
+//	----		----		----------- 
+//	kkee    	4/24/98 	Initial version 
+//	
+//---------------------------------------------------------------------------
+@method // inline void
+HTTokenClass, GlyphGetBounds // (HTCoord *bounds) const
+{
+    PARAM_ASSERT(bounds);
+    bounds->x0 = bounds->y0 = bounds->x1 = bounds->y1 = 0;
+}  /* End of HTToken::GetBounds() */
+
+
+//---------------------------------------------------------------------------
+//		HTToken::GetAbsoluteBounds()
+//---------------------------------------------------------------------------
+// 
+// SYNOPSIS: 	Token has no bounds.
+// SCOPE:	Public
+// RETURN:	Nothing
+// STRATEGY:	
+// 
+// REVISION HISTORY: 
+//	Name		Date		Description 
+//	----		----		----------- 
+//	kkee    	4/24/98 	Initial version 
+//	
+//---------------------------------------------------------------------------
+@method // inline void
+HTTokenClass, GetAbsoluteBounds // (HTCoord *rect)
+{
+    PARAM_ASSERT(rect);
+    rect->x0 = rect->y0 = rect->x1 = rect->y1 = 0;
+}  /* End of HTToken::GetAbsoluteBounds() */
+
+
+//---------------------------------------------------------------------------
+//		HTToken::GetSize()
+//---------------------------------------------------------------------------
+// 
+// SYNOPSIS: 	Token has no size.
+// SCOPE:	Public
+// RETURN:	Nothing
+// STRATEGY:	
+// 
+// REVISION HISTORY: 
+//	Name		Date		Description 
+//	----		----		----------- 
+//	kkee    	4/24/98 	Initial version 
+//	
+//---------------------------------------------------------------------------
+@method // inline void
+HTTokenClass, GetSize // (HTSize *size) const
+{
+    PARAM_ASSERT(size);
+    size->width = size->height = 0;    
+}  /* End of HTToken::GetSize() */
+
+
+@method // inline sword
+HTTokenClass, GetWidth // () const
+{
+    return 0;
+}
+
+
+@method // inline sdword
+HTTokenClass, GetHeight // () const
+{
+    return 0;
+}
+
+
+@method // inline Boolean
+HTTokenClass, HasSize // () const
+{
+    return FALSE;
+}
+
+
+@method // virtual HTGlyphBoundsCheck 
+HTTokenClass, Intersects // (const HTPoint * point) 
+{
+    return HTGLYPH_OUT_BOUNDS;
+}
+
+@method // virtual Boolean 
+HTTokenClass, Append // (HTGlyph * glyph) 
+{
+    EC_FAIL("HTToken::Append() not allowed");
+    return FALSE;
+}
+
+@method  // virtual HTGlyph* 
+HTTokenClass, GlyphGet 
+{
+    EC_FAIL("HTToken::Get() not allowed");
+    return NULL;
+}
+
+@method // virtual HTGlyph* 
+HTTokenClass, GlyphRemove // (HTGlyph * glyph)
+{
+    EC_FAIL("HTToken::Remove() not allowed");
+    return NULL;
+}
+
+@method HTTokenClass, HTToken
+{
+}
+
+//---------------------------------------------------------------------------
+//		HTBoundedGlyph::ECPrintBounds()
+//---------------------------------------------------------------------------
+// 
+// SYNOPSIS: 	Print glyph bounds on a single line by itself.
+// SCOPE:	Public
+// RETURN:	Nothing
+// STRATEGY:	
+// 
+// REVISION HISTORY: 
+//	Name		Date		Description 
+//	----		----		----------- 
+//	kkee    	4/02/98 	Initial version 
+//	
+//---------------------------------------------------------------------------
+@if 0 
+#if ERROR_CHECK
+@method // void
+HTBoundedGlyphClass, ECPrintBounds // (File *fp)
+{
+    PARAM_ASSERT(fp);
+
+    char str[124];
+    sprintf(str, "\n  Bounds = (%d,%d) - (%d,%d)", 
+            _coord.x0, _coord.y0, _coord.x1, _coord.y1);
+    @call fp::Write((byte*)str, strlen(str));
+
+    sprintf(str, "\n  GeometryValid = ", 
+            _coord.x0, _coord.y0, _coord.x1, _coord.y1);
+    if (_flags.geometryValid) {
+        strcat(str, "TRUE");
+    } else {
+        strcat(str, "FALSE");
+    }
+    @call fp::Write((byte*)str, strlen(str));
+}	/* End of HTBoundedGlyph::ECPrintBounds() */
+#endif
+
+#if ERROR_CHECK
+//---------------------------------------------------------------------------
+//		HTToken::ECPrintBounds()
+//---------------------------------------------------------------------------
+// 
+// SYNOPSIS: 	A token has zero bounds.
+// SCOPE:	Public
+// RETURN:	Nothing
+// STRATEGY:	
+// 
+// REVISION HISTORY: 
+//	Name		Date		Description 
+//	----		----		----------- 
+//	kkee    	4/23/98 	Initial version 
+//	
+//---------------------------------------------------------------------------
+@method // void
+HTTokenClass, ECPrintBounds // (File *fp)
+{
+    PARAM_ASSERT(fp);
+}	/* End of HTToken::ECPrintBounds() */
+#endif
+@endif
+
+
+
+//---------------------------------------------------------------------------
+//		MinMaxAccumulator::MinMaxAccumulator()
+//---------------------------------------------------------------------------
+// 
+// SYNOPSIS: 	Constructor
+// SCOPE:	Public
+// RETURN:	Nothing
+// STRATEGY:	
+// 
+// REVISION HISTORY: 
+//	Name		Date		Description 
+//	----		----		----------- 
+//	kkee    	4/17/98 	Initial version 
+//	
+//---------------------------------------------------------------------------
+@method MinMaxAccumulatorClass, MinMaxAccumulator // () 
+{
+    _min = 0;
+    _max = 0;
+    _runningMin = 0;
+    _runningMax = 0;
+    _indentLevel= 0;
+}	/* End of MinMaxAccumulator::MinMaxAccumulator() */
+
+
+//---------------------------------------------------------------------------
+//		MinMaxAccumulator::NewRow()
+//---------------------------------------------------------------------------
+// 
+// SYNOPSIS: 	New line, so we reset running min and max.
+// SCOPE:	Public
+// RETURN:	Nothing
+// STRATEGY:	
+// 
+// REVISION HISTORY: 
+//	Name		Date		Description 
+//	----		----		----------- 
+//	kkee    	4/17/98 	Initial version 
+//	
+//---------------------------------------------------------------------------
+@method // void
+MinMaxAccumulatorClass, NewRow // ()
+{
+    _runningMin += (_indentLevel * HT_INDENT_SPACE);
+    _min = (_runningMin > _min ? _runningMin : _min);
+    _runningMax += (_indentLevel * HT_INDENT_SPACE);
+    _max = (_runningMax > _max ? _runningMax : _max);
+    _runningMin = 0;
+    _runningMax = 0;
+}	/* End of MinMaxAccumulator::NewRow() */
+
+
+@method 
+MinMaxAccumulatorClass, AcceptMyMin // (sword width)
+{
+    _runningMin = (width > _runningMin ? width : _runningMin);
+}
+
+@method // inline void
+MinMaxAccumulatorClass, AcceptMyMax // (sword width)
+{
+    _runningMax += width;
+}
+
+
+@method // inline sword
+MinMaxAccumulatorClass, GetMin // () 
+{
+    @call self::NewRow();
+    return _min;
+}
+
+@method // inline sword
+MinMaxAccumulatorClass, GetMax // () 
+{
+    @call self::NewRow();
+    return _max;
+}
+
+
+
+@method // inline void
+MinMaxAccumulatorClass, IncrementIndent // () 
+{
+    _indentLevel++;
+}
+
+
+@method // inline void
+MinMaxAccumulatorClass, DecrementIndent // () 
+{
+    if (_indentLevel) {
+        _indentLevel--;
+    }
+}

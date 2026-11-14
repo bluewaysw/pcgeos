@@ -1,0 +1,752 @@
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Geoworks 1996.  All rights reserved.
+	GEOWORKS CONFIDENTIAL
+
+PROJECT:	GeoBrowser
+MODULE:		text/html
+FILE:		html.goc
+
+AUTHOR:		Kok Kin Kee, Sep 15, 1996
+
+ROUTINES:
+	Name			Description
+	----			-----------
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	kkee	9/15/96   	Initial version.
+
+DESCRIPTION:
+
+	text/html content handler.
+
+	$Id: html.goc,v 1.1 97/04/04 17:20:47 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+
+@include <stdapp.goh>
+@include <WWW/HTCore/htreq.goh>
+@include <WWW/HTCore/htmem.goh>
+@include <WWW/HTCore/htstring.goh>
+@include <WWW/sgml.goh>
+@include <WWW/uigenera.goh>
+@include "html.goh"
+@include <WWW/htmlDTD.goh>
+@include "htfatals.goh"
+#include <Ansi/string.h>
+@include "bUI.goh"
+@include "bConst.goh"
+
+#define HTML_THREAD_STACK_SIZE 1024   /* No ui stuff, 1K is enough. */
+
+extern SGMLDTD htmlDTD;               /* in htmlDTD.goc */
+@extern chunk ISO_Latin1;             /* in htmlDTD.goc */
+
+SGMLEntity H1[] = { HTML_ATTR_SIZE, @H1_Chunk, NULL };
+SGMLEntity H2[] = { HTML_ATTR_SIZE, @H2_Chunk, NULL };
+SGMLEntity H3[] = { HTML_ATTR_SIZE, @H3_Chunk, NULL };
+SGMLEntity H4[] = { HTML_ATTR_SIZE, @H4_Chunk, NULL };
+SGMLEntity H5[] = { HTML_ATTR_SIZE, @H5_Chunk, NULL };
+SGMLEntity H6[] = { HTML_ATTR_SIZE, @H6_Chunk, NULL };
+
+/***********************************************************************
+		Class Declaration
+***********************************************************************/
+
+@classdecl	HTMLClass;
+
+
+/***********************************************************************
+                Private Functions
+***********************************************************************/
+
+
+/***********************************************************************
+		Message Handlers
+***********************************************************************/
+
+
+/***********************************************************************
+ *		MSG_HT_STREAM_GET_TARGET for HTMLClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    We do not want anyone to know about our target
+ *                  as the target is not a stream class!
+ * PARAMETERS:	    
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	kkee	9/27/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method HTMLClass, MSG_HT_STREAM_GET_TARGET
+{
+    return NullOptr;
+}	/* End of MSG_HT_STREAM_GET_TARGET.	*/
+
+
+
+
+/***********************************************************************
+ *		MSG_HT_STREAM_ABORT for HTMLClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    We must make sure we don't abort the target.
+ * PARAMETERS:	    int (void)
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:        We need to send MSG_META_FINAL_OBJ_FREE instead of 
+ *                  MSG_META_OBJ_FREE to bypass MSG_META_OBJ_FLUSH_QUEUE 
+ *                  which loops back to thread browser:0 generating a 
+ *                  FatalError as the content thread would have exited.
+ *        
+ *                  You are guaranteed by the WWW Library that there will
+ *                  not be any messages sent to your content objects once 
+ *                  you've received MSG_HT_STREAM_ABORT. (Just make sure 
+ *                  you don't send messages to your object after sending
+ *                  MSG_META_FINAL_OBJ_FREE.)
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	kkee	9/15/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method HTMLClass, MSG_HT_STREAM_ABORT
+{
+    @call UIGenerator::MSG_UI_GENERATOR_END_HTML();
+    ObjIncInUseCount(OptrToHandle(oself));
+    @send, forceQueue oself::MSG_META_FINAL_OBJ_FREE();
+    return HT_OK;
+}	/* End of MSG_HT_STREAM_ABORT.	*/
+
+
+
+
+/***********************************************************************
+ *		MSG_HT_STREAM_PUT_BLOCK for HTMLClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    text/html parser.
+ * PARAMETERS:	    int (byte *data, word len)
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:        
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	kkee	9/15/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method HTMLClass, MSG_HT_STREAM_PUT_BLOCK
+{
+    /* Ignore empty data */
+    if (!data || !len) return HT_OK;
+
+    @call @self->HTSI_target::MSG_UI_GENERATOR_APPEND_TEXT_PTR
+       ((char *) data, len);
+
+    return HT_OK;
+}	/* End of MSG_HT_STREAM_PUT_BLOCK.	*/
+
+
+
+
+/***********************************************************************
+ *		MSG_HT_STRUCTURED_PUT_START_ELEMENT for HTMLClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    Accepts a HTML start element.
+ * PARAMETERS:	    int (HTMLToken elementToken, MemHandle block,
+ *                       ChunkHandle chunk);
+ *                  - elementNumber matches the tag list we've put in
+ *                    the DTD passed to our caller.
+ *                  - block and chunk contains an array of SGMLEntity
+ *                    as defined in sgml.goh. All chunks in SGMLEntity
+ *                    belong to the same block. 
+ * 
+ *                    The list is terminated by 
+ *                    SGMLEntity.SGMLE_token == 0; Therefore we must
+ *                    not use 0th as a valid token (which we map to  
+ *                    HTMLT_XXX_INVALID).
+ * 
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:       This is one big switch statement that recognizes all
+ *                 supported HTML elements.
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	kkee	10/ 2/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method HTMLClass, MSG_HT_STRUCTURED_PUT_START_ELEMENT
+{
+    SGMLEntity *sptr;
+
+#ifdef ERROR_CHECK
+    if ((elementToken <= HTMLT_XXX_INVALID) ||
+	(elementToken >= HTMLT_XXX_NULL))
+	EC_ERROR(INVALID_HTML_ELEMENT_TOKEN);
+#endif
+
+    MemLock(block);
+
+    sptr = (SGMLEntity *) LMemDerefHandles(block, chunk);
+
+    switch (elementToken) {
+
+    case HTMLT_DOCTYPE:
+      break;
+    case HTMLT_A:
+      @call UIGenerator::MSG_UI_GENERATOR_START_ANCHOR(block, sptr);
+      break;
+    case HTMLT_ABBREV:
+    case HTMLT_ABSTRACT:
+    case HTMLT_ACRONYM:
+    case HTMLT_ADDED:
+      break;
+    case HTMLT_ADDRESS:
+      @call UIGenerator::MSG_UI_GENERATOR_START_ITALIC();
+      break;
+    case HTMLT_APPLET:
+      break;
+    case HTMLT_AREA:
+      @call UIGenerator::MSG_UI_GENERATOR_CREATE_AREA(block, sptr);
+      break;
+    case HTMLT_ARG:
+      break;
+    case HTMLT_B:
+      @call UIGenerator::MSG_UI_GENERATOR_START_BOLD();
+      break;
+    case HTMLT_BASE:
+      @call UIGenerator::MSG_UI_GENERATOR_CREATE_BASE(block, sptr);
+      break;
+    case HTMLT_BASEFONT:
+    case HTMLT_BGSOUND:
+      break;
+    case HTMLT_BIG:
+      @call UIGenerator::MSG_UI_GENERATOR_CHANGE_BIG_FONT();
+      break;
+    case HTMLT_BLOCKQUOTE:
+      @call UIGenerator::MSG_UI_GENERATOR_START_BLOCKQUOTE();
+      break;
+    case HTMLT_BODY:
+      break;
+    case HTMLT_BR:
+      @call UIGenerator::MSG_UI_GENERATOR_ADD_BR();
+      break;
+    case HTMLT_CAPTION:
+    case HTMLT_CENTER:
+    case HTMLT_CHANGED:
+      break;
+    case HTMLT_CITE:
+      @call UIGenerator::MSG_UI_GENERATOR_START_ITALIC();
+      break;
+    case HTMLT_CODE:
+      @call UIGenerator::MSG_UI_GENERATOR_START_FIXED_WIDTH_FONT();
+      break;
+    case HTMLT_COL:
+    case HTMLT_COLGROUP:
+    case HTMLT_COMMENT:
+      break;
+    case HTMLT_DD:
+      @call UIGenerator::MSG_UI_GENERATOR_CREATE_DEFINITION_DD();
+      break;
+    case HTMLT_DFN:
+      @call UIGenerator::MSG_UI_GENERATOR_START_ITALIC();
+      break;
+    case HTMLT_DIR:
+      @call UIGenerator::MSG_UI_GENERATOR_START_UNORDERED_LIST(block,sptr);
+      break;
+    case HTMLT_DIV:
+      break;
+    case HTMLT_DL:
+      @call UIGenerator::MSG_UI_GENERATOR_START_DEFINITION_LIST();
+      break;
+    case HTMLT_DT:
+      @call UIGenerator::MSG_UI_GENERATOR_CREATE_DEFINITION_DT();
+      break;
+    case HTMLT_EM:
+      @call UIGenerator::MSG_UI_GENERATOR_START_ITALIC();
+      break;
+    case HTMLT_EMBED:
+    case HTMLT_FIG:
+      break;
+    case HTMLT_FONT:
+      @call UIGenerator::MSG_UI_GENERATOR_START_FONT_SIZE(block, sptr);
+      break;
+    case HTMLT_FORM:
+      @call UIGenerator::MSG_UI_GENERATOR_START_FORM(block, sptr);
+      break;
+    case HTMLT_FRAME:
+    case HTMLT_FRAMESET:
+      break;
+    case HTMLT_H1:
+      @call UIGenerator::MSG_UI_GENERATOR_START_HEADER
+	 (OptrToHandle(@UIGenerator), H1);
+      break;
+    case HTMLT_H2:
+      @call UIGenerator::MSG_UI_GENERATOR_START_HEADER
+	 (OptrToHandle(@UIGenerator), H2);
+      break;
+    case HTMLT_H3:
+      @call UIGenerator::MSG_UI_GENERATOR_START_HEADER
+	 (OptrToHandle(@UIGenerator), H3);
+      break;
+    case HTMLT_H4:
+      @call UIGenerator::MSG_UI_GENERATOR_START_HEADER
+	 (OptrToHandle(@UIGenerator), H4);
+      break;
+    case HTMLT_H5:
+      @call UIGenerator::MSG_UI_GENERATOR_START_HEADER
+	 (OptrToHandle(@UIGenerator), H5);
+      break;
+    case HTMLT_H6:
+      @call UIGenerator::MSG_UI_GENERATOR_START_HEADER
+	 (OptrToHandle(@UIGenerator), H6);
+      break;
+    case HTMLT_HEAD:
+      break;
+    case HTMLT_HR:
+      @call UIGenerator::MSG_UI_GENERATOR_CREATE_HR(block, sptr);
+      break;
+    case HTMLT_HTML:
+      break;
+    case HTMLT_I:
+      @call UIGenerator::MSG_UI_GENERATOR_START_ITALIC();
+      break;
+    case HTMLT_IMAGE:
+    case HTMLT_IMG:
+      @call UIGenerator::MSG_UI_GENERATOR_CREATE_IMAGE(block, sptr);
+      break;
+    case HTMLT_INPUT:
+      @call UIGenerator::MSG_UI_GENERATOR_CREATE_INPUT(block, sptr);
+      break;
+    case HTMLT_ISINDEX:
+      break;
+    case HTMLT_KBD:
+      @call UIGenerator::MSG_UI_GENERATOR_START_FIXED_WIDTH_FONT();
+      break;
+    case HTMLT_L:
+      break;
+    case HTMLT_LI:
+      @call UIGenerator::MSG_UI_GENERATOR_CREATE_LIST_ITEM(block, sptr);
+      break;
+    case HTMLT_LINK:
+      break;
+    case HTMLT_LISTING:
+      @call UIGenerator::MSG_UI_GENERATOR_START_PRE();
+      break;
+    case HTMLT_LIT:
+      break;
+    case HTMLT_MAP:
+      @call UIGenerator::MSG_UI_GENERATOR_START_MAP(block, sptr);
+      break;
+    case HTMLT_MARGIN:
+    case HTMLT_MARQUEE:
+    case HTMLT_MATH:
+      break;
+    case HTMLT_MENU:
+      @call UIGenerator::MSG_UI_GENERATOR_START_UNORDERED_LIST(block,sptr);
+      break;
+    case HTMLT_META:
+    case HTMLT_NEXTID:
+    case HTMLT_NOBR:
+    case HTMLT_NOFRAMES:
+    case HTMLT_NOTE:
+    case HTMLT_OBJECT:
+      break;
+    case HTMLT_OL:
+      @call UIGenerator::MSG_UI_GENERATOR_START_ORDERED_LIST(block, sptr);
+      break;
+    case HTMLT_OPTION:
+      @call UIGenerator::MSG_UI_GENERATOR_CREATE_OPTION(block, sptr);
+      break;
+    case HTMLT_OVER:
+      break;
+    case HTMLT_P:
+      @call UIGenerator::MSG_UI_GENERATOR_START_PARAGRAPH(block, sptr);
+      break;
+    case HTMLT_PARAM:
+    case HTMLT_PERSON:
+    case HTMLT_PLAINTEXT:
+      break;
+    case HTMLT_PRE:
+      @call UIGenerator::MSG_UI_GENERATOR_START_PRE();
+      return HT_OK;
+    case HTMLT_Q:
+    case HTMLT_QUOTE:
+    case HTMLT_REMOVED:
+    case HTMLT_RENDER:
+      break;
+    case HTMLT_S:
+      @call UIGenerator::MSG_UI_GENERATOR_START_STRIKE();
+      break;
+    case HTMLT_SAMP:
+      @call UIGenerator::MSG_UI_GENERATOR_START_FIXED_WIDTH_FONT();
+      break;
+    case HTMLT_SCRIPT:
+      break;
+    case HTMLT_SELECT:
+      @call UIGenerator::MSG_UI_GENERATOR_START_SELECT(block, sptr);
+      break;
+    case HTMLT_SMALL:
+      @call UIGenerator::MSG_UI_GENERATOR_CHANGE_SMALL_FONT();
+      break;
+    case HTMLT_STRIKE:
+      @call UIGenerator::MSG_UI_GENERATOR_START_STRIKE();
+      break;
+    case HTMLT_STRONG:
+      @call UIGenerator::MSG_UI_GENERATOR_START_BOLD();
+      break;
+    case HTMLT_SUB:
+      @call UIGenerator::MSG_UI_GENERATOR_START_SUBSCRIPT();
+      break;
+    case HTMLT_SUP:
+      @call UIGenerator::MSG_UI_GENERATOR_START_SUPERSCRIPT();
+      break;
+    case HTMLT_TAB:
+      break;
+    case HTMLT_TABLE:
+      @call UIGenerator::MSG_UI_GENERATOR_START_TABLE(block, sptr);
+      break;
+    case HTMLT_TBODY:
+      break;
+    case HTMLT_TD:
+      @call UIGenerator::MSG_UI_GENERATOR_CREATE_TD(block, sptr);
+      break;
+    case HTMLT_TEXTAREA:
+      @call UIGenerator::MSG_UI_GENERATOR_START_TEXTAREA(block, sptr);
+    case HTMLT_TFOOT:
+      break;
+    case HTMLT_TH:
+      @call UIGenerator::MSG_UI_GENERATOR_CREATE_TH(block, sptr);
+      break;
+    case HTMLT_THEAD:
+      break;
+    case HTMLT_TITLE:
+      @call UIGenerator::MSG_UI_GENERATOR_START_TITLE();
+      break;
+    case HTMLT_TR:
+      @call UIGenerator::MSG_UI_GENERATOR_START_TR(block, sptr);
+      break;
+    case HTMLT_TT:
+      @call UIGenerator::MSG_UI_GENERATOR_START_FIXED_WIDTH_FONT();
+      break;
+    case HTMLT_U:
+      break;
+    case HTMLT_UL:
+      @call UIGenerator::MSG_UI_GENERATOR_START_UNORDERED_LIST(block,sptr);
+      break;
+    case HTMLT_VAR:
+      @call UIGenerator::MSG_UI_GENERATOR_START_ITALIC();
+      break;
+    case HTMLT_WBR:
+      break;
+    case HTMLT_XMP:
+      @call UIGenerator::MSG_UI_GENERATOR_START_PRE();
+      break;
+    default:
+	break;
+
+    }
+
+    MemUnlock(block);
+
+    return HT_OK;  /* Parse in DTD mode */
+}	/* End of MSG_HT_STRUCTURED_PUT_START_ELEMENT.	*/
+
+
+
+/***********************************************************************
+ *		MSG_HT_STRUCTURED_PUT_END_ELEMENT for HTMLClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    Accepts the end of a HTML element.
+ * PARAMETERS:	    int (word elementToken);
+ *                  - element number matches the tag list we've put in 
+ *                    the DTD passed to our caller.
+ *                  - the return code is defined by SGMLParseMode in 
+ *                    sgml.goh.
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:        <PLAINTEXT>, <PRE>, <XMP>, or <LISTING> ends
+ *                  SGMLPM_preformatted.
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	kkee	10/ 2/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method HTMLClass, MSG_HT_STRUCTURED_PUT_END_ELEMENT
+{
+    switch (elementToken) {
+
+    case HTMLT_DOCTYPE:
+      break;
+    case HTMLT_A:
+      @call UIGenerator::MSG_UI_GENERATOR_END_FORMAT();
+      break;
+    case HTMLT_ABBREV:
+    case HTMLT_ABSTRACT:
+    case HTMLT_ACRONYM:
+    case HTMLT_ADDED:
+      break;
+    case HTMLT_ADDRESS:
+      @call UIGenerator::MSG_UI_GENERATOR_END_FORMAT();
+      break;
+    case HTMLT_APPLET:
+      /*    case HTMLT_AREA: */
+    case HTMLT_ARG:
+      break;
+    case HTMLT_B:
+      @call UIGenerator::MSG_UI_GENERATOR_END_FORMAT();
+      break;
+      /*    case HTMLT_BASE: */
+    case HTMLT_BASEFONT:
+    case HTMLT_BGSOUND:
+      break;
+    case HTMLT_BIG:
+      @call UIGenerator::MSG_UI_GENERATOR_END_FORMAT();
+      break;
+    case HTMLT_BLOCKQUOTE:
+      @call UIGenerator::MSG_UI_GENERATOR_END_FORMAT();
+      break;
+    case HTMLT_BODY:
+      /*    case HTMLT_BR: */
+    case HTMLT_CAPTION:
+    case HTMLT_CENTER:
+    case HTMLT_CHANGED:
+      break;
+    case HTMLT_CITE:
+      @call UIGenerator::MSG_UI_GENERATOR_END_FORMAT();
+      break;
+    case HTMLT_CODE:
+      @call UIGenerator::MSG_UI_GENERATOR_END_FORMAT();
+      break;
+    case HTMLT_COL:
+    case HTMLT_COLGROUP:
+    case HTMLT_COMMENT:
+      /*    case HTMLT_DD: */
+      break;
+    case HTMLT_DFN:
+      @call UIGenerator::MSG_UI_GENERATOR_END_FORMAT();
+      break;
+    case HTMLT_DIR:
+      @call UIGenerator::MSG_UI_GENERATOR_END_FORMAT();
+      break;
+    case HTMLT_DIV:
+      break;
+    case HTMLT_DL:
+      @call UIGenerator::MSG_UI_GENERATOR_END_FORMAT();
+      break;
+      /*    case HTMLT_DT: */
+    case HTMLT_EM:
+      @call UIGenerator::MSG_UI_GENERATOR_END_FORMAT();
+      break;
+    case HTMLT_EMBED:
+    case HTMLT_FIG:
+      break;
+    case HTMLT_FONT:
+      @call UIGenerator::MSG_UI_GENERATOR_END_FORMAT();
+      break;
+    case HTMLT_FORM:
+      @call UIGenerator::MSG_UI_GENERATOR_END_FORM();
+      break;
+    case HTMLT_FRAME:
+    case HTMLT_FRAMESET:
+      break;
+    case HTMLT_H1:
+      @call UIGenerator::MSG_UI_GENERATOR_END_FORMAT();
+      break;
+    case HTMLT_H2:
+      @call UIGenerator::MSG_UI_GENERATOR_END_FORMAT();
+      break;
+    case HTMLT_H3:
+      @call UIGenerator::MSG_UI_GENERATOR_END_FORMAT();
+      break;
+    case HTMLT_H4:
+      @call UIGenerator::MSG_UI_GENERATOR_END_FORMAT();
+      break;
+    case HTMLT_H5:
+      @call UIGenerator::MSG_UI_GENERATOR_END_FORMAT();
+      break;
+    case HTMLT_H6:
+      @call UIGenerator::MSG_UI_GENERATOR_END_FORMAT();
+      break;
+    case HTMLT_HEAD:
+    case HTMLT_HR:
+    case HTMLT_HTML:
+      break;
+    case HTMLT_I:
+      @call UIGenerator::MSG_UI_GENERATOR_END_FORMAT();
+      break;
+      /*    case HTMLT_IMAGE: */
+      /*    case HTMLT_IMG: */
+      /*    case HTMLT_INPUT: */
+    case HTMLT_ISINDEX:
+      break;
+    case HTMLT_KBD:
+      @call UIGenerator::MSG_UI_GENERATOR_END_FORMAT();
+      break;
+    case HTMLT_L:
+      /*    case HTMLT_LI: */
+    case HTMLT_LINK:
+      break;
+    case HTMLT_LISTING:
+      @call UIGenerator::MSG_UI_GENERATOR_END_FORMAT();
+      break;
+    case HTMLT_LIT:
+      break;
+    case HTMLT_MAP:
+      @call UIGenerator::MSG_UI_GENERATOR_END_MAP();
+      break;
+    case HTMLT_MARGIN:
+    case HTMLT_MARQUEE:
+    case HTMLT_MATH:
+      break;
+    case HTMLT_MENU:
+      @call UIGenerator::MSG_UI_GENERATOR_END_FORMAT();
+      break;
+    case HTMLT_META:
+    case HTMLT_NEXTID:
+    case HTMLT_NOBR:
+    case HTMLT_NOFRAMES:
+    case HTMLT_NOTE:
+    case HTMLT_OBJECT:
+      break;
+    case HTMLT_OL:
+      @call UIGenerator::MSG_UI_GENERATOR_END_FORMAT();
+      break;
+      /*    case HTMLT_OPTION: */
+    case HTMLT_OVER:
+      break;
+      /* case HTMLT_P: */
+    case HTMLT_PARAM:
+    case HTMLT_PERSON:
+    case HTMLT_PLAINTEXT:
+      break;
+    case HTMLT_PRE:
+      @call UIGenerator::MSG_UI_GENERATOR_END_FORMAT();
+      return HT_OK;
+    case HTMLT_Q:
+    case HTMLT_QUOTE:
+    case HTMLT_REMOVED:
+    case HTMLT_RENDER:
+      break;
+    case HTMLT_S:
+      @call UIGenerator::MSG_UI_GENERATOR_END_FORMAT();
+      break;
+    case HTMLT_SAMP:
+      @call UIGenerator::MSG_UI_GENERATOR_END_FORMAT();
+      break;
+    case HTMLT_SCRIPT:
+      break;
+    case HTMLT_SELECT:
+      @call UIGenerator::MSG_UI_GENERATOR_END_SELECT();
+      break;
+    case HTMLT_SMALL:
+      @call UIGenerator::MSG_UI_GENERATOR_END_FORMAT();
+      break;
+    case HTMLT_SPAN:
+    case HTMLT_STRIKE:
+      @call UIGenerator::MSG_UI_GENERATOR_END_FORMAT();
+      break;
+    case HTMLT_STRONG:
+      @call UIGenerator::MSG_UI_GENERATOR_END_FORMAT();
+      break;
+    case HTMLT_SUB:
+      @call UIGenerator::MSG_UI_GENERATOR_END_FORMAT();
+      break;
+    case HTMLT_SUP:
+      @call UIGenerator::MSG_UI_GENERATOR_END_FORMAT();
+      break;
+    case HTMLT_TAB:
+      break;
+    case HTMLT_TABLE:
+      @call UIGenerator::MSG_UI_GENERATOR_END_TABLE();
+      break;
+    case HTMLT_TBODY:
+    case HTMLT_TD:
+      break;
+    case HTMLT_TEXTAREA:
+      @call UIGenerator::MSG_UI_GENERATOR_END_TEXTAREA();
+      break;
+    case HTMLT_TFOOT:
+    case HTMLT_TH:
+    case HTMLT_THEAD:
+      break;
+    case HTMLT_TITLE:
+      { optr titleOptr;
+      	@call UIGenerator::MSG_UI_GENERATOR_END_TITLE();
+      	titleOptr = @call ISPManager::MSG_PM_GET_TITLE();
+      	if(titleOptr != NullOptr) 
+  	    @send ISApp::MSG_ISA_SET_CURRENT_TITLE_AND_DISPLAY(titleOptr);
+      }
+      break;
+    case HTMLT_TR:
+      break;
+    case HTMLT_TT:
+      @call UIGenerator::MSG_UI_GENERATOR_END_FORMAT();
+      break;
+    case HTMLT_U:
+      break;
+    case HTMLT_UL:
+      @call UIGenerator::MSG_UI_GENERATOR_END_FORMAT();
+      break;
+    case HTMLT_VAR:
+      @call UIGenerator::MSG_UI_GENERATOR_END_FORMAT();
+      break;
+    case HTMLT_WBR:
+      break;
+    case HTMLT_XMP:
+      @call UIGenerator::MSG_UI_GENERATOR_END_FORMAT();
+      break;
+    default:
+	break;
+
+    }
+
+    return HT_OK;  /* normal DTD parse mode */
+}	/* End of MSG_HT_STRUCTURED_PUT_END_ELEMENT.	*/
+
+
+
+/***********************************************************************
+ *		MSG_HT_STREAM_FLUSH for HTMLClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    Push down buffered data.
+ * PARAMETERS:	    void (void)
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	kkee	9/27/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method HTMLClass, MSG_HT_STREAM_FLUSH
+{
+    return HT_OK;
+}	/* End of MSG_HT_STREAM_FLUSH.	*/
+
+
+
+
+
+
+

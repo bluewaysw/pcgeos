@@ -1,0 +1,1095 @@
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Geoworks 1998.  All rights reserved.
+	GEOWORKS CONFIDENTIAL
+
+PROJECT:	Geobrowser
+MODULE:		ftp
+FILE:		ftpget.goc
+
+AUTHOR:		Jeremy Broestl, Jun 22, 1998
+
+ROUTINES:
+	Name			Description
+	----			-----------
+
+REVISION HISTORY:
+	Name		Date		Description
+	----		----		-----------
+	jeremyb 	6/22/98   	Initial version.
+
+DESCRIPTION:
+
+	Contains code for preparing to get and getting a file from ftp
+
+	$Id: ftpget.goc,v 1.1.1.4 98/08/04 14:45:29 jeremyb Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+@include <nsftp.goh>
+@include <socket.goh>
+@include <WWW/HTCore/htfwrite.goh>
+#include <sem.h>
+
+word FTPGetFilenameFromClientLow(word length);
+
+GeodeHandle ftpClientApp;
+word ftpClientMsg;
+SemaphoreHandle filenameSem;
+HTMemHandle appFilenameHandle = NullHandle;
+char ipAddrString[32];
+HTSocketHandle listen_sock;
+int idleCount;
+
+/* portAlreadyListening indicates that we've ftp'd something before 
+ * using a socket we've created and done a SocketAccept on.  Since the 
+ * socket so created is still there (SocketAccept creates a new socket
+ * for us), we needn't do the SocketBind and SocketListen again, as it's
+ * still bound and listening.
+ */
+Boolean portAlreadyListening = FALSE;
+
+/* This itoa routine shamelessly swiped from some Taylor code.*/
+void myitoa(int num, TCHAR *str) {
+    int i, negative = 0, pos = 0;
+    int j;
+
+    if (num < 0) {
+	str[0] = '-';
+	negative = 1;
+    }
+    for (i = 10000; i > 0; i /= 10) {
+	j = num/i;
+	if (pos || j || i == 1) {
+	  str[negative+pos++] = '0'+ j;
+	  num = num%i;
+      }
+    }
+    str[negative+pos] = 0;
+}  
+
+/***********************************************************************
+ *		ftp_send_port
+ ***********************************************************************
+ *
+ * SYNOPSIS:	non-pasv, we need to listen on a socket connection 
+ * CALLED BY:	ftp state machine
+ * RETURN:	status
+ *	
+ * STRATEGY:	Create the socket
+ *              Get it's IP address
+ *              Bind a port
+ *              Set it to listen for connections??
+ *              Send the stuff onto the server.
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	jeremyb 	6/23/98   	Initial Revision
+ *	
+ ***********************************************************************/
+int
+ftp_send_port(HTMemHandle ftpConHandle, HTNetThread *net)
+{
+
+    FTPConData *cd;
+    int bufSize;
+    byte myAddress[4];
+    HTSocket *socketPtr;
+    SocketPort thisPort;
+    int status;
+    MediumAndUnit mau;
+    int i;
+    char outBuf[80] = "PORT ";
+    char tmpBuf[6] ;
+	
+    cd = (FTPConData *) HTMemLock(ftpConHandle);
+
+    PUSHDS;
+    SET_DS_LIB_DGROUP;
+
+    cd->pasv_mode = FALSE;  /* not using pasv mode if we get here */
+
+    if (!portAlreadyListening) {
+
+	/*  Create internet socket
+	 */
+	cd->listen_sock = HTSocketCreate(net);
+	listen_sock = cd->listen_sock;
+	
+	if(listen_sock == NULL) {
+	    return MK_UNABLE_TO_CREATE_SOCKET;
+	}
+	
+	socketPtr = (HTSocket *)MemLock(cd->listen_sock);
+	
+	thisPort.SP_port = FTP_PORT_DATA ;
+	thisPort.SP_manuf = MANUFACTURER_ID_SOCKET_16BIT_PORT;
+	
+	status = SocketBind(socketPtr->HTS_sockfd, thisPort, SBF_REUSE_PORT);
+
+	bufSize = 4;
+
+	/* We have a broken C-Stub for Brother, so make your own in 
+	   ftputils.asm. Global shouldn't need this.  Need a different name 
+	   to avoid compiler 
+	   * confusion.
+	   */
+	SOCKETGETMYADDRESS("tcpip", myAddress, &bufSize, &mau);
+	
+	SocketGetMediumAddress("tcpip", myAddress, &bufSize, &mau);
+
+	/* We get the ip address in binary form.  Parse each byte, filling 
+	 * in the string to send the server telling it where to connect.
+	 */
+	for (i = 0; i < 4 ; i++) {
+	    int j;
+	    tmpBuf[0] = '\0';
+	    j = (int) (myAddress[i]);
+	    myitoa(j, tmpBuf);
+	    strcat(outBuf, tmpBuf);
+	    strcat(outBuf, ",");
+	}
+	
+	strcat(outBuf, "0,");
+	myitoa((int) thisPort.SP_port, tmpBuf);
+	strcat(outBuf, tmpBuf);
+	strcat(outBuf, "\n");
+    
+	strcpy(ipAddrString, outBuf);
+
+	status = SocketListen(socketPtr->HTS_sockfd, 5);
+
+	cd->next_state = FTP_WAIT_FOR_RESPONSE;
+	cd->next_state_after_response = FTP_SEND_PORT_RESPONSE;
+	
+	status = HTSocketSend(cd->csock, outBuf, strlen(outBuf));
+	
+	MemUnlock(cd->listen_sock);
+	portAlreadyListening = TRUE;
+    } else {
+	status = HTSocketSend(cd->csock, ipAddrString, 
+			      strlen(ipAddrString));
+
+	cd->listen_sock = listen_sock;
+	cd->next_state = FTP_WAIT_FOR_RESPONSE;
+	cd->next_state_after_response = FTP_SEND_PORT_RESPONSE;
+    }
+    HTMemUnlock(ftpConHandle);
+
+    POPDS;
+
+    return(status);
+} // end ftp_send_port
+
+
+/***********************************************************************
+ *		ftp_send_port_response
+ ***********************************************************************
+ *
+ * SYNOPSIS:	if port successfully sent, go get the file type
+ * CALLED BY:	ftp state machine
+ * RETURN:	status
+ *	
+ * STRATEGY:	
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	jeremyb 	7/29/98   	Initial Revision
+ *	
+ ***********************************************************************/
+int
+ftp_send_port_response (HTMemHandle ftpConHandle)
+{
+    FTPConData *cd;
+    int ret = 0;
+
+    cd = (FTPConData *) HTMemLock(ftpConHandle);
+
+    if (cd->response_code !=2) {
+        ret = MK_UNABLE_TO_SEND_PORT_COMMAND;
+    } else {
+
+	cd->next_state = FTP_GET_FILE_TYPE;
+    }
+
+    HTMemUnlock(ftpConHandle);
+
+    return(ret); /* good */
+} // end ftp_send_port_response
+
+/***********************************************************************
+ *		FTPGetFileType
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Determine what file type to use in transfer
+ * CALLED BY:	ftp_get_file_type
+ * RETURN:	FTPFileType
+ *	
+ * STRATEGY:	if it's text or htm, use ASCII, else binary
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	jeremyb 	6/29/98   	Initial Revision
+ *	
+ ***********************************************************************/
+FTPFileType
+FTPGetFileType (FTPConData *cd)
+{
+    char *filename ;
+    int nameLength, i;
+    FTPFileType ret = FTP_FILE_TYPE_BIN;
+    
+    filename = HTMemLock(cd->filenameHandle);
+    nameLength = strlen(filename);
+
+    i = nameLength;
+    while (1) {
+	i-- ;
+	if(filename[i] == '.') {
+	    if (!strcmp((filename+i), "txt") || !strcmp((filename+i), "htm")) {
+		ret = FTP_FILE_TYPE_TEXT;
+	    } /* else it's a binary, but that's the default*/
+	    break;
+	}
+	if (i == 0) {
+	    break ;
+	}
+    }
+    
+    HTMemUnlock(cd->filenameHandle);
+    return ret;
+
+}	/* End of FTP_GetFileType.	*/
+
+
+/***********************************************************************
+ *		ftp_get_file_type
+ ***********************************************************************
+ *
+ * SYNOPSIS:	figure out the file type
+ * CALLED BY:	ftp state machine
+ * RETURN:	status
+ *	
+ * STRATEGY:	
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	jeremyb 	7/29/98   	Initial Revision
+ *	
+ ***********************************************************************/
+int
+ftp_get_file_type (HTMemHandle ftpConHandle)
+{
+    FTPConData *cd;
+
+    cd = (FTPConData *) HTMemLock(ftpConHandle);
+
+    if(cd->fileType == FTP_MODE_UNKNOWN) {
+	/* use extensions to determine the type */
+
+	/* We're not encrypting, so we'll determine what to do next by
+	 * looking at the extension of the filename.  txt or htm will be
+	 * ascii, o/w binary.
+	 */
+	
+	FTPFileType fileType = FTPGetFileType(cd);
+	if (fileType == FTP_FILE_TYPE_TEXT) {
+	    if (cd->fileType != FTP_MODE_ASCII) {
+		cd->next_state = FTP_SEND_ASCII;
+	    } else {
+		cd->next_state = FTP_GET_FILE_SIZE;
+	    }
+	} else {
+	    if (cd->fileType != FTP_MODE_BINARY) {
+		cd->next_state = FTP_SEND_BIN;
+	    } else {
+		cd->next_state = FTP_GET_FILE_SIZE;
+	    }
+	}
+    } else {  
+	cd->next_state = FTP_GET_FILE_SIZE;
+    }
+  
+    HTMemUnlock(ftpConHandle);
+
+    return(0);  /* continue */
+} // end ftp_get_file_type
+
+
+/***********************************************************************
+ *		ftp_send_bin
+ ***********************************************************************
+ *
+ * SYNOPSIS:	tell the server we're goin binary
+ * CALLED BY:	ftp state machine
+ * RETURN:	status
+ *	
+ * STRATEGY:	send "TYPE I"
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	jeremyb 	7/29/98   	Initial Revision
+ *	
+ ***********************************************************************/
+int
+ftp_send_bin (HTMemHandle ftpConHandle)
+{
+    FTPConData *cd;
+    int status;
+    char outBuf[] = "TYPE I\n";
+
+    cd = (FTPConData *) HTMemLock(ftpConHandle);
+
+    cd->fileType = FTP_MODE_BINARY;
+
+    cd->next_state = FTP_WAIT_FOR_RESPONSE;
+    cd->next_state_after_response = FTP_SEND_BIN_RESPONSE;
+
+    status = HTSocketSend(cd->csock, outBuf, strlen(outBuf));
+  
+    HTMemUnlock(ftpConHandle);
+
+    return(status);
+
+} // end ftp_send_bin
+
+/***********************************************************************
+ *		ftp_send_ascii
+ ***********************************************************************
+ *
+ * SYNOPSIS:	tell the server we're going ascii
+ * CALLED BY:	ftp state machine
+ * RETURN:	status
+ *	
+ * STRATEGY:	send "TYPE A"
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	jeremyb 	7/29/98   	Initial Revision
+ *	
+ ***********************************************************************/
+int
+ftp_send_ascii (HTMemHandle ftpConHandle)
+{
+    FTPConData *cd;
+    int status;
+    char outBuf[] = "TYPE A\n";
+
+    cd = (FTPConData *) HTMemLock(ftpConHandle);
+
+    cd->fileType = FTP_MODE_ASCII;
+
+    cd->next_state = FTP_WAIT_FOR_RESPONSE;
+    cd->next_state_after_response = FTP_SEND_ASCII_RESPONSE;
+
+    status = HTSocketSend(cd->csock, outBuf, strlen(outBuf));
+  
+    HTMemUnlock(ftpConHandle);
+
+    return(status);
+
+} // end ftp_send_ascii
+
+/***********************************************************************
+ *		ftp_send_bin_or_ascii_response
+ ***********************************************************************
+ *
+ * SYNOPSIS:	process the response to our change in file type
+ * CALLED BY:	ftp state machine
+ * RETURN:	status
+ *	
+ * STRATEGY:	hope we got a return code of 2.
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	jeremyb 	7/29/98   	Initial Revision
+ *	
+ ***********************************************************************/
+int
+ftp_send_bin_or_ascii_response (HTMemHandle ftpConHandle)
+{
+    FTPConData *cd;
+    int ret = 0;
+
+    cd = (FTPConData *) HTMemLock(ftpConHandle);
+
+    if (cd->response_code != 2) {
+        ret = MK_UNABLE_TO_CHANGE_FTP_MODE;
+    } else {
+	cd->next_state = FTP_GET_FILE_SIZE;
+    }
+
+    HTMemUnlock(ftpConHandle);
+
+    return(ret); /* good */
+} // end ftp_send_bin_or_ascii_response
+
+/***********************************************************************
+ *		ftp_get_file_size
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Ask the server how big our file is
+ * CALLED BY:	ftp sstate machine
+ * RETURN:	status
+ *	
+ * STRATEGY:	SIZE <filename>
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	jeremyb 	7/29/98   	Initial Revision
+ *	
+ ***********************************************************************/
+int
+ftp_get_file_size (HTMemHandle ftpConHandle)
+{
+    FTPConData *cd;
+    char outBuf[OUTPUT_BUFFER_SIZE] = "SIZE ";
+    char *path;
+    int status;
+
+    cd = (FTPConData *) HTMemLock(ftpConHandle);
+
+    if (cd->server_type == FTP_VMS_TYPE)  {
+	/* skip this since I'm not sure how it should work on VMS
+	 */
+	cd->next_state = FTP_GET_FILE; 
+	status = 0;
+    } else { 
+    
+	path = HTMemLock(cd->path_handle);
+	strcat(outBuf, path);
+	HTMemUnlock(cd->path_handle);
+	
+	cd->next_state = FTP_WAIT_FOR_RESPONSE;
+	cd->next_state_after_response = FTP_GET_FILE_SIZE_RESPONSE;
+
+	status = HTSocketSend(cd->csock, outBuf, strlen(outBuf));
+    }
+  
+    HTMemUnlock(ftpConHandle);
+
+    return(status);
+} // end ftp_get_file_size
+
+
+/* Copied from someplace standard since I specifically need dword capability
+ */
+dword atol(const TCHAR *__s)
+{
+    int i; 
+    dword n=0;
+
+    for (i=0; __s[i] >= _TEXT('0') && __s[i] <= _TEXT('9'); ++i)
+	n = 10 * n + (__s[i] - _TEXT('0'));
+    return  n;
+}
+
+/***********************************************************************
+ *		ftp_get_file_size_response
+ ***********************************************************************
+ *
+ * SYNOPSIS:	store the file size returned
+ * CALLED BY:	ftp state machine
+ * RETURN:	status
+ *	
+ * STRATEGY:	Store it.
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	jeremyb 	7/29/98   	Initial Revision
+ *	
+ ***********************************************************************/
+int
+ftp_get_file_size_response (HTMemHandle ftpConHandle)
+{
+    FTPConData *cd;
+    char *return_msg;
+
+    cd = (FTPConData *) HTMemLock(ftpConHandle);
+    
+    if(cd->response_code == 2 && cd->return_msg_handle) {
+	dword contentLength;
+
+	return_msg = HTMemLock(cd->return_msg_handle);
+	contentLength = atol(return_msg);
+	/* The response looks like  "160452"
+	 * where "160452" is the size in bytes.
+	 */
+	HTMemUnlock(cd->return_msg_handle);
+	cd->content_length = contentLength;
+    } else {
+      	cd->content_length = 0;
+    }
+    /* Skip the time string, we don't use it*/
+    cd->next_state = FTP_GET_FILE;
+
+    HTMemUnlock(ftpConHandle);
+    
+    return(0);
+} // end ftp_get_file_size_response
+
+/***********************************************************************
+ *		ftp_get_file
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Set next state so we can go get the file
+ * CALLED BY:	ftp state machine
+ * RETURN:	status
+ *	
+ * STRATEGY:	
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	jeremyb 	7/30/98   	Initial Revision
+ *	
+ ***********************************************************************/
+int
+ftp_get_file (HTMemHandle ftpConHandle)
+{
+    FTPConData *cd;
+    char *path;
+
+    cd = (FTPConData *) HTMemLock(ftpConHandle);
+
+    if (cd->path_handle) {
+	path = HTMemLock(cd->path_handle);
+	/* if this is a VMS server then we need to 
+	 * do some special things to map a UNIX syntax
+	 * ftp url to a VMS type file syntax
+	 */
+	if (cd->server_type == FTP_VMS_TYPE) {
+	    /* If we want the VMS account's top directory speed to it 
+	     */
+	    if (path[0] == '\0' || 
+		(path[0] == '/' && path[1]== '\0')) {
+		/* It's a directory, and we're not supporting this time*/
+		cd->next_state = FTP_ERROR_DONE;
+	    } else if(!strchr(path, '/')) {
+		/* if we want a file out of the top 
+		 * directory skip the PWD
+		 */
+		cd->next_state = FTP_SEND_RETR;
+	    } else {
+		cd->next_state = FTP_SEND_CWD;
+	    }
+	} else {    /* non VMS */
+	    /* if we have already done the RETR or
+	     * if the path ends with a slash
+	     */
+	    if('/' == path[strlen(path)-1]) {
+		cd->next_state = FTP_SEND_CWD;
+	    } else {
+		cd->next_state = FTP_SEND_RETR;
+	    }
+	}
+	HTMemUnlock(cd->path_handle);
+    } else {
+	/* Do what?  get a file, but no path handle???*/
+	cd->next_state = FTP_ERROR_DONE;
+    }
+    HTMemUnlock(ftpConHandle);
+    
+    return(0); /* continue */
+} // end ftp_get_file
+
+/***********************************************************************
+ *		FTPGetFilenameFromClient
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Ask the browser where to save the file
+ * CALLED BY:	ftp_send_retr
+ * RETURN:	nothing
+ *	
+ * STRATEGY:	Send the message.  For Geobrowser, see htdirect.goc.
+ *               P the filenameSem so the thread will block til the 
+ *               user gives a filename.
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	jeremyb 	7/30/98   	Initial Revision
+ *	
+ ***********************************************************************/
+void _far _pascal
+FTPGetFilenameFromClient (word length)
+{
+    PUSHDS;
+    SET_DS_LIB_DGROUP;
+
+    @send (ConstructOptr(ftpClientApp, 0))::
+	{MSG_FROM_FTP_PROCESS}(ftpClientMsg)
+	    (FTP_RETURN_PATH_TO_USE, length);
+    ThreadPSem(filenameSem);
+
+    POPDS;
+    return;
+}
+
+/***********************************************************************
+ *		FTPFilenameReceivedFromClient
+ ***********************************************************************
+ *
+ * SYNOPSIS:	store the filename passed
+ * CALLED BY:	EXTERNAL the browser
+ * RETURN:	nothing
+ *	
+ * STRATEGY:	store the filename handle and then V the sem to allow ftp
+ *               to continue
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	jeremyb 	7/30/98   	Initial Revision
+ *	
+ ***********************************************************************/
+void _far _pascal
+FTPFilenameReceivedFromClient (HTMemHandle nameHandle)
+{
+    PUSHDS;
+    SET_DS_LIB_DGROUP;
+
+    if (nameHandle) {
+	appFilenameHandle = nameHandle;
+	ThreadVSem(filenameSem);
+    } else {
+	/* Stupid browser sent us a null handle.  Halt for EC, wait for
+	 * another in non-ec.  As if.*/
+	EC_ERROR(1);
+    }
+    POPDS;
+}
+
+/***********************************************************************
+ *		ftp_send_retr
+ ***********************************************************************
+ *
+ * SYNOPSIS:	send the retr 
+ * CALLED BY:	ftp state machine
+ * RETURN:	status
+ *	
+ * STRATEGY:	Get the filename for the file from the browser, set up
+ *               stream that's going to allow us to pipe this to a file,
+ *               then send the RETR and filename
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	jeremyb 	7/30/98   	Initial Revision
+ *	
+ ***********************************************************************/
+int
+ftp_send_retr (HTMemHandle ftpConHandle)
+{
+    FTPConData *cd;
+    char outBuf[OUTPUT_BUFFER_SIZE] = "RETR ";
+    char *fileOrPath ;
+    int status = -1;
+
+    cd = (FTPConData *) HTMemLock(ftpConHandle);
+
+    /* I only get a word send amount in K */
+    FTPGetFilenameFromClient(cd->content_length / 1024);
+
+    if(cd->server_type == FTP_VMS_TYPE) {
+	if (cd->filenameHandle) {
+	    fileOrPath = HTMemLock(cd->filenameHandle);
+	    strcat(outBuf, fileOrPath);
+	    HTMemUnlock(cd->filenameHandle);
+	} else {
+	    outBuf[0] = '\0'; /* error*/
+	}
+    } else {
+	if (cd->path_handle) {
+	    fileOrPath = HTMemLock(cd->path_handle) ;
+	    strcat(outBuf, fileOrPath);
+	    HTMemUnlock(cd->path_handle);
+	} else {
+	    outBuf[0] = '\0'; /* error*/
+	}
+    }
+
+    if (outBuf[0]) {
+	/* non-pasv connections need to be speedy.  We have to do
+	 * SocketAccept before we get server data.  So initialize stream 
+	 * now, then send the retr.
+	 */
+	ftp_setup_stream(ftpConHandle);
+
+	cd->next_state = FTP_WAIT_FOR_RESPONSE;
+	cd->next_state_after_response = FTP_SEND_RETR_RESPONSE;
+
+	status = HTSocketSend(cd->csock, outBuf, strlen(outBuf));
+
+	@send (ConstructOptr(ftpClientApp, 0))::
+	    {MSG_FROM_FTP_PROCESS}(ftpClientMsg)
+		(FTP_DOWNLOAD_COMMENCING, 0);
+    } else {
+	cd->next_state = FTP_ERROR_DONE;
+    }
+	
+    HTMemUnlock(ftpConHandle);
+
+    return(status);
+
+} // end ftp_send_retr
+
+/***********************************************************************
+ *		ftp_send_retr_response
+ ***********************************************************************
+ *
+ * SYNOPSIS:    Insure we got an ok response from server
+ * CALLED BY:	ftp state machine
+ * RETURN:	status
+ *	
+ * STRATEGY:	Since non-pasv connections need to be speedy (must get to
+ *               SocketAccept before server sends data), call 
+ *               ftp_wait_for_accept directly if required, o/w just 
+ *               change state to get the file.
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	jeremyb 	7/30/98   	Initial Revision
+ *	
+ ***********************************************************************/
+int
+ftp_send_retr_response (HTMemHandle ftpConHandle)
+{
+    FTPConData *cd;
+
+    cd = (FTPConData *) HTMemLock(ftpConHandle);
+
+    if(cd->response_code != 1) {
+        if(cd->server_type == FTP_VMS_TYPE) {
+            return(MK_UNABLE_TO_LOCATE_FILE);
+        } else { /* non VMS */
+
+	    /* we need to use this to make the mac FTPD work
+	     * old way 
+	     */
+            /* cd->next_state = FTP_SEND_CWD; */
+	    /* We've requested a file that didn't exist...*/
+	    cd->next_state = FTP_LOGOUT_AND_DONE;
+	}
+    } else {   /* successful RETR */
+	/* We've already setup the stream in send_retr for speed on non-pasv
+	 * connections, so go directly to the accept phase for speed.  See
+	 * the comment in send_retr.  Don't need to set the state thusly:
+	 *
+         * cd->next_state = FTP_SETUP_STREAM;
+	 */
+	if (!cd->pasv_mode) {
+	    ftp_wait_for_accept(ftpConHandle);
+	} else {
+	    cd->next_state = FTP_START_READ_FILE;
+	}
+    }
+
+    HTMemUnlock(ftpConHandle);
+
+    return(0); /* continue */
+} // end ftp_send_retr_response
+
+/***********************************************************************
+ *		ftp_setup_stream
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Initialize the stream used to save the file
+ * CALLED BY:	ftp_send_retr
+ * RETURN:	status
+ *	
+ * STRATEGY:	
+ *               
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	jeremyb 	7/30/98   	Initial Revision
+ *	
+ ***********************************************************************/
+int
+ftp_setup_stream (HTMemHandle ftpConHandle)
+{
+    FTPConData *cd;
+    char *filenamePtr;
+
+    cd = (FTPConData *) HTMemLock(ftpConHandle);
+
+    /* set up the data stream now
+     */
+    /* If/when we decide to support directory downloads, I think this is the
+     * location where handling first starts branching.  Obviously, you don't
+     * want to create a file if you're showing a directory.
+     */
+
+    filenamePtr = HTMemLock(appFilenameHandle);
+    cd->stream = HTFWriteNew(filenamePtr, 0);
+    HTMemUnlock(appFilenameHandle);
+    
+    if (!cd->stream) {
+        cd->next_state = FTP_ERROR_DONE;
+        return(MK_UNABLE_TO_CONVERT);
+    }
+
+    /* Since we are currently calling this function as a subroutine from
+     * within ftp_send_retr, we shouldn't change state: let caller do it.
+     */
+
+    HTMemUnlock(ftpConHandle);
+
+    return(0); /* continue */
+} // end ftp_setup_stream
+
+/***********************************************************************
+ *		ftp_wait_for_accept
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Look for the server to connect with our socket (non-pasv)
+ * CALLED BY:	ftp_send_retr_response
+ * RETURN:	status
+ *	
+ * STRATEGY:	Use SocketAccept to wait for server to connect.  Note
+ *               that SocketAccept creates a new socket for the connection
+ *               so established and the old one is still there and still
+ *               listening.
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	jeremyb 	7/30/98   	Initial Revision
+ *	
+ ***********************************************************************/
+int
+ftp_wait_for_accept (HTMemHandle ftpConHandle)
+{
+    FTPConData *cd;
+    int ret = 0;
+    HTSocket *listenSocket;
+    Socket tmpSocket;
+
+    cd = (FTPConData *) HTMemLock(ftpConHandle);
+
+    /* Wait for the connection
+     */
+#define ACCEPT_TIMEOUT 5
+    listenSocket = MemLock(cd->listen_sock);
+    tmpSocket = SocketAccept(listenSocket->HTS_sockfd, 
+					    ACCEPT_TIMEOUT*60);
+    if (tmpSocket == 0) {
+	if(ThreadGetError() != SE_TIMED_OUT) {
+            ret = MK_UNABLE_TO_ACCEPT_SOCKET;
+	}
+    } else {
+	cd->connected_listen_sock = tmpSocket;
+	cd->next_state = FTP_START_READ_FILE;
+    }
+    MemUnlock(cd->listen_sock);
+
+    HTMemUnlock(ftpConHandle);
+
+    return (ret);
+} // end ftp_wait_for_accept
+
+
+/***********************************************************************
+ *		ftp_start_read_file
+ ***********************************************************************
+ *
+ * SYNOPSIS:	initalize the process of reading the file from server data
+ * CALLED BY:	ftp state machine
+ * RETURN:	status
+ *	
+ * STRATEGY:	Not much to do, just set the state to go get the file
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	jeremyb 	7/30/98   	Initial Revision
+ *	
+ ***********************************************************************/
+int
+ftp_start_read_file (HTMemHandle ftpConHandle)
+{
+    FTPConData *cd;
+
+    cd = (FTPConData *) HTMemLock(ftpConHandle);
+
+    /* nothing much to be done */
+    cd->next_state = FTP_READ_FILE;
+
+    HTMemUnlock(ftpConHandle);
+
+    return(0); /* continue */
+} // end ftp_start_read_file
+
+/***********************************************************************
+ *		ftp_read_file
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Get more data from the server
+ * CALLED BY:	ftp state machine
+ * RETURN:	status - bytes read
+ *	
+ * STRATEGY:	Get the data from the server, one way or the other.  Allow
+ *               the server to not send us data up to 10 straight times,
+ *               then just give up.
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	jeremyb 	7/30/98   	Initial Revision
+ *	
+ ***********************************************************************/
+int
+ftp_read_file (HTMemHandle ftpConHandle)
+{
+    FTPConData *cd;
+    int status; 
+    HTSocketHandle liveSockHandle;
+    HTMemHandle recvBufHandle;
+    char *recvBuf ;
+
+    PUSHDS;
+    SET_DS_LIB_DGROUP;
+
+    cd = (FTPConData *) HTMemLock(ftpConHandle);
+
+    if (cd->pasv_mode) {
+	status = HTSocketRecv(cd->pasvSockHandle, 600); 
+    } else {
+	recvBufHandle = HTMemAlloc(HTSOCKET_BUFFER_SIZE);
+	recvBuf = HTMemLock(recvBufHandle);
+	status = SocketRecv(cd->connected_listen_sock, recvBuf, 
+			    HTSOCKET_BUFFER_SIZE, 60, 0, 
+			    (SocketAddress *) 0);
+    }
+
+    if(status > 0) {
+	HTSocket *socketPtr;
+	char *socketData ;
+    
+	cd->bytes_received += status;
+
+	if (cd->pasv_mode) {
+	    socketPtr = (HTSocket *) MemLock(cd->pasvSockHandle);
+	    socketData = (char *) socketPtr->HTS_buffer;
+	    @call (cd->stream)::
+		MSG_HT_STREAM_PUT_BLOCK((unsigned char *)socketData, status);
+	    MemUnlock(cd->pasvSockHandle);
+	} else {
+	    @call (cd->stream)::
+		MSG_HT_STREAM_PUT_BLOCK((unsigned char *) recvBuf, status);
+	    HTMemUnlockAndFree(recvBufHandle);
+	}
+
+	PUSHDS;
+	SET_DS_LIB_DGROUP;
+
+	/* Maybe there's some hope of it coming back */
+	idleCount = 0;
+
+	@send (ConstructOptr(ftpClientApp, 0))::
+	    {MSG_FROM_FTP_PROCESS}(ftpClientMsg)
+		(FTP_DOWNLOAD_PARTIALLY_COMPLETE, cd->bytes_received / 1024);
+	POPDS;
+	
+    } else if((status == 0) && (idleCount < 10) && 
+	      (cd->bytes_received < cd->content_length)) {
+	/* Put this code in just in case the server doesn't send us stuff
+	 * at the exact time we expect.  Maybe it's a little slow.  Wait til
+	 * we've got all the data we think we need or just too long from server
+	 */
+	idleCount++ ;
+	if (!cd->pasv_mode) {
+	    HTMemUnlockAndFree(recvBufHandle);
+	}
+    } else if((status == 0) && (idleCount == 10) ) {
+	/* give up, let's get out of here
+	 */
+	if (!cd->pasv_mode) {
+	    HTMemUnlockAndFree(recvBufHandle);
+	}
+	@send (ConstructOptr(ftpClientApp, 0))::
+	    {MSG_FROM_FTP_PROCESS}(ftpClientMsg)
+		(FTP_DOWNLOAD_STALLED, 0);
+
+	status = MK_DATA_LOADED;
+        cd->next_state = FTP_LOGOUT_AND_DONE;
+
+	if (!cd->pasv_mode) {
+	    SocketCloseSend(cd->connected_listen_sock);
+	    SocketReset(cd->connected_listen_sock);
+	    SocketClose(cd->connected_listen_sock);
+	    cd->connected_listen_sock = (Socket) 0;
+	} else {
+	    HTSocketDelete(cd->pasvSockHandle);
+	    cd->pasvSockHandle = (HTSocketHandle) 0;
+	}
+
+    } else if(status == 0) {
+        /* go read the response since we need to
+         * get the "226 successful transfer" message
+         * out of the read queue in order to cache
+         * connections properly
+         */
+	cd->next_state = FTP_WAIT_FOR_RESPONSE;
+        cd->next_state_after_response = FTP_LOGOUT_AND_DONE;
+	
+	if (!cd->pasv_mode) {
+	    SocketCloseSend(cd->connected_listen_sock);
+	    SocketReset(cd->connected_listen_sock);
+	    SocketClose(cd->connected_listen_sock);
+	    cd->connected_listen_sock = (Socket) 0;
+	    HTMemUnlockAndFree(recvBufHandle);
+	} else {
+	    HTSocketDelete(cd->pasvSockHandle);
+	    cd->pasvSockHandle = (HTSocketHandle) 0;
+	}
+
+        status = MK_DATA_LOADED;
+	@send (ConstructOptr(ftpClientApp, 0))::
+	    {MSG_FROM_FTP_PROCESS}(ftpClientMsg)
+		(FTP_DOWNLOAD_COMPLETE, 0);
+    }
+
+    HTMemUnlock(ftpConHandle);
+    
+    POPDS;
+
+    return(status);
+} // end ftp_read_file
+
+/***********************************************************************
+ *		ftp_start_read_dir
+ ***********************************************************************
+ *
+ * SYNOPSIS:	
+ * CALLED BY:	
+ * RETURN:	
+ *	
+ * STRATEGY:	XXX: pretty sure we don't use this.
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	jeremyb 	7/30/98   	Initial Revision
+ *	
+ ***********************************************************************/
+int
+ftp_start_read_dir (HTMemHandle ftpConHandle)
+{
+    EC_ERROR(1);
+    return(0); /* continue */
+} // end ftp_start_ftp_read_dir
+
+

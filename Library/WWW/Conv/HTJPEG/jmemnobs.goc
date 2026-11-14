@@ -1,0 +1,84 @@
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Geoworks 1995 -- All Rights Reserved
+
+PROJECT:	PC GEOS
+MODULE:		
+FILE:		jmemnobs.c
+
+AUTHOR:		Joon Song, Oct 29, 1995
+
+ROUTINES:
+	Name			Description
+	----			-----------
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	Joon	10/29/95   	Initial version.
+
+DESCRIPTION:
+	
+
+	$Id: jmemnobs.goc,v 1.1.11.5 97/11/11 10:28:10 joon Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+/*
+ * jmemnobs.c
+ *
+ * Copyright (C) 1992-1994, Thomas G. Lane.
+ * This file is part of the Independent JPEG Group's software.
+ * For conditions of distribution and use, see the accompanying README file.
+ *
+ * This file provides a really simple implementation of the system-
+ * dependent portion of the JPEG memory manager.  This implementation
+ * assumes that no backing-store files are needed: all required space
+ * can be obtained from malloc().
+ * This is very portable in the sense that it'll compile on almost anything,
+ * but you'd better have lots of main memory (or virtual memory) if you want
+ * to process big images.
+ * Note that the max_memory_to_use option is ignored by this implementation.
+ */
+@include <stdapp.goh>
+
+#define JPEG_INTERNALS
+#include <jinclude.h>
+#include <jpeglib.h>
+#include <jmemsys.h>		/* import the system-dependent declarations */
+
+
+/*
+ * Memory allocation and freeing are controlled by the regular library
+ * routines malloc() and free().
+ */
+
+GLOBAL void *
+jpeg_get_small (j_common_ptr cinfo, size_t sizeofobject)
+{ 
+  void *ptr;
+
+#ifdef __HIGHC__
+  _inline(0x1e);
+#endif
+#ifdef __BORLANDC__
+  asm{push ds}
+#endif
+  GeodeLoadDGroup(GeodeGetCodeProcessHandle());
+  
+  ptr = (void *) malloc(sizeofobject);
+  
+#ifdef __HIGHC__
+  _inline(0x1f);
+#endif
+#ifdef __BORLANDC__
+  asm{pop ds}
+#endif
+  return ptr;  
+}
+
+GLOBAL void
+jpeg_free_small (j_common_ptr cinfo, void * object, size_t sizeofobject)
+{
+  free(object); 
+}

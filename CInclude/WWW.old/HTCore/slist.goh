@@ -1,0 +1,138 @@
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Geoworks 1996 -- All Rights Reserved
+
+PROJECT:	Geos WWWW Library.
+MODULE:		GeoBrowser (client of WWW Library)
+FILE:		slist.goh
+
+AUTHOR:		Kok Kin Kee, Aug 21, 1996
+
+ROUTINES:
+	Name			Description
+	----			-----------
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	kkee	8/21/96   	Initial version.
+
+DESCRIPTION:
+	Synchronized request list. Designed for use with WWW Library.
+	Client should maintain their request list using SListClass.
+
+	Add and kill requests from your application process thread,
+	and delete requests from your "after" callbacks.
+
+	$Id: slist.goh,v 1.1 97/04/04 15:54:54 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+@ifndef __S_LIST_GOH
+@define __S_LIST_GOH
+
+@include <WWW/HTCore/htreq.goh>
+@include <WWW/HTCore/htutils.goh>
+@include <WWW/HTCore/htlist.goh>
+@include <sem.h>
+
+@class SListClass, MetaClass;
+
+/*
+ * Add a request.
+ *
+ * Context:	Synchronize request access.
+ * Source:	Client.
+ * Destination:	Anyone.
+ * Interception:Not necessary.
+ * Return:      HT_OK or HT_NO.
+ */
+@message int MSG_SLIST_ADD_REQUEST(HTRequestHandle request);
+
+/*
+ * Delete a request. A deleted request is assumed to have been killed 
+ * returned by the WWW Library via "after" callback (in which case, 
+ * it has been killed by the WWW Library).
+ *
+ * Context:	Synchronize request access.
+ * Source:	Client.
+ * Destination:	Anyone.
+ * Interception:Not necessary.
+ * Return:      HT_OK if deleted, else HT_NO request not in list.
+ */
+@message int MSG_SLIST_DELETE_REQUEST(HTRequestHandle request);
+
+/*
+ * Kill a request. If request was killed earlier, this call will
+ * not cause any problem with the WWW Library.
+ *
+ * Killed requests do not get deleted. You still need to call 
+ * MSG_SLIST_DELETE_REQUEST.
+ *
+ * Context:	Synchronize request access.
+ * Source:	Client.
+ * Destination:	Anyone.	
+ * Interception:Not necessary.
+ * Return:      HT_OK if killed, else HT_NO request not in list. 
+ */
+@message int MSG_SLIST_KILL_REQUEST(HTRequestHandle request);
+
+/*
+ * Kill all requests. You will be notified when all requests
+ * have been killed; the semaphore you passed in will be 'V'ed
+ * using ThreadVSem (so you should 'P' it before passing to this
+ * method).  If you add request while killing is in progress, the 
+ * request may be killed as well. So you should not do anything
+ * with the slist until the semaphore is 'V'ed.
+ *
+ * Context:	Synchronize request access.
+ * Source:	Client.
+ * Destination:	Anyone.
+ * Interception:Not necessary.
+ */
+@message void MSG_SLIST_KILL_ALL(SemaphoreHandle sem);
+
+/*
+ * Internal method to kill all requests. 
+ *
+ * Context:	Synchronize request access.
+ * Source:	Internal.
+ * Destination:	Anyone.
+ * Interception:Not necessary.
+ */
+@message void MSG_SLIST_KILL_ALL_LOW();
+
+/*
+ * Acknowledge to client that we have completely killed all requests.
+ *
+ * Context:	Synchronize request access.
+ * Source:	Internal.
+ * Destination:	Anyone.
+ * Interception:Not necessary.
+ */
+@message void MSG_SLIST_ACK();
+
+
+/* --------------------------------------------------------------------------
+ * 		Instance Data.
+ * --------------------------------------------------------------------------*/
+
+/*
+ * List to synchronize access.
+ */
+@instance HTListHandle SLI_list;
+
+/*
+ * Semaphore to indicate killing in progress.
+ */
+@instance SemaphoreHandle SLI_isKilling;
+
+/* 
+ * Client to ack when we are done killing all requests by 'V'ing 
+ * the ackSemaphore.
+ */
+@instance SemaphoreHandle SLI_ackSemaphore;
+
+@endc;
+
+@endif

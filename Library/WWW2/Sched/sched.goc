@@ -1,0 +1,498 @@
+/*---------------------------------------------------------------------------
+//
+//  Geoworks (R) application software and GEOS (R) operating system
+//  software copyright (C) 1990-1997 Geoworks.  All rights reserved.
+//  United States Patents 5327529, 5237651, and 5438662. U.K. Patents
+//  0375703 and 0631677.  German Patents P3854269.2-08 and
+//  69307728.1-08.  French Patents 0375703 and 0631677.  Other
+//  international patents pending.
+//
+//  This software is the confidential and proprietary information of
+//  Geoworks ("Confidential Information").  You shall not disclose
+//  such Confidential Information and shall use it only in accordance
+//  with the terms of the license agreement you entered into with
+//  Geoworks.
+//
+// PROJECT:     HTMLViewer
+// MODULE:      scheduler
+// FILE:        sched.cpp
+//
+// AUTHOR:      Kok Kin Kee: Jan 13, 1998
+//
+// REVISION HISTORY:
+//      Name            Date            Description
+//      ----            ----            -----------
+//      kkee          1/13/98           Initial version
+//
+//
+// DESCRIPTION:
+//      Command scheduler
+//      //depot/liberty/project/ellery/980805/library/www/sched/sched.cpp#1
+//
+//      $Id: sched.goc,v 1.4 98/09/17 15:42:56 brianc Exp $
+//
+//-------------------------------------------------------------------------*/
+
+/*
+#include <kernel/thread.h>
+#include <kernel/sema4.h>
+#include "sched.h"
+#include "cmds.h"
+*/
+
+#include <Ansi/stdlib.h>
+#include <sem.h>
+#include <WWW2/wwMacro.h>
+@include <WWW2/WW2Core/ww2list.goh>
+#include <WWW2/WW2Core/cmd.h>
+@include <WWW2/Conv/sched.goh>
+
+#define _meta (pself->__meta)
+#define _sched (pself->__sched)
+
+#define _cmd (pself->__cmd)
+#define _preempted (pself->__preempted)
+#define _queue (pself->__queue)
+#define _active (pself->__active)
+#define _mutex (pself->__mutex)
+#define _count (pself->__count)
+#define _iterator (pself->__iterator)
+#define _numThreads (pself->__numThreads)
+#define _aborted (pself->__aborted)
+#define _exited (pself->__exited)
+#define _killing (pself->__killing)
+#define _waitTillNoActive (pself->__waitTillNoActive)
+
+@classdecl CommandSchedulerClass;
+@classdecl CommandElementClass;
+
+void SchedulerCommandExecute(SchedulerCommand *pself) {
+    EC_BOUNDS(pself);
+EC (ECCheckLMemObject(_sched));
+    @call _sched::Run();
+}
+
+void SchedulerCommandDoNothing(SchedulerCommand *pself) {
+}
+
+void SchedulerCommandSchedulerCommand(SchedulerCommand *pself, optr sched) {
+    EC_BOUNDS(pself);
+    _meta.Destructor = (void (*)(Command *)) &SchedulerCommandDoNothing;
+    _meta.Execute = (void (*)(Command *)) &SchedulerCommandExecute;
+    _meta.Preempt = (void (*)(Command *)) &SchedulerCommandDoNothing;
+    _meta.Done = (void (*)(Command *)) &SchedulerCommandDoNothing;
+EC (ECCheckLMemObject(sched));
+    _sched = sched;
+}
+
+@method CommandElementClass, CommandElement
+{
+    _cmd = cmd;
+    /* _preempted already defaults to FALSE */
+}
+
+@method CommandElementClass, CommandGet
+{
+    return _cmd;
+}
+
+@method CommandElementClass, SetPreempted
+{
+    _preempted = TRUE;
+}
+
+@method CommandElementClass, IsPreempted
+{
+    return _preempted;
+}
+
+/*---------------------------------------------------------------------------
+//		CommandScheduler::CommandScheduler()
+//---------------------------------------------------------------------------
+// 
+// SYNOPSIS: 	Constructor.
+// SCOPE:	Public
+// RETURN:	Nothing
+// STRATEGY:	
+// 
+// REVISION HISTORY: 
+//	Name		Date		Description 
+//	----		----		----------- 
+//	kkee    	1/22/98 	Initial version 
+//	
+//-------------------------------------------------------------------------*/
+@if 0	/// No need for constructor since all instance set by Init() are 0's.
+@method CommandSchedulerClass, CommandScheduler /* () */
+{
+    Init();
+}	/* End of CommandScheduler::CommandScheduler() */
+@endif
+
+
+/*---------------------------------------------------------------------------
+//		CommandScheduler::~CommandScheduler()
+//---------------------------------------------------------------------------
+// 
+// SYNOPSIS: 	Destructor.
+// SCOPE:	Public
+// RETURN:	Nothing
+// STRATEGY:	
+// 
+// REVISION HISTORY: 
+//	Name		Date		Description 
+//	----		----		----------- 
+//	kkee    	1/22/98 	Initial version 
+//	
+//-------------------------------------------------------------------------*/
+@method CommandSchedulerClass, MSG_META_FINAL_OBJ_FREE /* ~CommandScheduler() */
+{
+    @send self::KillAll();
+    @send self::KillThreads();
+    @send self::SchedCleanup();
+}	/* End of CommandScheduler::~CommandScheduler() */
+
+
+
+/*---------------------------------------------------------------------------
+//		CommandScheduler::Initialize()
+//---------------------------------------------------------------------------
+// 
+// SYNOPSIS: 	Allocate scheduler threads and command object.
+// SCOPE:	Public
+// RETURN:	CS_OK
+//              CS_OUT_OF_MEMORY
+// STRATEGY:	
+// 
+// REVISION HISTORY: 
+//	Name		Date		Description 
+//	----		----		----------- 
+//	kkee    	1/22/98 	Initial version 
+//	
+//-------------------------------------------------------------------------*/
+@method /* CmdSchedResultCode */
+CommandSchedulerClass, SchedInitialize /* (uint8 numThreads) */
+{
+    PARAM_ASSERT(numThreads != 0);
+    
+    ASSERTS(_mutex == NULL, "CommandScheduler::Initialize() called twice");
+
+    _mutex = ThreadAllocSem(1);
+    _count = ThreadAllocSem(0);
+    _exited = ThreadAllocSem(0);
+    _waitTillNoActive = ThreadAllocSem(0);
+
+    _numThreads = numThreads;
+    _cmd = malloc(sizeof(SchedulerCommand));
+    SchedulerCommandSchedulerCommand(_cmd, oself);
+    if (!_mutex || !_count || !_exited || !_waitTillNoActive ||
+        !_cmd) {
+        @send self::SchedCleanup();
+	return CS_OUT_OF_MEMORY;
+    }
+
+    int i;
+    ThreadHandle result;
+    for (i=0; i<numThreads; i++) {
+	MemHandle argHptr;
+	argHptr = MemAlloc(sizeof(SchedulerCommand *), HF_DYNAMIC,
+			   HAF_STANDARD_NO_ERR_LOCK);
+	*(SchedulerCommand **) MemDeref(argHptr) = _cmd;
+	MemUnlock(argHptr);
+	result = ThreadCreate(PRIORITY_STANDARD, argHptr, ExecuteCommand, 512,
+			      GeodeGetProcessHandle());
+        if (result == NullHandle) {
+            @send self::SchedCleanup();
+            return CS_OUT_OF_MEMORY;
+        }
+    }
+    return CS_OK;
+}	/* End of CommandScheduler::Initialize() */
+
+
+
+/*---------------------------------------------------------------------------
+//		CommandScheduler::Submit()
+//---------------------------------------------------------------------------
+// 
+// SYNOPSIS: 	Submit a command. The command will be called sometime in the
+//              future to execute and will deleted by the scheduler
+//              after it has finished executing.
+// SCOPE:	Public
+// RETURN:	CS_OK
+//              CS_OUT_OF_MEMORY
+// STRATEGY:	This implements the writers of _queue.
+// 
+// REVISION HISTORY: 
+//	Name		Date		Description 
+//	----		----		----------- 
+//	kkee    	1/22/98 	Initial version 
+//	
+//-------------------------------------------------------------------------*/
+@method /* CmdSchedResultCode */
+CommandSchedulerClass, Submit /* (Command *cmd) */
+{
+    EC_BOUNDS(cmd);
+    ASSERTS(_mutex != NULL, 
+            "CommandScheduler::Initialize() was not called");
+  
+    optr element = ObjInstantiate(HandleOf(oself), &CommandElementClass);
+    @call element::CommandElement(cmd);
+    
+    ThreadPSem(_mutex);
+    @call _queue::AppendElt(element);
+    ThreadVSem(_mutex);
+    ThreadVSem(_count);
+    return CS_OK;
+}	/* End of CommandScheduler::Submit() */
+
+
+
+/*---------------------------------------------------------------------------
+//		CommandScheduler::Run()
+//---------------------------------------------------------------------------
+// 
+// SYNOPSIS: 	Run a scheduler thread. Get a command and execute it.
+//              If no command, block for a new command or until we are
+//              preempted.
+// SCOPE:	Private
+// RETURN:	Nothing
+// STRATEGY:	This implements the readers of _queue.
+// 
+// REVISION HISTORY: 
+//	Name		Date		Description 
+//	----		----		----------- 
+//	kkee    	1/22/98 	Initial version 
+//	
+//-------------------------------------------------------------------------*/
+@method /* void */
+CommandSchedulerClass, Run /* () */
+{
+    optr element;
+    
+    //
+    // Get a command and execute it.
+    //
+    while (!_aborted) {
+        ThreadPSem(_count);
+        ThreadPSem(_mutex);
+        // Move a command from inactive to active.
+        element = @call _queue::Get();
+        if (element) {
+            @call _active::AppendElt(element);
+        }
+#if ERROR_CHECK
+        else {
+            EC_WARN("CommandScheduler::Run() no command to execute");
+        }
+#endif
+        ThreadVSem(_mutex);
+        
+        // Service the command and remove it from active list
+        if (element) {  
+            Command *cmd = @call element::CommandGet();
+            cmd->Execute(cmd);
+            cmd->Done(cmd);    // Indicate that cmd is about to be deleted.
+	    
+            ThreadPSem(_mutex);
+#if ERROR_CHECK
+            optr temp = @call _active::Remove(element);
+            ASSERTS(temp == element,
+                    "CommandScheduler::Run() active list corrupted");
+#else  // ERROR_CHECK
+            @call _active::Remove(element);
+#endif // #if ERROR_CHECK
+	    cmd->Destructor(cmd);
+	    free(cmd);
+	    @call element::MSG_META_OBJ_FREE();
+        } else {
+            ThreadPSem(_mutex);
+        }
+
+        // Wake KillAll() ?
+        if (_killing && @call _active::Size() == 0) {
+            ThreadVSem(_waitTillNoActive);
+            _killing = FALSE;
+        }
+        ThreadVSem(_mutex);
+    }
+
+    ThreadVSem(_exited);
+}	/* End of CommandScheduler::Run() */
+
+
+/*---------------------------------------------------------------------------
+//		CommandScheduler::KillAll()
+//---------------------------------------------------------------------------
+// 
+// SYNOPSIS: 	Kill all submitted commands. By the time this method
+//              returns, all commands would have deleted.
+// SCOPE:	Public
+// RETURN:	Nothing
+// STRATEGY:	These are the steps to follow, in this order:
+//              1. Preempt all the active commands in _active.
+//              2. Delete all nonactive commands in _queue.
+// 
+// REVISION HISTORY: 
+//	Name		Date		Description 
+//	----		----		----------- 
+//	kkee    	1/22/98 	Initial version 
+//	
+//-------------------------------------------------------------------------*/
+@method /* void */
+CommandSchedulerClass, KillAll /* () */
+{
+    optr element;
+    Command *cmd;
+
+    ASSERTS(_mutex != NULL, 
+            "CommandScheduler::Initialize() was not called");
+    
+    ThreadPSem(_mutex);
+
+    // Preempt active commands wihtout removing them from _active list
+    // as these commands will be deleted by CommandScheduler::Run().
+    @call _iterator::LiterInitialize(_active);
+    for (@call _iterator::First(); !@call _iterator::IsDone();
+	 @call _iterator::Next()) {
+	element = @call _iterator::CurrentElement();
+        if (!@call element::IsPreempted()) {
+            cmd = @call element::CommandGet();
+            cmd->Preempt(cmd);
+            @call element::SetPreempted();
+        }
+        
+    }
+    
+    // Delete pending commands
+    int count = @call _queue::Size();
+    for (int i=0; i<count; i++) {
+        element = @call _queue::Get();
+        cmd  = @call element::CommandGet();
+        cmd->Done(cmd);
+	cmd->Destructor(cmd);
+	free(cmd);
+	@call element::MSG_META_OBJ_FREE();
+    }
+
+    Boolean wait=FALSE;
+    if (@call _active::Size()) {
+        wait = TRUE;
+        _killing = TRUE;
+    }
+
+    ThreadVSem(_mutex);
+
+    if (wait) {
+        ThreadPSem(_waitTillNoActive);
+    }
+}	/* End of CommandScheduler::KillAll() */
+
+
+
+/*---------------------------------------------------------------------------
+//		CommandScheduler::Cleanup()
+//---------------------------------------------------------------------------
+// 
+// SYNOPSIS: 	Restore scheduler state to when it was first created.
+// SCOPE:	Private
+// RETURN:	Nothing
+// STRATEGY:	
+// 
+// REVISION HISTORY: 
+//	Name		Date		Description 
+//	----		----		----------- 
+//	kkee    	1/27/98 	Initial version 
+//	
+//-------------------------------------------------------------------------*/
+@method /* void */
+CommandSchedulerClass, SchedCleanup /* () */
+{
+    _cmd->__meta.Destructor((Command *) _cmd);
+    free(_cmd);
+    ThreadFreeSem(_mutex);
+    ThreadFreeSem(_count);
+    ThreadFreeSem(_exited);
+    ThreadFreeSem(_waitTillNoActive);
+
+    @send self::Init();
+}	/* End of CommandScheduler::Cleanup() */
+
+
+/*---------------------------------------------------------------------------
+//		CommandScheduler::KillThreads()
+//---------------------------------------------------------------------------
+// 
+// SYNOPSIS: 	Kill all threads. For threads that have succesfully
+//              executed Thread::Run(), we must wait for them to
+//              exit. For threads that did not execute Thread::Run(),
+//              we must delete them manually. Actually NO! 
+//              There is a bug in Liberty Threads that prevent threads
+//              from being deleted regardless of whether the threads
+//              have successfully executed Thread::Run(). So we don't
+//              delete threads here.
+// SCOPE:	Private
+// RETURN:	Nothing
+// STRATEGY:	
+// 
+// REVISION HISTORY: 
+//	Name		Date		Description 
+//	----		----		----------- 
+//	kkee    	1/28/98 	Initial version 
+//	
+//-------------------------------------------------------------------------*/
+@method /* void */
+CommandSchedulerClass, KillThreads /* () */
+{
+    _aborted = TRUE;
+
+#if ERROR_CHECK
+    // Make sure threads are not running any commands and
+    // that there are no commands to run.
+    ThreadPSem(_mutex);
+    ASSERTS(@call _queue::Size() == 0,
+            "CommandScheduler::KillThreads() _queue not empty");
+    ASSERTS(@call _active::Size() == 0,
+            "CommandScheduler::KillThreads() _active not empty");
+    ThreadVSem(_mutex);
+#endif
+
+    // If threads are waiting to service requests, wake them up
+    int i;
+    for (i=0; i<_numThreads; i++) {
+        ThreadVSem(_count);
+    }
+    // Wait for these threads to complete
+    for (i=0; i<_numThreads; i++) {
+        ThreadPSem(_exited);
+    }
+}	/* End of CommandScheduler::KillThreads() */
+
+
+
+//---------------------------------------------------------------------------
+//		CommandScheduler::Init()
+//---------------------------------------------------------------------------
+// 
+// SYNOPSIS: 	Initialize variables.
+// SCOPE:	Private
+// RETURN:	Nothing
+// STRATEGY:	
+// 
+// REVISION HISTORY: 
+//	Name		Date		Description 
+//	----		----		----------- 
+//	kkee    	1/27/98 	Initial version 
+//	
+//---------------------------------------------------------------------------
+@method /* void */
+CommandSchedulerClass, Init /* () */
+{
+    _cmd = NULL;
+    _mutex = NULL;
+    _count = NULL;
+    _numThreads = 0;
+    _aborted = FALSE;
+    _exited = NULL;
+    _killing = FALSE;
+    _waitTillNoActive = NULL;
+}	/* End of CommandScheduler::Init() */

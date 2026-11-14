@@ -1,0 +1,300 @@
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Geoworks 1996.  All rights reserved.
+	GEOWORKS CONFIDENTIAL
+
+PROJECT:	GeoBrowser
+MODULE:		SGML scanner
+FILE:		sgmlS.goh
+
+AUTHOR:		Kok Kin Kee, Sep 16, 1996
+
+ROUTINES:
+	Name			Description
+	----			-----------
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	kkee	9/16/96   	Initial version.
+
+DESCRIPTION:
+
+	SGML Scanner.
+
+	$Id: sgmlS.goh,v 1.11.1.2 97/11/11 15:30:11 grisco Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+
+@ifndef __SGMLS_GOH__
+@define __SGMLS_GOH__
+
+@include <stdapp.goh>
+@include <WWW/sgml.goh>
+@include <sem.h>
+
+/****************************************************************************
+
+  SGML Scanner tokenizes all SGML elements. The design of the SGML scanner
+  requires that it be used in two threads, called it thread A and thread B.
+
+  Use thread A to:
+  1. Create (SGMLScanNew), append data (SGMLScanAppendData), and end data
+     (SGMLScanEndData). SGMLScanEndData is needed becasue we can't tell
+     the difference between no more data and not enough data to form a token.
+     So, we use SGMLScanEndData to indicate no more data.
+
+  Use thread B to:
+  1. Gobble sym (SGMLScanGobbleSym) and check symbol (SGMLScanGetSym).
+
+ ****************************************************************************/
+
+
+/*
+ * SGML basic tokens for parsing attrs (nothing to do with HTML or 
+ * other DTD tokens).
+ */
+typedef enum {
+    /* SGML Tokens */
+
+     SGMLT_CLOSE_BRACKET                     /* > */
+    ,SGMLT_EQUAL                             /* = */
+    ,SGMLT_DOUBLE_QUOTE                      /* " */
+    ,SGMLT_SINGLE_QUOTE                      /* ' */
+    ,SGMLT_STRING                            /* an sgml string */
+
+    /* Data indicators */
+
+    ,SGMLT_XXX_EOF              /* End of file (or data) */
+
+} SGMLToken;
+
+
+/* 
+ * Max length of an SGML name, it must be big enough for a 
+ * SGML element (e.g., HTML tag), attribute name, and attribute
+ * value.
+ */
+#define MAX_SGML_NAME_LENGTH                  256
+
+/*
+ * Max number of attributes per element. Is 20 reasonable? Yes.
+ * And its tunable as well.
+ */
+#define MAX_SGML_ATTRIBUTES                   20
+
+/* 
+ * If we can process data faster than the network can provide, 
+ * this buffer should be small. The HTSocket buffer is 512 bytes.
+ * So I am estimating that the network is about 4 times faster
+ * than processing. Well, no...The main reason why I made this buffer 
+ * 4 times bigger than socket's buffer is because we don't want 
+ * the Library to block in pumping data to the client as the Library
+ * is a single thread serving multiple requests.
+ */
+
+#define SGML_SCANNER_QUEUE_SIZE               1024  /* tunable */
+#define SGML_TEXT_BUFFER_SIZE                 512   /* tunable */
+#define SGML_MAX_NUMBER_UNGET_CHARS           256   /* a safer size */
+#define SGML_MAX_ELEMENT_NESTING_LEVEL        100
+
+/*
+ * The SGMLParseReference routine parses the entity or character
+ * reference and returns one of the following types of references.
+ * The type of reference determines what other information is 
+ * returned by this routine.
+ */
+
+
+typedef enum {
+	PARSE_REF_ENTITY_REF,		/* char ref e.g. "&auml"  */
+	PARSE_REF_CHAR_REF,             /* char ref e.g. "&#123"  */
+	PARSE_REF_WHITE_SPACE,		/* nothing  e.g. "& "     */
+	PARSE_REF_LEFT_BRACKET,  	/* left bracket e.g. "&<" */
+	PARSE_REF_NON_REFERENCE, 	/* not a ref e.g. "&abc%" */
+} ParseRefType;
+
+/* 
+ * Internal SGMLDTD structure. Pointer based as opposed to the optr 
+ * based SGMLDTD in sgml.goh. The DTD is always locked as long as 
+ * we parsing an SGML document. 
+ */
+typedef struct {
+    MemHandle SGMLD_block;        /* The block where all the DTD chunks
+				   * reside. We require that all DTD stuff
+				   * be in one block for performance reasons 
+				   */
+    SGMLTag *SGMLD_tagList; 
+    word     SGMLD_numOfTags; 
+
+    char   **SGMLD_entityList; 
+    char   **SGMLD_entityTranslate;
+    word     SGMLD_numOfEntities;
+
+    char   **SGMLD_characterTranslate;
+} SGMLDTDInternal;
+
+/*
+ * SGML Scanner structure.
+ */
+typedef struct {
+    /* 
+     * The word gobbled in the last call to SGMLScanGobbleSym if 
+     * SGMLS_thisSym = SGMLT_STRING.
+     */
+    char SGMLS_thisWord[MAX_SGML_NAME_LENGTH];
+
+    /*
+     * The token gobbled in last call to SGMLScanGobbleSym.
+     */
+    SGMLToken SGMLS_thisSym;
+
+    /*
+     * Element stack. Keeps track of elements parsed and do some
+     * error checking for illegal nesting of tags. We optimize
+     * by using a fixed array. Dynamic array is too slow. But...
+     * how big is good enough?
+     */
+    SGMLTag *SGMLS_elementStack[SGML_MAX_ELEMENT_NESTING_LEVEL];
+    int SGMLS_stackPos;  /* Points to next empty slot */
+    SGMLContent SGMLS_content;  /* current content */
+
+    /*
+     * Delayed end element stack. The stack maintains end elements that
+     * come in the wrong scope. The tags will be corrected when we get back
+     * to the right scope.
+     */
+    SGMLTag *SGMLS_delayStack[SGML_MAX_ELEMENT_NESTING_LEVEL];
+    int SGMLS_delayPos;  /* Point to next empty slot */
+    
+    /* 
+     * Synchronize termination of the parser thread. The parser sets
+     * SGMLS_noMoreData = TRUE and the scanner set SGMLS_endOfFile = TRUE 
+     * when the queue is empty and SGMLS_noMoreData == TRUE. Once the 
+     * parser sets SGMLS_noMoreData, it would 'P' 
+     * SGMLS_parserThreadIsRunning and the scanner would 'V' it.
+     * This allows the parser to wait for the scanner to complete
+     * and the parser to terminate.
+     */
+    SemaphoreHandle SGMLS_parserThreadIsRunning;
+    Boolean SGMLS_endOfFile;
+    Boolean SGMLS_noMoreData;
+
+    /* The DTD structure that determines the scanning/parsing process */
+    SGMLDTD *SGMLS_clientDTD;
+    SGMLDTDInternal SGMLS_dtd;
+	
+    /* Target for pushing structured data */
+    HTStreamHandle SGMLS_target;
+
+    /* For ungetting characters */
+    char SGMLS_ungottenChar[SGML_MAX_NUMBER_UNGET_CHARS];
+    word SGMLS_numOfUngotten;
+
+    /* 
+     * Synch writing/reading by two different threads (solves the 
+     * producer and consumer problem). SGMLS_data, SGMLS_len, and
+     * SGMLS_dataIndex are protected resources.
+     */
+    SemaphoreHandle SGMLS_put;      /* put data */
+    SemaphoreHandle SGMLS_get;      /* get data */
+    SemaphoreHandle SGMLS_wait;     /* wait for data to be consumed */
+    char *SGMLS_data;               /* protected data */
+    word SGMLS_len;                 /* SGMLS_data length */
+    word SGMLS_dataIndex;           /* for reading SGMLS_data */
+    Boolean SGMLS_haveData;         /* there is data to read */
+
+
+    /* Buffering text */
+    byte SGMLS_textBuffer[SGML_TEXT_BUFFER_SIZE]; 
+    word SGMLS_textLength;
+    Boolean SGMLS_hasTrailingWhiteSpace;
+
+    /* The MemHandle for SGMLS_attr and SGMLS_valueCopy */
+    MemHandle SGMLS_block;
+
+    /* Buffering the attributes of an element */
+    ChunkHandle SGMLS_attr;       /* array of MAX_SGML_ATTRIBUTES of 
+				     SGMLEntity */
+    
+    /* 
+     * SGMLS_valueCopy[i] is copied to SGMLS_attr[i].SGMLE_value when an 
+     * attribute i has a value.
+     */
+    ChunkHandle SGMLS_valueCopy[MAX_SGML_ATTRIBUTES];
+
+    /*
+     * Final return code from target when SGML is terminated.
+     */
+    int SGMLS_retCode;
+
+} SGMLScanner;
+
+
+#define TAGLIST            sptr->SGMLS_dtd.SGMLD_tagList
+#define NUMOFTAGS          sptr->SGMLS_dtd.SGMLD_numOfTags
+#define ENTITYLIST         sptr->SGMLS_dtd.SGMLD_entityList
+#define ENTITYTRANSLATE    sptr->SGMLS_dtd.SGMLD_entityTranslate
+#define CHARACTERTRANSLATE sptr->SGMLS_dtd.SGMLD_characterTranslate
+#define NUMOFENTITIES      sptr->SGMLS_dtd.SGMLD_numOfEntities
+
+/* --------------------------------------------------------------------------
+ * 		Client Public Function Prototypes
+ * --------------------------------------------------------------------------*/
+
+#define ISWHITE(c) \
+	(((c==' ') || (c>=9 && c<=13)) ? TRUE : FALSE)
+
+#define ISDIGIT(c) \
+	((c>='0' && c<='9') ? TRUE : FALSE)
+
+#define ISALPHA(c)  \
+	(((c>='a' && c<='z') || (c>='A' && c<='Z')) ? TRUE : FALSE)
+
+#define ISALNUM(c) \
+	((ISALPHA(c) || ISDIGIT(c)) ? TRUE : FALSE)
+
+extern SGMLScannerHandle  _pascal
+    SGMLScanNew(SGMLDTD *dtd, HTStreamHandle target);
+
+extern void  _pascal
+    SGMLScanDelete(SGMLScannerHandle scanner);
+
+extern int  _pascal
+    SGMLScanAppendData(SGMLScannerHandle scanner, char *data, word len);
+
+extern char  _pascal 
+    SGMLScanGetChar(SGMLScanner *sptr);
+
+extern char  _pascal
+    SGMLScanGetReduceWhiteChar(SGMLScanner *sptr);
+
+extern char  _pascal 
+    SGMLScanGetNonWhiteChar(SGMLScanner *sptr);
+
+#define SGMLScanUngetChar(sptr, chr) \
+    sptr->SGMLS_ungottenChar[sptr->SGMLS_numOfUngotten++] = chr
+
+extern void  _pascal
+    SGMLScanGobbleSym(SGMLScanner *sptr);
+
+extern void  _pascal
+    SGMLScanGobbleValue(SGMLScanner *sptr, char *buffer);
+
+extern void  _pascal
+    SGMLScanGobbleQuotedValue(SGMLScanner *sptr, char *buffer, char quote);
+
+extern int  _pascal
+    SGMLSearchTag(SGMLTag *tag, word numOfTags, char *thisWord);
+
+extern int  _pascal
+    SGMLSearchEntity(char **entity, word numOfEntities, char *thisWord);
+
+extern int  _pascal
+    SGMLSearchAttr(SGMLAttr *attr, word numOfAttrs, char *thisWord);
+
+extern ParseRefType _pascal 
+    SGMLParseReference(SGMLScanner *sptr, char *refChar);
+
+@endif /* __SGMLS_GOH__ */

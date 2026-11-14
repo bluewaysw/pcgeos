@@ -1,0 +1,832 @@
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Geoworks 1997.  All rights reserved.
+	GEOWORKS CONFIDENTIAL
+
+PROJECT:	Geos WWW Library
+MODULE:		resp
+FILE:		resp.goc
+
+AUTHOR:		Kok Kin Kee, Jun  2, 1997
+
+ROUTINES:
+	Name			Description
+	----			-----------
+
+REVISION HISTORY:
+	Name		Date		Description
+	----		----		-----------
+	kkee    	6/ 2/97   	Initial version.
+
+DESCRIPTION:
+
+	Generate response for target.
+
+	$Id: resp.goc,v 1.16.1.1 97/09/05 10:52:38 jeremyb Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+
+@include "resp.goh"
+@include "parse.goh"
+@include "scan.goh"
+@include "const.goh"
+#include <WWW/htmem.h>
+@include <WWW/htimap.goh>
+@include <WWW/HTCore/htstring.goh>
+@include <WWW/HTCore/htuu.goh>
+@include "htfatals.goh"
+
+#define HTIMAP_ENCODING_LENGTH   5
+/*
+ * Encoding reserved words table.
+ */
+IMAPKey mimeEncodingWords[] = {
+    /*
+     * *MUST* be strcmp order and case insensitive. 
+     * Remember to keep HTIMAP_RESERVED_WORDS up-to-date.
+     */
+    {"7BIT",             IE_7BIT},
+    {"8BIT",             IE_8BIT},
+    {"BASE64",           IE_BASE64},
+    {"BINARY",           IE_BINARY},
+    {"QUOTED-PRINTABLE", IE_QUOTED_PRINTABLE},
+    {0,0}
+};
+
+
+extern HTMemHandle _pascal DecodeMIMEMsgHdrX(HTMemHandle hdr);
+
+
+/***********************************************************************
+		Public Functions
+***********************************************************************/
+
+/***********************************************************************
+ *		RespNew
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Create a new response for a particular request.
+ * CALLED BY:	Parser.
+ * RETURN:	Nothing. p->resp and p->resphtmh contains the response 
+ *              created.
+ *	
+ * STRATEGY:	
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	kkee    	6/ 6/97   	Initial Revision
+ *	
+ ***********************************************************************/
+void _pascal
+RespNew (IMAPParser *p, IMAPRequest req)
+{
+    p->wanted = req;
+    switch (req) {
+    case IMAPC_LOGON:
+	p->resp = HTMemAllocAndLock(&(p->resphtmh),
+				    sizeof(HTIMAPLogonResp));
+	break;
+    case IMAPC_LIST:
+	p->resp = HTMemAllocAndLock(&(p->resphtmh),
+				    sizeof(HTIMAPListResp));
+	break;
+    case IMAPC_BODY:
+	p->resp = HTMemAllocAndLock(&(p->resphtmh),
+				    sizeof(HTIMAPBodyResp));
+	break;
+    case IMAPC_PBODY:
+	p->resp = HTMemAllocAndLock(&(p->resphtmh),
+				    sizeof(HTIMAPPBodyResp));
+	break;
+    case IMAPC_ATTACH:
+	p->resp = HTMemAllocAndLock(&(p->resphtmh),
+				    sizeof(HTIMAPAttachResp));
+	break;
+    case IMAPC_PATTACH:
+	p->resp = HTMemAllocAndLock(&(p->resphtmh),
+				    sizeof(HTIMAPPAttachResp));
+	break;
+    case IMAPC_DELETE:
+    case IMAPC_LOGOUT:
+	/* Empty response for these requests */
+	break;
+    default:
+	EC_ERROR(HTIMAP_REQUEST_NOT_SUPPORTED);
+    }
+    
+}	/* End of RespNew.	*/
+
+
+
+/***********************************************************************
+ *		RespAdd
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Add data to current response. Pass itype = IMAPC_IGNORE
+ *              to ignore and free the passed in parameters.
+ * CALLED BY:	Parse.
+ * RETURN:	Nothing.
+ *	
+ * STRATEGY:	Response is p->resp (locked pointer of p->resphtmh).
+ *              p->wanted indicates what response data we need to save
+ *              and finally push to client.
+ *
+
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	kkee    	6/ 3/97   	Initial Revision
+ *	
+ ***********************************************************************/
+void _pascal
+RespAdd (IMAPParser *p, IMAPRespData itype, HTMemHandle str1,
+	 HTMemHandle str2, dword num1, dword num2)
+{
+#if ERROR_CHECK
+    /* Only one of them is valid */
+    if (str1) ECCheckHTMemHandle(str1);
+    if (str2) ECCheckHTMemHandle(str2);
+#endif
+
+#define IGNOREPARAMS        {if (str1) HTMemFree(str1);\
+	                     if (str2) HTMemFree(str2);}
+
+    switch (p->wanted) {
+    case IMAPC_LOGON:
+	{
+	    HTIMAPLogonResp *r = (HTIMAPLogonResp *) p->resp;
+	    switch (itype) {
+	    case IMRD_UIDVALIDITY:
+		r->ILR_uidValidity = str1;
+		break;
+	    default:
+		IGNOREPARAMS;
+		EC_WARNING(HTIMAP_RESPONSE_IGNORED);
+		break;
+	    }
+	}
+	break;
+
+    case IMAPC_LIST:
+	{
+	    /* Either we are adding data to HTIMAPListResp itself or 
+	     * the last attachment in HTIMAPListResp attachmentList.
+	     */
+	    HTIMAPListResp *r = (HTIMAPListResp *) p->resp;
+	    switch (itype) {
+	    case IMRD_SEEN:
+		r->ILR_flags |= IF_SEEN;
+		break;
+	    case IMRD_DATE:
+EC(             if (r->ILR_date) EC_ERROR(HTIMAP_ALREADY_HAS_DATE);          )
+		r->ILR_date = str1;
+		break;
+	    case IMRD_SUBJECT:
+EC(             if (r->ILR_subject) EC_ERROR(HTIMAP_ALREADY_HAS_SUBJECT);    )
+		r->ILR_subject = DecodeMIMEMsgHdrX(str1);
+		break;
+	    case IMRD_FROM:
+EC(             if (r->ILR_senderName)                                       )
+EC(                 EC_ERROR(HTIMAP_ALREADY_HAS_SENDERNAME);                 )
+EC(             if (r->ILR_senderEmail)                                      )
+EC(                 EC_ERROR(HTIMAP_ALREADY_HAS_SENDEREMAIL);                )
+		r->ILR_senderName = DecodeMIMEMsgHdrX(str1);
+		r->ILR_senderEmail = str2;
+		break;
+	    case IMRD_RFC822_SIZE:
+		r->ILR_totalSize = num1;
+		break;
+	    case IMRD_UID:
+		r->ILR_uid = str1;
+		break;
+	    case IMRD_CONTENT_TYPE:
+		/* str1 = type & str2 = subtype */
+		{
+		    HTIMAPAttachResp attach;
+		    int count = HTListGetCount(r->ILR_attachmentList);
+EC(                 if (!str1 || !str2)                                     )
+EC(                    EC_ERROR(HTIMAP_CONTENT_TYPE_EXPECTED);              )
+EC(                 if (!count) EC_ERROR(HTIMAP_LIST_MUST_HAVE_BODY);       )
+
+                    HTListRemoveItem(r->ILR_attachmentList, count-1, 
+				(void*)&attach, sizeof(HTIMAPAttachResp));
+
+EC(                 if (attach.IAR_contentType)                             )
+EC(                    EC_ERROR(HTIMAP_ALREADY_HAS_CONTENT_TYPE);           )
+                    str1 = HTStrAllocCat(str1, "/");
+                    attach.IAR_contentType = HTStrAllocCat(str1, 
+				   	        (char *)HTMemLock(str2));
+		    HTMemUnlockAndFree(str2);
+		    HTListAppend(r->ILR_attachmentList, (void*)&attach,
+				 sizeof(HTIMAPAttachResp));
+		}
+		break;
+	    case IMRD_BODY_NUMBER:
+		/* str1 is the body part number */
+		{
+		    HTIMAPAttachResp attach;
+		    int count = HTListGetCount(r->ILR_attachmentList);
+EC(		    if (!str1) EC_ERROR(HTIMAP_BODY_PART_NUMBER_EXPECTED);  )
+EC(                 if (!count) EC_ERROR(HTIMAP_LIST_MUST_HAVE_BODY);       )
+                    
+                    HTListRemoveItem(r->ILR_attachmentList, count-1,
+				     (void*)&attach, sizeof(HTIMAPAttachResp));
+
+EC(                 if (attach.IAR_partNumber)                              )
+EC(                    EC_ERROR(HTIMAP_ALREADY_HAS_BODY_PART_NUMBER);       )
+    
+                    attach.IAR_partNumber = str1;
+		    HTListAppend(r->ILR_attachmentList, (void*)&attach,
+				 sizeof(HTIMAPAttachResp));
+		}
+		break;
+	    case IMRD_BODY_FLD_OCTETS:
+		/* num1 is the body size */
+		{
+		    HTIMAPAttachResp attach;
+		    int count = HTListGetCount(r->ILR_attachmentList);
+EC(                 if (!count) EC_ERROR(HTIMAP_LIST_MUST_HAVE_BODY);       )
+                    
+                    HTListRemoveItem(r->ILR_attachmentList, count-1,
+				     (void*)&attach, sizeof(HTIMAPAttachResp));
+
+EC(                 if (attach.IAR_size)                                    ) 
+EC(                    EC_ERROR(HTIMAP_ALREADY_HAS_BODY_SIZE);              )
+    
+                    attach.IAR_size = num1;
+		    HTListAppend(r->ILR_attachmentList, (void*)&attach,
+				 sizeof(HTIMAPAttachResp));
+		}
+		break;
+	    case IMRD_FLD_PARAM:
+		/* str1 and str2 are (name,value) pairs */
+		/* we are interested in "name" & "charset" */
+		{
+		    HTIMAPAttachResp attach;
+		    char *p;
+		    int count;
+
+EC(                 if (!str1) EC_ERROR(HTIMAP_FLD_PARAM_EXPECTED);        )
+
+		    p = (char *) HTMemLock(str1);
+
+		    if (!strcasecmp(p, "name")) {
+			count = HTListGetCount(r->ILR_attachmentList);
+EC(		        if (!count) EC_ERROR(HTIMAP_LIST_MUST_HAVE_BODY);  )
+
+                        HTListRemoveItem(r->ILR_attachmentList, count-1, 
+				     (void*)&attach, sizeof(HTIMAPAttachResp));
+
+EC(                    if (attach.IAR_name)                                )
+EC(                        EC_ERROR(HTIMAP_ALREADY_HAS_NAME);              )
+
+                        attach.IAR_name = str2;      /* Consume str2 */
+			HTListAppend(r->ILR_attachmentList, (void*)&attach,
+				 sizeof(HTIMAPAttachResp));
+			HTMemUnlockAndFree(str1);
+
+		    } else if (!strcasecmp(p, "charset")) {
+			count = HTListGetCount(r->ILR_attachmentList);
+EC(		        if (!count) EC_ERROR(HTIMAP_LIST_MUST_HAVE_BODY);  )
+
+                        HTListRemoveItem(r->ILR_attachmentList, count-1, 
+				     (void*)&attach, sizeof(HTIMAPAttachResp));
+
+EC(                    if (attach.IAR_charset)                             )
+EC(                        EC_ERROR(HTIMAP_ALREADY_HAS_CHARSET);           )
+
+			attach.IAR_charset = str2;
+			HTListAppend(r->ILR_attachmentList, (void*)&attach,
+				     sizeof(HTIMAPAttachResp));
+			HTMemUnlockAndFree(str1);
+
+		    } else {
+			HTMemUnlock(str1);
+			IGNOREPARAMS;
+		    }
+		}
+		break;
+
+	    case IMRD_FLD_ENC:
+		/* str1 contains the encoding */
+		/* we convert str1 to HTIMAPEncoding */
+		{
+		    HTIMAPAttachResp attach;
+		    int count;
+
+EC(                 if (!str1) EC_ERROR(HTIMAP_ENCODING_EXPECTED);        )
+
+		    count = HTListGetCount(r->ILR_attachmentList);
+EC(                 if (!count) EC_ERROR(HTIMAP_LIST_MUST_HAVE_BODY);     )
+                  
+                    HTListRemoveItem(r->ILR_attachmentList, count-1,
+				     (void*)&attach, sizeof(HTIMAPAttachResp));
+		    attach.IAR_encoding = 
+			IMAPBinSearch((char*) HTMemLock(str1), 
+				      mimeEncodingWords,
+				      HTIMAP_ENCODING_LENGTH);
+		    HTListAppend(r->ILR_attachmentList, (void*)&attach,
+				 sizeof(HTIMAPAttachResp));
+		    HTMemUnlockAndFree(str1);
+		}
+		break;
+
+	    default:
+		IGNOREPARAMS;
+		EC_WARNING(HTIMAP_RESPONSE_IGNORED);
+		break;
+	    }
+	}
+	break;
+
+    case IMAPC_BODY:
+    case IMAPC_PBODY:
+	{
+	    /* I am not using HTIMAPBodyResp because it is a subset of
+	     * HTIMAPPBodyResp.
+	     */
+	    HTIMAPPBodyResp *r = (HTIMAPPBodyResp *) p->resp;
+	    HTIMAPRecipient recv;
+
+	    /* We get BODY and ENVEVOPE data. For BODY data, make sure we
+	     * check against the right bodyPart. Of the following, only
+		 * encoding is the BODY data, the rest are ENVELOPE.
+	     */
+	    switch (itype) {
+	    case IMRD_FLD_ENC:
+		/* str1 contains the encoding */
+		/* Encoding is a response data from BODY, so it must be checked
+		 * against the right bodyPart.
+		 */
+	    {
+		char *c;
+	    if (!r->IBR_partNumber) return;
+	    if (strcasecmpHTMemHandle(r->IBR_partNumber, 
+				      (char*) HTMemLock(p->bodyNumber))) {
+		HTMemUnlock(p->bodyNumber);
+		IGNOREPARAMS;
+		return;
+	    }
+	    HTMemUnlock(p->bodyNumber);
+
+		/* OK, encoding belongs to the body we requested */
+		c = (char *) HTMemLock(str1);
+	    p->strTarget = HTDecodeNew(c, p->strTarget);
+		p->retEncoding = IMAPBinSearch(c, 
+				      mimeEncodingWords,
+				      HTIMAP_ENCODING_LENGTH);
+		HTMemUnlockAndFree(str1);
+		break;
+		}
+	    case IMRD_SUBJECT:
+EC(             if (r->IBR_subject) EC_ERROR(HTIMAP_ALREADY_HAS_SUBJECT);    )
+		r->IBR_subject = DecodeMIMEMsgHdrX(str1);
+		break;
+	    case IMRD_DATE:
+EC(             if (r->IBR_date) EC_ERROR(HTIMAP_ALREADY_HAS_DATE);          )
+		r->IBR_date = str1;
+		break;
+	    case IMRD_TO:
+		/* We have already masked out Message/RFC822 envelope, so
+		 * no need to check for the right bodyPart.
+		 */
+		if (!r->IBR_recipientList) r->IBR_recipientList = HTListNew();
+		recv.IR_name = DecodeMIMEMsgHdrX(str1);
+		recv.IR_address = str2;
+		recv.IR_role = IMAPAR_TO;
+		HTListAppend(r->IBR_recipientList, (void*)&recv,
+			     sizeof(HTIMAPRecipient));
+		break;
+	    case IMRD_CC:
+		/* We have already masked out Message/RFC822 envelope  so
+		 * no need to check for the right bodyPart.
+		 */
+		if (!r->IBR_recipientList) r->IBR_recipientList = HTListNew();
+		recv.IR_name = DecodeMIMEMsgHdrX(str1);
+		recv.IR_address = str2;
+		recv.IR_role = IMAPAR_CC;
+		HTListAppend(r->IBR_recipientList, (void*)&recv,
+			     sizeof(HTIMAPRecipient));
+		break;
+	    case IMRD_BCC:
+		/* We have already masked out Message/RFC822 envelope  so
+		 * no need to check for the right bodyPart.
+		 */
+		if (!r->IBR_recipientList) r->IBR_recipientList = HTListNew();
+		recv.IR_name = DecodeMIMEMsgHdrX(str1);
+		recv.IR_address = str2;
+		recv.IR_role = IMAPAR_BCC;
+		HTListAppend(r->IBR_recipientList, (void*)&recv,
+			     sizeof(HTIMAPRecipient));
+		break;
+            case IMRD_BODY_STRING_LENGTH:
+                /* Only needed for partial body fetch. THIS WILL CORRUPT
+                 * memory if added to IMAPC_BODY as it does not have entry
+                 * IBR_length. See HTIMAPBodyResp in CInclude/WWW/htimap.goh.
+		 */
+                if (p->wanted == IMAPC_PBODY) r->IBR_length = num1;
+                break;
+	    default:
+		IGNOREPARAMS;
+		break;
+	    }
+	}
+	break;
+
+    case IMAPC_ATTACH:
+    case IMAPC_PATTACH:
+	{
+	    HTIMAPPAttachResp *r = (HTIMAPPAttachResp *) p->resp;
+
+	    /* We get BODY response. So make sure get we check against the
+		 * right bodyPart. 
+	     */
+	    
+	    /* Response data NOT specific to a bodyPart */
+	    if (itype == IMRD_BODY_STRING_LENGTH &&
+		p->wanted == IMAPC_PATTACH) {
+		r->IAR_length = num1;
+	    }
+
+	    /* All the following response data are from BODY,
+	     * therefore must first match the bodyPart.
+	     */
+	    if (!r->IAR_partNumber) return;
+	    if (strcasecmpHTMemHandle(r->IAR_partNumber, 
+				      (char*) HTMemLock(p->bodyNumber))) {
+		HTMemUnlock(p->bodyNumber);
+		IGNOREPARAMS;
+		return;
+	    }
+	    HTMemUnlock(p->bodyNumber);
+
+	    switch (itype) {
+	    case IMRD_BODY_FLD_OCTETS:
+		{
+EC(                 if (r->IAR_size)                                        ) 
+EC(                    EC_ERROR(HTIMAP_ALREADY_HAS_BODY_SIZE);              )
+                    r->IAR_size = num1;
+                }
+		break;
+	    case IMRD_CONTENT_TYPE:
+		/* str1 = type & str2 = subtype */
+		{
+EC(                 if (!str1 || !str2)                                     )
+EC(                    EC_ERROR(HTIMAP_CONTENT_TYPE_EXPECTED);              )
+EC(                 if (r->IAR_contentType)                                 )
+EC(                    EC_ERROR(HTIMAP_ALREADY_HAS_CONTENT_TYPE);           )
+                    str1 = HTStrAllocCat(str1, "/");
+                    r->IAR_contentType = HTStrAllocCat(str1, 
+					      (char *)HTMemLock(str2));
+		    HTMemUnlockAndFree(str2);
+		}
+		break;
+	    case IMRD_FLD_PARAM:
+		/* str1 and str2 are the (name, value) pair */
+		/* we want "name" and "charset" */
+	        {
+		    char *p;
+EC(                 if (!str1) EC_ERROR(HTIMAP_FLD_PARAM_EXPECTED);        )
+
+		    p = (char *) HTMemLock(str1);
+
+		    if (!strcasecmp(p, "name")) {
+EC(                    if (r->IAR_name)                                    )
+EC(                        EC_ERROR(HTIMAP_ALREADY_HAS_NAME);              )
+
+                        r->IAR_name = str2;      /* Consume str2 */
+			HTMemUnlockAndFree(str1);
+
+		    } else if (!strcasecmp(p, "charset")) {
+EC(                    if (r->IAR_charset)                                 )
+EC(                        EC_ERROR(HTIMAP_ALREADY_HAS_CHARSET);           )
+
+			r->IAR_charset = str2;
+			HTMemUnlockAndFree(str1);
+
+		    } else {
+			HTMemUnlock(str1);
+			IGNOREPARAMS;
+		    }
+                }
+		break;
+	    case IMRD_FLD_ENC:
+		/* str1 contains the encoding */
+		{
+		char *c;
+EC(             if (!str1) EC_ERROR(HTIMAP_ENCODING_EXPECTED);             )
+		c = (char*) HTMemLock(str1);
+             	r->IAR_encoding = IMAPBinSearch(c, 
+					       mimeEncodingWords,
+					       HTIMAP_ENCODING_LENGTH);
+		p->strTarget = HTDecodeNew(c, p->strTarget);
+		p->retEncoding = r->IAR_encoding;
+		HTMemUnlockAndFree(str1);
+		}
+		break;
+	    default:
+		IGNOREPARAMS;
+		break;
+	    }
+	}
+	break;
+
+    case IMAPC_DELETE:
+    case IMAPC_LOGOUT:
+	/* Nothing to push to client */
+    case IMAPC_IGNORE:
+	/* IGNORE: Use to filter our fields that we don't want to handle */
+	IGNOREPARAMS;
+	break;
+
+    default:
+	EC_ERROR(HTIMAP_REQUEST_NOT_SUPPORTED);
+	break;
+    }
+}	/* End of RespAdd.	*/
+
+
+
+/***********************************************************************
+ *		RespNewBody
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Add a new body to a response. The current request type
+ *              p->wanted must be IMAPC_LIST to add a body.
+ * CALLED BY:	Parser.
+ * RETURN:	
+ *	
+ * STRATEGY:	A new body is added to p->resp.
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	kkee    	6/ 6/97   	Initial Revision
+ *	
+ ***********************************************************************/
+void _pascal
+RespNewBody (IMAPParser *p)
+{
+    HTIMAPListResp *r;
+    HTIMAPAttachResp a = {0,0,0,0,0,IE_NOTSET};
+
+EC( if (p->wanted != IMAPC_LIST) EC_WARNING(HTIMAP_ADD_BODY_NOT_ALLOWED); )
+    if (p->wanted != IMAPC_LIST) return;
+    
+    r = (HTIMAPListResp *) p->resp;
+    if (!r->ILR_attachmentList) r->ILR_attachmentList = HTListNew();
+    HTListAppend(r->ILR_attachmentList, (void*)&a, 
+		 sizeof(HTIMAPAttachResp));
+}	/* End of RespNewBody.	*/
+
+
+
+
+/***********************************************************************
+ *		RespPush
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Push data to client.
+ * CALLED BY:	Parse.
+ * RETURN:	Return code from pushing data to client.
+ *	
+ * STRATEGY:	
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	kkee    	6/ 3/97   	Initial Revision
+ *	
+ ***********************************************************************/
+int _pascal
+RespPush (IMAPParser *p, HTIMAPState cmd)
+{
+    int ret = HT_OK;
+    switch (p->wanted) {
+    case IMAPC_LOGON:
+	/* Last command in the logon sequence */
+	if (cmd == HTIMAP_SELECT)
+	    ret = PUTBLOCK(p->target, (byte*)p->resp, sizeof(HTIMAPLogonResp));
+	break;
+
+    case IMAPC_LIST:
+	/* 
+	 * We push one list item at a time, and then we delete
+	 * and reuse the same structure.
+	 */
+	if (cmd == HTIMAP_FETCH) {
+	    ret = PUTBLOCK(p->target, (byte*)p->resp, sizeof(HTIMAPListResp));
+	    RespDelete(p);  /* Reuse resp structure */
+	}
+	break;
+
+    case IMAPC_ATTACH:
+	/* Last command in the get attachment sequence */
+	if (cmd == HTIMAP_ATTACH_REQUEST) {
+		if (p->strTarget) @call p->strTarget::MSG_HT_STREAM_FLUSH();
+	    ret = PUTBLOCK(p->target, (byte*)p->resp, sizeof(HTIMAPAttachResp));
+	}
+	break;
+
+    case IMAPC_BODY:
+	/* Last command in the get body sequence */
+	if (cmd == HTIMAP_BODY_REQUEST)  {
+		if (p->strTarget) @call p->strTarget::MSG_HT_STREAM_FLUSH();
+	    ret = PUTBLOCK(p->target, (byte*)p->resp, sizeof(HTIMAPBodyResp));
+	}
+	break;
+
+    case IMAPC_PBODY:
+	/* Last command in the get partial body sequence */
+	if (cmd == HTIMAP_PBODY_REQUEST2)  {
+		if (p->strTarget) @call p->strTarget::MSG_HT_STREAM_FLUSH();
+	    ret = PUTBLOCK(p->target, (byte*)p->resp, sizeof(HTIMAPPBodyResp));
+	}
+	break;
+
+    case IMAPC_PATTACH:
+	/* Last command in the get partial attachment sequence */
+	if (cmd == HTIMAP_PBODY_REQUEST2)  {
+		if (p->strTarget) @call p->strTarget::MSG_HT_STREAM_FLUSH();
+	    ret = PUTBLOCK(p->target, (byte*)p->resp, 
+			   sizeof(HTIMAPPAttachResp));
+	}
+	break;
+
+    case IMAPC_DELETE:
+	/* Last command in delete is HTIMAP_EXPUNGE */
+	if (cmd == HTIMAP_EXPUNGE) 
+	    ret = PUTBLOCK(p->target, 0, 0);
+	break;
+
+    case IMAPC_LOGOUT:
+	/* Both delete and logout require an empty response */
+	ret = PUTBLOCK(p->target, 0, 0);
+	break;
+
+    default:
+	EC_ERROR(HTIMAP_REQUEST_NOT_SUPPORTED);
+	return HT_ERROR;
+    }
+    return ret;
+}	/* End of RespPush.	*/
+
+
+
+/***********************************************************************
+ *		RespDelete
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Delete the data items in a response data structure. The
+ *              deleted items should be set to zero as we do not free
+ *              response here. The response data structure will be reused.
+ * CALLED BY:	HTIMAP::MSG_HT_STREAM_ABORT or anytime we need to reuse
+ *              the response data structure.
+ * RETURN:	Nothing
+ *	
+ * STRATEGY:	
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	kkee    	5/26/97   	Initial Revision
+ *	
+ ***********************************************************************/
+void _pascal
+RespDelete (IMAPParser *p)
+{
+    switch (p->wanted) {
+    case IMAPC_LOGON:
+	{
+	    HTIMAPLogonResp *r = (HTIMAPLogonResp *) p->resp;
+	    if (r->ILR_uidValidity) HTMemFree(r->ILR_uidValidity);
+	}
+	break;
+    case IMAPC_LIST:
+	{
+	    int count, i;
+	    char *b;
+	    HTIMAPListResp *r = (HTIMAPListResp *) p->resp;
+	    /* 
+	     * After deleting a field, must be set to 0 as the structure
+	     * will be reused.
+	     */
+	    r->ILR_totalSize = 0;
+	    if (r->ILR_senderName) {
+		HTMemFree(r->ILR_senderName);
+		r->ILR_senderName = 0;
+	    }
+	    if (r->ILR_senderEmail) {
+		HTMemFree(r->ILR_senderEmail);
+		r->ILR_senderEmail = 0;
+	    }
+	    if (r->ILR_subject) {
+		HTMemFree(r->ILR_subject);
+		r->ILR_subject = 0;
+	    }
+	    if (r->ILR_attachmentList) {
+		HTIMAPAttachResp attach;
+		count = HTListGetCount(r->ILR_attachmentList);
+		for (i= 0; i<count; i++) {
+		    HTListRemoveItem(r->ILR_attachmentList, 0,
+				     (void*)&attach, sizeof(HTIMAPAttachResp));
+		    if (attach.IAR_name) HTMemFree(attach.IAR_name);
+		    if (attach.IAR_partNumber) HTMemFree(attach.IAR_partNumber);
+		    if (attach.IAR_contentType) 
+			HTMemFree(attach.IAR_contentType);
+		    if (attach.IAR_charset) HTMemFree(attach.IAR_charset);
+		}
+		HTListDelete(r->ILR_attachmentList);
+		r->ILR_attachmentList = 0;
+	    }
+	    if (r->ILR_date) {
+		HTMemFree(r->ILR_date);
+		r->ILR_date = 0;
+	    }
+	    if (r->ILR_uid) {
+		HTMemFree(r->ILR_uid);
+		r->ILR_uid = 0;
+	    }
+	    r->ILR_flags = 0;
+	    /* Reset body tracking number, don't delete as it will be reused */
+	    b = (char *)HTMemLock(p->bodyNumber);
+	    *b = 0;
+	    HTMemUnlock(p->bodyNumber);
+	}
+	break;
+    case IMAPC_ATTACH:
+    case IMAPC_PATTACH:
+	{
+	    /* Deleted items must be NULLed to be avoid being deleted twice 
+	     * when we get MSG_HT_STREAM_ABORT. Note that only those items
+	     * common to both HTIMAPAttachResp and HTIMAPPAttachResp are 
+	     * deleted.
+	     */
+	    HTIMAPAttachResp *r = (HTIMAPAttachResp *) p->resp;
+	    if (r->IAR_partNumber) {
+		HTMemFree(r->IAR_partNumber);
+		r->IAR_partNumber = 0;
+	    }
+	    if (r->IAR_name) {
+		HTMemFree(r->IAR_name);
+		r->IAR_name = 0;
+	    }
+	    if (r->IAR_contentType) {
+		HTMemFree(r->IAR_contentType);
+		r->IAR_contentType = 0;
+	    }
+	    if (r->IAR_charset) {
+		HTMemFree(r->IAR_charset);
+		r->IAR_charset = 0;
+	    }
+	}
+	break;
+    case IMAPC_BODY:
+    case IMAPC_PBODY:
+	{
+	    /* Deleted items must be NULLed to be avoid being deleted twice 
+	     * when we get MSG_HT_STREAM_ABORT. Note that only those items
+	     * in common to both HTIMAPBodyResp anre HTIMAPPBodyResp are 
+	     * deleted.
+	     */
+	    HTIMAPBodyResp *r = (HTIMAPBodyResp *) p->resp;
+		if (r->IBR_partNumber) {
+		HTMemFree(r->IBR_partNumber);
+		r->IBR_partNumber = 0;
+	    }
+	    if (r->IBR_recipientList) {
+		int count, i;
+		HTIMAPRecipient recv;
+		count = HTListGetCount(r->IBR_recipientList);
+		for (i=0; i<count; i++) {
+		    HTListRemoveItem(r->IBR_recipientList, 0, 
+				     (void*)&recv, sizeof(HTIMAPRecipient));
+		    if (recv.IR_name) HTMemFree(recv.IR_name);
+		    if (recv.IR_address) HTMemFree(recv.IR_address);
+		}
+		HTListDelete(r->IBR_recipientList);
+		r->IBR_recipientList = 0;
+	    }
+	    if (r->IBR_subject) {
+		HTMemFree(r->IBR_subject);
+		r->IBR_subject = 0;
+	    }
+	    if (r->IBR_date) {
+		HTMemFree(r->IBR_date);
+		r->IBR_date = 0;
+	    }
+	}
+	break;
+    case IMAPC_DELETE:
+    case IMAPC_LOGOUT:
+    case IMAPC_IGNORE:
+	/* Currently, nothing to delete */
+	break;
+    default:
+	EC_ERROR(HTIMAP_REQUEST_NOT_SUPPORTED);
+    }
+}	/* End of RespDelete.	*/
+

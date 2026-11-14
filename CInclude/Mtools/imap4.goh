@@ -1,0 +1,193 @@
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Geoworks 1997.  All rights reserved.
+	GEOWORKS CONFIDENTIAL
+
+PROJECT:	
+MODULE:		
+FILE:		imap4.goh
+
+AUTHOR:		Kok Kin Kee, Mar 12, 1997
+
+ROUTINES:
+	Name			Description
+	----			-----------
+
+REVISION HISTORY:
+	Name		Date		Description
+	----		----		-----------
+	kkee    	3/12/97   	Initial version.
+
+DESCRIPTION:
+
+	
+
+	$Id: imap4.goh,v 1.1 97/04/04 15:56:06 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+/***********************************************************************
+ *
+ *      Copyright (c) STNC Enterprises Ltd. 1996 -- All Rights Reserved
+ *
+ * PROJECT:    Tungsten
+ * MODULE:     IMAP4 header.
+ * FILE:       IMAP4.GOH
+ *
+ * AUTHOR:  Bill Godfrey, <bgodfrey@stnc.com>
+ *
+ ***********************************************************************/
+
+
+#ifndef INCLUDED_IMAP_GOH
+#define INCLUDED_IMAP_GOH
+
+@include <mtools/ifile.goh>
+@include <mtools/message.goh>
+@include <socket.goh>
+#include <ansi/stdio.h>
+@include <mtools/mterror.goh>
+@include <mtools/memutils.goh>
+
+#define TAG_LENGTH 6         /* five tag characters + '\0' */
+
+	/* Identifies the various types of atom. */
+typedef enum {
+	I4AT_ATOM,			/* atomdata is char*  */
+	I4AT_NUMBER,		/* atomdata is long*  */
+	I4AT_STRING_MEM,	/* OBSOLETE. Use I4AT_ATOM  */
+	I4AT_STRING_FILE,	/* atomdata is NULL. use data from parent resp.  */
+	I4AT_PLIST_BEGIN,	/* atomdata is I4Atom*, pointing to the equivilient PLIST_END  */
+	I4AT_PLIST_END,	/* atomdata is NULL  */
+	I4AT_NIL,			/* atomdata is NULL  */
+	I4AT_OK  			/* atomdata is char* OK/BAD/NO response */
+} I4AtomType;
+
+	/* I4RespState - Current status in reading in a response. */
+typedef enum {
+	I4RS_NORMAL,				/* All is well. Nothing doing. */
+	I4RS_WAIT_LIT_STRING,	/* Waiting for part of a literal string {xxx} */
+	I4RS_WAIT_ATOMS,			/* Waiting for a normal response line, conatining atoms. */
+	I4RS_FULL					/* Finished. */
+} I4RespState;
+
+			/* Obsolete. Use MailMessage struct */
+
+	/* I4StringNode - A part of a string (literal or quoted) */
+struct I4StringNode {
+	char *sline;				/* String line. (malloc'd) */
+	struct I4StringNode *next;		/* next in list. */
+};
+typedef struct I4StringNode I4StringNode;
+
+	/* I4String - A quoted or literal string. */
+typedef struct {
+	long int length;	/* String length, as quoted in { and } or zero for "quoted" strings */
+	I4StringNode *head;	/* First in list. */
+} I4String;
+
+			/* End obsolete. */
+
+	/* I4Atom - An Atom in a response list. */
+struct I4Atom {
+	I4AtomType atype;			/* Atom type. */
+
+//	void* atomdata;		   /* malloc'd pointer to atom data of type specified by atype */
+
+	union {
+		HTHANDLE atom;			// I4AT_ATOM    char
+		long number;		   // I4AT_NUMBER
+		I4String *string;	   // I4AT_STRING_MEM
+		HTHANDLE ok;			// I4AT_OK      char
+	} atom;
+
+	HTHANDLE next;   		/* Next in list. I4Atom */
+};
+typedef struct I4Atom I4Atom;
+#define ht_I4Atom(h) ((I4Atom*)ht_lock(h))
+
+	/* I4Resp - A response stricture. */
+typedef struct {
+	I4RespState state;		/* Current status. */
+	HTHANDLE head;				/* First in atom list. I4Atom */
+	HTHANDLE prev;				/* Last in atom list. Only used during a broken GetResp. I4Atom */
+	char tag[TAG_LENGTH];	/* Response tag. (tag or "*") */
+
+	/*char *outfname;			 File for output, if applicable. */
+	/*FILE *outf;				 While literal string output is in process... */
+
+	MailMessage *msg;			/* Message Output. */
+
+	I4StringNode *SNprev;	/* Last line in current Literal String beuing loaded into memory. head is prev->atomdata->head */
+
+	long int litstrlen;		/* Length of literal string. number between {..} */
+	long int litstrin;		/* Number of octets actually loaded. */
+} I4Resp;
+#define ht_I4Resp(h) ((I4Resp*)ht_lock(h))
+
+	/* I4OpenState - The status of the open routine. */
+typedef enum {
+	I4OS_NORMAL,				/* About to start. */
+	I4OS_WAIT_OPEN_RESP,		/* Waiting for the first opening response. */
+	I4OS_WAIT_LOGIN_RESP,	/* Waiting for the response to the LOGIN command. */
+	I4OS_FULL               /* Full. */
+} I4OpenState;
+
+	/* I4Open - Information required by IMAP4_Open should it timeout. */
+typedef struct {
+	Socket i;
+	I4OpenState s;
+
+	I4Resp resp;
+
+	char tag[TAG_LENGTH];
+} I4Open;
+#define ht_I4Open(h) ((I4Open*)ht_lock(h))
+
+	/* Error code, used by IMAP4_Open only. */
+extern I4Error f_i4ECode(void);
+#define i4ECode f_i4ECode()
+
+	/* Starts the open process. */
+extern void IMAP4_InitOpen(I4Open *os);
+
+	/* Opens an IMAP session.
+			host - Name of server.
+			user - User name.
+			pass - Password.
+			ostate - Structure initialised by IMAP4_InitOpen.
+		Returns socket handle or zero for error.	*/
+extern Socket IMAP4_Open(char *host, char *user, char *pass, I4Open *ostate);
+
+	/* Generates a tag string, which it will place in the buffer - tag, which must have TAG_LENGTH
+			charcaters allocated. Sends the tag, followed by the command and a crlf pair down the
+			socket. */
+extern I4Error IMAP4_SendCommand(Socket i, char *cmd, char *tag);
+
+	/* As IMAP4_SendCommand, but after the command has been sent, the size of the message is
+			calculated and sent in ascii form between { and } brackets, followed by a CRLF.
+			The Message is then sent down the socket, including any attachments. */
+extern I4Error IMAP4_SendCommandWithMessage(Socket i, char *cmd, char *tag, MailMessage *m);
+
+	/* Initialise a response structure. */
+extern void IMAP4_InitResp(I4Resp *resp);
+
+	/* Initialise a response structure, but place any literal strings into the Message structure
+			instead of the internal linked list. */
+extern I4Error IMAP4_InitRespForMessage(I4Resp *resp, MailMessage *m);
+
+	/* Gets a response from the server. */
+extern I4Error IMAP4_GetResp(Socket i, I4Resp *resp, char *tagifshort);
+
+	/* Search list for specified atom, and then count backwards or forwards and return that atom. */
+extern HTHANDLE IMAP4_FindAtom(I4Resp *resp, char *atomkey, short pos);
+
+	/* Frees any resources used by a response structure. */
+extern I4Error IMAP4_DelResp(I4Resp *resp);
+
+	/* Sends EXPUNGE and LOGOUT commands before closing the socket. If there are errors or
+				excesive delays, iclose must be used instead. */
+extern I4Error IMAP4_Close(Socket i);
+
+#endif
+
+

@@ -1,0 +1,233 @@
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Geoworks 1996.  All rights reserved.
+	GEOWORKS CONFIDENTIAL
+
+PROJECT:	Geos WWW Library
+MODULE:		htassoc
+FILE:		htassoc.goc
+
+AUTHOR:		Kok Kin Kee, Nov 29, 1996
+
+ROUTINES:
+	Name			Description
+	----			-----------
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	kkee	11/29/96   	Initial version.
+
+DESCRIPTION:
+
+	Association lists. Lookups are case insensitive.
+
+	Note that many of the routines here
+
+	$Id: htassoc.goc,v 1.1 97/04/07 11:48:19 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+
+@include <WWW/HTCore/htassoc.goh>
+@include <WWW/HTCore/htstring.goh>
+#include <WWW/htmem.h>
+#include <Ansi/string.h>
+
+
+/***********************************************************************
+ *		HTASSOCLISTNEW
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Create a new associative list.
+ * CALLED BY:	Client
+ * RETURN:	HTAssocList.
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	kkee	11/29/96   	Initial Revision
+ *
+ ***********************************************************************/
+HTAssocList _far _pascal
+HTASSOCLISTNEW (void)
+{
+    return HTListNew();
+}	/* End of HTASSOCLISTNEW.	*/
+
+
+
+
+/***********************************************************************
+ *		HTASSOCLISTDELETE
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Delete an associative list.
+ * CALLED BY:	Client
+ * RETURN:	Nothing
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	kkee	11/29/96   	Initial Revision
+ *
+ ***********************************************************************/
+void _far _pascal
+HTASSOCLISTDELETE (HTAssocList alist)
+{
+    if (alist) {
+	int i,count,size;
+	HTAssoc assoc;
+	
+	count = HTListGetCount(alist);
+	size = sizeof(HTAssoc);
+	
+	for (i=0; i<count; i++) {
+	    HTListRemoveItem(alist, 0, (void *)&assoc, size);
+	    if (assoc.HTA_name) HTMemFree(assoc.HTA_name);
+	    if (assoc.HTA_value) HTMemFree(assoc.HTA_value);
+	}
+	
+	HTListDelete(alist);
+    }
+}	/* End of HTASSOCLISTDELETE.	*/
+
+
+
+
+
+/***********************************************************************
+ *		HTASSOCLISTADD
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Add an associative to list.
+ * CALLED BY:	Client
+ * PASS:        name and client. These are consumed by this routine and
+ *                 must *NOT* be deleted by caller.
+ *                 name must be valid but value is optional.
+ *
+ * RETURN:	TRUE if added, else FALSE.
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	kkee	11/29/96   	Initial Revision
+ *
+ ***********************************************************************/
+Boolean _far _pascal
+HTASSOCLISTADD (HTAssocList alist, HTMemHandle name, HTMemHandle value)
+{
+    HTAssoc assoc;
+
+    if (!name) return FALSE;                /* Must have a name, though
+					       value is optional */
+    if (alist) {
+	assoc.HTA_name = name;
+	assoc.HTA_value = value;
+	HTListAppend(alist, &assoc, sizeof(HTAssoc));
+	return TRUE;
+    }
+
+    return FALSE;
+}	/* End of HTASSOCLISTADD.	*/
+
+
+
+
+
+/***********************************************************************
+ *		HTASSOCLISTLOOKUP
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Lookup the value of a name. Name comparison in lookup
+ *              is case insensitive.
+ *
+ * CALLED BY:	Client.
+ * RETURN:	HTMemHandle of value (which caller must *NOT* delete), 
+ *              else NULL.
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	kkee	12/ 5/96   	Initial Revision
+ *
+ ***********************************************************************/
+HTMemHandle _far _pascal
+HTASSOCLISTLOOKUP (HTAssocList alist, HTMemHandle name)
+{
+    HTMemHandle ret;
+    char *n;
+
+    if (!name) return NULL;
+
+    n = (char *) HTMemLock(name);
+    ret = HTAssocListLookupPtr(alist, n);
+    HTMemUnlock(name);
+
+    return ret;
+}	/* End of HTASSOCLISTLOOKUP.	*/
+
+
+
+
+
+/***********************************************************************
+ *		HTASSOCLISTLOOKUPPTR
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Same as HTAssocListLookup but pass a character pointer.
+ * CALLED BY:	Client.
+ * RETURN:	HTMemHandle (which client must *NOT* delete) or NULL.
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	kkee	12/ 5/96   	Initial Revision
+ *
+ ***********************************************************************/
+HTMemHandle _far _pascal
+HTASSOCLISTLOOKUPPTR (HTAssocList alist, const char *name)
+{
+    HTMemHandle ret = NULL;
+
+    if (!name) return NULL;
+
+    if (alist) { 
+	HTAssoc assoc;
+	char *p;
+	int i, count, size;
+	
+	count = HTListGetCount(alist);
+	size = sizeof(HTAssoc);
+
+	for (i=0; i<count; i++) {
+
+	    HTListGetItem(alist, i, &assoc, size);
+	    p = (char *) HTMemLock(assoc.HTA_name);
+
+	    if (!strncasecmp(p, name, strlen(name)))
+		ret = assoc.HTA_value;
+
+	    HTMemUnlock(assoc.HTA_name);
+	    if (ret) break;
+	}
+
+    }
+
+    return ret;
+}	/* End of HTASSOCLISTLOOKUPPTR.	*/

@@ -1,0 +1,550 @@
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Geoworks 1996.  All rights reserved.
+	GEOWORKS CONFIDENTIAL
+
+PROJECT:	Penelope Information Services
+MODULE:		
+FILE:		infoServProcApp.goc
+
+AUTHOR:		Mingzhe Zhu, Sep 11, 1996
+
+ROUTINES:
+	Name			Description
+	----			-----------
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	mzhu	9/11/96   	Initial version.
+
+DESCRIPTION:
+
+	This file has all the code for the process object and the application
+	object, and some other functions.
+
+	$Id: bProc.goc,v 1.1 97/04/04 17:20:37 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+@include "bConst.goh"
+@include "bUI.goh"
+@include "htfatals.goh"
+#include <initfile.h>
+
+/* WWW Library */
+
+@include <WWW/htcore.goh>
+@include <WWW/http.goh>
+@include <WWW/htmlp.goh>
+
+@include "htCbf.goh"
+@include "htdirect.goh"
+@include "reqList.goh"
+
+@include "plain.goh"
+@include "html.goh"
+
+@include <WWW/pmanager.goh>
+@include <WWW/uigenera.goh>
+
+#if ERROR_CHECK
+FatalErrors geoBrowserFatalErrors;
+Warnings geoBrowserWarnings;
+#endif
+
+/* The proxy server's name/IP, port number. */
+static char proxyName[20] = ""; /* = "192.168.70.1";	/* geoworks' proxy server */
+static word proxyPort = 80;			/* default HTTP port number */
+/* The access point for socket. */
+static word accessPoint = 1;			
+
+static HTListHandle afterCbfList = NULL;
+static HTListHandle requestCbfList = NULL;
+static HTListHandle protocolList = NULL;
+
+static HTPolicyContentCallback contentCbf = &GBDirectorContentCallback;
+static ClassStruct *htmlpClassName = &HTMLPClass;
+
+@classdecl	ISProcessClass, neverSaved;
+
+SReqList sRequestList;
+SemaphoreHandle sRequestEmpty;
+Boolean		IsBusy;
+
+GStateHandle CreateLMemGString (optr *);
+
+
+/***********************************************************************
+ *		ISSetWindowMoniker
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Set the application moniker to use the given strings.
+ * CALLED BY:	Whenever the window title need to change.
+ * PARAMETERS: 	void (char *title, char *url)
+ * RETURN:	nothing
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:	If *url == NULL, just display title only.
+ * 		Otherwise, divides the title bar to two parts, the first
+ *		part to display the title, and the second one to display the
+ *		url. If they are too long to display, for the title, cuts 
+ *		end, for the url, cuts the middle.
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	mzhu	9/ 5/96   	Initial Revision
+ *
+ ***********************************************************************/
+void
+ISSetWindowMoniker (char *title, char *url)
+{
+    GStateHandle	gstate;
+    optr		gstring;
+    char 		tmp_str[MAX_TITLE_LEN+1];
+    char 		tmp_url1[MAX_TITLE_LEN/2+1];
+    char 		tmp_url2[MAX_TITLE_LEN/2+1];
+    int 		end_title, i, j;
+    int			tmp_len;
+
+    /* Create a GString and a GState to write the logo, title, and url.*/
+    gstate = CreateLMemGString(&gstring);
+    
+    if(*url) {
+ 	/* Check if the title is too long when there is url.*/
+	if(GrTextWidth(gstate, title, strlen(title)) + TEXT_START
+		> TITLE_LT_URL_START ) {
+	    strncpy(tmp_str, title, NUM_TEXT_GUESS);
+	    tmp_str[NUM_TEXT_GUESS] = 0;
+	    tmp_len = GrTextWidth(gstate, tmp_str, NUM_TEXT_GUESS) + TEXT_START;
+
+	    /* Find a right position to cut the string. */
+	    for(i=NUM_TEXT_GUESS; i<strlen(title); i++) {
+		tmp_len += GrTextWidth(gstate, title+i, 1);
+		if(tmp_len >= TITLE_LT_URL_START - 20) break;
+	 	tmp_str[i] = *(title+i);
+	    }
+	    tmp_str[i] = 0;
+	    strcat(tmp_str, "...");
+	    end_title = TITLE_LT_URL_START;
+	} else {
+	    strcpy(tmp_str, title);
+	    end_title = max(TITLE_ST_URL_START, 
+			GrTextWidth(gstate, tmp_str, strlen(tmp_str))
+			+ TEXT_START + 10);
+	}
+
+	/* Check if the url is too long. */
+	if(GrTextWidth(gstate, url, strlen(url)) + end_title 
+		> TITLE_BAR_LEN) {
+	    j = -1;
+	   
+ 	    /* Keeps the important part in the end. */
+	    for(i=strlen(url)-1; i>=strlen(url)-15; i--) {
+		j++;
+		tmp_url2[j] = *(url+i);
+		if(j && tmp_url2[j] == '/') break;
+	    }
+	    tmp_url2[j+1] = 0;
+	    strcat(tmp_url2, "...");
+
+	    tmp_len = end_title + GrTextWidth(gstate, tmp_url2, j+4);
+
+	    j = min(i-2, NUM_TEXT_GUESS);
+	    strncpy(tmp_url1, url, j);
+	    tmp_url1[j] = 0;
+
+	    /* Find the first part from the beginning. */
+	    if(GrTextWidth(gstate, tmp_url1, j) + tmp_len >= TITLE_BAR_LEN){
+		strncpy(tmp_url1, url, 4);
+		tmp_url1[4] = 0;
+		tmp_len += GrTextWidth(gstate, tmp_url1, 4);
+		for(i=4; i<=j; i++) {
+		    tmp_len += GrTextWidth(gstate, url+i, 1);
+		    if(tmp_len >= TITLE_BAR_LEN) break;
+		    tmp_url1[i] = *(url+i);
+	        }
+		tmp_url1[i] = 0;
+	    }
+	
+	    j = strlen(tmp_url1);
+	    for(i=strlen(tmp_url2)-1; i>=0; i--) {
+		tmp_url1[j] = tmp_url2[i];
+		j++;
+	    }
+	    tmp_url1[j] = 0;
+
+	    strcat(tmp_str, " -- ");
+	    strcat(tmp_str, tmp_url1);
+	} else {
+	    strcat(tmp_str, " -- ");
+	    strcat(tmp_str, url);
+	}
+
+    } else 
+	strcpy(tmp_str, title);
+
+    /* Close the gstring. */
+    GrDestroyGString(gstate, 0, GSKT_LEAVE_DATA);
+
+    /* Send to the genprimary to put in the title bar. */
+/*    @call ISPrimary::MSG_GEN_REPLACE_VIS_MONIKER
+	(VUM_DELAYED_VIA_APP_QUEUE, 0, 0, sizeof(gstring),
+	 VMDT_GSTRING, VMST_OPTR, (dword)gstring );*/
+
+    @call ISPrimary::MSG_GEN_REPLACE_VIS_MONIKER_TEXT(tmp_str, 
+			VUM_DELAYED_VIA_APP_QUEUE);
+
+    MemFree(HandleOf(gstring));
+    
+}	/* End of ISSetWindowMoniker.	*/
+
+
+
+/***********************************************************************
+ *		CreateLMemGString
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Create an LMeme-block-based grahpics string ready 
+ *		for filling by the caller.
+ * CALLED BY:	
+ * RETURN:	gstate through which to draw, plus optr of the storage
+ *		for the graphics string.
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	mzhu	9/ 4/96   	Initial Revision
+ *
+ ***********************************************************************/
+GStateHandle
+CreateLMemGString (optr *storagePtr)
+{
+    MemHandle		newBlock;
+    ChunkHandle		newChunk;
+    GStateHandle 	gstate;
+
+    newBlock = MemAllocLMem(LMEM_TYPE_GENERAL, sizeof(LMemBlockHeader));
+    gstate = GrCreateGString(newBlock, GST_CHUNK, &newChunk);
+    *storagePtr = ConstructOptr(newBlock, newChunk);
+ 
+    return(gstate);
+}	/* End of CreateLMemGString.	*/
+
+
+
+/***********************************************************************
+ *		MSG_GEN_PROCESS_OPEN_APPLICATION for ISProcessClass
+ ***********************************************************************
+ * SYNOPSIS:	To initilize the bookmarks when launching the application. 
+ * PARAMETERS	:	    
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:	Just calls MSG_ISB_INITIALIZE.
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	MZ	8/24/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method ISProcessClass, MSG_GEN_PROCESS_OPEN_APPLICATION
+{
+    GeodeHandle myGeodeHandle;
+    ThreadHandle contentThread;
+    word	size;
+
+    @callsuper();
+
+    InitFileReadStringBuffer("infoServ", "proxyName", 
+				(char *)proxyName, 
+				/* IFRF_READ_ALL | IFRF_CHAR_CONVERT | */
+				20, &size);
+    InitFileReadInteger("infoServ", "proxyPort", &proxyPort);
+    InitFileReadInteger("infoServ", "accessPoint", &accessPoint);
+
+    /* Adds the WWW stuff. */
+    myGeodeHandle = GeodeGetProcessHandle();
+  
+    /* Initializes the WWW library. */
+    HTRegister(myGeodeHandle, accessPoint); 
+
+    /* Registers the policy manager */
+    HTPolicyAddClient(myGeodeHandle, contentCbf); 
+
+    /* Registers the protocol handlers. */
+    protocolList = HTListNew();
+    HTPolicyAddProtocolHandler(protocolList, HTStringFor("http"),
+				&HTTPClass); 
+  
+    /* Registers "after" callback functions. */
+    afterCbfList = HTListNew();
+    HTNetAddAfterCallback(afterCbfList, GBTerminateRequest, HT_ALL);
+
+    /* Register "request" callback function.*/
+    requestCbfList = HTListNew();
+    HTNetAddRequestCallback(requestCbfList, GBRequestCallback,
+			HT_ALL); 
+    
+    /* Create a content thread  for the director. */
+    @call self::MSG_PROCESS_CREATE_EVENT_THREAD(&contentThread,
+						&ProcessClass, 1024);
+
+    if(contentThread) 
+	GBDirectorInitialize(contentThread);
+ 
+    GBDirectorAddContent(HT_CONTENT_TYPE_TEXT_XGW_HTML, 
+			 HT_CONTENT_TYPE_TEXT_XGWP_HTML,
+			 htmlpClassName);
+
+    GBDirectorAddContent(HT_CONTENT_TYPE_TEXT_XGWP_HTML, 
+			 HT_CONTENT_TYPE_STAR_STAR,
+			 &HTMLClass);
+
+    GBDirectorAddContent(HT_CONTENT_TYPE_TEXT_PLAIN, 
+			 HT_CONTENT_TYPE_STAR_STAR,
+			 &HTPlainClass);
+
+    /* Inform callbacks the process so that they can send messages. */
+    GBSetProcessHandle(myGeodeHandle);
+
+    /* Creates a list for synchronizing access to the requests. */
+    SReqListNew(&sRequestList);
+    sRequestEmpty = ThreadAllocSem(1);
+
+    return;
+}	/* End of MSG_GEN_PROCESS_OPEN_APPLICATION.	*/
+
+
+
+/***********************************************************************
+ *		MSG_GEN_PROCESS_CLOSE_APPLICATION for ISProcessClass
+ ***********************************************************************
+ * SYNOPSIS:	    To close the DB file when closing the application.
+ * PARAMETERS:	    
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	MZ	8/24/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method ISProcessClass, MSG_GEN_PROCESS_CLOSE_APPLICATION
+{
+
+    SReqListKillAllRequests(&sRequestList);
+
+    /* Waits for killing all requests. */
+    ThreadPSem(sRequestEmpty);
+    ThreadVSem(sRequestEmpty);
+    ThreadFreeSem(sRequestEmpty);
+
+    SReqListFree(&sRequestList);
+    
+    HTListDelete(protocolList);
+    protocolList = NULL;
+
+    HTListDelete(afterCbfList);
+    afterCbfList = NULL;
+    
+    HTUnregister(GeodeGetProcessHandle());
+
+    GBDirectorDetach();
+
+    return(@callsuper());
+}	/* End of MSG_GEN_PROCESS_CLOSE_APPLICATION.	*/
+
+
+
+/***********************************************************************
+ *		MSG_ISP_OPEN_URL for ISProcessClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    
+ * PARAMETERS:	    void (MemHandle urlBlock, optr target)
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:	Submits a request to WWW Library. 
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	mzhu	10/ 7/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method ISProcessClass, MSG_ISP_OPEN_URL
+{
+    HTRequestHandle request;
+    char *url;
+    
+    url = MemLock(urlBlock);
+    if(url != NULL){
+    	request = HTRequestCreate(HTTPT_REQUEST);
+	if(target && target != @UIGenerator)
+       	    SReqListAddRequest(sRequestList, request, target);
+	else {
+	    /*
+	     * If the target is the UIGenerator, it is a new document.
+	     * So the old request should be stop before sending the new one.
+	     */
+	    @send application::MSG_GEN_APPLICATION_MARK_APP_COMPLETELY_BUSY();
+	    IsBusy = TRUE;
+
+	    if(SReqListGetRequestCount(sRequestList))
+		SReqListKillAllRequests(&sRequestList);
+
+	    /* Waits for killing all old requests. */
+	    ThreadPSem(sRequestEmpty);
+
+    	    /* Clears the old stuff from the UIGenerator. */
+    	    @call UIGenerator::MSG_UI_GENERATOR_CLEAR_UI_TREE();
+
+       	    SReqListAddRequest(sRequestList, request, @UIGenerator);
+	    SReqListSetURL(&sRequestList, url);
+ 	}
+
+	if(strlen(proxyName)) 
+    	    HTRequestSetProxy(request, proxyName, proxyPort);
+
+    	/* The request-line */
+    	HTRequestSetMethod(request, HTM_GET);
+    	HTRequestSetURI(request, url);
+    	HTRequestSetHTTPVersion(request, HTTPV_1_1);
+
+    	HTRequestSetAfterCallbackList(request, afterCbfList);
+    	HTRequestSetRequestCallbackList(request, requestCbfList);
+
+    	HTRequestSubmit(request, GeodeGetProcessHandle());
+    }
+
+    MemFree(urlBlock);
+}	/* End of MSG_ISP_OPEN_URL.	*/
+
+
+
+/***********************************************************************
+ *		MSG_ISP_STOP for ISProcessClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    
+ * PARAMETERS:	    
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	mzhu	10/ 7/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method ISProcessClass, MSG_ISP_STOP
+{
+    SReqListKillAllRequests(&sRequestList);
+
+}	/* End of MSG_ISP_STOP.	*/
+
+
+
+/***********************************************************************
+ *		MSG_ISP_LOCAL_ICONS for ISProcessClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    The main entry for all the local icons.
+ * PARAMETERS:	    
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	mzhu	9/24/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method ISProcessClass, MSG_ISP_LOCAL_ICONS
+{
+    if(trigger == @ISLIBackButton)
+	@send application::MSG_ISA_BACK();
+    else if(trigger == @ISLIForwardButton)
+	@send application::MSG_ISA_FORWARD();
+    else if(trigger == @ISLIOpenLocationButton)
+	@send application::MSG_ISA_OPEN_LOCATION();
+    else if(trigger ==  @ISLIHistoryButton)
+	@send application::MSG_ISA_HISTORY();
+    else if(trigger == @ISLIDocuInfoButton)
+	@send application::MSG_ISA_DOCUMENT_INFORMATION();
+    else if(trigger == @ISLIFindButton)
+	@send self::MSG_ISP_FIND();
+    else if(trigger == @ISLICopyButton)
+	@send self::MSG_ISP_COPY();
+    else if(trigger == @ISLILoadImageButton)
+	@send self::MSG_ISP_LOAD_IMAGE();
+    else if(trigger == @ISLILoadAllImageButton)
+	@send self::MSG_ISP_LOAD_ALL_IMAGE();
+    else if(trigger == @ISLIReloadButton)
+	@send self::MSG_ISP_RELOAD();
+    else if(trigger == @ISLIPrintButton)
+	@send self::MSG_ISP_PRINT();
+    
+}	/* End of MSG_ISP_LOCAL_ICONS.	*/
+
+
+
+/***********************************************************************
+ *		MSG_ISP_DISPLAY_DOCUMENT for ISProcessClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    Whenever to display a content(document), the window's
+ *			title, and the local icons need to change.
+ * PARAMETERS:	    
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	mzhu	9/12/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method ISProcessClass, MSG_ISP_DISPLAY_DOCUMENT
+{
+    /* Turns on/off local icons. */
+    if(@call application::MSG_ISA_CAN_BACK()) 
+    	@send ISLIBackButton::MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_APP_QUEUE);
+    if(@call application::MSG_ISA_CAN_FORWARD()) 
+    	@send ISLIForwardButton::MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_APP_QUEUE);
+
+}	/* End of MSG_ISP_DISPLAY_DOCUMENT.	*/
+
+
+
+/***********************************************************************
+ *		MSG_PROCESS_CREATE_UI_THREAD for ISProcessClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    
+ * PARAMETERS:	    
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	edwin	10/21/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method ISProcessClass, MSG_PROCESS_CREATE_UI_THREAD
+{
+  stackSize = 3000;
+  return @callsuper();
+} /* End of MSG_PROCESS_CREATE_UI_THREAD.	*/
+

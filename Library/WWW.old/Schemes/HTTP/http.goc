@@ -1,0 +1,1090 @@
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Geoworks 1996 -- All Rights Reserved
+
+PROJECT:	Goes WWW Library
+MODULE:		HTTP Protocol
+FILE:		http.goc
+
+AUTHOR:		Kok Kin Kee, May 23, 1996
+
+ROUTINES:
+	Name			Description
+	----			-----------
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	kkee	5/23/96   	Initial version.
+
+DESCRIPTION:
+	The HTTP Protocol Class. In addition to implementing 
+	HTTP protocol communication, we also manage all HTTP 
+	exceptions here. Especially when we fail to push and 
+	read data.
+	
+	$Id: http.goc,v 1.1 97/04/07 11:49:57 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+@include <stdapp.goh>
+@include <WWW/http.goh>
+@include <WWW/htcache.goh>
+@include <WWW/HTCore/htsock.goh>
+@include <WWW/HTCore/htsockMan.goh>
+@include <WWW/HTCore/htmime.goh>
+@include <WWW/HTCore/hterror.goh>
+@include <WWW/HTCore/htnet.goh>
+#include <WWW/htmem.h>
+@include <WWW/HTCore/hturi.goh>
+@include <WWW/HTCore/htsuffix.goh>
+@include <WWW/HTCore/htpolicy.goh>
+@include <WWW/HTCore/htanchor.goh>
+@include <WWW/HTCore/httee.goh>
+@include <WWW/HTCore/htaabrow.goh>
+@include <math.h>
+#include <Ansi/string.h>
+#include <Ansi/stdlib.h>
+#include <sem.h>
+
+@include "httpgen.goh"
+@include "httpreq.goh"
+@include "htfatals.goh"
+
+
+/* --------------------------------------------------------------------------
+ * 		PRIVATE DATA
+ * --------------------------------------------------------------------------*/
+
+#if ERROR_CHECK
+FatalErrors httpFatalErrors;
+Warnings    httpWarnings;
+#endif
+
+#ifndef HTTP_PORT
+#define HTTP_PORT 80                 /* Default */
+#endif
+
+/* HTTP parser state */
+#define EOL_BEGIN           0
+#define EOL_FCR             1
+
+#define PUTBLOCK(target, data, len)  \
+        @call target::MSG_HT_STREAM_PUT_BLOCK(data, len)
+
+
+/***********************************************************************
+		Class Declaration
+***********************************************************************/
+
+@classdecl	HTTPClass;
+
+
+/* --------------------------------------------------------------------------
+ * 		PRIVATE FUNCTIONS
+ * --------------------------------------------------------------------------*/
+
+
+/***********************************************************************
+ *		HTTPVersionEnum
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Translate HTTP version string to HTTPVersion.
+ * CALLED BY:	MSG_HTTP_STREAM_PIPE
+ * RETURN:	HTTPVersion, as defined in CInclude/WWW/HTCore/htreq.goh.
+ *	
+ * STRATEGY:	
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	kkee    	2/19/97   	Initial Revision
+ *	
+ ***********************************************************************/
+static HTTPVersion _pascal
+HTTPVersionEnum (const char *str)
+{
+    if (!str || !(*str))
+	return HTTPV_0_9;
+    else if (!strcasecmp(str, "HTTP/1.0"))
+	return HTTPV_1_0;
+    else if (!strcasecmp(str, "HTTP/1.1"))
+	return HTTPV_1_1;
+    else
+	return HTTPV_INVALID;
+}	/* End of HTTPVersionEnum.	*/
+
+
+
+
+/***********************************************************************
+ *		HTTPGetAddress
+ ***********************************************************************
+ * SYNOPSIS:	Get the address of a HTTP request for connecting to 
+ *              the network.
+ *
+ * CALLED BY:	MSG_HT_PROTOCOL_LOAD.
+ * RETURN:	HTSocketAddress.
+ * SIDE EFFECTS:Nothing.
+ *	
+ * STRATEGY:    If a request uses a proxy, the proxy name is given higher
+ *              priority. Otherwise use the hostname provided in the URI. 
+ *
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	kkee	8/ 6/96   	Initial Revision
+ *
+ ***********************************************************************/
+static void _pascal
+HTTPGetAddress (HTRequestHandle request, HTSocketAddress *htAddress)
+{
+    HTMemHandle htmh;
+    HTRequest *rptr;
+    word port;
+    char *cptr;
+
+EC( ECCheckRequest(request);                                            )
+
+    rptr = (HTRequest *) MemThreadGrab(request);
+
+    /* IP address */
+    if (rptr->HTR_proxy) 
+	strcpy(htAddress->HTSA_ipAddress,
+	       (char *)rptr->HTR_proxyName);
+    else {
+	MemLock(rptr->HTR_uriString);
+	cptr = (char *) MemDeref(rptr->HTR_uriString);
+	htmh = HTParseURI(cptr, NULL, HTURI_PARSE_HOST);
+	MemUnlock(rptr->HTR_uriString);
+
+	/* Check that htmh is allocated! */
+
+	cptr = (char *) HTMemLock(htmh);
+	strcpy(htAddress->HTSA_ipAddress, cptr);
+	HTMemUnlockAndFree(htmh);
+    }
+
+    /* Port number */
+    if (rptr->HTR_proxy) 
+	htAddress->HTSA_port = rptr->HTR_proxyPortNumber;
+    
+    else {
+	MemLock(rptr->HTR_uriString);
+	cptr = (char *) MemDeref(rptr->HTR_uriString);
+	htmh = HTParseURI(cptr, NULL, HTURI_PARSE_PORT);
+	MemUnlock(rptr->HTR_uriString);
+
+	/* Check that htmh is allocated! */
+
+	cptr = (char *) HTMemLock(htmh);
+	port = atoi(cptr);
+	HTMemUnlockAndFree(htmh);
+
+	if (port)
+	    htAddress->HTSA_port = port;
+	else 
+	    htAddress->HTSA_port = HTTP_PORT;
+    }
+
+    /* AccessPoint */
+    htAddress->HTSA_accessPoint = rptr->HTR_accessPoint;
+    
+    MemThreadRelease(request);
+}	/* End of HTTPGetAddress.	*/
+
+
+
+/***********************************************************************
+ *		HTTPPushRequest
+ ***********************************************************************
+ * SYNOPSIS:	Push request data down an input stream stack of a request.
+ * CALLED BY:	MSG_HT_PROTOCOL_LOAD
+ * RETURN:	HT_OK if ok, else anything else. Note that because we do 
+ *              a callback to client, the callback can return any value 
+ *              it wishes to the Library.
+ * SIDE EFFECTS:Nothing
+ *	
+ * STRATEGY:    If there is a client callback, we call it. Otherwise we 
+ *              finish off the request headers by putting CRLF and then
+ *              simply flush the input stream (MSG_HT_STREAM_FLUSH).
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	kkee	6/17/96   	Initial Revision
+ *
+ ***********************************************************************/
+static int _pascal
+HTTPPushRequest (HTRequestHandle request)
+{
+    HTRequest *rptr;
+    int status = HT_OK;
+    char crlf[] = {CR, LF, '\0'};
+    
+EC( ECCheckRequest(request);                                            )
+
+    rptr = (HTRequest *) MemThreadGrab(request);
+
+EC( ECCheckStream(rptr->HTR_inputStream);                               )
+
+    /*
+     * If we are NOT dealing with HTTP/0.9 request and there is a post 
+     * callback, then use it. The user will provide the CRLF that terminates 
+     * a request header. There is no extra headers to provide if we are 
+     * communicating with HTTP/0.9.
+     */
+    if ((rptr->HTR_type == HTTPT_REQUEST) && 
+	(rptr->HTR_version != HTTPV_0_9) &&
+	(rptr->HTR_postCallback)) 
+	status = ProcCallFixedOrMovable_pascal(request, rptr->HTR_inputStream,
+                                              rptr->HTR_postCallback);
+    /*
+     * In both cases (callback or no callback), we must flush all 
+     * buffered data down the stream pipe.
+     */
+    if (status == HT_OK)
+	status = @call rptr->HTR_inputStream::MSG_HT_STREAM_FLUSH();
+
+    MemThreadRelease(request);
+    return status;
+}	/* End of HTTPPushRequest.	*/
+
+
+
+
+/***********************************************************************
+ *		HTTPUseClientHeaderParser
+ ***********************************************************************
+ * SYNOPSIS:	Use client header parser if one is registered.
+ * CALLED BY:	MSG_HT_PROTOCOL_LOAD
+ * RETURN:	HTStreamHandle if client header parser is used, else NULL.
+ * SIDE EFFECTS:Grows the request output stream stack.
+ *	
+ * STRATEGY:    If a client header parser is sucessfully created, the 
+ *              output stream becomes:
+ *              HTSock --> HTTP (nondestructive) --> ClientHeaderParser
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	kkee	7/10/96   	Initial Revision
+ *
+ ***********************************************************************/
+static HTStreamHandle _pascal
+HTTPUseClientHeaderParser (HTRequestHandle request)
+{
+    HTRequest *rptr;
+    HTStreamHandle stream = NullOptr;
+    
+EC( ECCheckRequest(request);                                            )
+
+    rptr = (HTRequest *) MemThreadGrab(request);
+    if (rptr->HTR_responseParserClass) 
+	stream = ObjInstantiateForThread(0, rptr->HTR_responseParserClass);
+    MemThreadRelease(request);
+
+    if (stream) 
+	@call stream::MSG_HT_STREAM_SET_REQUEST(request);
+
+    return stream;
+}	/* End of HTTPUseClientHeaderParser.	*/
+
+
+
+/***********************************************************************
+ *		HTTPNextState
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Determine the next state based on the response status
+ *              code.
+ * CALLED BY:	MSG_HT_STREAM_PUT_BLOCK
+ * RETURN:	HTTPState, the next state.
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:    Ported from W3C HTTP.c HTTPNextState. Modified by kkee.
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	kkee	11/10/96   	Initial Revision
+ *
+ ***********************************************************************/
+static HTTPState _pascal
+HTTPNextState (HTRequestHandle request, word statusCode, char *reason)
+{
+    HTTPState ret;
+
+    switch (statusCode) {
+
+      case 0:					    /* HTTP 0.9 response */
+      case 200:                                     /* OK */
+	ret = HTTP_GOT_DATA;
+	break;
+
+      case 201:                                     /* Created */
+	HTRequestAddError(request, HTERRS_INFO, FALSE, HTERR_CREATED,
+			   reason,  strlen(reason),
+			   "HTTPNextState");
+	ret = HTTP_GOT_DATA;
+	break;
+
+      case 202:                                     /* Accepted */
+	HTRequestAddError(request, HTERRS_INFO, FALSE, HTERR_ACCEPTED,
+			   reason,  strlen(reason),
+			   "HTTPNextState");
+	ret = HTTP_GOT_DATA;
+	break;
+
+      case 203:                  /* Non-Authoritative Infomation */
+	HTRequestAddError(request, HTERRS_INFO, FALSE, HTERR_PARTIAL,
+			   reason,  strlen(reason),
+			   "HTTPNextState");
+	ret = HTTP_GOT_DATA;
+	break;
+
+      case 204:			                  /* No Content */
+	HTRequestAddError(request, HTERRS_INFO, FALSE, HTERR_NO_CONTENT,
+			   reason,  strlen(reason),
+			   "HTTPNextState");
+	ret = HTTP_NO_DATA;
+	break;
+
+      case 206:			                 /* Partial Content */
+	HTRequestAddError(request, HTERRS_INFO, FALSE, HTERR_PARTIAL,
+			   reason,  strlen(reason),
+			   "HTTPNextState");
+	ret = HTTP_GOT_DATA;
+	break;
+
+      case 301:		    	   	       /* Moved Permanently */
+	HTRequestAddError(request, HTERRS_INFO, FALSE, HTERR_MOVED,
+			   reason,  strlen(reason),
+			   "HTTPNextState");
+	ret = HTTP_PERM_REDIRECT;
+	break;
+
+      case 302:			       /* Found and Moved Temporarily */
+	HTRequestAddError(request, HTERRS_INFO, FALSE, HTERR_FOUND,
+			   reason,  strlen(reason),
+			   "HTTPNextState");
+	ret = HTTP_TEMP_REDIRECT;
+	break;
+	
+      case 303:				   /* Method */
+	HTRequestAddError(request, HTERRS_FATAL, FALSE, HTERR_NOT_IMPLEMENTED,
+			   reason,  strlen(reason),
+			   "HTTPNextState");
+	ret = HTTP_ERROR;
+	break;
+
+      case 304:					     /* Not Modified */
+	HTRequestAddError(request, HTERRS_FATAL, FALSE, HTERR_NOT_MODIFIED,
+			   reason,  strlen(reason),
+			   "HTTPNextState");
+	ret = HTTP_NOT_MODIFIED;
+	break;
+	
+      case 400:					      /* Bad Request */
+	HTRequestAddError(request, HTERRS_FATAL, FALSE, HTERR_BAD_REQUEST,
+		   reason,  strlen(reason), "HTTPNextState");
+	ret = HTTP_ERROR;
+	break;
+
+      case 401:                                     /* Unauthorized */
+	HTRequestAddError(request, HTERRS_FATAL, FALSE, HTERR_UNAUTHORIZED,
+		   reason,  strlen(reason), "HTTPNextState");
+	ret = HTTP_AA;
+	break;
+	
+      case 402:					 /* Payment required */
+	HTRequestAddError(request, HTERRS_FATAL, FALSE, HTERR_PAYMENT_REQUIRED,
+		   reason,  strlen(reason), "HTTPNextState");
+	ret = HTTP_ERROR;
+	break;
+	
+      case 403:						/* Forbidden */
+	HTRequestAddError(request, HTERRS_FATAL, FALSE, HTERR_FORBIDDEN,
+		   reason,  strlen(reason), "HTTPNextState");
+	ret = HTTP_ERROR;
+	break;
+	
+      case 404:						/* Not Found */
+	HTRequestAddError(request, HTERRS_FATAL, FALSE, HTERR_NOT_FOUND,
+		   reason,  strlen(reason), "HTTPNextState");
+	ret = HTTP_ERROR;
+	break;
+	
+      case 405:				      /* Method Not Allowed */
+	HTRequestAddError(request, HTERRS_FATAL, FALSE, HTERR_NOT_ALLOWED,
+		   reason,  strlen(reason), "HTTPNextState");
+	ret = HTTP_ERROR;
+	break;
+
+      case 406:					  /* Not Acceptable */
+	HTRequestAddError(request, HTERRS_FATAL, FALSE, HTERR_NONE_ACCEPTABLE,
+		   reason,  strlen(reason), "HTTPNextState");
+	ret = HTTP_ERROR;
+	break;
+
+      case 407:			    /* Proxy Authentication Required */
+	HTRequestAddError(request, HTERRS_FATAL, FALSE, HTERR_PROXY,
+		   reason,  strlen(reason), "HTTPNextState");
+	ret = HTTP_ERROR;
+	break;
+
+      case 408:				  /* Request Timeout */
+	HTRequestAddError(request, HTERRS_FATAL, FALSE, HTERR_TIMEOUT,
+		   reason,  strlen(reason), "HTTPNextState");
+	ret = HTTP_ERROR;
+	break;
+
+      case 500:                            /* Internal Server Error */
+	HTRequestAddError(request, HTERRS_FATAL, FALSE, HTERR_INTERNAL,
+		   reason,  strlen(reason), "HTTPNextState");
+	ret = HTTP_ERROR;
+	break;
+	
+      case 501:                             /* Not Implemented */
+	HTRequestAddError(request, HTERRS_FATAL, FALSE, HTERR_NOT_IMPLEMENTED,
+		   reason,  strlen(reason), "HTTPNextState");
+	ret = HTTP_ERROR;
+	break;
+
+      case 502:                             /* Bad Gateway */
+	HTRequestAddError(request, HTERRS_FATAL, FALSE, HTERR_BAD_GATE,
+		   reason,  strlen(reason), "HTTPNextState");
+	ret = HTTP_ERROR;
+	break;
+
+      case 503:                               /* Service Unavailable */
+	HTRequestAddError(request, HTERRS_FATAL, FALSE, HTERR_DOWN,
+		   reason,  strlen(reason), "HTTPNextState");
+
+	/* If Retry-After header is found then return HT_RETRY else HT_ERROR */
+	/* if (request->retry_after)
+	    ret = HTTP_RETRY;
+	else */
+	    ret = HTTP_ERROR;
+	break;
+
+      case 504:
+	HTRequestAddError(request, HTERRS_FATAL, FALSE, HTERR_GATE_TIMEOUT,
+		   reason,  strlen(reason), "HTTPNextState");
+        ret = HTTP_ERROR;
+	break;
+
+      default:						       /* bad number */
+	HTRequestAddError(request, HTERRS_FATAL, FALSE, HTERR_BAD_REPLY,
+		   reason, strlen(reason), "HTTPNextState");
+	ret = HTTP_ERROR;
+	break;
+    }
+
+    return ret;
+}	/* End of HTTPNextState.	*/
+
+
+
+/***********************************************************************
+		Message Handlers
+***********************************************************************/
+
+
+/***********************************************************************
+ *		MSG_META_INITIALIZE for HTTPClass
+ ***********************************************************************
+ * SYNOPSIS:	    Initialize protocol instance data.
+ * PARAMETERS:	    void (void)
+ * SIDE EFFECTS:    Nothing
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	kkee	6/11/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method HTTPClass, MSG_META_INITIALIZE
+{
+    /* Initialize HTTP state machine to initial state */
+    @self->HTTPI_currentState = HTTP_BEGIN;
+
+    @callsuper();
+}	/* End of MSG_META_INITIALIZE.	*/
+
+
+
+
+/***********************************************************************
+ *		MSG_HT_STREAM_ABORT for HTTPClass
+ ***********************************************************************
+ * SYNOPSIS:	    Trigger an abort sequence to abort both input and
+ *                  output stream pipes bound to this protocol.
+ * PARAMETERS:	    void (void)
+ * SIDE EFFECTS:
+ *
+ * STRATEGY:        If we have asynch receive going on, stop it now.
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	kkee	6/28/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method HTTPClass, MSG_HT_STREAM_ABORT
+{
+    HTRequest *rptr;
+
+    rptr = (HTRequest *) MemThreadGrab(@self->HTSI_request);
+
+    /* Abort input stream */
+    if (rptr->HTR_inputStream) 
+	@call rptr->HTR_inputStream::MSG_HT_STREAM_ABORT();
+
+    rptr->HTR_sockfd = NULL;
+    MemThreadRelease(@self->HTSI_request);
+
+    /* Abort output stream and self */
+    return @callsuper();
+}	/* End of MSG_HT_STREAM_ABORT.	*/
+
+
+
+
+/***********************************************************************
+ *		MSG_HT_PROTOCOL_STOP for HTTPClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    Stop all backgroup processing of http protocol.
+ * PARAMETERS:	    void (void)
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:        The only thing we may have running in the background
+ *                  is htsocket.
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	kkee	9/ 4/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method HTTPClass, MSG_HT_PROTOCOL_STOP
+{
+    @call @self->HTPI_socket::MSG_HT_SOCKET_STOP();
+}	/* End of MSG_HT_PROTOCOL_STOP.	*/
+
+
+
+
+/***********************************************************************
+ *		MSG_HTTP_STREAM_PIPE for HTTPClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    Create a output stream pipe based on the response 
+ *                  HTTP response.
+ * PARAMETERS:	    int (void)
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:        
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	kkee	11/13/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method HTTPClass, MSG_HTTP_STREAM_PIPE
+{
+    HTRequest *rptr;
+    char *cptr;
+
+    /* 
+     * Always the first thing to check.
+     */
+    if (@self->HTSI_transparent) {
+
+EC(	ECCheckOD(@self->HTSI_target);                                 )
+
+	return PUTBLOCK(@self->HTSI_target, 
+			(byte *) @self->HTTPI_buffer,
+			@self->HTTPI_bufferLength);
+    }
+    
+EC( ECCheckRequest(@self->HTSI_request);                               )
+
+    /* 
+     * We need to parse out HTTP status-line. We are interested in 
+     * the status code:
+     *       HTTP-Version SP Status-Code SP Reason-Phrase CRLF
+     */
+    rptr = (HTRequest *) MemThreadGrab(@self->HTSI_request);
+
+    if ((cptr = strcasestr((char *)@self->HTTPI_buffer, "http/")) 
+	!= NULL) {
+
+	char *ver = cptr;
+    	while (!isspace(*cptr)) cptr++;      /* HTTP-Version */
+	*cptr = '\0';                        /* Null-terminate it */
+	cptr++;
+	rptr->HTR_responseVersion = HTTPVersionEnum(ver);
+	while (isspace(*cptr)) cptr++;       /* Skip SP */
+    
+	if (isdigit(*cptr)) {                /* Status-Code */
+	    rptr->HTR_responseStatusCode = atoi(cptr);
+	}
+
+	while (isspace(*cptr)) cptr++;
+	@self->HTTPI_reason = cptr-@self->HTTPI_buffer;
+	if (cptr && (cptr = strchr(cptr, LF)) != NULL)
+	    *cptr = '\0';
+	else if (cptr && (cptr = strchr(cptr, CR)) != NULL)
+	    *cptr = '\0';
+
+	/* 
+	 * We have a HTTP/1.0 and above response here.
+	 * If client does not provide a parser, 
+	 * create a MIME parser and bind it as part of the 
+	 * request output stream. The output stream setup is as
+	 * follows: HTSocket --> HTTP --> HTMIME
+	 */
+	if ((@self->HTSI_target = 
+	     HTTPUseClientHeaderParser(@self->HTSI_request)) == NULL) {
+	    
+	    HTStreamHandle s;
+
+	    @self->HTSI_target = 
+		HTPolicyStreamStack(HT_WWW_MIME, 
+				    NULL,
+				    @self->HTSI_target, 
+				    @self->HTSI_request, 
+				    FALSE);
+
+	    /*
+	     * See if we can cache this data object. Note that 
+	     * we only cache HTTP/1.0 & higher reponses. 
+	     */
+	    if (rptr->HTR_responseStatusCode == 200 && 
+		rptr->HTR_method == HTM_GET && 
+		HTCacheIsEnabled() &&
+		((s = HTCacheWriterCreate(HT_WWW_MIME, NullOptr,
+					  @self->HTSI_request)) != NULL))
+		@self->HTSI_target = HTTeeCreate(@self->HTSI_request,
+						 @self->HTSI_target,
+						 s, NULL);
+		
+	}
+
+	if (!@self->HTSI_target) {
+	    MemThreadRelease(@self->HTSI_request);
+	    return HT_OUT_OF_MEMORY;
+	}
+
+    } else {
+	/*
+	 * No HTTP headers, so its HTTP/0.9 response here. Try using
+	 * file extension (suffix), if not, use a guess stream.
+	 */
+	rptr = (HTRequest *) MemThreadGrab(@self->HTSI_request);
+	MemLock(rptr->HTR_uriString);
+
+	cptr = (char *) MemDeref(rptr->HTR_uriString);
+	cptr = strrchr(cptr, '.');
+	if (cptr) cptr++;
+
+	if (cptr) /* Use suffix to create a stream */
+	    @self->HTSI_target = HTSuffixCreate(cptr, @self->HTSI_request);
+
+	MemUnlock(rptr->HTR_uriString);
+	MemThreadRelease(@self->HTSI_request);
+
+	/*
+	 * If client does not provide a parser, 
+	 * we need a guess stream. The output stream stack is as
+	 * follows: HTSocket --> HTTP --> HTGuess.
+	 */
+	if (!@self->HTSI_target)
+	    if ((@self->HTSI_target = 
+		 HTTPUseClientHeaderParser(@self->HTSI_request)) == NULL)
+		@self->HTSI_target = 
+		    HTPolicyStreamStack(HT_WWW_GUESS,
+					NULL,
+					@self->HTSI_target,
+					@self->HTSI_request,
+					FALSE);
+
+    }
+
+    @self->HTSI_transparent = TRUE;
+    
+    /*
+     * Passing pointer here, make sure HTTPNextState don't change
+     * the resource of this object.
+     */
+    @self->HTTPI_nextState = 
+	HTTPNextState(@self->HTSI_request,
+		      rptr->HTR_responseStatusCode, 
+		      @self->HTTPI_buffer+@self->HTTPI_reason);
+    
+    MemThreadRelease(@self->HTSI_request);
+
+    return HT_OK;
+}	/* End of MSG_HTTP_STREAM_PIPE.	*/
+
+
+
+
+
+/***********************************************************************
+ *		MSG_HT_STREAM_PUT_BLOCK for HTTPClass
+ ***********************************************************************
+ * SYNOPSIS:	    Searches for HTTP header line and use that info
+ *                  to determine the output stream stack. Note that we 
+ *                  modified the input data as we don't know what HTTP
+ *                  version we are dealing with.
+ *
+ * PARAMETERS:	    int (const byte *data, word len)
+ *                  - return HT_OUT_OF_MEMORY if we are of memory to 
+ *                    proceed.
+ *                  - return value from target stream. If all is well,
+ *                    its HT_OK.
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:        Parses the http header for HTTP status-line, general 
+ *                  headers, and response headers.
+ *
+ *                  If it is a HTTP/0.9 response, there are headers. 
+ *                  (1) If there is a filename in the URL, use the file
+ *                      extension to determine the entity.
+ *                  (2) If no file extension, then use a guess stream.
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	kkee	6/29/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method HTTPClass, MSG_HT_STREAM_PUT_BLOCK
+{
+    if (!data || !len) return HT_OK;
+
+    while (!@self->HTSI_transparent && len-- > 0) {
+	int status;
+
+	*(@self->HTTPI_buffer+@self->HTTPI_bufferLength++) = *data;
+	if (@self->HTTPI_parseState == EOL_FCR) {
+	    if (*data == LF) {	/* Line found */
+		if ((status = @call oself::MSG_HTTP_STREAM_PIPE())
+		    != HT_OK)
+		    return status;
+		
+	    } else {
+		@self->HTTPI_parseState = EOL_BEGIN;
+	    }
+
+	} else if (*data == CR) {
+	    @self->HTTPI_parseState = EOL_FCR;
+
+	} else if (*data == LF) {
+	    if ((status = @call oself::MSG_HTTP_STREAM_PIPE())
+		!= HT_OK)
+		return status;
+
+	} else {
+	    if (@self->HTTPI_bufferLength >= HTTP_MAX_STATUS_LENGTH) {
+		if ((status = @call oself::MSG_HTTP_STREAM_PIPE())
+		    != HT_OK)
+		    return status;
+	    }
+	}
+	data++;
+    }
+
+    if (len > 0) return PUTBLOCK(@self->HTSI_target, data, len);
+    return HT_OK;
+
+}	/* End of MSG_HT_STREAM_PUT_BLOCK.	*/
+
+
+
+
+/***********************************************************************
+ *		MSG_HT_PROTOCOL_LOAD for HTTPClass
+ ***********************************************************************
+ * SYNOPSIS:	    Load data object. This is a state-based implementation
+ *		    of the HTTP protocol. 
+ * PARAMETERS:	    int (int status)
+ *                  - return HT_OK if all is well and want to be 
+ *                    rescheduled.
+ *                  - return HT_ASYNCH_LOAD if HTTP is going into asynch
+ *                    mode and does not need to be scheduled until
+ *                    status is updated using HTNetThreadUpdateStatus.
+ *                  - return HT_OUT_OF_MEMORY if we failed allocate 
+ *                    stream objects.
+ *                  - return HT_CANNOT_CONNECT if failed to connect to 
+ *                    server.
+ *                  - return HT_CANNOT_RESOLVE_HOST_NAME if hostName or
+ *                    proxy name is bad.
+ *                  - return HT_LINK_FAILED if some hardware or configuration
+ *                    prevents use of socket.
+ *                  - return HT_ERROR if an unrecoverable has occurred.
+ * SIDE EFFECTS:    
+ * STRATEGY:	    Implement the HTTP protocol in a state-based fashion. 
+ *                  This means that this handler exits after a stable state 
+ *		    is reached, and then reenter later to resume execution
+ *   		    from the previous state.
+ *
+ *                  If we return anything other than HT_OK, the protocol
+ *                  will be terminated. So we must intercept all problems
+ *                  that arise from pushing data to the socket or reading
+ *                  data from the socket and perform the appropriate 
+ *                  actions to recover.
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	kkee	5/23/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method HTTPClass, MSG_HT_PROTOCOL_LOAD
+{
+    int ret;
+    HTStreamHandle stream;
+    HTRequest *rptr;
+    GeodeHandle clientGeodeHandle;
+    Boolean genEndHeader, reqEndHeader, entityEndHeader;
+
+EC( if (@self->HTSI_request == NULL) EC_ERROR(HTTP_REQUEST_NOT_SET);    )
+
+    /* 
+     * Now jump into the machine. We know the state from the previous run.
+     * This is one big switch loop.
+     */
+    if (status != HT_OK) 
+	@self->HTTPI_currentState = status;
+
+    while (1) {
+	switch (@self->HTTPI_currentState) {
+
+	case HTTP_BEGIN:
+
+	    /* Inform client what we are doing with the request. */
+	    ret = HTNetReportProgress(@self->HTSI_request, 
+				      HT_RESOLVING_HOST);
+	    if (ret != HT_OK) return ret;
+	    
+	    /* Create and initialize a HTSocket */
+	    ret = HTSocketCreate(@self->HTSI_request, &stream);
+	    @self->HTPI_socket = stream;
+	    if (ret == HT_WOULD_BLOCK) return HT_OK; /* Continue on. */
+	    if (ret != HT_OK) return ret;
+
+	    rptr = (HTRequest *) MemThreadGrab(@self->HTSI_request);
+	    if (ret == HT_OK) {
+
+		rptr->HTR_sockfd = @call @self->HTPI_socket::
+		    MSG_HT_SOCKET_GET_DESCRIPTOR();
+
+	    }
+
+	    /* Decide on who is suppose to end the headers. Headers
+	     * are ended using a line with only CRLF. Only one of
+	     * the following booleans is TRUE.
+	     */
+	    genEndHeader = FALSE;
+	    reqEndHeader = (!rptr->HTR_postCallback && !rptr->HTR_source);
+	    entityEndHeader = (!rptr->HTR_postCallback && rptr->HTR_source);
+
+	    MemThreadRelease(@self->HTSI_request);
+
+	    /* 
+	     * HTSocket is the FIRST stream object in both input and 
+	     * output stream stacks; it is used for reading by input 
+	     * stream stack and for writing by output stream stack.
+	     */
+	    HTStreamGrowInputStreamStack(@self->HTSI_request,
+					 @self->HTPI_socket);
+
+	    /*
+	     * Create HTTP general headers generator, HTTP request
+	     * headers generator, and HTTP entity headers and bind it to 
+	     * the input stream stack.
+	     *
+	     * HTSocket <-- HTTPGen (general headers)  
+	     *   <-- HTTPReq (request headers) 
+	     *   <-- HTMIMERq (entity headers)
+	     */
+
+	    /*
+	     * stream = HTTPGenNew(@self->HTSI_request, genEndHeader);
+	     * if (!stream) return HT_OUT_OF_MEMORY;
+	     * HTStreamGrowInputStreamStack(@self->HTSI_request, stream);
+	     */
+
+	    stream = HTTPReqNew(@self->HTSI_request, reqEndHeader);
+	    if (!stream) return HT_OUT_OF_MEMORY;
+	    HTStreamGrowInputStreamStack(@self->HTSI_request, stream);
+	    
+	    if (entityEndHeader) {
+		stream = HTMIMERqNew(@self->HTSI_request, entityEndHeader);
+		if (!stream) return HT_OUT_OF_MEMORY;
+		HTStreamGrowInputStreamStack(@self->HTSI_request, stream);
+	    }
+
+	    /* 
+	     * HTTP is the second stream object in the output stream pipe.
+	     * The output stream stack is now as follows:
+	     *
+	     * HTSocket --> HTTP.
+	     */
+	    @call @self->HTPI_socket::MSG_HT_STREAM_SET_TARGET(oself);
+
+	    @self->HTTPI_currentState = HTTP_NEED_CONNECTION;
+	    return HT_OK;
+
+	case HTTP_NEED_CONNECTION:
+	    /* 
+	     * Nonblocking resolve & connect now and check socket state 
+	     * later. 
+	     */
+	    {
+		HTSocketAddress address;
+
+		HTTPGetAddress(@self->HTSI_request, &address);
+
+		rptr = (HTRequest *) MemThreadGrab(@self->HTSI_request);
+		clientGeodeHandle = rptr->HTR_clientGeodeHandle;
+		MemThreadRelease(@self->HTSI_request);
+
+		if ((ret = @call @self->HTPI_socket::
+		     MSG_HT_SOCKET_RESOLVE_AND_CONNECT(&address,
+				clientGeodeHandle, NULL)) == HT_OK) {
+		    @self->HTTPI_currentState = HTTP_CHECK_CONNECTION;
+
+		} else {
+		    /* 
+		     * If we failed to connect, retry? Let's make it
+		     * simple here...
+		     */
+		    return HT_SOCKET_ERROR;
+		}
+	    }
+
+	    /* Inform client what we are going to do next. */
+	    ret = HTNetReportProgress(@self->HTSI_request, 
+				      HT_CONNECTING_TO_SERVER);
+	    if (ret != HT_OK) return ret;
+
+	    return HT_OK;
+
+	case HTTP_CHECK_CONNECTION:
+	    /* 
+	     * Need to check these states: resolving, cannot_resolve,
+	     * resolved, connecting, cannot_connect, connected.
+	     */
+	    ret = @call @self->HTPI_socket::MSG_HT_SOCKET_GET_STATE();
+
+	    if (ret == HT_OK)
+		@self->HTTPI_currentState = HTTP_NEED_REQUEST;
+
+	    else if (ret == HT_CANNOT_CONNECT ||
+		     ret == HT_LINK_FAILED ||
+		     ret == HT_CANNOT_RESOLVE_HOST_NAME ||
+		     ret == HT_INTERRUPTED)
+		return ret;
+
+	    else if ((ret == HT_RESOLVING_HOST) ||
+		     (ret == HT_CONNECTING_TO_SERVER)) {
+		/* Check again later. */
+		return HT_OK;
+
+	    } else {
+EC (        	EC_ERROR(HTTP_STATE_NOT_HANDLED);                       )
+	    }
+
+	    return HT_OK;
+
+	case HTTP_NEED_REQUEST:
+	    /*
+	     * Push request data to the network using the input stream stack.
+	     */
+	    if ((ret = HTTPPushRequest(@self->HTSI_request)) != HT_OK)
+		return ret;
+	    
+	    @self->HTTPI_currentState = HTTP_CHECK_RESPONSE;
+	    @self->HTTPI_parseState = EOL_BEGIN;
+
+	    /* Inform client what we are going to do next. */
+	    ret = HTNetReportProgress(@self->HTSI_request, 
+				      HT_WAITING_FOR_REPLY);
+	    if (ret != HT_OK) return ret;
+
+	    return HT_OK;
+
+	case HTTP_CHECK_RESPONSE:
+	    /*
+	     * Inform client we are loading data.
+	     */
+	    ret = HTNetReportProgress(@self->HTSI_request, 
+				      HT_LOADING_DATA);
+	    if (ret != HT_OK) return ret;
+
+	    /* 
+	     * Push data from network using the output stream stack. 
+	     * MSG_HT_SOCKET_PUSH_DATA is an asynchronous call to 
+	     * push data to target.
+	     */
+	    @self->HTTPI_currentState = HTTP_LOAD_DATA;
+	    return @call @self->HTPI_socket::MSG_HT_SOCKET_PUSH();
+	    
+	case HTTP_LOAD_DATA:
+	    /*
+	     * Push data to target until there is no more data, or
+	     * some error occurs.
+	     */
+	    ret = @call @self->HTPI_socket::MSG_HT_SOCKET_PUSH();
+	    /* If OK, maintain state to load more data */
+	    if (ret == HT_OK) {
+		ret = HTNetReportProgress(@self->HTSI_request, 
+					  HT_MORE_DATA);
+		if (ret != HT_OK) return ret;
+
+	    } else 
+		/* No more data to load, so move on */
+		@self->HTTPI_currentState = @self->HTTPI_nextState;
+
+	    return HT_OK;
+
+	case HTTP_GOT_DATA:
+	case HTTP_PERM_REDIRECT:
+	    /*
+	     * No more data, return loaded.
+	     */
+	    return HT_LOADED;
+
+	case HTTP_TEMP_REDIRECT:
+	    /*
+	     * Client should reissue the request where the 
+	     * submitted URL has been replaced with a new one.
+	     */
+	    return HT_DOCUMENT_MOVED;
+
+	case HTTP_AA:
+	    return HT_UNAUTHORIZED;
+
+	case HTTP_ERROR:
+	    return HT_ERROR;
+
+	default:
+
+EC(         EC_ERROR(HTTP_STATE_NOT_HANDLED);                           )
+
+	    break;
+	}
+    }
+}	/* End of MSG_HT_PROTOCOL_LOAD.	*/
+
+
+

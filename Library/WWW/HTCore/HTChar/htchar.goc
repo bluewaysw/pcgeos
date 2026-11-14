@@ -1,0 +1,130 @@
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Geoworks 1996.  All rights reserved.
+	GEOWORKS CONFIDENTIAL
+
+PROJECT:	Geos WWW Library
+MODULE:		htchar
+FILE:		htchar.goc
+
+AUTHOR:		Kok Kin Kee, Oct 16, 1996
+
+ROUTINES:
+	Name			Description
+	----			-----------
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	kkee	10/16/96   	Initial version.
+
+DESCRIPTION:
+
+	* Local to ISO chars and ISO to local chars converter streams.
+	* Other character converter streams to be added include 
+	  Japanese to local representation etc.
+
+	$Id: htchar.goc,v 1.1.5.1 97/09/05 10:49:10 jeremyb Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+@include <stdapp.goh>
+@include <WWW/HTCore/htreq.goh>
+@include <WWW/HTCore/htchar.goh>
+@include <WWW/HTCore/htobj.goh>
+@include "htfatals.goh"
+
+/***********************************************************************
+ *		HTCHARNEW
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Create a char converter stream.
+ * CALLED BY:	Client.
+ * RETURN:	HTStreamHandle or NULL.
+ *	
+ * STRATEGY:	
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	kkee    	6/ 9/97   	Initial Revision
+ *	
+ ***********************************************************************/
+HTStreamHandle _far _pascal
+HTCHARNEW (HTRequestHandle request, HTStreamHandle target, 
+		   CharConverterCallback cbf)
+{
+    HTStreamHandle stream;
+
+    PUSHDS;
+    SET_DS_LIB_DGROUP;       /* To use HTCharClass */
+    stream = HTObjInstantiateForThread(0, &HTCharClass);
+    POPDS;
+    if (!stream) return 0;
+	@call stream::MSG_HT_STREAM_SET_REQUEST(request);
+	@call stream::MSG_HT_STREAM_SET_TARGET(target);
+    @call stream::MSG_HTCHAR_SET_CALLBACK(cbf);
+    return stream;
+}	/* End of HTFWRITENEW.	*/
+
+
+
+/***********************************************************************
+		Class Declaration
+***********************************************************************/
+
+@classdecl	HTCharClass;
+
+/***********************************************************************
+		Message Handlers
+***********************************************************************/
+
+
+/***********************************************************************
+ *		MSG_HTCHAR_SET_CALLBACK for HTCharClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    Set the callback function for converting chars.
+ * PARAMETERS:	    void (CharConverterCallback cbf)
+ * SIDE EFFECTS:    None
+ *
+ * STRATEGY:	    
+ *
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	kkee    	6/ 9/97   	Initial Revision
+ *	
+ ***********************************************************************/
+@method HTCharClass, MSG_HTCHAR_SET_CALLBACK
+{
+     @self->HTLTI_cbf = cbf;
+}	/* End of MSG_HTCHAR_SET_CALLBACK.	*/
+
+
+
+/***********************************************************************
+ *		MSG_HT_STREAM_PUT_BLOCK for HTCharClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    Convert data for target.
+ * PARAMETERS:	    int (const byte *data, word len)
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	kkee	10/16/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method HTCharClass, MSG_HT_STREAM_PUT_BLOCK
+{
+    if (!len || !data) return HT_OK;
+
+	ProcCallFixedOrMovable_pascal((char *)data, len, @self->HTLTI_cbf);
+
+	return @call @self->HTSI_target::MSG_HT_STREAM_PUT_BLOCK(data, len);
+}	/* End of MSG_HT_STREAM_PUT_BLOCK.	*/
+

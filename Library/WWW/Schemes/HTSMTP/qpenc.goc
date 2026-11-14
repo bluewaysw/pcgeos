@@ -1,0 +1,299 @@
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Geoworks 1997.  All rights reserved.
+	GEOWORKS CONFIDENTIAL
+
+PROJECT:	Geos WWW Library
+MODULE:		qpenc
+FILE:		qpenc.goc
+
+AUTHOR:		Kok Kin Kee, May 12, 1997
+
+ROUTINES:
+	Name			Description
+	----			-----------
+
+REVISION HISTORY:
+	Name		Date		Description
+	----		----		-----------
+	kkee    	5/12/97   	Initial version.
+
+DESCRIPTION:
+
+	Quoted-printable, aka Q, encoding.
+
+	$Id: qpenc.goc,v 1.4.7.1 97/09/05 10:51:57 jeremyb Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+@include <WWW/htcore.goh>
+@include <WWW/HTCore/htqp.goh>
+@include "qpenc.goh"
+
+extern char CRLF[];                  /* In htsmtp.goc */
+static char EQCRLF[] = {'=',CR,LF,0};
+
+#define QP_ENCODING_CHUNK  512  
+
+/* More than enough for encoding QP_ENCODING_CHUNK of data */
+#define QP_BUFFER_SIZE     QP_ENCODING_CHUNK*3+1   
+
+#define PUTBLOCK(target, data, len)  \
+        @call target::MSG_HT_STREAM_PUT_BLOCK(data, len)
+
+/***********************************************************************
+		Private Functions
+***********************************************************************/
+
+
+/***********************************************************************
+ *		PutEncodedData
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Put encoded buffer to target. Implement Rules 3 and 5
+ *              in MSG_HT_STREAM_PUT_BLOCK.
+ * CALLED BY:	MSG_HT_STREAM_PUT_BLOCK
+ * RETURN:	Return code from pushing data to target.
+ *	
+ * STRATEGY:	Break data into lines of <= 76 (including the padding of
+ *              soft break '=', but does not include CRLF). 
+ *
+ *              We don't have to make sure that every line is as close to
+ *              76 chars as possible since that would complicate
+ *              processing as we would have to remember how many chars were
+ *              in the previous line. Ah! The wonderful Q encoding :)
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	kkee    	5/13/97   	Initial Revision
+ *	
+ ***********************************************************************/
+int static _pascal
+PutEncodedData (HTStreamHandle target, const byte *data, word len,	
+		int *fold)
+{
+    int fit;
+    int ret;
+    int nbytes;
+
+    fit = 75-*fold;
+    if (fit < 3) {
+	/* Must at least fit an encoded octet; i.e., three bytes */
+	/* If not, go to new line */
+	PUTBLOCK(target, (byte*)EQCRLF, 3);
+	*fold=0;
+	fit=75;
+    }
+    while (len) {
+	if (len > fit) {
+	    /* 
+	     * Do not break a line in the middle of an encoded octet.
+	     */
+	    if (*(data+fit) == '=') {
+		len -= fit;
+		nbytes = fit;
+	    } else if (*(data+fit-1) == '=') {
+		len -= (fit-1);
+		nbytes = (fit-1);
+	    } else if (*(data+fit-2) == '=') {
+		len -= (fit-2);
+		nbytes = (fit-2);
+	    } else {
+		/* 
+		 * If we did not encounter any encoding, then its
+		 * safe to send 75 bytes and attach a soft break
+		 * "=CRLF" to it.
+		 */
+		len -= fit;
+		nbytes = fit;
+	    }
+
+	} else {
+	    nbytes = len;
+	    len = 0;
+	}
+
+	if (nbytes) {
+	    ret = PUTBLOCK(target, data, nbytes);
+	    if (ret != HT_OK) return ret;
+	    if (len) {
+		PUTBLOCK(target, (byte*)EQCRLF, 3);
+		fit=75;
+		*fold=0;
+	    } else {
+		*fold += nbytes;
+	    }
+	}
+
+	data += nbytes;
+    }
+
+    return HT_OK;
+}	/* End of PutEncodedData.	*/
+
+
+
+
+/***********************************************************************
+		Class Declaration
+***********************************************************************/
+
+@classdecl	HTQPEncodeClass;
+
+
+/***********************************************************************
+ *		HTQPEncodeNew
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Create a new quoted-printable encoding stream.
+ * CALLED BY:	Client
+ * RETURN:	HTStreamHandle, NULL if not created.
+ *	
+ * STRATEGY:	
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	kkee    	5/12/97   	Initial Revision
+ *	
+ ***********************************************************************/
+HTStreamHandle _far _pascal
+HTQPEncodeNew (HTRequestHandle request, HTStreamHandle target)
+{
+    HTStreamHandle stream;
+    
+EC( ECCheckRequest(request);                                            )
+
+    stream = HTObjInstantiateForThread(0, &HTQPEncodeClass);
+
+    if (!stream) {
+	/* Log error */
+    } else {
+	/* Initialize the stream instance data */
+	@call stream::MSG_HT_STREAM_SET_REQUEST(request);
+	@call stream::MSG_HT_STREAM_SET_TARGET(target);
+    }
+    return stream;
+}	/* End of HTQPEncodeNew.	*/
+
+
+
+/***********************************************************************
+		Message Handlers
+***********************************************************************/
+
+
+/***********************************************************************
+ *		MSG_META_INITIALIZE for HTQPEncodeClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    Allocate a line buffer for Q encoding.
+ * PARAMETERS:	    void (void)
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:	    
+ *
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	kkee    	5/13/97   	Initial Revision
+ *	
+ ***********************************************************************/
+@method HTQPEncodeClass, MSG_META_INITIALIZE
+{
+    @self->HTQPCI_bufferHandle = HTMemAlloc(QP_BUFFER_SIZE);
+    @self->HTQPCI_buffer = (byte *) HTMemLock(@self->HTQPCI_bufferHandle);
+    @callsuper();
+}	/* End of MSG_META_INITIALIZE.	*/
+
+
+
+/***********************************************************************
+ *		MSG_HT_STREAM_ABORT for HTQPEncodeClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    Free allocated memory.
+ * PARAMETERS:	    int (int status);
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:	    
+ *
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	kkee    	5/13/97   	Initial Revision
+ *	
+ ***********************************************************************/
+@method HTQPEncodeClass, MSG_HT_STREAM_ABORT
+{
+    if (@self->HTQPCI_bufferHandle) 
+	HTMemUnlockAndFree(@self->HTQPCI_bufferHandle);
+    return @callsuper();
+}	/* End of MSG_HT_STREAM_ABORT.	*/
+
+
+
+
+/***********************************************************************
+ *		MSG_HT_STREAM_PUT_BLOCK for HTQPEncodeClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    Quoted-printable encoding as per RFC1521.
+ * PARAMETERS:	    int (const byte *data, word len)
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:         Quoted-printable encode non-USASCII characters.
+ *                   The actual encoding is done by API HTQPEncodePtr.
+ *                   Here we need to make sure the lines are <= 76 chars
+ *                   using Rules 3 and 5 below.
+ *
+ *                   Rule 3. Any TAB of SPACE must be followed by a 
+ *                        printable character. Therefore if TAB or SPACE
+ *                        appears at the end of an encoded line, it must
+ *                        be encoded according to Rule 1.
+ *
+ *                   Rule 5. The encoded line must not be longer than
+ *                        76 characters. This does not include the CRLF
+ *                        ending the encoded line. If necessary, 'soft'
+ *                        line breaks can be used. An '=' sign as the 
+ *                        last character on an encoded line indicates 
+ *                        such a 'soft' break.
+ *
+ *                   We encode in chunks of QP_ENCODING_CHUNK.
+ *
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	kkee    	5/12/97   	Initial Revision
+ *	
+ ***********************************************************************/
+@method HTQPEncodeClass, MSG_HT_STREAM_PUT_BLOCK
+{
+    int ret;
+    int nbytes;            /* Number of bytes to encode */
+    int encodedLen;        /* Length of encoded buffer */
+    int fold = @self->HTQPCI_fold;
+
+    if (!data || !len) return HT_OK;
+    
+    while (len) {
+	nbytes = (len > QP_ENCODING_CHUNK) ? QP_ENCODING_CHUNK : len;
+	len -= nbytes;
+
+	encodedLen = HTQPEncodePtr(data, nbytes, @self->HTQPCI_buffer);
+	data += nbytes;
+
+	ret = PutEncodedData(@self->HTSI_target, @self->HTQPCI_buffer, 
+			     encodedLen, &fold);
+	@self->HTQPCI_fold = fold;
+	if (ret != HT_OK) return ret;
+
+    }
+
+    return HT_OK;
+}	/* End of MSG_HT_PUT_BLOCK.	*/
+
+
+
+

@@ -1,0 +1,653 @@
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Geoworks 1996 -- All Rights Reserved
+
+PROJECT:	WWW2 Library
+MODULE:		WW Stream Class
+FILE:		WWStream.cpp
+
+AUTHOR:		Kok Kin Kee
+
+ROUTINES:
+	Name			Description
+	----			-----------
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+
+DESCRIPTION:
+	WWStream class. 
+	
+	$Id: ww2strm.goc,v 1.2 98/08/04 16:46:28 edwin Exp $
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+@include <Ansi/stdlib.h>
+@include <Ansi/string.h>
+#include <ec.h>
+@include "WWW2/WW2Core/ww2strm.goh"
+#include "WWW2/wwMacro.h"
+
+/*
+
+#include <system.h>
+extern "C" 
+{
+#include <string.h>
+}
+
+#include <www/wwcore/wwstream.h>
+#include <www/wwcore/wwstring.h>
+
+#ifdef _WIN32
+    #include <string.h>
+    #define bcopy(src, dest, size) memmove(dest, src, size)
+#else
+extern "C" {
+    void bcopy(...);
+}
+#endif
+
+*/
+
+#define _aborted pself->__aborted
+#define _endOfData pself->__endOfData
+#define _mimeType pself->__mimeType
+#define _hasContentLength pself->__hasContentLength
+#define _contentLength pself->__contentLength
+#define _stream pself->->__stream
+#define _ungetBuffer pself->__ungetBuffer
+#define _ungetBufferSize pself->__ungetBufferSize
+#define _ungetIndex pself->__ungetIndex
+
+#ifdef ERROR_CHECK
+#define _initialized pself->__initialized
+#endif
+
+@classdecl WWStreamClass;
+
+/*---------------------------------------------------------------------------
+//              WWStream::WWStream
+//---------------------------------------------------------------------------
+//
+// SYNOPSIS:    Default constructor
+// SCOPE:       Public
+// RETURN:      Nothing
+// STRATEGY:    We must not allocate anything in constructor as we can't
+//              return error code. Use Initialize() instead.
+//
+// REVISION HISTORY:
+//	Name	Date		Description
+//	----	----		-----------
+//	jlang	12/1/97   	Initial revision
+//
+//-------------------------------------------------------------------------*/
+@method WWStreamClass, WWStream /* ()  */
+{
+    _aborted = FALSE;
+    _endOfData = FALSE;
+    _mimeType = NULL;
+    _hasContentLength = FALSE;
+    _contentLength = 0;
+/*    _stream = NULL; */
+    _ungetBuffer = NULL;
+    _ungetBufferSize = 0;
+    _ungetIndex = 0;
+#ifdef ERROR_CHECK
+    _initialized = FALSE;
+#endif
+}
+
+
+/*---------------------------------------------------------------------------
+//              WWStream::~WWStream
+//---------------------------------------------------------------------------
+//
+// SYNOPSIS:    Destructor.
+// SCOPE:       Public
+// RETURN:      Nothing
+// STRATEGY:  
+//
+// REVISION HISTORY:
+//	Name	Date		Description
+//	----	----		-----------
+//	jlang	12/1/97   	Initial revision
+//
+//-------------------------------------------------------------------------*/
+@method WWStreamClass, MSG_META_FINAL_OBJ_FREE /* ~WWStream() */
+{
+    @call self::Cleanup();
+    @callsuper();
+} 
+
+
+/*---------------------------------------------------------------------------
+//              WWStream::Initialize
+//---------------------------------------------------------------------------
+//
+// SYNOPSIS:    Initialize stream before using the stream. It should also
+//              be called if Abort() was called.
+// SCOPE:       Public
+// RETURN:      WWSTREAM_OK
+//              WWSTREAM_OUT_OF_MEMORY    Cannot allocate resource.
+// STRATEGY:  
+//
+// REVISION HISTORY:
+//	Name	Date		Description
+//	----	----		-----------
+//	jlang	12/1/97   	Initial revision
+//
+//-------------------------------------------------------------------------*/
+@method /* WWStreamResultCode */
+WWStreamClass, InitializeStream /* (uint16 bufferSize, uint8 ungetBufferSize) */
+{
+    PARAM_ASSERT(bufferSize != 0);
+    ASSERTS(_aborted == FALSE,
+            "WWStream::Initialize() attempt to reuse stream");
+    ASSERTS(_initialized == FALSE,
+            "Memory leak: calling WWStream::Initialize() twice");
+
+    /* Create unget buffer */
+    if (ungetBufferSize) {
+        _ungetBufferSize = ungetBufferSize;
+        _ungetBuffer = (byte *)malloc(sizeof(byte)*(ungetBufferSize));
+        if (!_ungetBuffer) {
+            return WWSTREAM_OUT_OF_MEMORY;
+        }
+    }
+
+@if 0
+    /* Create stream. */
+    _stream = new Stream();
+    if (!_stream) {
+        return WWSTREAM_OUT_OF_MEMORY;
+    }
+    if (_stream->CreateBuffer(bufferSize) != STREAM_RETURN_OK) {
+        return WWSTREAM_OUT_OF_MEMORY;
+    }
+   _stream->OpenReader();
+   _stream->OpenWriter();
+
+@endif
+
+#ifdef ERROR_CHECK
+    _initialized = TRUE;
+#endif
+   return WWSTREAM_OK;
+}
+
+
+
+
+@method /* uint16 */
+WWStreamClass, GetBufferSize /* () */
+{
+    ASSERTS(_initialized == TRUE,
+            "WWStream::Initialize() was not called");
+/*    ASSERT(_stream != NULL); */
+    return /* _stream->GetBufferSize() */ 0;
+}	/* End of WWStream::GetBufferSize() */
+
+
+
+@method /* uint8 */
+WWStreamClass, GetUngetBufferSize /* ()  */
+{
+    ASSERTS(_initialized == TRUE,
+            "WWStream::Initialize() was not called");
+    return _ungetBufferSize;
+}
+
+
+
+/*---------------------------------------------------------------------------
+//		WWStream::SetMimeType()
+//---------------------------------------------------------------------------
+// 
+// SYNOPSIS: 	Set the MIME content-type.
+// SCOPE:	Public
+// RETURN:	WWSTREAM_OK
+//              WWSTREAM_OUT_OF_MEMORY
+// STRATEGY:	
+// 
+// REVISION HISTORY: 
+//	Name		Date		Description 
+//	----		----		----------- 
+//	kkee    	2/11/98 	Initial version 
+//	
+//-------------------------------------------------------------------------*/
+@method /* WWStreamResultCode */
+WWStreamClass, SetMimeType /* (const char *mimeType) */
+{
+    /* Create mime type. */
+    if (_mimeType) {
+        free(_mimeType);
+        _mimeType = NULL;
+    }
+    
+    if (mimeType) {
+        _mimeType = (char *)malloc(sizeof(char)*(strlen(mimeType)+1));
+        if (!_mimeType) {
+            return WWSTREAM_OUT_OF_MEMORY;
+        }
+        strcpy(_mimeType, mimeType);
+    }
+    return WWSTREAM_OK;
+}	/* End of WWStream::SetMimeType() */
+
+
+@method /* void  */
+WWStreamClass, SetMimeLength /* (uint32 length) */
+{
+    _hasContentLength = TRUE;
+    _contentLength = length;
+}
+
+
+
+/*---------------------------------------------------------------------------
+//		WWStream::GetMimeType()
+//---------------------------------------------------------------------------
+// 
+// SYNOPSIS: 	Get MIME content-type.
+// SCOPE:	Public
+// RETURN:	WWSTREAM_OK
+//              WWSTREAM_NOT_AVAIL
+//              WWSTREAM_OUT_OF_MEMORY
+// STRATEGY:	
+// 
+// REVISION HISTORY: 
+//	Name		Date		Description 
+//	----		----		----------- 
+//	kkee    	2/11/98 	Initial version 
+//	
+//-------------------------------------------------------------------------*/
+@method /* WWStreamResultCode */
+WWStreamClass, GetMimeType  /* (char **mimeType) */
+{
+    if (_mimeType) {
+        *mimeType = (char *)malloc(sizeof(char)*(strlen(_mimeType)+1));
+        if (!(*mimeType)) {
+            return WWSTREAM_OUT_OF_MEMORY;
+        }
+        strcpy(*mimeType, _mimeType);
+        return WWSTREAM_OK;
+    }
+    else {
+        *mimeType = NULL;
+    }
+    return WWSTREAM_NOT_AVAIL;
+}	/* End of WWStream::GetMimeType() */
+
+
+@method /* WWStreamResultCode */
+WWStreamClass, GetMimeLength /* (uint32 *length) */
+{
+    *length = _contentLength;
+    return (_hasContentLength==TRUE ? WWSTREAM_OK :
+            WWSTREAM_NOT_AVAIL);
+}
+
+
+
+//---------------------------------------------------------------------------
+//              WWStream::Read
+/*---------------------------------------------------------------------------
+//
+// SYNOPSIS:    Read the requested number of bytes from the stream into the 
+//              buffer.
+// SCOPE:       Public
+// RETURN:      WWSTREAM_OK             Success. numBytesRead returns
+//                                      <= numBytes and >= 1.
+//              WWSTREAM_EOF            All the requested data has been
+//                                      read. numBytesRead returns 0.
+//              WWSTREAM_ABORTED        Abort() was called. numBytesRead 
+//                                      returns 0.
+//              WWSTREAM_WOULD_BLOCK    If blocking == FALSE and no byte
+//                                      was read. numBytesRead returns
+//                                      0.
+//              WWSTREAM_TIMEOUT        If blocking == TRUE and timeout
+//                                      expired before a byte was read.
+//                                      numBytesRead returns 0.
+//              WWSTREAM_SPECIFIC_ERROR Check SpecificError(). 
+//                                      numBytesRead returns 0.
+//
+// STRATEGY:  
+//
+// REVISION HISTORY:
+//	Name	Date		Description
+//	----	----		-----------
+//	jlang	12/1/97   	Initial revision
+//
+//-------------------------------------------------------------------------*/
+@method /* WWStreamResultCode  */
+WWStreamClass, Read /* (uint8 *buffer, 
+		    uint16 numBytes,
+		    uint16 *numBytesRead, 
+		    Boolean blocking, 
+		    Timeout timeout)  */
+{
+    PARAM_ASSERT(buffer != NULL);
+    PARAM_ASSERT(numBytes != 0);
+    PARAM_ASSERT(numBytesRead != NULL);
+@if 0
+    StreamResultCode rc;
+    
+    if (_aborted) {
+        return WWSTREAM_ABORTED;
+    }
+    
+    ASSERTS(_initialized == TRUE, "WWStream::Initialize() was not called");
+
+    /*
+    // Check for ungotten data first
+    */
+    if (_ungetIndex) {  /* Faster to check here. */
+        ReadUngottenBytes(buffer, numBytes, numBytesRead);
+        return WWSTREAM_OK;
+    }
+
+    /*
+    // Read from stream
+    */
+    rc = _stream->Read(buffer, numBytes, numBytesRead, 
+                       blocking, timeout, TRUE);
+
+    /*
+    // Here is what _stream would return:
+    // STREAM_RETURN_OK, numBytesRead == numBytes
+    // STREAM_CLOSED, numBytesRead = 0
+    // STREAM_CLOSING, numBytesRead = 0
+    // STREAM_WOULD_BLOCK, numBytesRead = 0
+    // STREAM_SHORT_READ_WRITE, numBytesRead >= 0
+    // STREAM_TIMEOUT, numBytesRead >= 0
+    // STREAM_DEVICE_ERROR, numBytesRead >= 0
+    */
+
+    if (*numBytesRead) {
+        return WWSTREAM_OK;
+    } 
+    if (_endOfData) {
+        return WWSTREAM_EOF;
+    }
+
+    switch (rc) {
+     case STREAM_CLOSED:
+     case STREAM_CLOSING:
+     case STREAM_DEVICE_ERROR:
+        return WWSTREAM_ABORTED;
+        break;
+        
+     case STREAM_TIMEOUT:
+     case STREAM_SHORT_READ_WRITE:
+        return WWSTREAM_TIMEOUT;
+        break;
+        
+     case STREAM_WOULD_BLOCK:
+        return WWSTREAM_WOULD_BLOCK;
+        break;
+        
+     default:
+        /* STREAM_SHORT_READ_WRITE also returns numBytesRead > 0. */
+        EC_FAIL("WWStream::Read() returns numBytesRead == 0!");
+        /* To keep compiler happy, we must return something...    */
+        return WWSTREAM_EOF;
+        break;
+    }
+
+@endif
+
+    return WWSTREAM_ABORTED;
+
+}
+
+
+@method /* WWStreamResultCode  */
+WWStreamClass, ReadByte /* (uint8 *readByte,
+                     Boolean blocking,
+                     Timeout timeout) */
+{
+    word junk;
+    return @call self::Read(readByte, 1, &junk, blocking, timeout);
+}
+
+
+
+/*---------------------------------------------------------------------------
+//		WWStream::UngetByte()
+//---------------------------------------------------------------------------
+// 
+// SYNOPSIS: 	Unget a byte. If attempting to unget more bytes than
+//              the UngetBufferSize, will EC crash and ignored in 
+//              non-EC. The unget buffer uses the LIFO strategy.
+// SCOPE:	Public
+// RETURN:	Nothing
+// STRATEGY:	
+// 
+// REVISION HISTORY: 
+//	Name		Date		Description 
+//	----		----		----------- 
+//	kkee    	2/27/98 	Initial version 
+//	
+//-------------------------------------------------------------------------*/
+@method /* void */
+WWStreamClass, UngetByte /* (uint8 b) */
+{
+    if (_ungetIndex == _ungetBufferSize) {
+        EC_ERROR(1); /* "WWStream::UngetByte() unget buffer is full"); */
+        return;
+    }
+    _ungetBuffer[_ungetIndex++] = b;
+}	/* End of WWStream::UngetByte() */
+
+
+
+/*---------------------------------------------------------------------------
+//              WWStream::Write
+//---------------------------------------------------------------------------
+//
+// SYNOPSIS:    Write the requested number of bytes from the buffer to the 
+//              stream.
+// SCOPE:       Public
+// RETURN:
+//              WWSTREAM_OK               Success. numBytesWritten >= 1.
+//              WWSTREAM_ABORTED          Abort() was called.  
+//                                        numBytesWritten == 0.
+//              WWSTREAM_WOULD_BLOCK      If blocking == FALSE.
+//                                        numBytesWritten == 0.
+//              WWSTREAM_TIMEOUT          If blocking == TRUE, 
+//                                        numBytesWritten == 0.
+//              WWSTREAM_SPECIFIC_ERROR   Check SpecificError().
+//                                        numBytesWritten == 0.
+//
+// STRATEGY:  
+//
+// REVISION HISTORY:
+//	Name	Date		Description
+//	----	----		-----------
+//	jlang	12/1/97   	Initial revision
+//
+//-------------------------------------------------------------------------*/
+@method /* WWStreamResultCode  */
+WWStreamClass, Write /* (const uint8 *buffer, 
+                         uint16 numBytes, 
+                         uint16 *numBytesWritten, 
+                         Boolean endOfData,
+                         Boolean blocking, 
+                         Timeout timeout) */
+{
+    PARAM_ASSERT(buffer != NULL);
+    PARAM_ASSERT(numBytes != 0);
+    PARAM_ASSERT(numBytesWritten != NULL);
+
+@if 0    
+
+    StreamResultCode rc;
+
+    ASSERTS(_initialized == TRUE, "WWStream::Initialize() was not called");
+    ASSERT(_stream != NULL);
+
+    if (_aborted) {
+        return WWSTREAM_ABORTED;
+    }
+
+    rc = _stream->Write(buffer, numBytes, numBytesWritten, 
+                        blocking, timeout, TRUE);
+
+    /* 
+    // Here is what _stream could return:
+    // STREAM_RETURN_OK, numBytesWritten == numBytes
+    // STREAM_CLOSED, numBytesWritten = 0
+    // STREAM_CLOSING, numBytesWritten = 0
+    // STREAM_WOULD_BLOCK, numBytesWritten = 0
+    // STREAM_SHORT_READ_WRITE, numBytesWritten >= 0
+    // STREAM_TIMEOUT, numBytesWritten >= 0
+    // STREAM_DEVICE_ERROR, numBytesWritten = 0
+    */
+    if (*numBytesWritten) {
+        if (*numBytesWritten == numBytes) {
+            _endOfData = endOfData;
+        }
+        return WWSTREAM_OK;
+    }
+    switch (rc) {
+     case STREAM_CLOSED:
+     case STREAM_CLOSING:
+     case STREAM_DEVICE_ERROR:
+        return WWSTREAM_ABORTED;
+        break;
+        
+     case STREAM_WOULD_BLOCK:
+        return WWSTREAM_WOULD_BLOCK;
+        break;
+        
+     case STREAM_TIMEOUT:
+        return WWSTREAM_TIMEOUT;
+        break;
+        
+     default:        
+        /* STREAM_SHORT_READ_WRITE also returns numBytesWritten > 0. */
+        EC_FAIL("WWStream::Write() returns numBytesWritten 0!");
+        /* To keep compiler happy, we must return something...       */
+        return WWSTREAM_EOF;
+        break;
+    }
+
+@endif
+
+    return WWSTREAM_ABORTED;
+}
+
+
+
+@method /* WWStreamResultCode */
+WWStreamClass, WriteByte /* (uint8 writeByte,
+                      Boolean endOfData,
+                      Boolean blocking,
+                      Timeout timeout)  */
+{
+    word junk;
+    return @call self::Write(&writeByte, 1, &junk, endOfData, blocking, timeout);
+}
+
+
+
+/*---------------------------------------------------------------------------
+//		WWStream::Cleanup()
+//---------------------------------------------------------------------------
+// 
+// SYNOPSIS: 	Cleanup allocated memory and restore WWStream to the
+//              state when it was first created using a constructor.
+// SCOPE:	Protected.
+// RETURN:	Nothing
+// STRATEGY:	
+// 
+// REVISION HISTORY: 
+//	Name		Date		Description 
+//	----		----		----------- 
+//	kkee    	1/14/98 	Initial version 
+//	
+//-------------------------------------------------------------------------*/
+@method /* void */
+WWStreamClass, Cleanup /* () */
+{
+    if (_mimeType) {
+        free(_mimeType);
+        _mimeType = NULL;
+    }
+    _hasContentLength = FALSE;
+    if (_ungetBuffer) {
+        free(_ungetBuffer);
+        _ungetBuffer = NULL;
+    }
+
+@if 0
+    if (_stream) {
+        _stream->CloseReader();
+        _stream->CloseWriter();
+        delete _stream;
+        _stream = NULL;
+    }
+@endif
+
+    _endOfData = FALSE;
+}	/* End of WWStream::Cleanup() */
+
+
+
+
+@method /* void */
+WWStreamClass, Abort /* (void) */
+{
+
+@if 0
+    if (_stream) {
+        _stream->DeviceError();   /* Abort _stream */
+    }
+@endif
+
+    _aborted = TRUE;
+}	/* End of WWStream::Abort() */
+
+
+@method /* void  */
+WWStreamClass, SpecificError /* (TCHAR **errorMsg) */
+{
+    *errorMsg = NULL;
+}
+
+
+/*---------------------------------------------------------------------------
+//		WWStream::ReadUngottenBytes()
+//---------------------------------------------------------------------------
+// 
+// SYNOPSIS: 	Read ungotten bytes in _ungetBuffer.
+// SCOPE:	Protected
+// RETURN:	TRUE if numBytesRead returns > 0.
+//              FALSE if numBytesRead returns 0.
+// STRATEGY:	
+// 
+// REVISION HISTORY: 
+//	Name		Date		Description 
+//	----		----		----------- 
+//	kkee    	2/27/98 	Initial version 
+//	
+//-------------------------------------------------------------------------*/
+@method /* Boolean */
+WWStreamClass, ReadUngottenBytes /* (uint8 *buffer,
+                                     uint16 numBytes,
+                                     uint16 *numBytesRead) */
+{
+    if (_ungetIndex) {
+        *numBytesRead = (_ungetIndex > numBytes ? 
+                         numBytes : _ungetIndex);
+        for (word i=0; i<*numBytesRead; i++) {
+            buffer[i] = _ungetBuffer[--_ungetIndex];
+        }
+        return TRUE;
+    }
+    return FALSE;
+}	/* End of WWStream::ReadUngottenBytes() */
+

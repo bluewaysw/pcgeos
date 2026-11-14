@@ -1,0 +1,951 @@
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Geoworks 1996.  All rights reserved.
+	GEOWORKS CONFIDENTIAL
+
+PROJECT:	Geos WWW Library
+MODULE:		htftp
+FILE:		htftp.goc
+
+AUTHOR:		Jeremy Broestl, Jun 15, 1998
+
+ROUTINES:
+	Name			Description
+	----			-----------
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	jeremyb	6/15/98   	Initial version.
+
+DESCRIPTION:
+
+	HTFTP protocol class.
+
+	$Id: htftp.goc,v 1.1.1.6 98/08/04 14:44:39 jeremyb Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+
+@include <nsftp.goh>
+
+// #define HTFTP_BUFFER_SIZE      512
+
+/***********************************************************************
+		Class Declaration
+***********************************************************************/
+
+@classdecl	HTFTPClass;
+
+MemHandle bufferedReadHandle;
+
+extern GeodeHandle ftpClientApp;
+extern word ftpClientMsg;
+
+/***********************************************************************
+		Message Handlers
+***********************************************************************/
+
+
+
+/***********************************************************************
+ *		MSG_HT_STREAM_ABORT for HTFTPClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    
+ * PARAMETERS:	    
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:	    
+ *
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	jeremyb    	6/15/98   	Initial Revision
+ *	
+ ***********************************************************************/
+@method HTFTPClass, MSG_HT_STREAM_ABORT
+{
+    if (@self->HTFI_block) {
+	MemFree(@self->HTFI_block);
+    }
+
+    return @callsuper();
+}	/* End of MSG_HT_STREAM_ABORT.	*/
+
+
+
+/***********************************************************************
+ *		FTPParseURL
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Netscape origniated function to break the URL into pieces
+ * CALLED BY:	utility
+ * RETURN:	HTMemHandle, newly allocated and unlocked
+ *	
+ * STRATEGY:	So URL's apparently look like this:
+ *
+ * (protocol)://(username):(password)@(host)/(path)#(hash)?(search)
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	jeremyb 	6/17/98   	Initial Revision
+ *	
+ ***********************************************************************/
+HTMemHandle
+FTPParseURL (HTMemHandle urlHandle, int parts_requested, int *length)
+{
+    char *urlPiece; /* the piece to be returned in the HTMemHandle*/
+    char *colon, *slash, *ques_mark, *hash_mark;
+    char *atSign, *host, *passwordColon;
+    const char *url;
+    int urlLength;
+    HTMemHandle urlString;
+    /* resize in the end*/
+
+    url = HTMemLock(urlHandle);
+    urlString = HTMemAlloc(HT_MAX_URL_FIELD_LENGTH);
+    
+    urlPiece = HTMemLock(urlString);
+    *urlPiece = '\0';
+    if(!url) {
+	strcat(urlPiece, "");
+	HTMemUnlock(urlString);
+	return(urlString);
+    }
+    colon = strchr(url, ':'); /* returns a const char */
+
+    /* Get the protocol part, not including anything beyond the colon */
+    if (parts_requested & GET_PROTOCOL_PART) {
+	if(colon) {
+	    char val = *(colon+1);
+	    *(colon+1) = '\0';
+	    strcat(urlPiece, url);
+	    *(colon+1) = val;
+	    
+	     /*If the user wants more url info, tack on extra slashes. */
+	    if( (parts_requested & GET_HOST_PART)
+	       || (parts_requested & GET_USERNAME_PART)
+	       || (parts_requested & GET_PASSWORD_PART)) {
+		    if( *(colon+1) == '/' && *(colon+2) == '/'){
+			strcat(urlPiece, "//");
+			/* If there's a third slash consider it file:/// and 
+			   tack on the last slash. */
+			if( *(colon+3) == '/' ) {
+			    strcat(urlPiece, "/");
+			}
+		    }
+		}
+	}
+    }
+
+    /* Get the username if one exists  - up to the username*/
+    if (parts_requested & GET_USERNAME_PART) {
+	if (colon && (*(colon+1) == '/') && (*(colon+2) == '/')
+	    && (*(colon+3) != '\0')) {
+	    
+	    if ( (slash = strchr(colon+3, '/')) != NULL) {
+		*slash = '\0';
+	    }
+	    if ( (atSign = strchr(colon+3, '@')) != NULL) {
+		*atSign = '\0';
+		if ( (passwordColon = strchr(colon+3, ':')) != NULL) {
+		    *passwordColon = '\0';
+		}
+		strcat(urlPiece, colon+3);
+		
+		/* Get the password if one exists */
+		if (parts_requested & GET_PASSWORD_PART) {
+		    if (passwordColon) {
+			strcat(urlPiece, ":");
+			strcat(urlPiece, passwordColon+1);
+		    }
+		}
+		if (parts_requested & GET_HOST_PART){
+		    strcat(urlPiece, "@");
+		}
+		if (passwordColon){
+		    *passwordColon = ':';
+		}
+		*atSign = '@';
+	    }
+	    if (slash) {
+		*slash = '/';
+	    }
+	}
+    }
+    
+	/* Get the host part -- after http:// up to first / or ?*/
+    if (parts_requested & GET_HOST_PART) {
+        if(colon) {
+	    if(*(colon+1) == '/' && *(colon+2) == '/') {
+
+		    slash = strchr(colon+3, '/');
+		    
+		    if(slash) {
+			*slash = '\0';
+		    }
+		    if( (atSign = strchr(colon+3, '@')) != NULL) {
+			host = atSign+1;
+		    } else {
+			host = colon+3;
+		    }
+		    ques_mark = strchr(host, '?');
+		    
+		    if(ques_mark) {
+			*ques_mark = '\0';
+		    }
+                /* limit hostnames to within MAXHOSTNAMELEN characters to keep
+                 * from crashing
+                 */
+		    if(strlen(host) > MAXHOSTNAMELEN) {
+			char * cp;
+			char old_char;
+			
+			cp = host+MAXHOSTNAMELEN;
+			old_char = *cp;
+			
+			*cp = '\0';
+			
+			strcat(urlPiece, host);
+			
+			*cp = old_char;
+		    } else {
+			strcat(urlPiece, host);
+		    }
+		    
+		    if(slash) {
+			*slash = '/';
+		    }
+		    if(ques_mark) {
+			*ques_mark = '?';
+		    }
+		}
+	}
+    }
+	
+	/* Get the path part -- everything after host up to a # or ?*/
+    if (parts_requested & GET_PATH_PART) {
+        if(colon) {
+            if(*(colon+1) == '/' && *(colon+2) == '/') {
+		/* skip host part */
+                slash = strchr(colon+3, '/');
+	    } else {
+		/* path is right after the colon
+		 */
+                slash = colon+1;
+	    }
+	    
+	    if(slash) {
+		ques_mark = strchr(slash, '?');
+		hash_mark = strchr(slash, '#');
+		
+		if(ques_mark) {
+		    *ques_mark = '\0';
+		}
+		if(hash_mark) {
+		    *hash_mark = '\0';
+		}
+                strcat(urlPiece, slash);
+		
+		if(ques_mark) {
+		    *ques_mark = '?';
+		}
+		if(hash_mark) {
+		    *hash_mark = '#';
+		}
+	    }
+	}
+    }
+    
+    /* Hash part is after a # up to a ? */
+    if(parts_requested & GET_HASH_PART) {
+	hash_mark = strchr(url, '#'); /* returns a const char * */
+	
+	if(hash_mark) {
+	    ques_mark = strchr(hash_mark, '?');
+	    
+	    if(ques_mark) {
+		*ques_mark = '\0';
+	    }
+	    strcat(urlPiece, hash_mark);
+	    
+	    if(ques_mark) {
+		*ques_mark = '?';
+	    }
+	}
+    }
+
+    /* search is just the part after a ?*/
+    if(parts_requested & GET_SEARCH_PART) {
+        ques_mark = strchr(url, '?'); /* returns a const char * */
+
+        if(ques_mark) {
+            hash_mark = strchr(ques_mark, '#');
+	    
+            if(hash_mark) {
+                *hash_mark = '\0';
+	    }
+
+            strcat(urlPiece, ques_mark);
+
+            if(hash_mark) {
+                *hash_mark = '#';
+	    }
+	}
+    }
+
+    /* copy in a null string if nothing was copied in
+     */
+    if(!urlPiece) {
+	strcat(urlPiece, "");
+    }
+
+    /* XXX: What unlock, then lock???*/
+    HTMemUnlock(urlString);
+    urlPiece = HTMemLock(urlString);
+    strcat(urlPiece, "\n") ;
+    urlLength = strlen(urlPiece);
+    if (length) {
+	*length = urlLength;
+    }
+    HTMemUnlock(urlString);
+    urlString = HTMemReAlloc(urlString, urlLength+1);
+    HTMemUnlock(urlHandle);
+    return (urlString);
+}	/* End of FTPParseURL.	*/
+
+/* FTP is really based on lines of input from the FTP server.  Geos
+ * socket lib doesn't do this for us, so we'll do it ourselves.  If you
+ * are trying to speed up ftp, particularly login times, this would be
+ * a good place to start.  What things do here:
+ *
+ * liveSockHandle = HTSocketHandle from which we read
+ * bufferedReadHandle = MemHandle to buffer of unprocessed socket data.  
+ * lineHandle = returned to ftp_wait_for_response as the next line of data
+ * Each handle should have lock count of 0 on exit of each function.
+ */
+
+/***********************************************************************
+ *		FTPFillBufferWithSocketData
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Get more data from the physical socket cause buffer near
+ *               empty
+ * CALLED BY:	FTPGetLineFromBuffer
+ * RETURN:	int, number of bytes read from socket
+ *	
+ * STRATEGY:	Either the buffer is empty or ends in an incomplete line
+ *              so we get more socket data, and concatenate it with the
+ *              buffered data.
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	jeremyb 	6/24/98   	Initial Revision
+ *	
+ ***********************************************************************/
+int
+FTPFillBufferWithSocketData (MemHandle bufferedReadHandle, 
+			      HTSocketHandle liveSockHandle, int timeOut)
+{
+    int status ;
+    HTSocket *socketPtr;
+    char *socketData, *bufferPtr;
+    
+    status = HTSocketRecv(liveSockHandle, timeOut);
+    if (status) {
+	bufferPtr = MemLock(bufferedReadHandle);
+	socketPtr = (HTSocket *) MemLock(liveSockHandle);
+	socketData = (char *) socketPtr->HTS_buffer;
+	strcat(bufferPtr, socketData);
+	MemUnlock(bufferedReadHandle);
+	MemUnlock(liveSockHandle);
+    }
+    return(status);
+
+}	/* End of FTPFillBufferWithSocketData.	*/
+
+
+/***********************************************************************
+ *		FTPGetLineFromBuffer
+ ***********************************************************************
+ *
+ * SYNOPSIS:	ftp ready to get process more data, so get a line from 
+ *               buffer
+ * CALLED BY:	FTPGetNextLine
+ * RETURN:	allocated HTMemHandle containing the next line of data
+ *	
+ * STRATEGY:	Allocate handle to hold new line of data, copy beginning
+ *               of bufferedReadHandle to \r into it.  Also removes old
+ *               lines from the buffer.
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	jeremyb 	6/24/98   	Initial Revision
+ *	
+ ***********************************************************************/
+HTMemHandle
+FTPGetLineFromBuffer (MemHandle bufferedReadHandle, int *lineLength)
+{
+    char *linePtr, *lineEndPtr;
+    HTMemHandle lineHandle;
+    
+    PUSHDS;
+    SET_DS_LIB_DGROUP;
+
+    linePtr = MemLock(bufferedReadHandle);
+    if (*linePtr == '\0') {
+	MemUnlock(bufferedReadHandle);
+	POPDS;
+	return NULL; /* Got nothing in the buffer*/
+    }
+    lineEndPtr = strstr(linePtr, "\r");
+
+    if (lineEndPtr) {
+	*lineLength = (int) ((lineEndPtr - linePtr) + 1); 
+    } else {
+	*lineLength = strlen(linePtr);
+    }
+    lineHandle = HTMemAlloc((*lineLength)+1); /* grab char after \r too*/
+    strncpy(HTMemLock(lineHandle), linePtr, *lineLength); 
+    HTMemUnlock(lineHandle);
+
+    if (lineEndPtr) {
+	/* Watch out!  If strcpy copies back to front, then this
+	 * will mess up.
+	 */
+	strcpy(linePtr, lineEndPtr+2);
+    } else {
+	/* NULL terminate buffer, we're returning the whole thing. */
+	linePtr = '\0'; 
+    }
+
+    MemUnlock(bufferedReadHandle);
+    POPDS;
+
+    return (lineHandle);
+    
+}	/* End of FTPGetLineFromBuffer.	*/
+
+
+/***********************************************************************
+ *		FTPGetNextLine
+ ***********************************************************************
+ *
+ * SYNOPSIS:	FTP wants to only next line of data from the socket
+ * CALLED BY:	ftp_wait_for_response
+ * RETURN:	int, number of bytes read
+ *	
+ * STRATEGY:	Interface to SocketRecv.  We want one line at a time.
+ *              - initialize if necessary
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	jeremyb 	6/24/98   	Initial Revision
+ *	
+ ***********************************************************************/
+static int
+FTPGetNextLine (HTSocketHandle liveSockHandle, int timeOut, 
+		 HTMemHandle *lineHandle)
+{
+    char *bufferPtr, *lineEndPtr;
+    int lineLength = 0;
+
+    PUSHDS;
+    SET_DS_LIB_DGROUP;
+
+    if (!bufferedReadHandle) {
+	/* First time by, must initialize structures*/
+
+	bufferedReadHandle = MemAlloc(512, HF_SHARABLE | HF_SWAPABLE,
+		      HAF_ZERO_INIT | HAF_LOCK);
+
+	*((char *) (MemLock(bufferedReadHandle))) = '\0';
+	MemUnlock(bufferedReadHandle);
+
+	FTPFillBufferWithSocketData(bufferedReadHandle, liveSockHandle,
+				     timeOut);
+	*lineHandle = FTPGetLineFromBuffer(bufferedReadHandle, 
+					    &lineLength);
+    } else {
+	bufferPtr = MemLock(bufferedReadHandle);
+	lineEndPtr = strstr(bufferPtr, "\r");
+	MemUnlock (bufferedReadHandle);
+	if (lineEndPtr) {
+	    *lineHandle = FTPGetLineFromBuffer(bufferedReadHandle,
+						&lineLength);
+	} else {
+	    /* no end of line, better go read some more from socket*/
+	    bufferedReadHandle = MemReAlloc(bufferedReadHandle, 1024, 
+					    HAF_ZERO_INIT);
+	    FTPFillBufferWithSocketData(bufferedReadHandle, 
+					 liveSockHandle, timeOut);
+	    /* Doesn't really matter what status returns, still get a line 
+	     * and return.
+	     */
+	    *lineHandle = FTPGetLineFromBuffer(bufferedReadHandle,
+						&lineLength);
+	}
+    }
+    POPDS;
+    return(lineLength);
+}	/* End of FTPGetNextLine.	*/
+
+
+/***********************************************************************
+ *		ftp_wait_for_response
+ ***********************************************************************
+ *
+ * SYNOPSIS:	FTP client just sent something, get server response
+ * CALLED BY:	MSG_HT_PROTOCOL_LOAD for HTFTP class
+ * RETURN:	int 
+ *	
+ * STRATEGY:	Get the next line of data from the server, and perform
+ *               some processing.  Parse the return code from the server
+ *               and deal with continuation of server messages.
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	jeremyb 	7/29/98   	Initial Revision
+ *	
+ ***********************************************************************/
+int
+ftp_wait_for_response (HTMemHandle ftpConHandle)
+{
+    FTPConData * cd ;
+    int result_code;        /* numerical result code from server */
+    int status, lineLength;
+    char cont_char;
+    char *ptr, *line;
+    HTSocketHandle liveSockHandle;
+    int i = -1 ;
+    int numStart = -1 ;
+    HTMemHandle lineHandle;
+
+    cd = (FTPConData *) HTMemLock(ftpConHandle);
+    liveSockHandle = cd->csock;
+
+    status = FTPGetNextLine(liveSockHandle, 60, &lineHandle);
+    
+    if(status == 0) {
+	HTMemUnlock(ftpConHandle);
+	return(0);
+    }
+
+    line = (char *) HTMemLock(lineHandle);
+
+    /* This is a great place to set a breakpoint to print out server data*/
+    
+    lineLength = status;
+
+    /* Login messages or CWD messages 
+     * They're so handy, those help messages are 
+     */
+    if(cd->server_type == FTP_UNIX_TYPE && !strncmp(line, "250-",4)) {
+	/* -4 since we're not adding the first 4 char, +1 null, +1 \n */
+	HTMemAlloc(lineLength- 4 + 1 + 1);
+	ptr = HTMemLock(cd->cwd_message_handle);
+	*ptr = '\0';
+	strcat(ptr, line+4);
+	strcat(ptr, "\n");
+	HTMemUnlock(cd->cwd_message_handle);
+    } else if(!strncmp(line,"230-",4) || !strncmp(line,"220-",4)) {
+	/* What is the login_message_handle used for??  Gotta free it
+	 * sometime, so free the previous one here*/
+	if (cd->login_message_handle) {
+	    HTMemFree(cd->login_message_handle);
+	}
+	cd->login_message_handle = HTMemAlloc(lineLength-4 + 1 + 1);
+	ptr = HTMemLock(cd->login_message_handle);
+	strcpy(ptr, line+4);
+	strcat(ptr, "\n");
+	HTMemUnlock(cd->login_message_handle);
+    } else if(cd->cont_response == 230) {
+ 	/* this does the same thing as the one directly above it
+	 * but it checks for 230 response code instead
+  	 * this is to fix buggy ftp servers that don't follow specs
+	 */
+	if(strncmp(line, "230", 3)) {
+			/* make sure it's not  "230 Guest login ok...
+			 */
+	    if (cd->login_message_handle) {
+		HTMemFree(cd->login_message_handle);
+	    }
+	    cd->login_message_handle = HTMemAlloc(lineLength + 1 + 1);
+	    ptr = HTMemLock(cd->login_message_handle);
+	    *ptr = '\0';
+	    strcat(ptr, line);
+	    strcat(ptr, "\n");
+	    HTMemUnlock(cd->login_message_handle);
+        }
+    }
+
+    result_code = 0;          /* defualts */
+    cont_char = ' ';  /* defualts */
+    /*sscanf(line, "%d%c", &result_code, &cont_char);*/
+    while (1) {
+	if (i == lineLength) {
+	    break;
+	}
+	i++ ;
+	if (isdigit(line[i])) {
+	    if (numStart < 0) {
+		numStart = i;
+	    }
+	} else {
+	    if (numStart < 0) {
+		continue; /* Start with 1st digit*/
+	    }
+	    cont_char = line[i];
+	    line[i] = '\0';
+	    result_code = atoi(line+numStart);
+	    line[i] = cont_char;
+	    break;
+	}
+    }
+
+    /* We're going to keep a piece of data for the length of the return
+     * msg.  Reason: this is commonly used and needs to be fast.  Alternative
+     * is to do two each MemLocks and unlocks in the realloc - one to find
+     * length, then unlock, realloc, lock, access...
+     */
+    if (!cd->return_msg_handle) {
+	cd->return_msg_length = lineLength- 4;
+	cd->return_msg_handle = HTMemAlloc(cd->return_msg_length + 1) ;
+    }
+    if(cd->cont_response == -1) {
+         if (cont_char == '-') { /* start continuation */
+             cd->cont_response = result_code;
+	 }
+	 ptr = HTMemLock(cd->return_msg_handle) ;
+	 strncpy(ptr, line+4, cd->return_msg_length) ;
+	 HTMemUnlock(cd->return_msg_handle);
+    } else {    /* continuing */
+	if (cd->cont_response == result_code && cont_char == ' ') {
+	    cd->cont_response = -1;    /* ended */
+	}
+	cd->return_msg_length += lineLength +2;
+	cd->return_msg_handle = HTMemReAlloc(cd->return_msg_handle, 
+					     cd->return_msg_length);
+	ptr = HTMemLock(cd->return_msg_handle);
+	strcat(ptr, "\n");
+	if(lineLength > 3) {
+	    if(isdigit(line[0])) {
+		strcat(ptr, line+4);
+		/* Note that we're allowed more 4 bytes, but let it go,
+		 * you're going to realloc to right size next time by.
+		 * Let's be speedy.
+		 */
+		cd->return_msg_length -= 4;
+	    } else {
+		strcat(ptr, line);
+	    }
+	} else {
+	    strcat(ptr, line);
+	}
+	HTMemUnlock(cd->return_msg_handle);
+    }    
+
+    HTMemUnlockAndFree(lineHandle);
+
+    if(cd->cont_response == -1) { /* all done with this response? */ 
+     	 cd->next_state = cd->next_state_after_response;
+    }
+    if(result_code == 551) {
+	cd->next_state = FTP_ERROR_DONE;
+	return (-1);
+    }
+        
+    cd->response_code = result_code/100;
+
+    HTMemUnlock(ftpConHandle);
+    
+    return(1);  /* everything ok */
+} // end ftp_wait_for_response
+
+/***********************************************************************
+ *		ftp_control_connect
+ ***********************************************************************
+ *
+ * SYNOPSIS:	initiate connection
+ * CALLED BY:	HT_PROTOCOL_LOAD
+ * RETURN:	int status
+ *	
+ * STRATEGY:	Create a socket and connect to the address specified in
+ *               the request.
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	jeremyb 	7/29/98   	Initial Revision
+ *	
+ ***********************************************************************/
+int
+ftp_control_connect (HTMemHandle ftpConHandle, HTNetThread *net, 
+		     HTSocketAddress *address)
+{
+    FTPConData *cd;
+
+    cd = (FTPConData *)HTMemLock(ftpConHandle);    
+
+    PUSHDS;
+    SET_DS_LIB_DGROUP;    
+    @send (ConstructOptr(ftpClientApp, 0))::
+	{MSG_FROM_FTP_PROCESS}(ftpClientMsg)
+	    (FTP_TRYING_TO_LOG_IN, 0);
+    POPDS;
+
+    net->HTNT_socket = HTSocketCreate(net);
+    cd->csock = net->HTNT_socket ;
+    
+    if (HTSocketResolveAndConnect(net->HTNT_socket, 
+				  address) == HT_OK) {
+	cd->next_state = FTP_WAIT_FOR_RESPONSE;
+	cd->next_state_after_response = FTP_SEND_USERNAME;
+    } else {
+	cd->next_state = FTP_ERROR_DONE;
+    }
+    
+    HTMemUnlock(ftpConHandle);
+
+    return(0);
+}	/* End of ftp_control_connect.	*/
+
+
+
+/***********************************************************************
+ *		MSG_HT_PROTOCOL_LOAD for HTFTPClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    The meat of the FTP loading process.  We use lots of
+ * 			subroutines to do the real work.  Netscape has
+ *			alot of code.
+ *
+ * PARAMETERS:	    int (HTNetThread *net)
+ *                  - return HT_OK if all is well.
+ *                  - return HT_NO_CONTENT.
+ *                  - return HT_OUT_OF_MEMORY.
+ *                  - return HT_FILE_NOT_FOUND.
+ *                  - return HT_LOADED if we are done reading file.
+ * SIDE EFFECTS:    As some Geoworker once said "various and sundry"[sic]
+ *
+ * STRATEGY:        Massage the Netscape code a little.  Break it up into
+ *		geos-happy pieces.
+ * 
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	jeremyb	6/15/98   	Initial Revision
+ *
+ ***********************************************************************/
+@method HTFTPClass, MSG_HT_PROTOCOL_LOAD
+{
+    HTMemHandle ftpConHandle;
+    FTPConData *cd ;
+    HTMemHandle addressHandle;
+    HTSocketAddress *address;
+
+    ftpConHandle = FTPInitStructures(net); 
+    cd = (FTPConData *)HTMemLock(ftpConHandle);
+
+    while(1) {
+
+	int state = cd->next_state ;
+	int status;
+	HTMemUnlock(ftpConHandle);
+
+        switch(state) {
+
+          case FTP_WAIT_FOR_RESPONSE:
+            status = ftp_wait_for_response(ftpConHandle);
+            break;
+    
+          case FTP_CONTROL_CONNECT:
+	    /* need to do some work here since we have self now*/
+	    addressHandle = HTMemAlloc(sizeof(HTSocketAddress));
+	    address = (HTSocketAddress *) HTMemLock(addressHandle);
+	    FTPGetAddress(@self->HTSI_request, address);
+	    status = ftp_control_connect(ftpConHandle, net, address);
+	    HTMemUnlockAndFree(addressHandle);
+            break;
+	
+          case FTP_SEND_USERNAME:
+            status = ftp_send_username(ftpConHandle);
+            break;
+
+          case FTP_SEND_USERNAME_RESPONSE:
+            status = ftp_send_username_response(ftpConHandle);
+            break;
+
+	  case FTP_GET_PASSWORD:
+            status = ftp_get_password(ftpConHandle);
+            break;
+
+          case FTP_SEND_PASSWORD:
+            status = ftp_send_password(ftpConHandle);
+            break;
+    
+          case FTP_SEND_PASSWORD_RESPONSE:
+            status = ftp_send_password_response(ftpConHandle);
+            break;
+
+          case FTP_SEND_REST_ZERO:
+            status = ftp_send_rest_zero(ftpConHandle);
+            break;
+    
+          case FTP_SEND_REST_ZERO_RESPONSE:
+            status = ftp_send_rest_zero_response(ftpConHandle);
+            break;
+
+          case FTP_SEND_SYST:
+            status = ftp_send_syst(ftpConHandle);
+            break;
+    
+          case FTP_SEND_SYST_RESPONSE:
+            status = ftp_send_syst_response(ftpConHandle);
+            break;
+	    
+          case FTP_SEND_PWD:
+            status = ftp_send_pwd(ftpConHandle);
+            break;
+    
+          case FTP_SEND_PWD_RESPONSE:
+            status = ftp_send_pwd_response(ftpConHandle);
+            break;
+
+	  case FTP_FIGURE_OUT_WHAT_TO_DO:
+            status = ftp_figure_out_what_to_do(ftpConHandle);
+	    break;
+
+          case FTP_SEND_PASV:
+            status = ftp_send_pasv(ftpConHandle);
+            break;
+
+          case FTP_SEND_PASV_RESPONSE:
+            status = ftp_send_pasv_response(ftpConHandle, net);
+            break;
+
+          case FTP_PASV_DATA_CONNECT:
+	    status = ftp_pasv_data_connect(ftpConHandle);
+            break;
+
+          case FTP_SEND_PORT:
+            status = ftp_send_port(ftpConHandle, net);
+            break;
+    
+          case FTP_SEND_PORT_RESPONSE:
+            status = ftp_send_port_response(ftpConHandle);
+            break;
+	    
+          case FTP_GET_FILE_TYPE:
+            status = ftp_get_file_type(ftpConHandle);
+            break;
+    
+          case FTP_SEND_BIN:
+            status = ftp_send_bin(ftpConHandle);
+            break;
+    
+          case FTP_SEND_ASCII:
+            status = ftp_send_ascii(ftpConHandle);
+            break;
+    
+          case FTP_SEND_BIN_RESPONSE:
+          case FTP_SEND_ASCII_RESPONSE:
+            status = ftp_send_bin_or_ascii_response(ftpConHandle);
+            break;
+
+	  case FTP_GET_FILE_SIZE:
+            status = ftp_get_file_size(ftpConHandle);
+            break;
+
+	  case FTP_GET_FILE_SIZE_RESPONSE:
+            status = ftp_get_file_size_response(ftpConHandle);
+            break;
+
+/**************************************************************************
+ * We're skipping the mdtm.  What were we supposed to do with it??
+ * 
+	  case FTP_GET_FILE_MDTM:
+            status = ftp_get_file_mdtm(ftpConHandle);
+            break;
+
+	  case FTP_GET_FILE_MDTM_RESPONSE:
+            status = ftp_get_file_mdtm_response(ftpConHandle);
+            break;
+*********/    
+          case FTP_GET_FILE:
+            status = ftp_get_file(ftpConHandle);
+            break;
+
+          case FTP_SEND_RETR:
+            status = ftp_send_retr(ftpConHandle);
+            break;
+    
+          case FTP_SEND_RETR_RESPONSE:
+            status = ftp_send_retr_response(ftpConHandle);
+            break;
+
+	case FTP_START_READ_FILE:
+            status = ftp_start_read_file(ftpConHandle);
+            break;
+    
+	case FTP_READ_FILE:
+            status = ftp_read_file(ftpConHandle);
+            break;
+    
+          case FTP_START_READ_DIRECTORY:
+            status = ftp_start_read_dir(ftpConHandle);
+            break;
+
+	case FTP_LOGOUT_AND_DONE:
+	    /* Specially added state to tell server to QUIT*/
+	    status = ftp_logout_and_done(ftpConHandle);
+	    break;
+
+	case FTP_DONE:
+	    status = ftp_done(&ftpConHandle, net);
+	    ftpConHandle = (HTMemHandle) 0;
+	    break;
+
+	default:
+	    /* Uhhh, what the heck happened here?? We're too late, but ...
+	     */
+	    EC_ERROR(-1);
+	    return(-1);
+	} /* end switch */
+	if (ftpConHandle) {
+	    cd = HTMemLock(ftpConHandle);
+	} else {
+	    break;
+	}
+
+	if((status < 0) && (cd->next_state != FTP_FREE_DATA)) {
+	    cd->next_state = FTP_ERROR_DONE;
+	} 
+    } /* end while */
+
+    return(HT_LOADED); /* Whatever happens, we don't want to come back here
+			*/
+
+}	/* End of MSG_HT_PROTOCOL_LOAD.	*/
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

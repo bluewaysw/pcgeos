@@ -1,0 +1,282 @@
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Geoworks 1996 -- All Rights Reserved
+
+PROJECT:	
+MODULE:		
+FILE:		uiattr.goc
+
+AUTHOR:		Edwin Yu, Apr 25, 1996
+
+ROUTINES:
+	Name			Description
+	----			-----------
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	EY	4/25/96   	Initial version.
+
+DESCRIPTION:
+	This file defines messages that process HTML attributes.
+
+	$Id: uiattr.goc,v 1.9.4.2 97/09/22 18:25:10 kkee Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+@include <stdapp.goh>
+@include <WWW/uigenera.goh>
+#include <Ansi/string.h>
+#include <Ansi/stdlib.h>	/* atoi */
+@include "utility.goh"
+
+
+
+/***********************************************************************
+ *		ProcessAlignAttr
+ ***********************************************************************
+ * SYNOPSIS:	Identify the type of justifications
+ * CALLED BY:	MSG_UI_GENERATOR_START_HEADER
+ * RETURN:	Justification: J_LEFT | J_CENTER | J_RIGHT | J_FULL
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	EY	5/15/96   	Initial Revision
+ *
+ ***********************************************************************/
+Justification
+ProcessAlignAttr (char *type)
+{
+  if (strcasecmp(type, "center") == 0)
+	return J_CENTER;
+  else if (strcasecmp(type, "left") == 0)
+	return J_LEFT;
+  else if (strcasecmp(type, "right") == 0)
+	return J_RIGHT;
+  else if (strcasecmp(type, "justify") == 0)
+	return J_FULL;
+  else
+	return J_LEFT;
+}	/* End of ProcessAlignAttr.	*/
+
+
+/***********************************************************************
+ *		ProcessOrderedListAttr
+ ***********************************************************************
+ * SYNOPSIS:	Process <OL> attribute list
+ * CALLED BY:	MSG_UI_GENERATOR_START_ORDERED_LIST
+ * RETURN:	none
+ * SIDE EFFECTS:
+ *
+ * STRATEGY:
+ *		Supported Attributes:
+ *		<OL>	: START = n,			(default is 1)
+ *			  TYPE  = A | a | I | i | 1	(default is 1)
+ *	
+ *		Assume dataBlock and dataChunk are valid
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	EY	5/ 7/96   	Initial Revision
+ *
+ ***********************************************************************/
+void ProcessOrderedListAttr 
+(MemHandle block, SGMLEntity *entity, optr content)
+{
+  char *value;
+  int index, start = 1;		/* default: count from 1    */
+  char type = '1';		/* default: numeric counter */
+
+  for(index = 0; entity[index].SGMLE_token; index++) {
+    if (!entity[index].SGMLE_value)
+      continue;
+    value = (char *)LMemDerefHandles(block, entity[index].SGMLE_value);
+    switch(entity[index].SGMLE_token) {
+    case HTML_ATTR_START:
+      /*
+       * get the starting number for the first list item
+       */
+      start = atoi(value);
+      if (start < 1)
+	  start = 1;
+      break;
+    case HTML_ATTR_TYPE:
+      /*
+       * get the display type of the list items.
+       */
+      type = value[0];
+      break;
+    }
+  }
+  /*
+   * Store the list information in a stack
+   */
+  @call content::MSG_GEN_HTML_CONTENT_PUSH_LIST_GROUP(STYLE_OL, start, type);
+  return;
+}	/* End of ProcessOrderedListAttr.	*/
+
+
+/***********************************************************************
+ *		ProcessUnorderedListAttr
+ ***********************************************************************
+ * SYNOPSIS:	Process <UL> attribute list
+ * CALLED BY:	MSG_UI_GENERATOR_START_UNORDERED_LIST
+ * RETURN:	none
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:
+ *		Three infomation about the group is pushed to the list
+ *		stack:
+ *		  type of group:
+ *			<UL>
+ *		  counter:
+ *			0, actually, counter is not used for <UL>
+ *		  type of header:
+ *			d - disk.
+ *			c - circle.
+ *			s - square.
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	EY	5/ 8/96   	Initial Revision
+ *
+ ***********************************************************************/
+void ProcessUnorderedListAttr 
+(MemHandle block, SGMLEntity *entity, optr content)
+{
+  char *value;
+  int  index = 0;
+  char type = 'x';		/* default: none */
+
+  for(index = 0; entity[index].SGMLE_token; index++) {
+    if (!entity[index].SGMLE_value)
+      continue;
+    value = (char *)LMemDerefHandles(block, entity[index].SGMLE_value);
+    switch(entity[index].SGMLE_token) {
+    case HTML_ATTR_TYPE:    /* TYPE */
+      /*
+       * get the display type of the list items.
+       */
+      if (strcasecmp(value, "circle") == 0)
+	type = 'c';
+      else if (strcasecmp(value, "square") == 0)
+	type = 's';
+    }
+  }
+
+  /*
+   * Store the list information in a stack
+   * no counter for UL
+   */
+  @call content::MSG_GEN_HTML_CONTENT_PUSH_LIST_GROUP(STYLE_UL, 0, type);
+
+  return;
+}	/* End of ProcessUnorderedListAttr.	*/
+
+
+/***********************************************************************
+ *		ProcessLIAttr
+ ***********************************************************************
+ * SYNOPSIS:	Process the attribute list of <LI>
+ * CALLED BY:	
+ * RETURN:	char - display type
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:
+ *	Supported Attributes:
+ *		TYPE = A | a | I | i | 1 for <OL>
+ *		TYPE = square | circle | disk for <UL>
+ *		VALUE = n for <OL>
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	EY	5/15/96   	Initial Revision
+ *
+ ***********************************************************************/
+void
+ProcessLIAttr (MemHandle block, SGMLEntity *entity,
+		StyleType type, dword *counter, char *display, optr content)
+{
+  char *value;
+  int index;
+
+  for(index = 0; entity[index].SGMLE_token; index++) {
+    if (!entity[index].SGMLE_value)
+      continue;
+    value = (char *)LMemDerefHandles(block, entity[index].SGMLE_value);
+    switch(entity[index].SGMLE_token) {
+    case HTML_ATTR_TYPE:    /* TYPE */
+      /*
+       * get the display type for the list header.
+       */
+      if (type == STYLE_UL && strcasecmp(value, "circle") == 0)
+	*display = 'c';
+      else if (type == STYLE_UL && strcasecmp(value, "square") == 0)
+	*display = 's';
+      else if (type == STYLE_UL && strcasecmp(value, "disk") == 0)
+	*display = 'd';
+      else if (type == STYLE_OL && 
+	       (value[0] == '1' || value[0] == 'A' ||
+		value[0] == 'a' || value[0] == 'I' ||
+		value[0] == 'i'))
+	*display = value[0];
+      else if (type == STYLE_OL)
+	*display = 1;
+      else /* type == STYLE_UL */
+	*display = 'd';
+      break;
+    case HTML_ATTR_VALUE:
+      if (type == STYLE_OL) {
+	*counter = myatoi(value);
+	if (*counter < 1)
+	    *counter = 1;
+	@call content::MSG_GEN_HTML_CONTENT_UPDATE_COUNTER\
+	   (*counter);
+      }
+      break;
+    }
+  }
+  return;
+}	/* End of ProcessLIAttr.	*/
+
+
+/***********************************************************************
+ *		ProcessParagraphAttr
+ ***********************************************************************
+ * SYNOPSIS:	Process the attribute list of <P> and <DIV>
+ * CALLED BY:	
+ * RETURN:	
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:
+ *	Supported Attributes:
+ *		ALIGN: left | center | right
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	EY	5/20/96   	Initial Revision
+ *
+ ***********************************************************************/
+Justification ProcessDivParagraphAttr(MemHandle block, SGMLEntity *entity)
+{
+  char *value;
+  int	index;
+  Justification just = J_LEFT;
+
+  for(index = 0; entity[index].SGMLE_token; index++) {
+    if (!entity[index].SGMLE_value)
+      continue;
+    value = (char *)LMemDerefHandles(block, entity[index].SGMLE_value);
+    switch(entity[index].SGMLE_token) {
+    case HTML_ATTR_ALIGN:
+	just = ProcessAlignAttr(value);
+	break;
+    }
+  }
+
+  return just;
+}	/* End of ProcessParagraphAttr.	*/

@@ -1,0 +1,847 @@
+/*---------------------------------------------------------------------------
+//
+//  Geoworks (R) application software and GEOS (R) operating system
+//  software copyright (C) 1990-1997 Geoworks.  All rights reserved.
+//  United States Patents 5327529, 5237651, and 5438662. U.K. Patents
+//  0375703 and 0631677.  German Patents P3854269.2-08 and
+//  69307728.1-08.  French Patents 0375703 and 0631677.  Other
+//  international patents pending.
+//
+//  This software is the confidential and proprietary information of
+//  Geoworks ("Confidential Information").  You shall not disclose
+//  such Confidential Information and shall use it only in accordance
+//  with the terms of the license agreement you entered into with
+//  Geoworks.
+//
+// PROJECT:     HTMLViewer
+// MODULE:      html
+// FILE:        html.cpp
+//
+// AUTHOR:      Kok Kin Kee: Jan 13, 1998
+//
+// REVISION HISTORY:
+//      Name            Date            Description
+//      ----            ----            -----------
+//      kkee          1/13/98           Initial version
+//
+//
+// DESCRIPTION:
+//      HTMLViewer
+//      //depot/liberty/project/ellery/980805/library/www/html/html.cpp#1
+//
+//      $Id: html.goc,v 1.3 98/09/03 03:52:19 allen Exp $
+//
+//-------------------------------------------------------------------------*/
+
+/*
+#include <system.h>
+#include <string.h>
+#include <jstring.h>
+#include <tstring.h>
+#include <ui/appbase.h>
+#include <kernel/msgqueue.h>    // MessageQueue
+#include <toolkit/frame.h>
+#include <www/conv/html.h>
+#include <www/scheme/wwfile.h>
+#include <www/wwcore/wwstring.h>
+#include <www/wwcore/wwuri.h>
+#include <www/wwmem.h>
+#include <www/conv/sgml.h>
+#include <www/conv/htmldtd.h>
+#include "sched.h"
+#include "req.h"
+#include "htframe.h"         // HTML Frame
+#include "imgframe.h"        // Image frame
+#include "htglyph.h"
+#include "htimg.h"
+#include "reqmgr.h"
+
+#include <kernel/log.h>
+
+*/
+
+@include <stdapp.goh>
+@include <Ansi/string.h>
+@include <Ansi/stdlib.h>
+@include "WWW2/Conv/html.goh"
+@include "WWW2/Conv/sgml.goh"
+@include "WWW2/Conv/htmldtd.goh"
+@include "WWW2/WW2Core/ww2string.goh"
+@include "WWW2/WW2Core/ww2strm.goh"
+@include "WWW2/wwMacro.h"
+@include "WWW2/Conv/reqmgr.goh"
+@include "WWW2/Conv/req.goh"
+#include "WWW2/ww2mem.h"
+
+#define _appHandle  (pself->__appHandle)
+#define _flexframe  (pself->__flexframe)
+#define _reqManager (pself->__reqManager)
+#define _frameSem   (pself->__frameSem)
+#define _wwFrame    (pself->__wwFrame)
+#define _xPos       (pself->__xPos)
+#define _yPos       (pself->__yPos)
+#define _width      (pself->__width)
+#define _height     (pself->__height)
+
+#define FRAME_NOT_YET_DEFINED 0
+#define IMG_FRAME_NOT_YET_DEFINE 0
+
+typedef struct arg { 
+    HTRequest *req;
+    optr  viewer;
+    word  xPos;
+    dword yPos;
+    word  width;
+    dword height;
+    optr  *wwFrame
+} Arg;
+
+typedef struct htcoord
+{
+    word  x0;
+    dword y0;
+    word  x1;
+    dword y1;
+} HTCoord;
+
+/* Callback to UI thread to create a HTFrame object.   */
+static void
+CreateNewHTFrame(word hi, word lo); 
+#if 0
+                 (optr /* HTRequest * */ req, optr /* HTMLViewer * */ viewer, 
+                 HTCoord * coord, optr /* HTFrame ** */ *newFrame);
+#endif
+
+/* Callback to UI thread to create an ImgFrame object. */
+static void
+CreateNewImgFrame(word hi, word lo);
+#if 0
+(optr /* HTRequest * */ req, optr /* HTMLViewer * */ viewer, 
+                  HTCoord *coord, optr /* ImgFrame ** */ *newFrame);
+#endif
+
+/* Callback to UI thread to delete a WWFrame object.   */
+static void
+CloseFrames(word Han, word Chunk);
+#if 0
+(optr /* WWFrame * */ frame);
+#endif
+
+
+@classdecl HTMLViewerClass;
+
+
+/*---------------------------------------------------------------------------
+//		HTMLViewer::HTMLViewer()
+//---------------------------------------------------------------------------
+// 
+// SYNOPSIS: 	Default constructor
+// SCOPE:	Public
+// RETURN:	Nothing
+// STRATEGY:	
+// 
+// REVISION HISTORY: 
+//	Name		Date		Description 
+//	----		----		----------- 
+//	kkee    	1/13/98 	Initial version 
+//	
+//-------------------------------------------------------------------------*/
+@method HTMLViewerClass, HTMLViewer /* (uint16 x, uint16 y, 
+                       uint16 width, uint16 height) :  */
+{       
+    PARAM_ASSERT(width != 0);
+    PARAM_ASSERT(height != 0);
+
+    _reqManager = 0;
+    _frameSem = ThreadAllocSem(1);
+    _wwFrame = NULL;
+    _xPos = coordX;
+    _yPos = coordY;
+    _width = width;
+    _height= height;
+
+}	/* End of HTMLViewer::HTMLViewer() */
+
+
+/*---------------------------------------------------------------------------
+//		HTMLViewer::~HTMLViewer()
+//---------------------------------------------------------------------------
+// 
+// SYNOPSIS: 	Destructor
+// SCOPE:	Public
+// RETURN:	Noting
+// STRATEGY:	
+// 
+// REVISION HISTORY: 
+//	Name		Date		Description 
+//	----		----		----------- 
+//	kkee    	1/13/98 	Initial version 
+//	
+//-------------------------------------------------------------------------*/
+@method HTMLViewerClass, MSG_META_FINAL_OBJ_FREE /* ::~HTMLViewer() */
+{
+    @call _reqManager::MSG_META_OBJ_FREE();
+
+    /* Can call CloseFrames() or delete it. */
+    @call _wwFrame::MSG_META_OBJ_FREE();
+
+}	/* End of HTMLViewer::~HTMLViewer() */
+
+
+/*---------------------------------------------------------------------------
+//		HTMLViewer::Initialize()
+//---------------------------------------------------------------------------
+// 
+// SYNOPSIS: 	Initialize a HTMLViewer.
+// SCOPE:	Public
+// RETURN:	HTMLV_OK
+//              HTMLV_OUT_OF_MEMORY
+// STRATEGY:	
+// 
+// REVISION HISTORY: 
+//	Name		Date		Description 
+//	----		----		----------- 
+//	kkee    	1/16/98 	Initial version 
+//	
+//-------------------------------------------------------------------------*/
+@method /* HTMLViewerResultCode  */
+HTMLViewerClass, ViewerInitialize /* (FlexFrame *flexframe) */
+{
+    PARAM_ASSERT(flexframe);
+
+/*    _appbase = AppBase::GetAppBase(); */
+    _appHandle = app;
+
+    _reqManager = ObjInstantiate(HandleOf(oself), &HTRequestManagerClass);
+
+    if (_reqManager)
+	@call _reqManager::HTRequestManager(app, NULL/*_appbase */, 
+					    flexframe, oself /* this */);
+    else
+	return HTMLV_OUT_OF_MEMORY;
+
+    if (!@call _reqManager::ReqMgrInitialize()) {
+	@call _reqManager::MSG_META_OBJ_FREE();
+	_reqManager = NULL;
+        return HTMLV_OUT_OF_MEMORY;
+    }
+    return HTMLV_OK;
+}	/* End of HTMLViewer::Initialize() */
+
+
+/*---------------------------------------------------------------------------
+//		HTMLViewer::SetProxy()
+//---------------------------------------------------------------------------
+// 
+// SYNOPSIS: 	Set the proxy preference. 
+// SCOPE:	Public
+// RETURN:	Nothing
+// STRATEGY:	
+// 
+// REVISION HISTORY: 
+//	Name		Date		Description 
+//	----		----		----------- 
+//	kkee    	5/16/98 	Initial version 
+//	
+//-------------------------------------------------------------------------*/
+@method /* void */
+HTMLViewerClass, SetProxy /* (const char *name, uint32 port) */
+{
+    ASSERT(_reqManager);
+    @call _reqManager::ReqMgrSetProxy(name, port);
+}	/* End of HTMLViewer::SetProxy() */
+
+@method /* void */
+HTMLViewerClass, SetLoadImage /* (Boolean flag)  */
+{
+    ASSERT(_reqManager);
+    @call _reqManager::ReqMgrSetLoadImage(flag);
+}
+
+
+/*---------------------------------------------------------------------------
+//		HTMLViewer::GetURL()
+//---------------------------------------------------------------------------
+// 
+// SYNOPSIS: 	Get a URL and display the response data. If return
+//              code is HTMLV_OK, this will initiate background
+//              processing of response data. If an existing request is
+//              still active (either created by GetURL(), PostURL(),
+//              or NewStream()) it will be aborted. If that request
+//              was created using NewStream(), we crash in EC code as 
+//              client should have called DestroyStream() before
+//              making a new request.
+// SCOPE:	Public
+// RETURN:	HTMLV_OK                Background processing started. 
+//          HTMLV_OUT_OF_MEMORY
+// STRATEGY:	
+// 
+// REVISION HISTORY: 
+//	Name		Date		Description 
+//	----		----		----------- 
+//	kkee    	1/20/98 	Initial version 
+//	
+//-------------------------------------------------------------------------*/
+@method /* HTMLViewerResultCode */
+HTMLViewerClass, GetURL /* (const char *url,
+                   HTMLViewer::LoadMode loadMode) */
+{       
+    PARAM_ASSERT(url != NULL);
+    ASSERTS(_reqManager != NULL,
+            "HTMLViewer::Initialize() was not called");
+
+    return (@call _reqManager::ReqMgrGetURL(url, loadMode, NULL) ? 
+            HTMLV_OK : HTMLV_OUT_OF_MEMORY);
+}	/* End of HTMLViewer::GetURL() */
+
+
+
+/*---------------------------------------------------------------------------
+//		HTMLViewer::PostURL()
+//---------------------------------------------------------------------------
+// 
+// SYNOPSIS: 	Post a URL and display the response data. If return
+//              code is HTMLV_OK, this will initiate background
+//              processing of response data. If an existing request is
+//              still active (either created by GetURL(), PostURL(),
+//              or NewStream()) it will be aborted. If that request
+//              was created using NewStream(), we crash in EC code as 
+//              client should have called DestroyStream() before
+//              making a new request.
+// SCOPE:	Public
+// RETURN:	HTMLV_OK                Background processing started. 
+//          HTMLV_OUT_OF_MEMORY
+//
+// STRATEGY:	
+// 
+// REVISION HISTORY: 
+//	Name		Date		Description 
+//	----		----		----------- 
+//	kkee    	4/21/98 	Initial version 
+//	
+//-------------------------------------------------------------------------*/
+@method /* HTMLViewerResultCode */
+HTMLViewerClass, PostURL /* (const char *url,
+                    const byte *buffer,
+                    const dword len,
+                    Boolean file) */
+{
+    PARAM_ASSERT(url);
+    PARAM_ASSERT(buffer);
+    PARAM_ASSERT(len>0);
+    ASSERTS(file == FALSE,
+            "HTMLViewer::PostURL() post from file not implemented");
+    
+    ASSERTS(_reqManager != NULL,
+            "HTMLViewer::Initialize() was not called");
+
+    return (@call _reqManager::ReqMgrPostURL(url, buffer, len, file) ?
+        HTMLV_OK : HTMLV_OUT_OF_MEMORY);
+}	/* End of HTMLViewer::PostURL() */
+
+
+
+/*---------------------------------------------------------------------------
+//		HTMLViewer::NewStream()
+//---------------------------------------------------------------------------
+// 
+// SYNOPSIS: 	Inform HTMLViewer of a new data stream produced by caller
+//              and consumed by HTMLViewer. Caller will write to
+//              stream and HTMLViewer will read from it.
+// SCOPE:	Public
+// RETURN:	HTMLV_OK
+//              HTMLV_STREAM_ERROR
+//              HTMLV_OUT_OF_MEMORY
+// STRATEGY:	
+// 
+// REVISION HISTORY: 
+//	Name		Date		Description 
+//	----		----		----------- 
+//	kkee    	1/16/98 	Initial version 
+//	
+//-------------------------------------------------------------------------*/
+@method /* HTMLViewerResultCode */
+HTMLViewerClass, NewStream /* (WWStream *stream) */
+{      
+    EC_FAIL("HTMLViewer::NewStream() not implemented");
+    USE_IT(stream);
+    return HTMLV_OUT_OF_MEMORY;
+}	/* End of HTMLViewer::NewStream() */
+
+
+
+/*---------------------------------------------------------------------------
+//		HTMLViewer::DestroyStream()
+//---------------------------------------------------------------------------
+// 
+// SYNOPSIS: 	Wait for HTMLViewer to finish using a stream. After
+//              this call, client can delete the stream.
+// SCOPE:	Public
+// RETURN:	Nothing
+// STRATEGY:	Synchronizes with NewStream() to stop processing data
+//              from stream and to stop and remove all references to stream.
+// 
+// REVISION HISTORY: 
+//	Name		Date		Description 
+//	----		----		----------- 
+//	kkee    	1/16/98 	Initial version 
+//	
+//-------------------------------------------------------------------------*/
+@method /* void */
+HTMLViewerClass, DestroyStream /* (WWStream *stream) */
+{
+    PARAM_ASSERT(stream);
+    USE_IT(stream);
+    EC_FAIL("HTMLViewer::NewStream() not implemented");
+}	/* End of HTMLViewer::DestroyStream() */
+
+
+/*---------------------------------------------------------------------------
+//		HTMLViewer::Stop()
+//---------------------------------------------------------------------------
+// 
+// SYNOPSIS: 	Stop current display if not done.
+// SCOPE:	Public
+// RETURN:	Nothing
+// STRATEGY:	
+// 
+// REVISION HISTORY: 
+//	Name		Date		Description 
+//	----		----		----------- 
+//	kkee    	1/19/98 	Initial version 
+//	
+//-------------------------------------------------------------------------*/
+@method /* void */
+HTMLViewerClass, Stop /* () */
+{
+    @call _reqManager::StopAllRequests();
+}	/* End of HTMLViewer::Stop() */
+
+
+/*---------------------------------------------------------------------------
+//		HTMLViewer::AcceptStream()
+//---------------------------------------------------------------------------
+// 
+// SYNOPSIS: 	Accept a response stream for a request. The request id
+//              is provided.
+// SCOPE:	Private
+// RETURN:	Nothing
+// STRATEGY:	Use the id to decide what request is it and act on the
+//              stream. This method must be thread-safe.
+// 
+// REVISION HISTORY: 
+//	Name		Date		Description 
+//	----		----		----------- 
+//	kkee    	1/29/98 	Initial version 
+//	
+//-------------------------------------------------------------------------*/
+@method /* void */
+HTMLViewerClass, ViewerAcceptStream /* (WWStream *stream, HTRequest *req) */
+{
+    PARAM_ASSERT(stream);
+    PARAM_ASSERT(req);
+
+    ThreadPSem(_frameSem);
+    
+    /* Check mime type and call the right parser. */
+    char *mimeType;
+    @call stream::GetMimeType(&mimeType);
+    if (!mimeType || !WWStrCaseCmp(mimeType, "text/html")) {
+        @call self::ParseHTML(stream, req);
+    } else if (!WWStrCaseCmp(mimeType, "image/gif")) {
+        @call self::ParseImage(stream, req);
+    } else if (!WWStrCaseCmp(mimeType, "image/jpeg")) {
+        @call self::ParseImage(stream, req);
+    } else {
+        /* Mime type we don't know how to handle */
+        EC_WARN("HTMLViewer::AcceptStream() unknown mime type");
+    }
+    free(mimeType);
+
+    ThreadVSem(_frameSem);
+}	/* End of HTMLViewer::AcceptStream() */
+
+
+/*---------------------------------------------------------------------------
+//		HTMLViewer::AcceptDone()
+//---------------------------------------------------------------------------
+// 
+// SYNOPSIS: 	A request is finished and it id is provided.
+// SCOPE:	Private
+// RETURN:	Nothing
+// STRATEGY:	This is called from a request that we've submitted
+//              earlier. This tells us that we can reuse the id or
+//              remove from the list of submitted requests. This
+//              method must be thread safe.
+// 
+// REVISION HISTORY: 
+//	Name		Date		Description 
+//	----		----		----------- 
+//	kkee    	2/12/98 	Initial version 
+//	
+//-------------------------------------------------------------------------*/
+@method /* void */
+HTMLViewerClass, ViewerAcceptDone /* (HTRequest * req) */
+{       
+    ThreadPSem(_frameSem);
+    if (_wwFrame) {
+        /* If a frame was created */
+        @call _wwFrame::DecNumRequest();
+    }
+    ThreadVSem(_frameSem);
+}	/* End of HTMLViewer::AcceptDone() */
+
+
+
+/*---------------------------------------------------------------------------
+//		HTMLViewer::ParseHTML()
+//---------------------------------------------------------------------------
+// 
+// SYNOPSIS: 	Parse HTML data by reading from a stream.
+// SCOPE:	Private
+// RETURN:	Nothing
+// STRATEGY:	This is called from a command scheduler thread.
+// 
+// REVISION HISTORY: 
+//	Name		Date		Description 
+//	----		----		----------- 
+//	kkee    	1/16/98 	Initial version 
+//	
+//-------------------------------------------------------------------------*/
+@method /* void */
+HTMLViewerClass, ParseHTML /* (WWStream *stream, HTRequest *req) */
+{
+    optr /* Sgml * */ sgml = ObjInstantiate(HandleOf(oself), &SgmlClass);
+    if (!sgml) {
+        return;
+    }
+    else
+	@call sgml::Sgml();
+
+    /* Close all the current frames if any (suppose this is the root  */
+    /* frame) */
+    /*
+    _appbase->GetMessageQueue()->RemoteProcedureCall(
+        (QueuedFunction) CloseFrames,
+        (MessageArg) _wwFrame);
+     */
+    word han  = HandleOf(_wwFrame);
+    word chunk = ChunkOf(_wwFrame);
+    void (*routine)() = (void (*)())&CloseFrames;
+
+    @call ConstructOptr(_appHandle,0)::MSG_PROCESS_CALL_ROUTINE
+	(han, chunk, NULL, NULL, NULL, NULL, routine);
+
+    /* Create a new frame for this stream */
+/*    HTCoord coord = {_xPos, _yPos, _width, _height};
+    _appbase->GetMessageQueue()->RemoteProcedureCall(
+        (QueuedFunction) CreateNewHTFrame,
+        (MessageArg) req,
+        (MessageArg) this,
+        (MessageArg) &coord,
+        (MessageArg) &_wwFrame);
+*/
+    Arg arg = { req, oself, _xPos, _yPos, _width, _height, &_wwFrame};
+    void (*routine2)() = (void (*)())&CreateNewHTFrame;
+    word hi = (((dword)&arg) >> 16) & 0x00FF;
+    word lo = ((dword)&arg) & 0x00FF;
+    @call ConstructOptr(_appHandle,0)::MSG_PROCESS_CALL_ROUTINE
+	(hi, lo, NULL, NULL, NULL, NULL, routine2);
+
+
+    if(!_wwFrame) {
+        @call sgml::MSG_META_OBJ_FREE();
+        return;
+    }
+#if FRAME_NOT_YET_DEFINE
+    _wwFrame->IncNumRequest();
+#endif
+    @call self::Report(WWSTATUS_LOADING_MAIN_DOC);
+    
+    /* _wwFrame is inherited from class Target. */
+    @call sgml::Parse(stream, &htmlDTD, _wwFrame);
+    @call sgml::MSG_META_OBJ_FREE();
+}	/* End of HTMLViewer::ParseHTML() */
+
+
+
+/*---------------------------------------------------------------------------
+//		HTMLViewer::ParseImage()
+//---------------------------------------------------------------------------
+// 
+// SYNOPSIS: 	Create an image target and display it.
+// SCOPE:	Public
+// RETURN:	Nothing
+// STRATEGY:	
+// 
+// REVISION HISTORY: 
+//	Name		Date		Description 
+//	----		----		----------- 
+//	kkee    	4/16/98 	Initial version 
+//	
+//-------------------------------------------------------------------------*/
+@method /* void */
+HTMLViewerClass, ParseImage  /* (WWStream *stream, HTRequest *req) */
+{       
+/*
+    _appbase->GetMessageQueue()->RemoteProcedureCall(
+        (QueuedFunction) CloseFrames,
+        (MessageArg) _wwFrame);
+*/
+    word han   = HandleOf(_wwFrame);
+    word chunk = ChunkOf(_wwFrame);
+    void (*routine)() = (void (*)())&CloseFrames;
+
+    @call ConstructOptr(_appHandle,0)::MSG_PROCESS_CALL_ROUTINE
+	(han, chunk, NULL, NULL, NULL, NULL, routine);
+
+    /* Create a new frame for this stream */
+/*
+    HTCoord coord = {_xPos, _yPos, _width, _height};
+    _appbase->GetMessageQueue()->RemoteProcedureCall(
+        (QueuedFunction) CreateNewImgFrame,
+        (MessageArg) req,
+        (MessageArg) this,
+        (MessageArg) &coord,
+        (MessageArg) &_wwFrame);
+*/
+    Arg arg = { req, oself, _xPos, _yPos, _width, _height, &_wwFrame};
+    void (*routine2)() = (void (*)())&CreateNewImgFrame;
+    word hi = (((dword)&arg) >> 16) & 0x00FF;
+    word lo = ((dword)&arg) & 0x00FF;
+    @call ConstructOptr(_appHandle,0)::MSG_PROCESS_CALL_ROUTINE
+	(hi, lo, NULL, NULL, NULL, NULL, routine2);
+
+    if(!_wwFrame) {
+        return;
+    }
+#if FRAME_NOT_YET_DEFINED
+    @call _wwFrame::IncNumRequest();
+
+    @call _wwFrame::Parse(stream);
+#endif
+}	/* End of HTMLViewer::ParseImage() */
+
+
+/*---------------------------------------------------------------------------
+//		CreateNewHTFrame()
+//---------------------------------------------------------------------------
+// 
+// SYNOPSIS: 	create a new HTFrame
+// SCOPE:	private
+// RETURN:	HTFrame or NULL
+// STRATEGY:	
+// 
+// REVISION HISTORY: 
+//	Name		Date		Description 
+//	----		----		----------- 
+//	mzhu    	2/17/98 	Initial version 
+//	
+//-------------------------------------------------------------------------*/
+static void
+CreateNewHTFrame(word hi, word lo)
+#if 0
+(optr /* HTRequest * */ req, optr /* HTMLViewer * */ viewer, 
+                 HTCoord *coord, optr /* HTFrame ** */ *newFrame)
+#endif
+{
+    Arg *arg = (Arg *)(((dword)hi << 16) | lo);
+    PARAM_ASSERT(arg->req);
+    PARAM_ASSERT(arg->viewer);
+/*    PARAM_ASSERT(arg->coord); */
+    PARAM_ASSERT(arg->wwFrame);
+    
+    *(arg->wwFrame) = NULL;
+    
+    /* create a WWMemHandle for the url */
+    WWMemHandle urlH = WWMemAlloc(strlen(HTRequestGetStrURL(arg->req))
+				  + 1);
+    if (!urlH) {
+        return;
+    }
+    strcpy((char *)WWMemLock(urlH), HTRequestGetStrURL(arg->req));
+    WWMemUnlock(urlH);
+#if FRAME_NOT_YET_DEFINED
+    *wwFrame = new HTFrame(viewer->GetRequestManager(), urlH, coord->x0, coord->y0,
+                            coord->x1, coord->y1);
+    if (!(*wwFrame)) {
+        WWMemFree(urlH);
+        return;
+    }
+
+    if ((*wwFrame)->Initialize()) {
+        return;
+    }
+    delete (*wwFrame);
+#endif
+    *(arg->wwFrame) = NULL;
+}	/* End of CreateNewHTFrame() */
+
+
+
+
+/*---------------------------------------------------------------------------
+//		CreateNewImgFrame()
+//---------------------------------------------------------------------------
+// 
+// SYNOPSIS: 	create a new ImgFrame
+// SCOPE:	private
+// RETURN:	ImgFrame or NULL
+// STRATEGY:	
+// 
+// REVISION HISTORY: 
+//	Name		Date		Description 
+//	----		----		----------- 
+//	mzhu    	2/17/98 	Initial version 
+//	
+//-------------------------------------------------------------------------*/
+static void
+CreateNewImgFrame(word hi, word lo)
+#if 0
+(optr /* HTRequest * */ req, optr /* HTMLViewer * */ viewer, 
+                 HTCoord *coord, optr /* ImgFrame ** */ *wwFrame)
+#endif
+{
+    Arg *arg = (Arg *)((((dword)hi) << 16) | lo);
+    PARAM_ASSERT(arg->req);
+    PARAM_ASSERT(arg->viewer);
+/*    PARAM_ASSERT(arg->coord); */
+    PARAM_ASSERT(arg->wwFrame);
+    
+    *(arg->wwFrame) = NULL;
+    
+    /* create a WWMemHandle for the url */
+    WWMemHandle urlH = WWMemAlloc(strlen(HTRequestGetStrURL(arg->req)) + 1);
+    if (!urlH) {
+        return;
+    }
+    strcpy((char *)WWMemLock(urlH), HTRequestGetStrURL(arg->req));
+    WWMemUnlock(urlH);
+#if IMG_FRAME_NOT_YET_DEFINE
+    *wwFrame = new ImgFrame(viewer->GetRequestManager(), urlH, coord->x0, coord->y0,
+                             coord->x1, coord->y1);
+    if (!(*wwFrame)) {
+        WWMemFree(urlH);
+        return;
+    }
+    
+    if ((*wwFrame)->Initialize()) {
+        return;
+    }
+    delete (*wwFrame);
+#endif
+    *(arg->wwFrame) = NULL;
+}	/* End of CreateNewImgFrame() */
+
+
+
+/*---------------------------------------------------------------------------
+//		CloseFrames()
+//---------------------------------------------------------------------------
+// 
+// SYNOPSIS: 	close all the opened frames.
+// SCOPE:	private
+// RETURN:	void
+// STRATEGY:	called when open a new page or exit HTMLViewer
+// 
+// REVISION HISTORY: 
+//	Name		Date		Description 
+//	----		----		----------- 
+//	mzhu    	2/17/98 	Initial version 
+//	
+//-------------------------------------------------------------------------*/
+static void
+CloseFrames(word Han, word Chunk)
+#if 0
+(optr /* WWFrame * */ frame)
+#endif
+{
+    EC_WARN("CloseFrames() old frame deleted");
+    @call ConstructOptr(Han, Chunk)::MSG_META_OBJ_FREE();
+}	/* End of CloseFrames() */
+
+
+
+/*---------------------------------------------------------------------------
+//		HTMLViewer::ECPrintUITree()
+//---------------------------------------------------------------------------
+// 
+// SYNOPSIS: 	Print ui tree to file /int/html/uitree.txt.
+// SCOPE:	Public
+// RETURN:	Nothing
+// STRATEGY:	
+// 
+// REVISION HISTORY: 
+//	Name		Date		Description 
+//	----		----		----------- 
+//	kkee    	4/02/98 	Initial version 
+//	
+//-------------------------------------------------------------------------*/
+@ifdef DO_ERROR_CHECKING
+@method /* void */
+HTMLViewerClass, ECPrintUITree /* () */
+{
+    if (_wwFrame) {
+        @call _wwFrame::ECPrintUITree();
+    }
+}	/* End of HTMLViewer::ECPrintUITree() */
+@endif
+
+
+/*---------------------------------------------------------------------------
+//		HTMLViewer::GetBounds()
+//---------------------------------------------------------------------------
+// 
+// SYNOPSIS: 	Get the position and size of the HTMLViewer.
+// SCOPE:	Public
+// RETURN:	(coordX, coordY) and width and height.
+// STRATEGY:	
+// 
+// REVISION HISTORY: 
+//	Name		Date		Description 
+//	----		----		----------- 
+//	edwin    	4/10/98 	Initial version 
+//	
+//-------------------------------------------------------------------------*/
+@method /* void */
+HTMLViewerClass, GetBounds /* (uint16 *coordX, uint16 *coordY, 
+                      uint16 *width, uint16 *height) */
+{
+    PARAM_ASSERT(coordX);
+    PARAM_ASSERT(coordY);
+    PARAM_ASSERT(width);
+    PARAM_ASSERT(height);
+    *coordX = _xPos;
+    *coordY = _yPos;
+    *width  = _width;
+    *height = _height;
+}	/* End of HTGlyph::GetBounds() */
+
+
+/*---------------------------------------------------------------------------
+//		HTMLViewer::SetVisible()
+//---------------------------------------------------------------------------
+// 
+// SYNOPSIS: 	Setting the frame's visibility
+// SCOPE:	Public
+// RETURN:	
+// STRATEGY:	
+// 
+// REVISION HISTORY: 
+//	Name		Date		Description 
+//	----		----		----------- 
+//	edwin    	4/29/98 	Initial version 
+//	
+//-------------------------------------------------------------------------*/
+@method /* void */
+HTMLViewerClass, SetVisible /* (Boolean visible) */
+{
+    @call _wwFrame::SetVisible(visible);
+}	/* End of HTGlyph::Visible() */
+
+
+@method /* HTRequestManager * */
+HTMLViewerClass, GetRequestManager
+{
+    return _reqManager;
+}

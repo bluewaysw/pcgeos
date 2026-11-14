@@ -1,0 +1,722 @@
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Geoworks 1997.  All rights reserved.
+	GEOWORKS CONFIDENTIAL
+
+PROJECT:	WWW UI Generation
+MODULE:		factory
+FILE:		factory.goc
+
+AUTHOR:		Kok Kin Kee, Sep 18, 1997
+
+ROUTINES:
+	Name			Description
+	----			-----------
+
+REVISION HISTORY:
+	Name		Date		Description
+	----		----		-----------
+	kkee    	9/18/97   	Initial version.
+
+DESCRIPTION:
+
+	UIFactory for UI creation. It was supposed to be the job of
+	UIGenerator, but UIGenerator has become unwieldy and so I am
+	reorganizing the code -- kkee 9/18/97
+
+	$Id: factory.goc,v 1.1.2.2 97/09/23 18:49:57 kkee Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+@include <WWW/HTCore/htutils.goh>
+@include <WWW/HTCore/htobj.goh>
+@include <WWW/uigenera.goh>
+@include <WWW/pmanager.goh>
+@include "uifatals.goh"
+#include <Ansi/string.h>
+#include <Ansi/stdlib.h>        /* atoi defined */
+#include <WWW/htmem.h>
+@include "uifact.goh"
+
+/*
+ * Design Note: 
+ * ===========
+ *
+ * All creational APIs are tied directly to the management of UI memory
+ * usage. We will use it for caching.
+ *
+ */
+
+/*
+ * For object instantiation and memory usage estimated.
+ */
+typedef struct {
+    ClassStruct *UI_class;       /* The class name itself */
+    word         UI_size;        /* Its estimated size */
+} UIClass;
+
+
+/*
+ *  Define the estimated size for each object.  The data have been collected
+ *  from SWAT after the object is set usable.
+ */
+#define ESTIMATED_SIZE_PMANAGER 200
+#define ESTIMATED_SIZE_TEXT (222+40+166+24+162+24+37+40+40)
+#define ESTIMATED_SIZE_FORM_TEXT (198+3+40+37+40+40)
+#define ESTIMATED_SIZE_TEXT_AREA_TEXT (187+3+40+37)
+#define ESTIMATED_SIZE_TEXT_AREA 127
+#define ESTIMATED_SIZE_IMAGE 119
+#define ESTIMATED_SIZE_TABLE (134+52+12)
+#define ESTIMATED_SIZE_TCELL 245
+#define ESTIMATED_SIZE_FORM 253
+#define ESTIMATED_SIZE_INPUT 144
+#define ESTIMATED_SIZE_OUTER_SELECT 91
+#define ESTIMATED_SIZE_SELECT 126
+#define ESTIMATED_SIZE_FORM_TRIGGER (79+7)
+#define ESTIMATED_SIZE_OPTION (66+8)
+#define ESTIMATED_SIZE_OTHER_OPTION (76+8)
+#define ESTIMATED_SIZE_MULTILINE_SELECT 146
+#define ESTIMATED_SIZE_HR 67
+#define ESTIMATED_SIZE_CAPTION 253
+#define ESTIMATED_SIZE_HTML_CONTENT (327+148)
+#define ESTIMATED_SIZE_FORM_HIDDEN 82
+#define ESTIMATED_SIZE_GEN_ITEM 58
+
+
+UIClass uiClass[] = {
+    {&HTGenTextClass,           ESTIMATED_SIZE_TEXT},
+    {&HTGenFormTextClass,       ESTIMATED_SIZE_FORM_TEXT},
+    {&TextAreaTextClass,        ESTIMATED_SIZE_TEXT_AREA_TEXT},
+    {&TextAreaClass,            ESTIMATED_SIZE_TEXT_AREA},
+    {&HTGenImageClass,          ESTIMATED_SIZE_IMAGE},
+    {&HTGenTableClass,          ESTIMATED_SIZE_TABLE},
+    {&HTGenTCellClass,          ESTIMATED_SIZE_TCELL},
+    {&HTGenFormClass,           ESTIMATED_SIZE_FORM},
+    {&HTGenInputClass,          ESTIMATED_SIZE_INPUT},
+    {&HTGenOuterSelectClass,    ESTIMATED_SIZE_OUTER_SELECT},
+    {&HTGenSelectClass,         ESTIMATED_SIZE_SELECT},
+    {&HTGenFormTriggerClass,    ESTIMATED_SIZE_FORM_TRIGGER},
+    {&HTGenOptionClass,         ESTIMATED_SIZE_OPTION},
+    {&HTOtherOptionClass,       ESTIMATED_SIZE_OTHER_OPTION},
+    {&HTGenMultiLineSelectClass,ESTIMATED_SIZE_MULTILINE_SELECT},
+    {&HTGenHRClass,             ESTIMATED_SIZE_HR},
+    {&HTGenCaptionClass,        ESTIMATED_SIZE_CAPTION},
+    {&HTGenHtmlContentClass,    ESTIMATED_SIZE_HTML_CONTENT},
+    {&HTGenFormHiddenClass,     ESTIMATED_SIZE_FORM_HIDDEN},
+    {&GenItemClass,             ESTIMATED_SIZE_GEN_ITEM},
+    {0,0}
+};
+
+
+/* Estimated total amount of memory allocated */
+static dword uiMemoryAllocated = 0;
+
+/* Current document being built */
+HTUIDoc *currentDoc = NULL;
+
+
+#if ERROR_CHECK
+/***********************************************************************
+ *		ECCheckUIDoc
+ ***********************************************************************
+ *
+ * SYNOPSIS:	
+ * CALLED BY:	
+ * RETURN:	
+ *	
+ * STRATEGY:	
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	kkee    	9/19/97   	Initial Revision
+ *	
+ ***********************************************************************/
+static void _pascal
+ECCheckUIDoc (HTMemHandle uiDoc)
+{
+    HTUIDoc *doc = (HTUIDoc*) HTMemLock(uiDoc);
+    ECCheckThreadHandle(doc->HTUI_threadID);
+    ECCheckHTMemHandle(doc->HTUI_myHandle);
+    ECCheckHTList(doc->HTUI_areaMaps);
+    ECCheckHTList(doc->HTUI_objList);
+    HTMemUnlock(uiDoc);
+}	/* End of ECCheckUIDoc.	*/
+#endif
+
+
+/***********************************************************************
+ *		UINewDoc
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Create a UI document.  To create for current 
+ *              thread, pass 0. pmClass must be inherited from 
+ *              PresentationManagerClass and contentClass must be 
+ *              inherited from GenContentClass.
+ * CALLED BY:	Client
+ * RETURN:	HTMemHandle.
+ *	
+ * STRATEGY:	
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	kkee    	9/19/97   	Initial Revision
+ *	
+ ***********************************************************************/
+HTMemHandle _pascal
+UINewDoc (ThreadHandle threadID, const char *anchor,
+	  ClassStruct *pmClass, ClassStruct *genContentClass)
+{
+    HTUIDoc *doc;
+    HTMemHandle htmh;
+
+    if (!threadID) threadID = ThreadGetInfo(0, TGIT_THREAD_HANDLE);
+EC( if (threadID) ECCheckThreadHandle(threadID);                        )
+
+    doc = HTMemAllocAndLock(&htmh, sizeof(HTUIDoc));
+    doc->HTUI_threadID = threadID;
+    doc->HTUI_myHandle = htmh;
+    doc->HTUI_objList = HTListNewWID(threadID);
+    doc->HTUI_areaMaps = HTListNewWID(threadID);
+    doc->HTUI_genContent = HTObjInstantiateForThreadWID(threadID, 
+							genContentClass);
+    doc->HTUI_pmanager = HTObjInstantiateForThreadWID(threadID, pmClass);
+    /* pmClass needs MSG_GEN_PREPARE_FOR_DESTROY */
+    HTListAppend(doc->HTUI_objList, (void*)&(doc->HTUI_pmanager), sizeof(optr));
+    PUSHDS;
+    SET_DS_LIB_DGROUP;
+    doc->HTUI_pmContent = UICreateObj(doc, &HTGenHtmlContentClass);
+    POPDS;
+    doc->HTUI_hrefToken = -1; /* Initially we are not in the <A> element */
+
+    /* Initialize them */
+    @call doc->HTUI_pmanager::MSG_PM_SET_CONTENT_OBJECT(doc->HTUI_pmContent);
+    @call doc->HTUI_pmContent::MSG_GEN_HTML_CONTENT_SET_PM(doc->HTUI_pmanager);
+    @call doc->HTUI_pmContent::MSG_GEN_HTML_CONTENT_SET_HREF_TOKEN(-1);
+
+    /* Go to the following anchor when its built */
+    if (anchor) {
+	doc->HTUI_jumpToAnchor = HTStrAllocCopyWID(threadID, anchor);
+    }
+    HTMemUnlock(htmh);
+
+    return htmh;
+}	/* End of UINewDoc.	*/
+
+
+/***********************************************************************
+ *		UICreateObj
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Create a UI object. Must not be a PManager class as it
+ *              should be created wiht UINewDoc.
+ * CALLED BY:	Client
+ * RETURN:	optr or NULL.
+ *	
+ * STRATEGY:	
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	kkee    	9/19/97   	Initial Revision
+ *	
+ ***********************************************************************/
+optr _pascal
+UICreateObj (HTUIDoc *doc, ClassStruct *objClass)
+{
+    optr ret;
+    word i=0;
+
+EC( ECCheckUIDoc(doc->HTUI_myHandle);                                    )
+
+    ret = HTObjInstantiateForThreadWID(doc->HTUI_threadID, 
+				       (ClassStruct *)objClass);
+
+    /* Tally the memory usage */
+    do {
+	if (uiClass[i].UI_class == objClass) {
+	    uiMemoryAllocated += uiClass[i].UI_size;
+	    break;
+	} else if (!uiClass[i].UI_class) {
+	    EC_ERROR(1);
+	    break;
+	}
+	i++;
+    } while (1);
+
+    /* Only some objects need to receive MSG_GEN_PREPARE_DESTROY */
+    if ((objClass == (ClassStruct *)&HTGenTextClass) ||
+	(objClass == (ClassStruct *)&HTGenImageClass) ||
+	(objClass == (ClassStruct *)&HTGenFormTextClass) ||
+	(objClass == (ClassStruct *)&TextAreaTextClass) ||
+	(objClass == (ClassStruct *)&TextAreaClass) ||
+	(objClass == (ClassStruct *)&HTGenMultiLineSelectClass)) {
+	HTListAppend(doc->HTUI_objList, (void*)&ret, sizeof(optr));
+    }
+
+    return ret;
+}	/* End of UICreateObj.	*/
+
+
+/*
+ * Design Note: 
+ * ===========
+ *
+ * All deletion APIs are tied directly to the management of UI memory
+ * usage. We will use it for caching.
+ *
+ */
+
+/***********************************************************************
+ *		UIDeleteDoc
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Delete the UI.
+ * CALLED BY:	Client
+ * RETURN:	Nothing
+ *	
+ * STRATEGY:	We may alternatively cache this page.
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	kkee    	9/18/97   	Initial Revision
+ *	
+ ***********************************************************************/
+void _pascal
+UIDeleteDoc (HTMemHandle uiDoc)
+{
+    HTUIDoc *doc;
+    word i, count;
+    optr obj;
+
+EC( ECCheckUIDoc(uiDoc);                                               )
+
+    doc = (HTUIDoc *) HTMemLock(uiDoc);
+    /* Detach from the uiDoc genView is we are attached. */
+    /* It is not safe to delete objects below a genView while attached */
+    if (doc->HTUI_genView)
+	@call doc->HTUI_genView::MSG_GEN_VIEW_SET_CONTENT(0);
+
+    count = HTListGetCount(doc->HTUI_objList);
+    for (i=0; i<count; i++) {
+	HTListGetItem(doc->HTUI_objList, i, (void*)&obj, sizeof(optr));
+	@call obj::MSG_GEN_PREPARE_FOR_DESTROY();
+    }
+
+    HTObjDestroyAllWID(doc->HTUI_threadID);
+    HTMemFreeAllWID(doc->HTUI_threadID);
+    HTListDeleteAllWID(doc->HTUI_threadID);
+
+    HTMemUnlockAndFree(uiDoc);
+
+    PUSHDS;
+    SET_DS_LIB_DGROUP;
+    uiMemoryAllocated = 0;
+    POPDS;
+}	/* End of UIDeleteDoc.	*/
+
+
+
+/*
+ * Design Note: 
+ * ===========
+ *
+ * All navigational and interaction APIs are mapped to some methods in the 
+ * presentation manager of the HTUIDoc.
+ *
+ */
+
+/***********************************************************************
+ *		UISetCurrentDoc
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Set current document to be viewed.
+ * CALLED BY:	Client
+ * RETURN:	Nothing
+ *	
+ * STRATEGY:	We set up the UI tree to be:
+ *              genView <---> genContent ---> PMananger.
+ *              The document will remain locked until UIDeleteDoc is called.
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	kkee    	9/19/97   	Initial Revision
+ *	
+ ***********************************************************************/
+void _pascal
+UISetCurrentDoc (HTMemHandle uiDoc, optr genView)
+{
+    HTUIDoc *doc;
+    optr parent, view;
+    SizeAsDWord size;
+    WindowHandle win;
+    RectDWord viewBound;
+
+EC( ECCheckUIDoc(uiDoc);                                                )
+EC( ECCheckOD(genView);                                                 )
+    
+    doc = (HTUIDoc *) HTMemLock(uiDoc);
+    doc->HTUI_genView = genView;
+    @call doc->HTUI_genContent::MSG_GEN_ADD_CHILD(doc->HTUI_pmanager, 
+						  CCF_MARK_DIRTY);
+    @call genView::MSG_GEN_VIEW_SET_CONTENT(doc->HTUI_genContent);
+    @call doc->HTUI_pmanager::MSG_GEN_SET_USABLE(VUM_NOW);
+
+    /* Initialize them */
+    @call doc->HTUI_pmanager::MSG_VIS_SET_SIZE(X_SCREEN_SIZE, Y_SCREEN_SIZE);
+    parent = @call doc->HTUI_pmanager::MSG_GEN_FIND_PARENT();
+    @call parent::MSG_VIS_SET_SIZE(X_SCREEN_SIZE, Y_SCREEN_SIZE);
+    @call doc->HTUI_pmanager::MSG_VIS_POSITION_BRANCH(0,0);
+    size = MAKE_SIZE_DWORD(X_SCREEN_SIZE, Y_SCREEN_SIZE);
+    @call parent::MSG_HTML_CONTENT_SET_VIEW_DOC_BOUNDS(size);
+
+    /*
+     *  Invalidate all the objects on the screen!
+     */
+    win = @call doc->HTUI_pmanager::MSG_VIS_QUERY_WINDOW();
+    if(win) {
+	view = @call doc->HTUI_pmanager::MSG_VIS_VUP_FIND_OBJECT_OF_CLASS
+	    (&GenViewClass);
+	@call view::MSG_GEN_VIEW_GET_VISIBLE_RECT(&viewBound);
+	WinInvalReg(win, 0, 0, 0, viewBound.RD_right - viewBound.RD_left,
+		    viewBound.RD_bottom - viewBound.RD_top);
+    }
+
+    /* Self manage geometry is set in MSG_PM_INITIALIZE */
+    @call doc->HTUI_pmanager::MSG_PM_INITIALIZE();
+
+    /* Keep the document locked */
+    PUSHDS;
+    SET_DS_LIB_DGROUP;
+    /* There can only be one current doc */
+EC( if (currentDoc) EC_ERROR(1);                                       )
+    currentDoc = doc;
+    POPDS;
+}	/* End of UISetCurrentDoc.	*/
+
+
+
+/***********************************************************************
+ *		UIResetCurrentDoc
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Unattach current doc from view. Must be called if 
+ *              UISetCurrentDoc was called before calling UIDeleteDoc.
+ * CALLED BY:	Client
+ * RETURN:	Nothing
+ *	
+ * STRATEGY:	
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	kkee    	9/20/97   	Initial Revision
+ *	
+ ***********************************************************************/
+void _pascal
+UIResetCurrentDoc (HTMemHandle uiDoc)
+{
+    /* Must be the same doc as the current doc */
+    PUSHDS;
+    SET_DS_LIB_DGROUP;
+    /* There can only be one current doc */
+    if (currentDoc && (currentDoc->HTUI_myHandle == uiDoc))
+	HTMemUnlock(uiDoc);
+    currentDoc = NULL;
+    POPDS;
+}	/* End of UIResetCurrentDoc.	*/
+
+
+
+
+/***********************************************************************
+ *		UIDocTitle
+ ***********************************************************************
+ *
+ * SYNOPSIS:	
+ * CALLED BY:	
+ * RETURN:	
+ *	
+ * STRATEGY:	
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	kkee    	9/20/97   	Initial Revision
+ *	
+ ***********************************************************************/
+HTMemHandle _pascal
+UIDocTitle (HTMemHandle uiDoc)
+{
+    HTMemHandle ret;
+    HTUIDoc *doc;
+EC( ECCheckUIDoc(uiDoc);                                               )
+    doc = (HTUIDoc *) HTMemLock(uiDoc);
+    ret = @call doc->HTUI_pmanager::MSG_PM_GET_TITLE();
+    HTMemUnlock(uiDoc);
+    return ret;
+}	/* End of UIDocTitle.	*/
+
+
+/***********************************************************************
+ *		UICurrentBaseURL
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Get the current base URL.
+ * CALLED BY:	Client
+ * RETURN:	HTMemHandle or NULL.
+ *	
+ * STRATEGY:	
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	kkee    	9/19/97   	Initial Revision
+ *	
+ ***********************************************************************/
+HTMemHandle _pascal
+UICurrentBaseURL (HTMemHandle uiDoc)
+{
+    HTMemHandle ret;
+    HTUIDoc *doc;
+EC( ECCheckUIDoc(uiDoc);                                                )
+    doc = (HTUIDoc *) HTMemLock(uiDoc);
+    ret = @call doc->HTUI_pmanager::MSG_PM_GET_BASE_OPTR();
+    HTMemUnlock(uiDoc);
+    return ret;
+}	/* End of UICurrentBaseURL.	*/
+
+
+
+/***********************************************************************
+ *		UIGotoNextFocusableField
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Move to the next focusable field in the UIDoc.
+ * CALLED BY:	Client
+ * RETURN:	Nothing
+ *	
+ * STRATEGY:	
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	kkee    	9/19/97   	Initial Revision
+ *	
+ ***********************************************************************/
+void _pascal
+UIGotoNextFocusableField (HTMemHandle uiDoc)
+{
+    HTUIDoc *doc;
+EC( ECCheckUIDoc(uiDoc);                                                )
+    doc = (HTUIDoc *) HTMemLock(uiDoc);
+    @send, forceQueue, checkDuplicate doc->HTUI_pmanager::
+	MSG_PM_SEARCH_NEXT_FOCUSABLE_OBJECT();
+    HTMemUnlock(uiDoc);
+}	/* End of UIGotoNextFocusableField.	*/
+
+
+
+/***********************************************************************
+ *		UISubmitForm
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Check for form submission as the keyboard has been 
+ *              pressed.
+ * CALLED BY:	Client
+ * RETURN:	Nothing
+ *	
+ * STRATEGY:	
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	kkee    	9/19/97   	Initial Revision
+ *	
+ ***********************************************************************/
+void _pascal
+UISubmitForm (HTMemHandle uiDoc)
+{
+    HTUIDoc *doc;
+EC( ECCheckUIDoc(uiDoc);                                               )
+    doc = (HTUIDoc *) HTMemLock(uiDoc);
+    @send doc->HTUI_pmanager::MSG_PM_FORM_ACTION();
+    HTMemUnlock(uiDoc);
+}	/* End of UISubmitForm.	*/
+
+
+
+/***********************************************************************
+ *		UIDocSize
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Get document size.
+ * CALLED BY:	Client
+ * RETURN:	SizeAsDWord.
+ *	
+ * STRATEGY:	
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	kkee    	9/19/97   	Initial Revision
+ *	
+ ***********************************************************************/
+SizeAsDWord _pascal
+UIDocSize (HTMemHandle uiDoc)
+{
+    SizeAsDWord ret;
+    HTUIDoc *doc;
+EC( ECCheckUIDoc(uiDoc);                                               )
+    doc = (HTUIDoc *) HTMemLock(uiDoc);
+    ret = @call doc->HTUI_pmanager::MSG_VIS_GET_SIZE();
+    HTMemUnlock(uiDoc);
+    return ret;
+}	/* End of UIDocSize.	*/
+
+
+
+/***********************************************************************
+ *		UIDocPrint
+ ***********************************************************************
+ *
+ * SYNOPSIS:	
+ * CALLED BY:	
+ * RETURN:	
+ *	
+ * STRATEGY:	
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	kkee    	9/19/97   	Initial Revision
+ *	
+ ***********************************************************************/
+void _pascal
+UIDocPrint (HTMemHandle uiDoc, GStateHandle gstate)
+{
+    HTUIDoc *doc;
+EC( ECCheckUIDoc(uiDoc);                                                )
+    doc = (HTUIDoc *) HTMemLock(uiDoc);
+    @call doc->HTUI_pmanager::MSG_VIS_DRAW(DF_PRINT, gstate);
+    HTMemUnlock(uiDoc);
+}	/* End of UIDocPrint.	*/
+
+
+
+/***********************************************************************
+ *		UIDocSearch
+ ***********************************************************************
+ *
+ * SYNOPSIS:	
+ * CALLED BY:	
+ * RETURN:	
+ *	
+ * STRATEGY:	
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	kkee    	9/19/97   	Initial Revision
+ *	
+ ***********************************************************************/
+void _pascal
+UIDocSearch (HTMemHandle uiDoc, MemHandle searchInfo)
+{
+    HTUIDoc *doc;
+EC( ECCheckUIDoc(uiDoc);                                               )
+    doc = (HTUIDoc *) HTMemLock(uiDoc);
+    @call doc->HTUI_pmanager::MSG_SEARCH(searchInfo);
+    HTMemUnlock(uiDoc);
+}	/* End of UIDocSearch.	*/
+
+
+
+/***********************************************************************
+ *		UIDocCopySelected
+ ***********************************************************************
+ *
+ * SYNOPSIS:	
+ * CALLED BY:	
+ * RETURN:	
+ *	
+ * STRATEGY:	
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	kkee    	9/19/97   	Initial Revision
+ *	
+ ***********************************************************************/
+void _pascal
+UIDocCopySelected (HTMemHandle uiDoc)
+{
+    HTUIDoc *doc;
+EC( ECCheckUIDoc(uiDoc);                                               )
+    doc = (HTUIDoc *) HTMemLock(uiDoc);
+EC(  ECCheckUIDoc(uiDoc);                                               )
+    @send doc->HTUI_pmanager::MSG_PM_COPY_SELECTED_OBJECTS();
+    HTMemUnlock(uiDoc);
+}	/* End of UIDocCopySelected.	*/
+
+
+/***********************************************************************
+ *		UIDocMemoryNeeded
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Tally the amount of memory used so far.
+ * CALLED BY:	Client
+ * RETURN:	dword, document width, and document height.
+ *	
+ * STRATEGY:	
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	kkee    	9/20/97   	Initial Revision
+ *	
+ ***********************************************************************/
+dword _pascal
+UIDocMemoryNeeded (HTMemHandle uiDoc, word *width, word *height)
+{
+    dword ret;
+    HTUIDoc *doc;
+EC( ECCheckUIDoc(uiDoc);                                               )
+    doc = (HTUIDoc *) HTMemLock(uiDoc);
+    PUSHDS;
+    SET_DS_LIB_DGROUP;
+    ret = uiMemoryAllocated;
+    POPDS;
+    @call doc->HTUI_pmContent::MSG_GEN_HTML_CONTENT_GET_ACCUMULATED_HEIGHTS
+	(width, height);
+    HTMemUnlock(uiDoc);
+    return ret;
+}	/* End of UIDocMemoryNeeded.	*/
+
+
+
+/***********************************************************************
+ *		UIDocAddMemory
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Add needed UI memory for a document.
+ * CALLED BY:	Internal to UIGenerator
+ * RETURN:	
+ *	
+ * STRATEGY:	
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	kkee    	9/21/97   	Initial Revision
+ *	
+ ***********************************************************************/
+void _pascal
+UIDocAddMemory (word len)
+{
+    /* No need to push and pop DS as called from UIGenerator */
+    uiMemoryAllocated += len;
+}	/* End of UIDocAddMemory.	*/

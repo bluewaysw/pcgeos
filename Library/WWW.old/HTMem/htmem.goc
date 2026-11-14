@@ -1,0 +1,771 @@
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Geoworks 1997.  All rights reserved.
+	GEOWORKS CONFIDENTIAL
+
+PROJECT:        Geos WWW Library
+MODULE:         htmem
+FILE:           htmem.goc
+
+AUTHOR:         Mingzhe Zhu, Jan  7, 1997
+
+ROUTINES:
+	Name                    Description
+	----                    -----------
+
+REVISION HISTORY:
+	Name    Date            Description
+	----    ----            -----------
+	mzhu    1/ 7/97         Initial version.
+
+DESCRIPTION:
+
+	This is a thread-safe and deadlock-free memory manager.
+	It simulates flat memory model. There is no need for memory
+	deferencing once a HTMemHandle is lock.
+
+	$Id: htmem.goc,v 1.1 97/04/07 11:49:46 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+@include <stdapp.goh>
+#include <sysstats.h>                 /* If don't include, end up calling 
+					 asm SysGetInfo */
+#include <sem.h>
+#include <heap.h>
+#include <WWW/htmem.h> 
+#include <Ansi/string.h>              /* memcpy */
+#include "htfatals.h"
+
+/* 
+ * Memory low limits. These limits are checked in HTMemoryLimit and
+ * enforced by all HTMemory APIs.
+ */
+#define HTMEMORY_HEAP_LOW_LIMIT        20000         /* in bytes */
+#define HTMEMORY_SWAP_LOW_LIMIT        10000         /* in bytes */
+
+
+/* Macros to access library dgroup */
+#ifdef __HIGHC__
+
+#ifndef PUSHDS
+#define PUSHDS	_inline(0x1e)	/* push	ds */
+#endif
+
+#ifndef POPDS
+#define POPDS	_inline(0x1f)	/* pop	ds */
+#endif
+
+#endif
+
+#ifdef __BORLANDC__
+
+#ifndef PUSHDS
+#define PUSHDS  asm{push ds}
+#endif
+
+#ifndef POPDS
+#define POPDS   asm{pop  ds}
+#endif
+
+#endif
+
+#ifndef SET_DS_LIB_DGROUP
+#define SET_DS_LIB_DGROUP GeodeLoadDGroup (GeodeGetCodeProcessHandle())
+                                /* destroys ds! */
+#endif
+
+#define DESIRED_HTMEM_BLOCK_SIZE  0x1000  /* 4K bytes */
+
+#if ERROR_CHECK
+FatalErrors htmemFatalErrors;
+Warnings    htmemWarnings;
+#endif
+
+/* the data struct for the list */
+typedef struct {
+    MemHandle          HTMS_memHandle;	/* LMem block handle */
+    SemaphoreHandle    HTMS_sem;
+    word	       HTMS_count;
+} HTMemStruct;
+
+/* use chunk array to implement the list */
+static ChunkHandle ListChunkHandle = NullHandle;
+static MemHandle   ListMemHandle = NullHandle;
+
+/* some data for debug purpose */
+#if ERROR_CHECK
+static word ecPeakNum = 0;	/* the max number of blocks we allocated */
+#endif
+
+static void _pascal HTMemFreeLow (HTMemHandle htmh, Boolean unlock);
+
+
+
+/***********************************************************************
+ *              ECCHECKHTMEMHANDLE
+ ***********************************************************************
+ *
+ * SYNOPSIS:    Check HTMemory.
+ * CALLED BY:   internal
+ * RETURN:      
+ * SIDE EFFECTS:
+ *      
+ * STRATEGY:	Dies if htmh is not a HTMemory.
+ *      
+ * REVISION HISTORY:
+ *      Name    Date            Description
+ *      ----    ----            -----------
+ *      kkee    9/17/96         Initial Revision
+ *
+ ***********************************************************************/
+void _far _pascal
+ECCHECKHTMEMHANDLE (HTMemHandle htmh)
+{
+#if ERROR_CHECK
+    MemHandle block; 
+    word count, i, sz;
+    HTMemStruct *mb;
+
+    PUSHDS;
+    SET_DS_LIB_DGROUP;
+    
+    block = OptrToHandle(htmh);
+
+    MemPLock(ListMemHandle);
+    count = ChunkArrayGetCountHandles(ListMemHandle, ListChunkHandle);
+    if(count > ecPeakNum) ecPeakNum = count;			
+    
+    /* find the block entry in the list */    
+    for(i=0; i<count; i++) {
+	mb = ChunkArrayElementToPtrHandles(ListMemHandle,
+					ListChunkHandle, i, &sz);
+
+	if(mb->HTMS_memHandle == block) {
+	    MemUnlockV(ListMemHandle);
+	    POPDS;
+	    return;
+	}
+    }
+    MemUnlockV(ListMemHandle);
+
+    EC_ERROR(INVALID_HTMEMORY);
+    
+    POPDS;
+#endif
+}       /* End of ECCHECKHTMEMHANDLE.   */
+
+
+
+
+/***********************************************************************
+ *              HTMemLibraryEntry
+ ***********************************************************************
+ *
+ * SYNOPSIS:    Initialize a list to hold blocks that will be allocated.
+ * CALLED BY:   Kernel
+ * RETURN:      0, required by Kernel to indicate all is well.
+ * SIDE EFFECTS:
+ *      
+ * STRATEGY:
+ *      
+ * REVISION HISTORY:
+ *      Name    Date            Description
+ *      ----    ----            -----------
+ *      mzhu    1/ 7/97         Initial Revision
+ *
+ ***********************************************************************/
+int _far _pascal
+HTMEMLIBRARYENTRY (LibraryCallType ty, GeodeHandle client)
+{
+    if(ty == LCT_ATTACH) {
+	ListMemHandle = MemAllocLMem(LMEM_TYPE_GENERAL,
+					sizeof(LMemBlockHeader));
+	HandleModifyOwner(ListMemHandle, GeodeGetCodeProcessHandle());
+    	MemModifyFlags(ListMemHandle, HF_SHARABLE, 0);
+
+	MemLock(ListMemHandle);
+	ListChunkHandle = ChunkArrayCreate(ListMemHandle, 
+				sizeof(HTMemStruct), 
+				sizeof(ChunkArrayHeader),
+				0);
+	MemUnlock(ListMemHandle);
+
+    } else if (ty == LCT_DETACH) {
+	MemFree(ListMemHandle);
+	ListMemHandle = NullHandle;
+
+    }
+
+    return 0;
+}       /* End of HTMemLibraryEntry.    */
+
+
+
+
+
+
+/***********************************************************************
+ *		HTMEMALLOCANDLOCK
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Allocate a HTMemory and lock it.
+ * CALLED BY:	Global
+ * RETURN:	far pointer to HTMemory (valid htmh) OR
+ *              or NULL (htmh is also NULL) for out of memory.
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:
+ *	check the blocks in the list to find one unlocked and size less
+ *	   than our limit,
+ *	if did not find, create a new block to use,
+ *	allocate a new chunk in the block,
+ *	every chunk has a one byte header to count the lock number for 
+ *	   this chunk.
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	mzhu	1/14/97   	Initial Revision
+ *
+ ***********************************************************************/
+void * _far _pascal
+HTMEMALLOCANDLOCK (HTMemHandle *htmh, word size)
+{
+    HTMemStruct *mb;
+    word sz, count;
+    int i;
+    word flag_and_lock;
+    ChunkHandle retChunk;
+    MemHandle retMem = NullHandle;
+    SemaphoreHandle sem;
+    byte *head;
+
+    PUSHDS;
+    SET_DS_LIB_DGROUP;
+
+    ECCheckMemHandle(ListMemHandle);
+
+    /* exclusive access to the list */
+    MemPLock(ListMemHandle);
+
+    count = ChunkArrayGetCountHandles(ListMemHandle, ListChunkHandle);
+    
+    /* find a unlocked block. */
+    for(i=count-1; i>=0; i--) {
+	mb = ChunkArrayElementToPtrHandles(ListMemHandle,
+					ListChunkHandle, i, &sz);
+
+	/* to prevent other users to access the data when alloc...*/
+	sem = mb->HTMS_sem;
+	ThreadPSem(sem);
+
+	flag_and_lock = 
+		MemGetInfo(mb->HTMS_memHandle, MGIT_FLAGS_AND_LOCK_COUNT);
+
+	if(!MGI_LOCK_COUNT(flag_and_lock)) {/* this block is unlocked.!! */
+
+	    /* check if its size is too large  */
+	    sz = MemGetInfo(mb->HTMS_memHandle, MGIT_SIZE);
+	    if(sz < DESIRED_HTMEM_BLOCK_SIZE) {
+		retMem = mb->HTMS_memHandle;
+		break;
+	    }
+	}
+	ThreadVSem(sem);
+    }
+	
+    if(!retMem) {       /* didn't find a unlocked block */
+	retMem = MemAllocLMem(LMEM_TYPE_GENERAL, sizeof(LMemBlockHeader));
+	HandleModifyOwner(retMem, GeodeGetCodeProcessHandle());
+    	MemModifyFlags(retMem, HF_SHARABLE, 0);
+
+	/* add this block to the list */
+	mb = ChunkArrayAppendHandles(ListMemHandle,
+					ListChunkHandle, 0);
+	mb->HTMS_memHandle = retMem;
+	mb->HTMS_sem = ThreadAllocSem(1);
+	HandleModifyOwner(mb->HTMS_sem, GeodeGetCodeProcessHandle());
+	mb->HTMS_count = 0;
+	sem = mb->HTMS_sem;
+	ThreadPSem(sem);
+
+EC(	ecPeakNum ++;							)
+    }
+
+    mb->HTMS_count ++;
+
+    /* don't need the list anymore */
+    MemUnlockV(ListMemHandle);
+
+    MemLock(retMem);
+    /* allocate the chunk, which has a one byte header to count the lock num */
+    retChunk = LMemAlloc(retMem, size + sizeof(byte));
+
+    /* after alloc, others can access this block */
+    ThreadVSem(sem);
+
+    /* create the return optr */
+    *htmh = ConstructOptr(retMem, retChunk);
+
+    /* initalize the new chunk with all 0 */
+    head = LMemDeref(*htmh);
+    for(i=0; i<size+sizeof(byte); i++) *(head + i) = 0;
+    (*head) = 1;
+
+    head += 1;
+
+    POPDS;
+
+    return (void*)head;
+}	/* End of HTMEMALLOCANDLOCK.	*/
+
+
+
+/***********************************************************************
+ *              HTMEMALLOC
+ ***********************************************************************
+ *
+ * SYNOPSIS:    Allocate a HTMemory.
+ * CALLED BY:   Global
+ * RETURN:      HTMemHandle or NULL if failed to allocated.
+ * SIDE EFFECTS:
+ *      
+ * STRATEGY:	
+ *      
+ * REVISION HISTORY:
+ *      Name    Date            Description
+ *      ----    ----            -----------
+ *      mzhu    1/ 8/97         Initial Revision
+ *
+ ***********************************************************************/
+HTMemHandle _far _pascal
+HTMEMALLOC (word size)
+{
+    HTMemHandle htmh;
+    byte *head;
+
+    PUSHDS;
+    SET_DS_LIB_DGROUP;
+
+    HTMEMALLOCANDLOCK(&htmh, size);
+
+    if (htmh) {
+	head = LMemDeref(htmh);
+	(*head) = 0;
+	MemUnlock(OptrToHandle(htmh));
+    }
+
+    POPDS;
+
+    return htmh;
+}       /* End of HTMEMALLOC.   */
+
+
+/***********************************************************************
+ *		HTMEMREALLOC
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Resize a HTMemory. The passed in HTMemory must NOT be 
+ *              locked. The return HTMemHandle may not be the same as 
+ *              the passed in HTMemHandle. 
+ * CALLED BY:	Global
+ * RETURN:	HTMemHandle, which may not be the same as the passed in 
+ *              HTMemHandle, or return NULL if failed to 
+ *              reallocate.
+ *	
+ * STRATEGY:	Since all allocated HTMemories belong to some block
+ *              which maybe locked, we have to free htmh and 
+ *              allocate a new HTMemory if resize to larger.
+ *              Otherwise resize it to smaller as it won't affect
+ *              other HTMemories in the same block.
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	kkee    	2/18/97   	Initial Revision
+ *	
+ ***********************************************************************/
+HTMemHandle _far _pascal
+HTMEMREALLOC (HTMemHandle htmh, word size)
+{
+    HTMemHandle ret = htmh;
+    byte *c, *p;
+    word sz;
+
+    c = (byte *) HTMemLock(htmh);
+    sz = LMemGetChunkSize(htmh);
+    sz--;           /* The first byte keeps count of locks */
+
+EC( if (*(c-1) > 0x01) EC_ERROR(CANNOT_REALLOC_LOCKED_HTMEMORY);       )
+
+    if (size < sz) {
+	/* Make it smaller */
+	LMemReAlloc(htmh, size+1); /* Needs an extra byte for lock count */
+	HTMemUnlock(htmh);
+
+    } else if (size > sz) {
+	/* 
+	 * Allocate a new HTMemory, copy data over, 
+	 * and delete old HTMemory. 
+	 */
+	p = (byte *) HTMemAllocAndLock(&ret, size);
+	memcpy(p, c, sz);
+	HTMemUnlock(ret);
+	HTMemUnlockAndFree(htmh);
+
+    } else {
+	/* Same size, do nothing */
+	HTMemUnlock(htmh);
+    }
+
+    return ret;
+}	/* End of HTMEMREALLOC.	*/
+
+
+
+
+/***********************************************************************
+ *              HTMEMFREE
+ ***********************************************************************
+ *
+ * SYNOPSIS:    Free a chunk by the HTMemHandle
+ * CALLED BY:   Global
+ * RETURN:      nothing
+ * SIDE EFFECTS:
+ *	if this chunk's lock number is not equal to 0, nothing happens.
+ *	it means that if the chunk being locked, couldn't be free.
+ *      
+ * STRATEGY:
+ *      
+ * REVISION HISTORY:
+ *      Name    Date            Description
+ *      ----    ----            -----------
+ *      mzhu    1/ 8/97         Initial Revision
+ *
+ ***********************************************************************/
+void _far _pascal
+HTMEMFREE (HTMemHandle htmh)
+{
+
+EC( ECCheckHTMemHandle(htmh);                                           )
+
+    HTMemFreeLow(htmh, FALSE);
+}       /* End of HTMEMFREE.    */
+
+
+
+/***********************************************************************
+ *		HTMEMUNLOCKANDFREE
+ ***********************************************************************
+ *
+ * SYNOPSIS:	unlock and free a chunk
+ * CALLED BY:	Global
+ * RETURN:	nothing
+ * SIDE EFFECTS:
+ *	if the chunk being locked more than once, just unlock once,
+ *	do not free it.
+ *	the chunk must be locked at least once before calling this
+ * 	function.
+ * STRATEGY:
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	mzhu	1/14/97   	Initial Revision
+ *
+ ***********************************************************************/
+void _far _pascal
+HTMEMUNLOCKANDFREE (HTMemHandle htmh)
+{
+
+EC( ECCheckHTMemHandle(htmh);                                           )
+
+    HTMemFreeLow(htmh, TRUE);
+}	/* End of HTMEMUNLOCKANDFREE.	*/
+
+
+
+/***********************************************************************
+ *		HTMemFreeLow
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Free a HTMemory.
+ * CALLED BY:	internal
+ * RETURN:	Nothing
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	mzhu	1/15/97   	Initial Revision
+ *
+ ***********************************************************************/
+static void _pascal
+HTMemFreeLow (HTMemHandle htmh, Boolean unlock)
+{
+    MemHandle block; 
+    SemaphoreHandle sem;
+    word i, count, sz;
+    HTMemStruct *mb;
+    byte *head;
+
+EC ( ECCheckHTMemHandle(htmh);                                          )
+
+    PUSHDS;
+    SET_DS_LIB_DGROUP;
+
+    block = OptrToHandle(htmh);
+
+    MemPLock(ListMemHandle);
+    count = ChunkArrayGetCountHandles(ListMemHandle, ListChunkHandle);
+
+    /* find the block entry in the list */    
+    for(i=0; i<count; i++) {
+	mb = ChunkArrayElementToPtrHandles(ListMemHandle,
+					ListChunkHandle, i, &sz);
+
+	if(mb->HTMS_memHandle == block) {
+	    sem = mb->HTMS_sem;
+	    break;
+	}
+    }
+
+    /* we need to check if its lock number is equal to 0 */
+    if(unlock) {		
+	/* suppose it's locked, so we just need to derefenece. */
+	head = LMemDeref(htmh);
+	(*head) --;
+    } else {
+    	ThreadPSem(sem);
+     	MemLock(block);
+    	ThreadVSem(sem);
+	head = LMemDeref(htmh);
+    }
+
+    if( *head ) { /* this chunk is still being locked */
+
+	EC_ERROR(CANNOT_FREE_LOCKED_HTMEMORY);	      
+
+	MemUnlock(block);
+    	MemUnlockV(ListMemHandle);
+	POPDS;
+	return;
+    }
+
+    /* nobody is using this chunk, so we can free it */    
+    mb->HTMS_count --;
+    /* check if there are more chunks in the same block*/
+    if(!mb->HTMS_count) {	/* if this is the last chunk in this block,
+				   then free the whole block. */
+	MemFree(block);
+
+	/* and free the semaphore too.*/
+	ThreadFreeSem(mb->HTMS_sem);
+
+	/* remove the entry in the list */
+	ChunkArrayDeleteHandle(ListChunkHandle, mb);
+    	MemUnlockV(ListMemHandle);
+
+	POPDS;
+        return;
+    }
+
+    MemUnlockV(ListMemHandle);
+    
+    /* now we can free this chunk. */
+    LMemFree(htmh);
+    MemUnlock(block);
+    
+    POPDS;
+
+    return;
+}	/* End of HTMemFreeLow.	*/
+
+
+
+
+/***********************************************************************
+ *              HTMEMLOCK
+ ***********************************************************************
+ *
+ * SYNOPSIS:    Lock a HTMemHandle
+ * CALLED BY:   Global
+ * RETURN:      far pointer of HTMemory.
+ * SIDE EFFECTS:
+ *      
+ * STRATEGY:
+ *      
+ * REVISION HISTORY:
+ *      Name    Date            Description
+ *      ----    ----            -----------
+ *      mzhu    1/ 8/97         Initial Revision
+ *
+ ***********************************************************************/
+void * _far _pascal
+HTMEMLOCK (HTMemHandle htmh)
+{
+    MemHandle block;
+    byte *ret;
+    word i, count, sz;
+    HTMemStruct *mb;
+    SemaphoreHandle sem;
+
+EC ( ECCheckHTMemHandle(htmh);                                          )
+
+    PUSHDS;
+    SET_DS_LIB_DGROUP;
+    
+    block = OptrToHandle(htmh);
+
+    MemPLock(ListMemHandle);
+    count = ChunkArrayGetCountHandles(ListMemHandle, ListChunkHandle);
+    
+    /* find the block entry in the list */    
+    for(i=0; i<count; i++) {
+	mb = ChunkArrayElementToPtrHandles(ListMemHandle,
+					ListChunkHandle, i, &sz);
+
+	if(mb->HTMS_memHandle == block) {
+	    sem = mb->HTMS_sem;
+	    break;
+	}
+    }
+    MemUnlockV(ListMemHandle);
+    
+    /* when this block is being allocated chunks, wait. otherwise go on.*/
+    ThreadPSem(sem);
+    MemLock(block);
+    ret = LMemDeref(htmh);
+    /* increase its lock count */
+    (*ret) ++;
+    ThreadVSem(sem);
+
+    POPDS;
+	
+    return (void*)(ret+1);
+}       /* End of HTMEMLOCK.    */
+
+
+
+
+/***********************************************************************
+ *              HTMEMUNLOCK
+ ***********************************************************************
+ *
+ * SYNOPSIS:    Unlock a HTMemory.
+ * CALLED BY:   Global
+ * RETURN:      nothing
+ * SIDE EFFECTS:
+ * STRATEGY:
+ *      
+ * REVISION HISTORY:
+ *      Name    Date            Description
+ *      ----    ----            -----------
+ *      mzhu    1/ 8/97         Initial Revision
+ *
+ ***********************************************************************/
+void _far _pascal
+HTMEMUNLOCK (HTMemHandle htmh)
+{
+    MemHandle block;
+    word i, count, sz;
+    SemaphoreHandle sem;
+    HTMemStruct *mb;
+    byte *head;
+
+EC ( ECCheckHTMemHandle(htmh);                                          )
+
+    PUSHDS;
+    SET_DS_LIB_DGROUP;
+
+    block = OptrToHandle(htmh);
+
+    MemPLock(ListMemHandle);
+    count = ChunkArrayGetCountHandles(ListMemHandle, ListChunkHandle);
+    
+    /* find the block entry in the list */    
+    for(i=0; i<count; i++) {
+	mb = ChunkArrayElementToPtrHandles(ListMemHandle,
+					ListChunkHandle, i, &sz);
+
+	if(mb->HTMS_memHandle == block) {
+	    sem = mb->HTMS_sem;
+	    break;
+	}
+    }
+    MemUnlockV(ListMemHandle);
+    
+    /* when this block is allocating chunks, wait. otherwise go on.*/
+    ThreadPSem(sem);
+    head = LMemDeref(htmh);
+EC( if(!*head) EC_ERROR(CANNOT_UNLOCK_NONLOCKED_HTMEMORY);		  )
+    (*head) --;
+    MemUnlock(block);
+    ThreadVSem(sem);
+
+    POPDS;
+	
+    return;
+}
+
+
+
+/***********************************************************************
+ *		HTMEMORYLIMIT
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Enforce memory usage limit. Memory usage is prevented
+ *              from dropping below HTMEMORY_HEAP_LOW_LIMIT and 
+ *              HTMEMORY_SWAP_LOW_LIMIT. All HTMemory APIs are already
+ *              checking memory limit, so you need not call this API
+ *              if using HTMemory APIs. However, you *MUST* call this 
+ *              API if you are allocating memory using Geos memory APIs.
+ *              If it returns FALSE, you must *NOT* proceed to allocate
+ *              memory.
+ * PASS:        size of memory to allocate.
+ * CALLED BY:	HTMemoryAlloc
+ * RETURN:	TRUE if memory check passes, else FALSE.
+ *	
+ * STRATEGY:	current heap space - size >= HTMEMORY_HEAP_LOW_LIMIT
+ *                       AND
+ *              current swap space - size >= HTMEMORY_SWAP_LOW_LIMIT
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	kkee    	3/13/97   	Initial Revision
+ *	
+ ***********************************************************************/
+Boolean _far _pascal
+HTMEMORYLIMIT (word size)
+{
+/* 
+ * Make sure these two constants are consistent with the ones in 
+ * Internal/heapInt.def.
+ */
+
+#define HT_SGIT_SWAP_FREE_SIZE 0x801a
+#define HT_SGIT_HEAP_FREE_SIZE 0x801c
+
+#if ERROR_CHECK
+    dword heap, swap;
+    heap = SysGetInfo(HT_SGIT_HEAP_FREE_SIZE);
+    swap = SysGetInfo(HT_SGIT_SWAP_FREE_SIZE);
+
+    if (heap+size>HTMEMORY_HEAP_LOW_LIMIT && 
+	swap+size>HTMEMORY_SWAP_LOW_LIMIT)
+	return TRUE;
+#else
+    if ((SysGetInfo(HT_SGIT_HEAP_FREE_SIZE)+size>HTMEMORY_HEAP_LOW_LIMIT) &&
+	(SysGetInfo(HT_SGIT_SWAP_FREE_SIZE)+size>HTMEMORY_SWAP_LOW_LIMIT))
+	return TRUE;
+#endif
+
+    EC_WARNING(HTMEMORY_EXCEEDING_LIMIT);
+    return FALSE;
+}	/* End of HTMEMORYLIMIT.	*/
+
+
+

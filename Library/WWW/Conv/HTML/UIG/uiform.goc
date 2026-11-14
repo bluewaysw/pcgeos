@@ -1,0 +1,2257 @@
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Geoworks 1996 -- All Rights Reserved
+
+PROJECT:	Penelope
+MODULE:		ui form module
+FILE:		uiform.goc
+
+AUTHOR:		Edwin Yu, June 20, 1996
+
+ROUTINES:
+	Name			Description
+	----			-----------
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	EY	6/20/96   	Initial version.
+
+DESCRIPTION:
+	This file defines message handlers to create form objects.
+
+	$Id: uiform.goc,v 1.58.1.44 98/01/10 11:34:58 jeremyb Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+@include <stdapp.goh>
+@include <WWW/html.goh>
+@include <WWW/HTCore/htobj.goh>   /* HTObjInstantiateForThread */
+#include <Ansi/string.h>
+#include <Ansi/stdlib.h>        /* atoi defined */
+@include "htfatals.goh"
+@include "UIG/uifact.goh"
+@include "UIG/utility.goh"
+
+@classdecl	HTGenInputClass;
+@classdecl	HTGenFormTriggerClass;
+@classdecl	HTGenFormTextClass;
+
+@extern method HTGenFormTextClass, MSG_UI_CALC_SIZE_POSITION;
+@extern method HTGenInputClass, MSG_UI_CALC_SIZE_POSITION;
+@extern method HTGenFormTriggerClass, MSG_UI_CALC_SIZE_POSITION;
+
+@extern method HTGenFormTextClass, MSG_UI_GET_ROW_POSITION;
+@extern method HTGenInputClass, MSG_UI_GET_ROW_POSITION;
+@extern method HTGenFormTriggerClass, MSG_UI_GET_ROW_POSITION;
+
+@extern method HTGenFormTextClass, MSG_UI_SET_NEW_POSITION;
+@extern method HTGenInputClass, MSG_UI_SET_NEW_POSITION;
+@extern method HTGenFormTriggerClass, MSG_UI_SET_NEW_POSITION;
+
+@extern method HTGenFormTextClass, MSG_GEN_PREPARE_FOR_DESTROY;
+@extern method HTGenInputClass, MSG_GEN_PREPARE_FOR_DESTROY;
+@extern method HTGenFormTriggerClass, MSG_GEN_PREPARE_FOR_DESTROY;
+
+@if @SHORT_LONG_TOUCH
+@extern method HTGenFormTriggerClass, MSG_META_UIG_SHORT_TOUCH_NOTIFY;
+@extern method HTGenFormTriggerClass, MSG_META_UIG_LONG_TOUCH_NOTIFY;
+@endif
+
+@extern method TextAreaClass, MSG_HTML_FORM_RESET;
+@extern method HTMLSelectClass, MSG_HTML_FORM_RESET;
+
+int uiCurrentFormId;
+
+
+
+/***********************************************************************
+ *		UIGen_START_FORM_Int for UIGeneratorClass
+ ***********************************************************************
+ * SYNOPSIS:	Create a ui object representing a fill-out form.
+ *		Information about the form fields are expected to 
+ *		be known as more incoming HTML elements are processed.
+ *		    
+ * PARAMETERS:	    (MemHandle block, SGMLEntity *entity)
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *	Supported Attr:	ACTION, METHOD
+ *
+ * INPUT, SELECT and TEXTAREA are only allowed within FORM elements.
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	EY	4/18/96   	Initial Revision
+ *      MZHU    12/97           Second Revision - removed HTGenFormClass,
+ *                                created a form list.
+ *
+ ***********************************************************************/
+ErrorCode UIGen_START_FORM_Int
+		(MemHandle block, SGMLEntity *entity)
+{
+  char *value, *cptr;
+  int	index = 0;
+  HTMemHandle htmh;
+  word br;
+  HTMLForm form;
+  MemHandle mh;
+
+  /*
+   * Firstly, if no form list in currentDoc, create one.
+   */
+  if(!uiMgr.UIM_currentDoc->HTUI_formList) {
+	uiMgr.UIM_currentDoc->HTUI_formList 
+	    = HTListNewWID(uiMgr.UIM_currentDoc->HTUI_memID);
+  }
+  
+  /*
+   * Clear action field.
+   */
+  form.HTF_action = 0;
+
+  /*
+   * Secondly, append a new item to the list.
+   */
+  
+  for(index = 0; entity[index].SGMLE_token; index++) {
+    if (!entity[index].SGMLE_value)
+      continue;
+    value = (char *)LMemDerefHandles(block, entity[index].SGMLE_value);
+    switch (entity[index].SGMLE_token) {
+    case HTML_ATTR_ACTION:
+      /* allocate a chunk to store the ACTION URL */
+      htmh = HTMemAllocWID(uiMgr.UIM_currentDoc->HTUI_memID, sizeof(char) * (strlen(value)+1));
+      form.HTF_action = htmh;
+      cptr = (char *)HTMemLock(form.HTF_action);
+      strcpy(cptr,value);
+      HTMemUnlock(form.HTF_action);
+      break;
+    case HTML_ATTR_METHOD:
+      if (strcasecmp(value, "post") == 0)
+	form.HTF_method = HTM_POST;	
+      else
+	form.HTF_method = HTM_GET;	
+      break;
+    }
+  }
+
+  if(!form.HTF_action) {
+      form.HTF_action = UIDocCurrentURL();
+  }
+
+  form.HTF_itemList = HTListNewWID(uiMgr.UIM_currentDoc->HTUI_memID);
+  form.HTF_nameList = HTListNewWID(uiMgr.UIM_currentDoc->HTUI_memID);
+
+  uiCurrentFormId = HTListAppend(uiMgr.UIM_currentDoc->HTUI_formList, &form, sizeof(HTMLForm));
+
+  return UI_GEN_NO_ERROR;
+}	/* End of UIGen_START_FORM_Int.	*/
+
+
+/***********************************************************************
+ *		UIGen_END_FORM_Int for UIGeneratorClass
+ ***********************************************************************
+ * SYNOPSIS:	    Tell the presentation manager that the form object
+ *		    is ready to be displayed.
+ * PARAMETERS:	    none
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	EY	4/18/96   	Initial Revision
+ *      MZHU    12/97           Second Revision - removed HTGenFormClass,
+ *
+ ***********************************************************************/
+ErrorCode UIGen_END_FORM_Int()
+{
+EC(  EC_ERROR_IF(uiCurrentFormId < 0, UIG_UI_TREE_OPERATION_FAILS);          )
+    /*
+     * Here need to check if there is a form tag not finished, and finsh it.
+     * 
+     */
+/*    FinishCurrentObjectInForm(&(uiMgr.UIM_currentDoc->HTUI_target)); */
+    uiCurrentFormId = -1;
+    
+    return UI_GEN_NO_ERROR;
+}	/* End of UIGen_END_FORM_Int.	*/
+
+
+/***********************************************************************
+ *		HTML_FORM_RESET
+ ***********************************************************************
+ *
+ * SYNOPSIS:	
+ * CALLED BY:	
+ * RETURN:	
+ *	
+ * STRATEGY:	
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	mzhu    	11/24/97   	Initial Revision
+ *      MZHU            12/97           Second Revision - 
+ *                                         removed HTGenFormClass, HTGenHidden,
+ *	
+ ***********************************************************************/
+void _far _pascal HTML_FORM_RESET(int formId)
+{
+    word i, count;
+    HTMLForm form;
+    HTMLFormItem *item;
+    MemHandle mh2;
+    char *str;
+
+EC(  EC_ERROR_IF(formId < 0, UIG_UI_TREE_OPERATION_FAILS);             )
+
+    if(formId > -1 && uiMgr.UIM_currentDoc 
+       && uiMgr.UIM_currentDoc->HTUI_formList) {
+	count = HTListGetCount(uiMgr.UIM_currentDoc->HTUI_formList);
+	if(count && formId < count) {
+	    HTListGetItem(uiMgr.UIM_currentDoc->HTUI_formList, 
+			formId, &form, sizeof(HTMLForm));
+	    count = HTListGetCount(form.HTF_itemList);
+	    for(i=0; i<count; i++) {
+		item = HTListLockItem(form.HTF_itemList, i, &mh2);
+		switch(item->HTFI_type) {
+		case FE_TEXT:
+		case FE_PASSWORD:
+		    if(item->HTFI_value) {
+			str = HTMemLock(item->HTFI_value);
+			@call item->HTFI_object::
+			    MSG_VIS_TEXT_REPLACE_ALL_PTR(str, 0);
+			HTMemUnlock(item->HTFI_value);
+		    } else
+			@call item->HTFI_object::
+			    MSG_VIS_TEXT_REPLACE_ALL_PTR("", 0);
+			
+		    break;
+		case FE_CHECKBOX:
+		case FE_RADIO:
+		    if(item->HTFI_checked)
+			@call item->HTFI_object::
+			    MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(0,0);
+		    else
+			@call item->HTFI_object::
+			    MSG_GEN_ITEM_GROUP_SET_NONE_SELECTED(0);
+		    break;
+		case FE_SUBMIT:
+		case FE_RESET:
+		case FE_HIDDEN:
+		    /* do nothing */
+		    break;
+		case FE_TEXTAREA:
+		case FE_SELECTION:
+		    @call item->HTFI_object::MSG_HTML_FORM_RESET();
+		    break;
+		}
+		HTListUnlock(mh2);
+	    }
+	}
+    }
+    return;
+}	/* End of HTML_FORM_RESET.	*/
+
+
+
+/***********************************************************************
+ *		HTML_FORM_SUBMIT for HTGenFormClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    Tell the items under the form to generate the
+ *                  name=value pairs for the form submission.  The
+ *                  information will be stored in a HTList like:
+ *                     index 0  - URL of server specified in ACTION
+ *                           1  - Either FORM_GET or FORM_POST
+ *                           2  - Name of item  1
+ *                           3  - Value of item 1
+ *                           4  - Name of item  2
+ *                           5  - Value of item 2
+ *                           .....
+ * PARAMETERS:	    optr button
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	edwin	10/19/96   	Initial Revision
+ *      mzhu    11/14/97        Second Revision - removed HTGenFormClass, 
+ *                                 HTGenHidden.
+ *
+ ***********************************************************************/
+void _far _pascal HTML_FORM_SUBMIT(int formId, optr object)
+{
+    HTMemHandle temp, valueHandle, *nameHandle;
+    word i, count, len;
+    HTMLForm form;
+    HTMLFormItem *item;
+    MemHandle mh2, mh3;
+    char *name, *ptr;
+
+EC(  EC_ERROR_IF(formId < 0, UIG_UI_TREE_OPERATION_FAILS);             )
+
+    if(formId < 0 || !uiMgr.UIM_currentDoc ||
+       !uiMgr.UIM_currentDoc->HTUI_formList) 
+	return;
+  
+    count = HTListGetCount(uiMgr.UIM_currentDoc->HTUI_formList);
+    if(!count || formId >= count) 
+	return;
+
+    HTListGetItem(uiMgr.UIM_currentDoc->HTUI_formList, 
+			formId, &form, sizeof(HTMLForm));
+    count = HTListGetCount(form.HTF_itemList);
+
+    if(!count || !form.HTF_nameList) {
+	return;
+    }
+
+    /*
+     * Here we simply don't want to accumulate the user's actions.
+     * So, make sure this be cleaned when switch pages.
+     */
+    if(uiMgr.UIM_formQuery) return; 
+
+    /*
+     *  Assemble a query string to be sent to the server specified in 
+     *  ACTION attribute.
+     */
+    uiMgr.UIM_formQuery = HTListNewWID(uiMgr.UIM_currentDoc->HTUI_memID);
+    /*
+     *  Append the Action URL.  If there is no HTGF_action, use the base 
+     *  URL of the document.
+     */
+    if (form.HTF_action) {
+	temp = HTStrHTMemAllocCopyWID(uiMgr.UIM_currentDoc->HTUI_memID, 
+				      form.HTF_action);
+    }
+    else {
+	if(!uiMgr.UIM_currentDoc->HTUI_baseURL)
+	    temp = HTStrAllocCopyWID(uiMgr.UIM_currentDoc->HTUI_memID, "");
+	else
+	    temp = HTStrHTMemAllocCopyWID(uiMgr.UIM_currentDoc->HTUI_memID, uiMgr.UIM_currentDoc->HTUI_baseURL);
+    }
+    HTListAppend(uiMgr.UIM_formQuery, &temp, sizeof(HTMemHandle));
+    /*
+     *  Append the Method type.
+     */
+    HTListAppend(uiMgr.UIM_formQuery, &(form.HTF_method), sizeof(HTMethod));
+    /*
+     *  Assemble the pairs of "name=value" for each objects in the form.
+     */
+
+    for(i=0; i<count; i++) {
+	valueHandle = 0;
+	item = HTListLockItem(form.HTF_itemList, i, &mh2);
+
+	if(item->HTFI_type == FE_SELECTION)
+	    /*
+	     * too bad, we must seperate selection from others.
+	     */
+	    @call item->HTFI_object::MSG_HTML_SELECT_SUBMIT(uiMgr.UIM_formQuery);
+
+	else if( item->HTFI_type == FE_IMAGE && item->HTFI_object == object)
+
+	    @call item->HTFI_object::MSG_HTML_IMAGE_SUBMIT(uiMgr.UIM_formQuery);
+
+	else if(item->HTFI_nameId > -1) {
+
+	    switch(item->HTFI_type) {
+	    case FE_TEXT:
+	    case FE_PASSWORD:
+		len = @call item->HTFI_object::MSG_VIS_TEXT_GET_TEXT_SIZE();
+		if(len) {
+		    ptr = HTMemAllocAndLockWID
+			(uiMgr.UIM_currentDoc->HTUI_memID, &valueHandle, len + 1);
+		    
+		    @call item->HTFI_object::
+			MSG_VIS_TEXT_GET_ALL_PTR(ptr);
+
+		    HTMemUnlock(valueHandle);
+		}
+
+		break;
+	    case FE_CHECKBOX:
+	    case FE_RADIO:
+		if((@call item->HTFI_object::
+			MSG_GEN_ITEM_GROUP_GET_SELECTION()) != GIGS_NONE) {
+		    if(item->HTFI_value) 
+			valueHandle = HTStrHTMemAllocCopyWID
+			    (uiMgr.UIM_currentDoc->HTUI_memID, 
+			     item->HTFI_value);
+		    else 
+			valueHandle = HTStrAllocCopyWID
+			    (uiMgr.UIM_currentDoc->HTUI_memID, "on");
+		}
+		break;
+
+	    case FE_HIDDEN:
+		if(item->HTFI_value) 
+		    valueHandle = HTStrHTMemAllocCopyWID
+			(uiMgr.UIM_currentDoc->HTUI_memID, 
+			 item->HTFI_value);
+		break;
+
+	    case FE_SUBMIT:
+		if(item->HTFI_object == object){
+		    if(item->HTFI_value) 
+			valueHandle = HTStrHTMemAllocCopyWID
+			    (uiMgr.UIM_currentDoc->HTUI_memID, 
+			     item->HTFI_value);
+		}
+		break;
+	    case FE_RESET:
+		/* nothing */
+		break;
+	    case FE_TEXTAREA:
+		valueHandle = @call item->HTFI_object::MSG_TEXT_AREA_GET_TEXT_HANDLE();
+		break;
+	    }
+
+	    if(valueHandle) {
+		/*
+		 * name first 
+		 */
+		nameHandle = HTListLockItem(form.HTF_nameList, item->HTFI_nameId, &mh3);
+		temp = HTStrHTMemAllocCopyWID(uiMgr.UIM_currentDoc->HTUI_memID,
+					   *nameHandle);
+		HTListAppend(uiMgr.UIM_formQuery, &temp, sizeof(HTMemHandle));
+
+		/*
+		 * value follows
+		 */
+		HTListAppend(uiMgr.UIM_formQuery, &valueHandle, sizeof(HTMemHandle));
+
+		HTListUnlock(mh3);
+	    }
+	}
+	HTListUnlock(mh2);
+    }
+
+    /*
+     * Inform the client to submit this form.
+     */
+@ifdef PRODUCT_NIKE
+    @send, forceQueue (ConstructOptr(uiMgr.UIM_client, 0))::
+	{MSG_FROM_UI_DOCUMENT}(uiMgr.UIM_message)(UI_APPLY_ON_FORM, 0);
+@else
+    @send (ConstructOptr(uiMgr.UIM_client, 0))::
+	{MSG_FROM_UI_DOCUMENT}(uiMgr.UIM_message)(UI_APPLY_ON_FORM, 0);
+@endif
+    return;
+}
+
+
+
+/***********************************************************************
+ *	MSG_GEN_FORM_SET_EXCLUSIVE_SELECTION for HTGenFormClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    
+ * PARAMETERS:	    (HTMemeHandle name, optr selectedObj)
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	edwin	1/ 9/97   	Initial Revision
+ *      mzhu    11/20/97        changed to function
+ *
+ ***********************************************************************/
+void _far _pascal HTML_FORM_SET_EXCLUSIVE_SELECTION(int formId,
+					       int nameId,
+					       optr selectedObj)
+{
+    optr next;
+    word i, count;
+    HTMLForm *form;
+    HTMLFormItem *item;
+    MemHandle mh1, mh2;
+
+EC(  EC_ERROR_IF(formId < 0, UIG_UI_TREE_OPERATION_FAILS);             )
+
+    if(formId < 0 || !uiMgr.UIM_currentDoc || !uiMgr.UIM_currentDoc->HTUI_formList) 
+	return;
+  
+    count = HTListGetCount(uiMgr.UIM_currentDoc->HTUI_formList);
+    if(!count || formId >= count) 
+	return;
+
+    form = HTListLockItem(uiMgr.UIM_currentDoc->HTUI_formList, 
+			  formId, &mh1);
+    count = HTListGetCount(form->HTF_itemList);
+    if(!count) {
+	HTListUnlock(mh1);
+	return;
+    }
+
+    for(i=0; i<count; i++) {
+	item = HTListLockItem(form->HTF_itemList, i, &mh2);
+	if(item->HTFI_type == FE_RADIO && 
+	   item->HTFI_nameId == nameId && item->HTFI_object != selectedObj)
+	    @send, forceQueue item->HTFI_object::
+		MSG_GEN_ITEM_GROUP_SET_NONE_SELECTED(FALSE);
+	HTListUnlock(mh2);
+    }
+    HTListUnlock(mh1);
+    return;
+}
+
+
+
+
+#ifdef __HIGHC__
+#pragma Code("FORMINPUT");
+#endif
+#ifdef __BORLANDC__
+#pragma codeseg FORMINPUT
+#endif
+
+
+
+/***********************************************************************
+ *		MSG_GEN_INPUT_STORE_DATA for HTGenInputClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    Store the identity of the INPUT object.  Some of
+ *                  data will be submitted to a remote server.
+ * PARAMETERS:	    (int formId, int nameId, 
+ *                   FormElementType type, optr content)
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	edwin	1/ 8/97   	Initial Revision
+ *
+ ***********************************************************************/
+@method HTGenInputClass, MSG_GEN_INPUT_STORE_DATA
+{
+  word br;
+  @self->HTGI_content = content;
+  @self->HTGI_formId = formId;
+  @self->HTGI_nameId = nameId;
+
+  @self->HTGI_pageRow = -1;
+  /*
+   *  Let's get the default alignment.  If the TABLE has ALIGN attribute,
+   *  the attribute overwrites the content alignment.
+   */
+  @self->HTGI_align=@call content::MSG_GEN_HTML_CONTENT_GET_JUSTIFICATION(&br);
+  @self->HTGI_noBr = br;
+
+  if (type == FE_CHECKBOX)
+    @self->GIGI_behaviorType = GIGBT_NON_EXCLUSIVE;
+
+  return;
+}	/* End of MSG_GEN_INPUT_STORE_DATA.	*/
+
+
+/***********************************************************************
+ *		MSG_GEN_DESTROY for HTGenInputClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    Free the allocated instance data.
+ * PARAMETERS:	    (VisUpdateMode updateMode, CompChildFlags flags)
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:	    
+ *
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	edwin   	2/ 7/97   	Initial Revision
+ *	
+ ***********************************************************************/
+@method HTGenInputClass, MSG_GEN_DESTROY
+{
+  @callsuper();
+
+  return;
+}	/* End of MSG_GEN_DESTROY.	*/
+
+
+/***********************************************************************
+ *		MSG_GEN_PREPARE_FOR_DESTROY for HTGenInputClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    Prepare the object for HTObjDestroyAllWID. All we
+ *                  need to do is delete instance data. This message 
+ *                  replaces MSG_GEN_DESTROY as we won't be sending 
+ *                  MSG_GEN_DESTROY to objects. Instance data allocated
+ *                  using ...WID APIs (like HTListNewWID, HTMemAllocWID)
+ *                  need not freed to save time.
+ * PARAMETERS:	    void (void)
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:	    
+ *
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	kkee    	9/15/97   	Initial Revision
+ *	
+ ***********************************************************************/
+@method HTGenInputClass, MSG_GEN_PREPARE_FOR_DESTROY
+{
+    /* 
+     * These are allocated using HTMemAllocWID and deleted using
+     * HTMemFreeAllWID.
+     *
+     * if (@self->HTGI_name)
+     * HTMemFree(@self->HTGI_name);
+     * if (@self->HTGI_value)
+     * HTMemFree(@self->HTGI_value);
+     */
+    /* 
+     * If we delete something here, make sure to add to list in 
+     * PresentationManager::MSG_PM_OBJECT_INSTANTIATE.
+     */
+    return;
+}	/* End of MSG_GEN_PREPARE_FOR_DESTROY.	*/
+
+
+
+/***********************************************************************
+ *		MSG_GEN_INPUT_DRAW_FOCUS for HTGenInputClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    Draw the bound to show that it has the navigation
+ *                  focus.
+ * PARAMETERS:	    (GStateHandle gstate, 
+ *                   RectDWord *ret);
+ *                   ret - thre returned drawing bounds
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:	    
+ *
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	edwin   	4/16/97   	Initial Revision
+ *	
+ ***********************************************************************/
+@method HTGenInputClass, MSG_GEN_INPUT_DRAW_FOCUS
+{
+  @self->HTGI_focalBound = *ret;
+
+  return;
+}	/* End of MSG_GEN_INPUT_DRAW_FOCUS.	*/
+
+
+/***********************************************************************
+ *		MSG_GEN_INPUT_UNDRAW_FOCUS for HTGenInputClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    Erase the drawing bound.  The object is no longer
+ *                  have the navigation focus.
+ * PARAMETERS:	    (GStateHandle gstate)
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:	    
+ *
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	edwin   	4/16/97   	Initial Revision
+ *	
+ ***********************************************************************/
+@method HTGenInputClass, MSG_GEN_INPUT_UNDRAW_FOCUS
+{
+  @self->HTGI_focalBound.RD_right = @self->HTGI_focalBound.RD_left = 0;
+  return;
+}	/* End of MSG_GEN_INPUT_UNDRAW_FOCUS.	*/
+
+
+
+/***********************************************************************
+ *		MSG_VIS_DRAW for HTGenInputClass
+ ***********************************************************************
+ * SYNOPSIS:	We intercept MSG_VIS_DRAW so that we can redraw the
+ *              focus if necessary.    
+ * PARAMETERS:	drawFlags, GState    
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	grisco	11/25/97   	Initial Revision
+ *
+ ***********************************************************************/
+@method HTGenInputClass, MSG_VIS_DRAW
+{
+  /*
+   * Superclass does the drawing.
+   */
+
+  @callsuper();
+
+  /*
+   * If we have the focus, make sure to redraw that, too.
+   */
+
+  if (@self->HTGI_focalBound.RD_right != @self->HTGI_focalBound.RD_left) {
+      RedrawFocus (gstate, &@self->HTGI_focalBound);
+  }
+
+}	/* End of MSG_VIS_DRAW.	*/
+
+
+
+/***********************************************************************
+ *	MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION for HTGenInputClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    Make sure only one GenItemGroup of the same name
+ *                  get selected.
+ * PARAMETERS:	    (word identifier, Boolean indeterminate);
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	edwin	1/ 9/97   	Initial Revision
+ *
+ ***********************************************************************/
+@method HTGenInputClass, MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION
+{
+    @callsuper();
+
+    /*
+     * Need to check if this is execlusive or non-.
+     * Not done!!!
+     */
+    if(@self->GIGI_behaviorType != GIGBT_NON_EXCLUSIVE)
+	HTML_FORM_SET_EXCLUSIVE_SELECTION
+	    (@self->HTGI_formId, @self->HTGI_nameId,oself);
+
+    return;
+}	/* End of MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION.	*/
+
+
+/***********************************************************************
+ *		MSG_META_FUP_KBD_CHAR for HTGenInputClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    Change the default behavior so that the arrow keys
+ *                  become TAB or shift-TAB for keyboard navigation.
+ * PARAMETERS:	    		(word character = cx,
+ *				word flags = dx,
+ *				word state = bp)
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:	    
+ *
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	edwin   	4/16/97   	Initial Revision
+ *	
+ ***********************************************************************/
+@method HTGenInputClass, MSG_META_FUP_KBD_CHAR
+{
+    if(!(((flags >> 8) & SS_LCTRL) 
+       || ((flags >> 8) & SS_RCTRL)) ) {
+
+	switch(character) {
+
+	case (VC_ISCTRL << 8) | VC_TAB:
+
+	    if( (flags & CF_FIRST_PRESS) && !(flags & CF_RELEASE)) {
+		if((flags >> 8 & SS_LSHIFT) || (flags >> 8 & SS_RSHIFT))
+		    @send self::MSG_GEN_NAVIGATE_TO_PREVIOUS_FIELD();
+		else
+		    @send self::MSG_GEN_NAVIGATE_TO_NEXT_FIELD();
+		
+		return TRUE;
+	    } 
+
+	    break;
+
+	case (VC_ISCTRL << 8) | VC_ENTER:
+
+	    if( (flags & CF_FIRST_PRESS) && !(flags & CF_RELEASE)) 
+		if(!(@call self::MSG_GEN_ITEM_GROUP_GET_NUM_SELECTIONS()))
+		    @send self::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(0,0);
+	        else if(@self->GIGI_behaviorType == GIGBT_NON_EXCLUSIVE)
+		    @send self::MSG_GEN_ITEM_GROUP_SET_NONE_SELECTED(0);
+
+	    return TRUE;
+
+	case (VC_ISCTRL << 8) | VC_LEFT:
+	case (VC_ISCTRL << 8) | VC_RIGHT:
+	case (VC_ISCTRL << 8) | VC_DOWN:
+	case (VC_ISCTRL << 8) | VC_UP:
+	case (VC_ISCTRL << 8) | VC_NEXT:
+	case (VC_ISCTRL << 8) | VC_PREVIOUS:
+	    /* 
+	     * We want the content to take care these keys 
+	     */
+	    {
+		EventHandle event;
+		event = @record GenContentClass::MSG_META_FUP_KBD_CHAR(character, flags, state);
+		@send self::MSG_VIS_VUP_SEND_TO_OBJECT_OF_CLASS(event);
+	    
+		return TRUE;
+	    }
+
+	default:
+	    break;
+	}
+    }
+
+    return @callsuper();
+
+}	/* End of MSG_META_FUP_KBD_CHAR.	*/
+
+
+/***********************************************************************
+ *		MSG_SPEC_BUILD_BRANCH for HTGenInputClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    
+ * PARAMETERS:	    
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:	    
+ *
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	edwin   	6/11/97   	Initial Revision
+ *	
+ ***********************************************************************/
+@method HTGenInputClass, MSG_SPEC_BUILD_BRANCH
+{
+  @callsuper();
+  if (@self->HTGI_guessSize) {
+    @call self::MSG_VIS_SET_SIZE(DWORD_WIDTH(@self->HTGI_guessSize),
+				 DWORD_HEIGHT(@self->HTGI_guessSize));
+
+    @send @genChildren::MSG_VIS_SET_SIZE(DWORD_WIDTH(@self->HTGI_guessSize),
+					 DWORD_HEIGHT(@self->HTGI_guessSize));
+  }
+  return;
+}	/* End of MSG_SPEC_BUILD_BRANCH.	*/
+
+
+
+/***********************************************************************
+ *		MSG_UI_CALC_SIZE_POSITION for HTGenInputClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    Find its row position and X coordinate in that row.
+ * PARAMETERS:	    none
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:        THIS IS AN EXCEPTION!
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	edwin	11/ 3/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method HTGenInputClass, MSG_UI_CALC_SIZE_POSITION
+{
+  int row, pos;
+  SizeAsDWord size;
+  VisInstance * vself;
+  pos = UpdateItsPotentialPosition(oself, @self->HTGI_content, &row, &size);
+
+  vself = ObjDerefVis(oself);
+  vself->VI_geoAttrs &= ~VGA_USE_VIS_SET_POSITION;
+  vself->VI_attrs &= ~VA_DRAWABLE;
+  /*
+   *  Get an estimate position of the object
+   */
+  @self->HTGI_xPos = pos; 
+  @self->HTGI_pageRow = row;
+  @self->HTGI_guessSize = size;
+
+/*  @call self::MSG_VIS_SET_ATTRS(0, VA_DRAWABLE, VUM_DELAYED_VIA_APP_QUEUE);*/
+  return;
+}	/* End of MSG_UI_CALC_SIZE_POSITION.	*/
+
+
+/***********************************************************************
+ *		MSG_VIS_RECALC_SIZE for HTGenInputClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    
+ * PARAMETERS:	    
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:	    
+ *
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	edwin   	6/16/97   	Initial Revision
+ *	
+ ***********************************************************************/
+@method HTGenInputClass, MSG_VIS_RECALC_SIZE
+{
+  SizeAsDWord size;
+
+  size = @callsuper();
+  if (size == NULL)
+      size = MAKE_SIZE_DWORD(26, 26);
+      /* 32 and 26 are the size of the checkbox in Penelope SPUI */
+
+  return size;
+}	/* End of MSG_VIS_RECALC_SIZE.	*/
+
+
+@method HTGenInputClass, MSG_VIS_MARK_INVALID
+{
+  VisCompInstance *vself;
+  
+  vself = ObjDerefVis(oself);
+  if (!(vself->VI_attrs & VA_REALIZED))
+    /*
+     *  Avoid MSG_VIS_UPDATE_WINDOWS_AND_IMAGE.
+     */
+    @call self::MSG_VIS_OPEN(0);
+
+    return;
+}
+
+
+
+/***********************************************************************
+ *		MSG_VIS_POSITION_BRANCH for HTGenInputClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    Manually position its position.
+ * PARAMETERS:	    
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	edwin	11/ 3/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method HTGenInputClass, MSG_VIS_POSITION_BRANCH
+{
+  XYValueAsDWord xy = @call @genParent::MSG_VIS_GET_POSITION();
+  word lineWidth, pWidth;
+  VisInstance * vself;
+
+  if (@self->HTGI_align == J_LEFT) {
+    xOrigin = DWORD_X(xy) + @self->HTGI_xPos;
+  }
+  else {
+    lineWidth = @call @self->HTGI_content::
+	MSG_GEN_HTML_CONTENT_GET_ROW_WIDTH(@self->HTGI_pageRow);
+    pWidth = DWORD_WIDTH(@call @genParent::MSG_VIS_GET_SIZE());
+    if (@self->HTGI_align == J_RIGHT) {
+	xOrigin = DWORD_X(xy) + (pWidth-lineWidth+@self->HTGI_xPos);
+    }
+    else {
+	xOrigin = DWORD_X(xy) + (((pWidth-lineWidth)/2)+@self->HTGI_xPos);
+    }
+  }
+
+  yOrigin = DWORD_Y(xy) + GetItsPotentialHeight
+	(@self->HTGI_content, @self->HTGI_pageRow, oself);
+
+  @callsuper();
+/*  @call self::MSG_VIS_SET_ATTRS(VA_DRAWABLE, 0, VUM_DELAYED_VIA_APP_QUEUE);*/
+
+  vself = ObjDerefVis(oself);
+  vself->VI_attrs |= VA_DRAWABLE;
+
+  if (@self->HTGI_focalBound.RD_left != 0 &&
+      @self->HTGI_focalBound.RD_right != 0 &&
+      @self->HTGI_focalBound.RD_top != @self->HTGI_focalBound.RD_bottom) {
+      /*
+       *  The object currently has a focus.  Update its new position.
+       */
+      Rectangle rect;
+      
+      @call self::MSG_VIS_GET_BOUNDS(&rect);
+      @self->HTGI_focalBound.RD_left   = rect.R_left-1;
+      @self->HTGI_focalBound.RD_right  = rect.R_right+1;
+      @self->HTGI_focalBound.RD_top    = rect.R_top-1;
+      @self->HTGI_focalBound.RD_bottom = rect.R_bottom;
+      @call uiMgr.UIM_currentDoc->HTUI_pmanager::MSG_PM_UPDATE_FOCUS
+	  (@self->HTGI_focalBound);
+  }
+
+  return;
+}	/* End of MSG_VIS_POSITION_BRANCH.	*/
+
+
+/***********************************************************************
+ *		MSG_UI_GET_ROW_POSITION for HTGenFormClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    
+ * PARAMETERS:	    
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:	    
+ *
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	edwin   	5/25/97   	Initial Revision
+ *	
+ ***********************************************************************/
+@method HTGenInputClass, MSG_UI_GET_ROW_POSITION
+{
+    return @self->HTGI_pageRow;
+}	/* End of MSG_UI_GET_ROW_POSITION.	*/
+
+
+/***********************************************************************
+ *		MSG_UI_SET_NEW_POSITION for HTGenInputClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    
+ * PARAMETERS:	    
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:	    
+ *
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	edwin   	6/ 4/97   	Initial Revision
+ *	
+ ***********************************************************************/
+@method HTGenInputClass, MSG_UI_SET_NEW_POSITION
+{
+  @self->HTGI_pageRow = row;
+  @self->HTGI_xPos = xPos;
+  return;
+}	/* End of MSG_UI_SET_NEW_POSITION.	*/
+
+
+/***********************************************************************
+ *		MSG_META_START_SELECT for HTGenInputClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    
+ * PARAMETERS:	    
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:	    
+ *
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	edwin   	5/ 9/97   	Initial Revision
+ *	
+ ***********************************************************************/
+@method HTGenInputClass, MSG_META_START_SELECT
+{
+  Rectangle box, rect;
+
+  /* prevent crash */
+  if(!uiMgr.UIM_currentDoc ||
+    (@call self::MSG_GEN_GUP_FIND_OBJECT_OF_CLASS
+      ((ClassStruct *)&GenContentClass)) != 
+     uiMgr.UIM_currentDoc->HTUI_genContent) {
+      retVal->flags = MRF_PROCESSED;
+      return;
+  }
+  @call self::MSG_VIS_GET_BOUNDS(&rect);
+  box.R_right = box.R_left = box.R_top = box.R_bottom = 0;
+  rect.R_left -= 1;
+  @self->HTGI_focalBound.RD_left   = rect.R_left;
+  rect.R_right += 1;
+  @self->HTGI_focalBound.RD_right  = rect.R_right;
+  rect.R_top -= 1;
+  @self->HTGI_focalBound.RD_top    = rect.R_top;
+  @self->HTGI_focalBound.RD_bottom = rect.R_bottom;
+  @send (uiMgr.UIM_currentDoc)->HTUI_pmanager::MSG_PM_GRAB_NEW_FOCUS
+      (oself, rect, box, &HTGenTextClass, &HTGenImageClass, &HTGenInputClass);
+  @callsuper();
+  return;
+}	/* End of MSG_META_START_SELECT.	*/
+
+
+#ifdef __HIGHC__
+#pragma Code("FORMTEXT");
+#endif
+#ifdef __BORLANDC__
+#pragma codeseg FORMTEXT
+#endif
+
+
+/***********************************************************************
+ *		MSG_GEN_FORM_TEXT_INITIALIZE for HTGenFormTextClass
+ ***********************************************************************
+ * SYNOPSIS:	    Store the NAME attribute for the user-input field
+ *		    under the FORM.
+ * PARAMETERS:	    (oprt content)
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	EY	8/23/96   	Initial Revision
+ *	sean	11/14/97	Added HINT_TEXT_WHITE_WASH_COLOR to
+ *				help fix #72465.
+ *
+ ***********************************************************************/
+@method HTGenFormTextClass, MSG_GEN_FORM_TEXT_INITIALIZE
+{
+  word br;
+
+  if (content)
+      @self->HTGFT_content = content;
+  /*
+   *  Let's get the default alignment.
+   */
+  @self->HTGFT_align=@call content::MSG_GEN_HTML_CONTENT_GET_JUSTIFICATION(&br);
+  @self->HTGFT_noBr = br;
+  @self->HTGFT_pageRow = -1;
+  /*
+   *  Let TAB to switch to different object, instead of inserting a tab.
+   */
+  @call self::MSG_GEN_TEXT_SET_ATTRS(GTA_USE_TAB_FOR_NAVIGATION, 0);
+  /*
+   *  Make the object to be able to grab focus exclusive.
+   */
+  @call self::MSG_GEN_SET_ATTRS(GA_TARGETABLE,0);
+
+  /* Added this so these text object would print correctly.  Helps fix */
+  /* #72465.  Sean 11/14/97.					       */
+  @call self::MSG_META_ADD_VAR_DATA(HINT_TEXT_WHITE_WASH_COLOR, 0, NULL);
+  return;
+}	/* End of MSG_GEN_FORM_TEXT_INITIALIZE.	*/
+
+
+
+/***********************************************************************
+ *		MSG_GEN_DESTROY for HTGenFormTextClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    Free the allocated instance data.
+ * PARAMETERS:	    (VisUpdateMode updateMode, CompChildFlags flags)
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:	    
+ *
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	edwin   	2/ 7/97   	Initial Revision
+ *	
+ ***********************************************************************/
+@method HTGenFormTextClass, MSG_GEN_DESTROY
+{
+  @callsuper();
+  return;
+}	/* End of MSG_GEN_DESTROY.	*/
+
+
+/***********************************************************************
+ *		MSG_GEN_PREPARE_FOR_DESTROY for HTGenFormTextClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    Prepare the object for HTObjDestroyAllWID. All we
+ *                  need to do is delete instance data. This message 
+ *                  replaces MSG_GEN_DESTROY as we won't be sending 
+ *                  MSG_GEN_DESTROY to objects. Instance data allocated
+ *                  using ...WID APIs (like HTListNewWID, HTMemAllocWID)
+ *                  need not freed to save time.
+ * PARAMETERS:	    void (void)
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:	    
+ *
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	kkee    	9/15/97   	Initial Revision
+ *	
+ ***********************************************************************/
+@method HTGenFormTextClass, MSG_GEN_PREPARE_FOR_DESTROY
+{
+    /* 
+     * These are allocated using HTMemAllocWID and deleted using
+     * HTMemFreeAllWID.
+     *
+     * if (@self->HTGFT_name)
+     * HTMemFree(@self->HTGFT_name);
+     * if (@self->HTGFT_value)
+     * HTMemFree(@self->HTGFT_value);
+     */
+    /* 
+     * If we delete something here, make sure to add to list in 
+     * UICreateObj.
+     */
+    VisTextInstance *vself;
+    vself = ObjDerefVis(oself);
+    if (vself->VTI_gstate)
+      GrDestroyState(vself->VTI_gstate);
+    return;
+}	/* End of MSG_GEN_PREPARE_FOR_DESTROY.	*/
+
+
+/***********************************************************************
+ *		MSG_GEN_FORM_TEXT_SET_FOCUS for HTGenFormTextClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    Set bound for showing the object is currently 
+ *                  having the keyboard navigation focus.
+ * PARAMETERS:	  (RectDWord *ret)
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:	    
+ *
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	edwin   	4/15/97   	Initial Revision
+ *	
+ ***********************************************************************/
+@method HTGenFormTextClass, MSG_GEN_FORM_TEXT_SET_FOCUS
+{
+  @self->HTGFT_focalBound = *ret;
+
+  return;
+}	/* End of MSG_GEN_FORM_TEXT_SET_FOCUS.	*/
+
+
+/***********************************************************************
+ *	MSG_GEN_FORM_TEXT_CLEAR_FOCUS for HTGenFormTextClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    Erase the drawing of navigation focus.
+ * PARAMETERS:	  ()
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:	    
+ *
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	edwin   	4/15/97   	Initial Revision
+ *	
+ ***********************************************************************/
+@method HTGenFormTextClass, MSG_GEN_FORM_TEXT_CLEAR_FOCUS
+{
+  @self->HTGFT_focalBound.RD_right = @self->HTGFT_focalBound.RD_left = 0;
+  return;
+}	/* End of MSG_GEN_FORM_TEXT_CLEAR_FOCUS.	*/
+
+
+/***********************************************************************
+ *		MSG_VIS_TEXT_MARK_INVALID for HTGenFormTextClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    Because the ui tree is custom manager.  The geometry
+ *                  update message is not sent down the ui tree, so
+ *                  the ui object have VI_optFlags = GEOMETRY_INVALID.
+ *                  Then user input textarea become editable when
+ *                  it changes the height.  Here I intercept this
+ *                  routine to manually update its geometry.
+ * PARAMETERS:	    
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:	    
+ *
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	edwin   	5/ 2/97   	Initial Revision
+ *	
+ ***********************************************************************/
+@method HTGenFormTextClass, MSG_VIS_MARK_INVALID
+{
+  VisCompInstance *vself;
+  
+  vself = ObjDerefVis(oself);
+  if (!(vself->VI_attrs & VA_REALIZED)) {
+    /*
+     *  Avoid MSG_VIS_UPDATE_WINDOWS_AND_IMAGE.
+     */
+    @call self::MSG_VIS_OPEN(0);
+  }
+
+    return;
+}	/* End of MSG_VIS_MARK_INVALID.	*/
+
+
+
+/***********************************************************************
+ *		MSG_VIS_DRAW for HTGenFormTextClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    Refresh the drawing bound of navigation focus if
+ *                  needed.
+ * PARAMETERS:	    
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:	    
+ *
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	edwin   	4/16/97   	Initial Revision
+ *	sean		11/14/97	Added font change to fix #72465.
+ *	
+ ***********************************************************************/
+@method HTGenFormTextClass, MSG_VIS_DRAW
+{
+@ifdef PRODUCT_RESPONDER
+  Rectangle bound;
+@endif
+
+  /* Let's change the font to be a printable one.   Fixes  */
+  /* #72465.  Sean 11/14/97. 				   */
+@ifdef	TRUNK
+  if (drawFlags & DF_PRINT) {
+    NPTextConvertFontID(oself, FID_PENELOPE, FID_DTC_URW_SANS);
+  }
+@endif
+
+  @callsuper();
+
+@ifdef	TRUNK
+  if (drawFlags & DF_PRINT) {
+    NPTextConvertFontID(oself, FID_DTC_URW_SANS, FID_PENELOPE);
+  }
+@endif
+
+@ifdef PRODUCT_RESPONDER
+    pself = ObjDerefGen(oself);
+@endif
+  if (@self->HTGFT_focalBound.RD_right != @self->HTGFT_focalBound.RD_left) {
+      RedrawFocus (gstate, &@self->HTGFT_focalBound);
+  }
+
+@ifdef PRODUCT_RESPONDER
+  GrSaveState(gstate);
+  GrSetLineMaskSys( gstate, SDM_50);
+  GrSetMixMode(gstate, MM_COPY);
+  GrSetLineColor(gstate, CF_INDEX, C_BLACK, 0, 0);
+  @call self::MSG_VIS_GET_BOUNDS(&bound);
+  GrDrawRect(gstate, bound.R_left - 1, bound.R_top - 1, 
+	     bound.R_right + 1, bound.R_bottom + 1);
+  GrRestoreState(gstate);
+@endif
+
+  return;
+}	/* End of MSG_VIS_DRAW.	*/
+
+
+
+/***********************************************************************
+ *		MSG_VIS_RECALC_SIZE for HTGenFormTextClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    Tell the Geometry Manager to sent 
+ *                  MSG_VIS_POSITION_BRANCH instead of calling a routine.
+ * PARAMETERS:	    SizeAsDWord (RecalcSizeArgs width, 
+ *				 RecalcSizeArgs height)
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	edwin	10/24/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method HTGenFormTextClass, MSG_VIS_RECALC_SIZE
+{
+  VisCompInstance * vself;
+  SizeAsDWord size;
+
+  size = @callsuper();
+@ifdef PRODUCT_RESPONDER
+    pself = ObjDerefGen(oself);
+@endif
+  size = MAKE_SIZE_DWORD(DWORD_WIDTH(size), DWORD_HEIGHT(size)+4);
+
+  /*
+   *  Tell the Geometry Manager to send a messaeg instead of caling a
+   *  a routine.
+   */
+  vself = ObjDerefVis(oself);
+  vself->VI_geoAttrs &= ~VGA_USE_VIS_SET_POSITION;
+
+  return size;
+}	/* End of MSG_VIS_RECALC_SIZE.	*/
+
+
+
+/***********************************************************************
+ *		MSG_VIS_POSITION_BRANCH for HTGenFormTextClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    Set its new X and Y position.
+ * PARAMETERS:	    (int xOrigin, int yOrigin)
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	edwin	10/24/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method HTGenFormTextClass, MSG_VIS_POSITION_BRANCH
+{
+  XYValueAsDWord xy = @call @genParent::MSG_VIS_GET_POSITION();
+  word lineWidth, pWidth;
+  VisInstance *vself;
+
+@ifdef PRODUCT_RESPONDER
+    pself = ObjDerefGen(oself);
+@endif
+
+  if (@self->HTGFT_align == J_LEFT) {
+    xOrigin = DWORD_X(xy) + @self->HTGFT_xPos;
+  }
+  else {
+    lineWidth = @call @self->HTGFT_content::
+	MSG_GEN_HTML_CONTENT_GET_ROW_WIDTH(@self->HTGFT_pageRow);
+    pWidth = DWORD_WIDTH(@call @genParent::MSG_VIS_GET_SIZE());
+    if (@self->HTGFT_align == J_RIGHT) {
+	xOrigin = DWORD_X(xy) + (pWidth-lineWidth+@self->HTGFT_xPos);
+    }
+    else {
+	xOrigin = DWORD_X(xy) + (((pWidth-lineWidth)/2)+@self->HTGFT_xPos);
+    }
+  }
+
+  yOrigin = DWORD_Y(xy) + 
+    GetItsPotentialHeight(@self->HTGFT_content, @self->HTGFT_pageRow, oself)
+	- 1;
+
+  if (uiMgr.UIM_currentDoc->PM_focalObj == oself)
+      @call self::MSG_META_RELEASE_FOCUS_EXCL(); /* bug fix #74789 */
+  @callsuper();
+  vself = ObjDerefVis(oself);
+  vself->VI_attrs |= VA_DRAWABLE;
+
+  if (@self->HTGFT_focalBound.RD_left != 0 &&
+      @self->HTGFT_focalBound.RD_right != 0 &&
+      @self->HTGFT_focalBound.RD_top != @self->HTGFT_focalBound.RD_bottom){
+    /*
+     *  The object currently has a focus.  Update its new position.
+     */
+    Rectangle rect;
+
+    @call self::MSG_VIS_GET_BOUNDS(&rect);
+    rect.R_left = rect.R_left - 2;
+    rect.R_top = rect.R_top - 2;
+    @self->HTGFT_focalBound.RD_left = rect.R_left;
+    @self->HTGFT_focalBound.RD_right = rect.R_right;
+    @self->HTGFT_focalBound.RD_top = rect.R_top;
+    @self->HTGFT_focalBound.RD_bottom = rect.R_bottom;
+    @call uiMgr.UIM_currentDoc->HTUI_pmanager::MSG_PM_UPDATE_FOCUS
+	(@self->HTGFT_focalBound);
+  }
+  if (uiMgr.UIM_currentDoc->PM_focalObj == oself)
+      @call self::MSG_META_GRAB_FOCUS_EXCL(); /* bug fix #74789 */
+
+  return;
+}	/* End of MSG_VIS_POSITION_BRANCH.	*/
+
+
+/***********************************************************************
+ *		MSG_UI_GET_ROW_POSITION for HTGenFormTextClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    
+ * PARAMETERS:	    
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:	    
+ *
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	edwin   	5/25/97   	Initial Revision
+ *	
+ ***********************************************************************/
+@method HTGenFormTextClass, MSG_UI_GET_ROW_POSITION
+{
+    return @self->HTGFT_pageRow;
+}	/* End of MSG_UI_GET_ROW_POSITION.	*/
+
+
+/***********************************************************************
+ *		MSG_UI_SET_NEW_POSITION for HTGenFormTextClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    
+ * PARAMETERS:	    
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:	    
+ *
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	edwin   	6/ 4/97   	Initial Revision
+ *	
+ ***********************************************************************/
+@method HTGenFormTextClass, MSG_UI_SET_NEW_POSITION
+{
+  @self->HTGFT_pageRow = row;
+  @self->HTGFT_xPos = xPos;
+  return;
+}	/* End of MSG_UI_SET_NEW_POSITION.	*/
+
+
+
+/***********************************************************************
+ *		MSG_VIS_TEXT_SHOW_SELECTION for HTGenFormTextClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    Don't cause the view object to scroll to show this
+ *                  object.
+ * PARAMETERS:	    
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	edwin	11/12/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method HTGenFormTextClass, MSG_VIS_TEXT_SHOW_SELECTION
+{
+  return;
+}	/* End of MSG_VIS_TEXT_SHOW_SELECTION.	*/
+
+
+
+/***********************************************************************
+ *		MSG_UI_CALC_SIZE_POSITION for HTGenFormTextClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    Find its row number and X position.
+ * PARAMETERS:	    none
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	edwin	10/28/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method HTGenFormTextClass, MSG_UI_CALC_SIZE_POSITION
+{
+  int row, pos;
+  SizeAsDWord size;
+  VisInstance *vself;
+  /*
+   *  Ask the text object's content object to figure out the size and
+   *  position of the text object.
+   */
+  pos = UpdateItsPotentialPosition(oself,@self->HTGFT_content,&row,&size);
+
+  /*
+   *  Store the returned x position in the returned row number.
+   */
+@ifdef PRODUCT_RESPONDER
+    pself = ObjDerefGen(oself);
+@endif
+  @self->HTGFT_xPos = pos; 
+  @self->HTGFT_pageRow = row;
+  @self->HTGFT_guessSize = size;
+
+  vself = ObjDerefVis(oself);
+  vself->VI_attrs &= ~VA_DRAWABLE;
+
+  return;
+}	/* End of MSG_UI_CALC_SIZE_POSITION.	*/
+
+
+/***********************************************************************
+ *		MSG_SPEC_BUILD_BRANCH for HTGenFormTextClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    
+ * PARAMETERS:	    
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:	    
+ *
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	edwin   	6/16/97   	Initial Revision
+ *	sean		7/31/97		Fix bug 68878
+ *	
+ ***********************************************************************/
+@method HTGenFormTextClass, MSG_SPEC_BUILD_BRANCH
+{
+  VisCompInstance * vself;
+
+  @callsuper();
+
+  if (@self->HTGFT_guessSize)
+      @call self::MSG_VIS_SET_SIZE(DWORD_WIDTH(@self->HTGFT_guessSize),
+				   DWORD_HEIGHT(@self->HTGFT_guessSize));
+
+  /*
+   *  If the text object is in a form/table, the bit is set again when
+   *  the vis part is built.  Thus, we clear it here again.
+   */
+  vself = ObjDerefVis(oself);
+  vself->VI_geoAttrs &= ~VGA_USE_VIS_SET_POSITION;
+  /*
+   *  One purpose to call geometry_valid message here is to let the
+   *  small text object to create chunk array for its VTI_lines field.
+   */
+
+  /* Removed VOF_IMAGE_INVALID from flags we clear here.  This was  */
+  /* causing a bug where the initial text was not showing correctly. */
+  /* Sean 7/31/97.  Fixes 68878. */
+  vself->VI_optFlags &= ~(VOF_GEOMETRY_INVALID | VOF_WINDOW_INVALID);
+  @call self::MSG_VIS_NOTIFY_GEOMETRY_VALID();
+
+  return;
+}	/* End of MSG_SPEC_BUILD_BRANCH.	*/
+
+
+/***********************************************************************
+ *		MSG_META_START_SELECT for HTGenFormTextClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    
+ * PARAMETERS:	    
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:	    
+ *
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	edwin   	5/ 9/97   	Initial Revision
+ *	
+ ***********************************************************************/
+@method HTGenFormTextClass, MSG_META_START_SELECT
+{
+  Rectangle box, rect;
+  SemaphoreHandle sem = uiMgr.UIM_access;
+
+  PUSHDS;
+  SET_DS_LIB_DGROUP;
+
+  /* prevent crash */
+  if(ThreadPTimedSem(sem, 1) == SE_TIMEOUT)
+      return;
+  if(!uiMgr.UIM_currentDoc ||
+    (@call self::MSG_GEN_GUP_FIND_OBJECT_OF_CLASS
+      ((ClassStruct *)&GenContentClass)) != 
+     uiMgr.UIM_currentDoc->HTUI_genContent) {
+      retVal->flags = MRF_PROCESSED;
+      ThreadVSem(sem);
+      POPDS;
+      return;
+  }
+  @call self::MSG_VIS_GET_BOUNDS(&rect);
+  rect.R_left = rect.R_left - 2;
+  rect.R_top = rect.R_top - 2;
+  @self->HTGFT_focalBound.RD_left   = rect.R_left;
+  @self->HTGFT_focalBound.RD_right  = rect.R_right;
+  @self->HTGFT_focalBound.RD_top    = rect.R_top;
+  @self->HTGFT_focalBound.RD_bottom = rect.R_bottom;
+  box.R_right = box.R_left = box.R_top = box.R_bottom = 0;
+  @send (uiMgr.UIM_currentDoc)->HTUI_pmanager::MSG_PM_GRAB_NEW_FOCUS
+      (oself, rect, box, &HTGenTextClass, &HTGenImageClass, &HTGenInputClass);
+
+  ThreadVSem(sem);
+
+  POPDS;
+  @callsuper();
+  return;
+}	/* End of MSG_META_START_SELECT.	*/
+
+
+@ifdef PRODUCT_RESPONDER
+/***********************************************************************
+ *		MSG_VIS_TEXT_DELETE_ALL for HTGenFormTextClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    
+ * PARAMETERS:	    
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:	    
+ *
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	mzhu    	4/21/97   	Initial Revision
+ *	
+ ***********************************************************************/
+@method HTGenFormTextClass, MSG_VIS_TEXT_DELETE_ALL
+{
+    @call self::MSG_VIS_TEXT_REPLACE_ALL_PTR("",0);
+}	/* End of MSG_VIS_TEXT_DELETE_ALL.	*/
+@endif
+
+
+
+#ifdef __HIGHC__
+#pragma Code("FORMTRIGGER");
+#endif
+#ifdef __BORLANDC__
+#pragma codeseg FORMTRIGGER
+#endif
+
+
+
+/***********************************************************************
+ *	MSG_GEN_FORM_TRIGGER_INITIALIZE for HTGenFormTriggerClass
+ ***********************************************************************
+ * SYNOPSIS:	    Store the NAME attribute for the triggers under the
+ *		    FORM.
+ * PARAMETERS:	    (int formId, int nameId, FormElementype type, optr content)
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	EY	8/27/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method HTGenFormTriggerClass, MSG_GEN_FORM_TRIGGER_INITIALIZE
+{
+  word br;
+  @self->HTGFT_type = type;
+  @self->HTGFT_content = container;
+  @self->HTGFT_formId = formId;
+  @self->HTGFT_nameId = nameId;
+
+  /*
+   *  Get the current alignment info.
+   */
+  @self->HTGFT_align=@call container::MSG_GEN_HTML_CONTENT_GET_JUSTIFICATION(&br);
+  @self->HTGFT_noBr = br;
+  @self->HTGFT_pageRow = -1;
+  /*
+   *  Make the object to be able to grab focus exclusive.
+   */
+  @call self::MSG_GEN_SET_ATTRS(GA_TARGETABLE,0);
+
+  return;
+}	/* End of MSG_GEN_FORM_TRIGGER_INITIALIZE.	*/
+
+
+/***********************************************************************
+ *		MSG_GEN_DESTROY for HTGenFormTriggerClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    Free the allocated instance data.
+ * PARAMETERS:	    (VisUpdateMode updateMode, CompChildFlags flags)
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:	    
+ *
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	edwin   	2/ 7/97   	Initial Revision
+ *	
+ ***********************************************************************/
+@method HTGenFormTriggerClass, MSG_GEN_DESTROY
+{
+  @callsuper();
+  return;
+}	/* End of MSG_GEN_DESTROY.	*/
+
+
+/***********************************************************************
+ *		MSG_GEN_PREPARE_FOR_DESTROY for HTGenFormTriggerClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    Prepare the object for HTObjDestroyAllWID. All we
+ *                  need to do is delete instance data. This message 
+ *                  replaces MSG_GEN_DESTROY as we won't be sending 
+ *                  MSG_GEN_DESTROY to objects. Instance data allocated
+ *                  using ...WID APIs (like HTListNewWID, HTMemAllocWID)
+ *                  need not freed to save time.
+ * PARAMETERS:	    void (void)
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:	    
+ *
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	kkee    	9/15/97   	Initial Revision
+ *	
+ ***********************************************************************/
+@method HTGenFormTriggerClass, MSG_GEN_PREPARE_FOR_DESTROY
+{
+    /* 
+     * These would be destroyed when we delete the blocks using
+     * HTMemFreeAllWID.
+     *
+     * if (@self->HTGFT_name)
+     * HTMemFree(@self->HTGFT_name);
+     */
+    /* 
+     * If we delete something here, make sure to add to list in 
+     * PresentationManager::MSG_PM_OBJECT_INSTANTIATE.
+     */
+    return;
+}	/* End of MSG_GEN_PREPARE_FOR_DESTROY.	*/
+
+
+
+/***********************************************************************
+ *	if SHORT_LONG_TOUCH
+ *		MSG_META_UIG_SHORT_TOUCH_NOTIFY for HTGenFormTriggerClass
+ *	else
+ *		MSG_META_START_SELECT for HTGenFormTriggerClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    Assemble a query URL of the form:
+ *                  action?name=value&name=value&name=value
+ *                  ("action" here is the URL specified by the ACTION 
+ *                  attribute to the FORM tag, or the current document
+ *                  URL if no ACTION attribute was specified.)
+ * PARAMETERS:	    
+ *	MSG_META_UIG_SHORT_TOUCH_NOTIFY:
+ *		void ()
+ *	MSG_META_START_SELECT:
+ *		void (MouseReturnParams *retVal,
+ *		      sword xPosition, sword yPosition,
+ *		      word inputState)
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	edwin	10/18/96   	Initial Revision
+ *
+ ***********************************************************************/
+@if @SHORT_LONG_TOUCH
+@method HTGenFormTriggerClass, MSG_META_UIG_SHORT_TOUCH_NOTIFY
+{
+  SemaphoreHandle sem = uiMgr.UIM_access;
+
+  PUSHDS;
+  SET_DS_LIB_DGROUP;
+
+  /* prevent crash */
+  if(ThreadPTimedSem(sem, 1) == SE_TIMEOUT) {
+      POPDS;
+      return;
+  }
+  if(!uiMgr.UIM_currentDoc ||
+    (@call self::MSG_GEN_GUP_FIND_OBJECT_OF_CLASS
+      ((ClassStruct *)&GenContentClass)) != 
+     uiMgr.UIM_currentDoc->HTUI_genContent) {
+    ThreadVSem(sem);
+    POPDS;
+    return;
+  }
+
+  if (@self->HTGFT_type == TRIGGER_SUBMIT) {
+      if (@self->HTGFT_formId > -1) 
+	HTML_FORM_SUBMIT(@self->HTGFT_formId, oself);
+  } else if(@self->HTGFT_type == TRIGGER_RESET) {
+      if (@self->HTGFT_formId > -1) 
+	  HTML_FORM_RESET(@self->HTGFT_formId);
+  }
+
+  ThreadVSem(sem);
+  POPDS;
+
+  return;
+}
+
+@method HTGenFormTriggerClass, MSG_META_UIG_LONG_TOUCH_NOTIFY
+{
+    return;
+}
+@endif /* SHORT_LONG_TOUCH */
+
+
+/***********************************************************************
+ *		MSG_META_START_SELECT for HTGenFormTriggerClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    Grab the focus, but don't activate hyperlink.
+ * PARAMETERS:	    void ()
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:	    
+ *
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	allen   	11/ 5/97   	Initial Revision
+ *	
+ ***********************************************************************/
+@method HTGenFormTriggerClass, MSG_META_START_SELECT
+{
+  Rectangle rect, box;
+  SemaphoreHandle sem = uiMgr.UIM_access;
+
+  @callsuper();
+
+@ifdef PRODUCT_NIKE
+  PUSHDS;
+  SET_DS_LIB_DGROUP;
+@endif
+
+  /* prevent crash */
+  if(ThreadPTimedSem(sem, 1) == SE_TIMEOUT) {
+@ifdef PRODUCT_NIKE
+      POPDS ;
+@endif
+      return;
+  }
+
+  if(!uiMgr.UIM_currentDoc ||
+    (@call self::MSG_GEN_GUP_FIND_OBJECT_OF_CLASS
+      ((ClassStruct *)&GenContentClass)) != 
+     uiMgr.UIM_currentDoc->HTUI_genContent) {
+      ThreadVSem(sem);
+      POPDS ;
+      return;
+  }
+
+  @call self::MSG_VIS_GET_BOUNDS(&rect);
+  rect.R_bottom -= 1;
+  rect.R_right -= 1;
+  box.R_right = box.R_left = box.R_top = box.R_bottom = 0;
+  @send uiMgr.UIM_currentDoc->HTUI_pmanager::MSG_PM_GRAB_NEW_FOCUS
+      (oself, rect, box, &HTGenTextClass, &HTGenImageClass, &HTGenInputClass);
+
+@if !@SHORT_LONG_TOUCH
+  if (@self->HTGFT_type == TRIGGER_SUBMIT) {
+      if (@self->HTGFT_formId > -1) 
+	HTML_FORM_SUBMIT(@self->HTGFT_formId, oself);
+  } else if(@self->HTGFT_type == TRIGGER_RESET) {
+      if (@self->HTGFT_formId > -1) 
+	  HTML_FORM_RESET(@self->HTGFT_formId);
+  }
+@endif /* SHORT_LONG_TOUCH */
+
+  ThreadVSem(sem);
+@ifdef PRODUCT_NIKE
+  POPDS ;
+@endif
+
+}	/* End of MSG_META_START_SELECT.	*/
+
+
+/***********************************************************************
+ *		MSG_META_KBD_CHAR for HTGenFormTriggerClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    
+ * PARAMETERS:	    
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:	    
+ *
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	mzhu    	4/18/97   	Initial Revision
+ *	
+ ***********************************************************************/
+@method HTGenFormTriggerClass, MSG_META_KBD_CHAR
+{
+    Boolean action = FALSE;
+
+    if(((word)( CS_CONTROL << 8 ) | VC_ENTER ) == character )
+	character = VC_BLANK;
+
+    if (VC_BLANK == character) 	action = TRUE;
+
+    @callsuper();
+
+    if(action) {
+	if (CF_FIRST_PRESS & flags && @self->HTGFT_formId > -1) {
+	    if (@self->HTGFT_type == TRIGGER_SUBMIT)
+		HTML_FORM_SUBMIT(@self->HTGFT_formId, oself);
+	    else if(@self->HTGFT_type == TRIGGER_RESET)
+		HTML_FORM_RESET(@self->HTGFT_formId);
+	}
+    }
+
+}	/* End of MSG_META_KBD_CHAR.	*/
+
+
+
+/***********************************************************************
+ *		MSG_UI_CALC_SIZE_POSITION for HTGenFormTriggerClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    Find its row number and X position.
+ * PARAMETERS:	    none
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	edwin	10/28/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method HTGenFormTriggerClass, MSG_UI_CALC_SIZE_POSITION
+{
+  int row, pos;
+  SizeAsDWord size;
+  /*
+   *  Get an estimate position of the object
+   */
+  pos = UpdateItsPotentialPosition(oself, @self->HTGFT_content, &row, &size);
+@ifdef PRODUCT_RESPONDER
+    pself = ObjDerefGen(oself);
+@endif
+  @self->HTGFT_xPos = pos;
+  @self->HTGFT_pageRow = row;
+  @self->HTGFT_guessSize = size;
+
+  @call self::MSG_VIS_SET_ATTRS(0, VA_DRAWABLE, VUM_DELAYED_VIA_APP_QUEUE);
+  return;
+}	/* End of MSG_UI_CALC_SIZE_POSITION.	*/
+
+
+
+/***********************************************************************
+ *		MSG_VIS_RECALC_SIZE for HTGenFormTriggerClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    Tell the Geometry Manager to sent 
+ *                  MSG_VIS_POSITION_BRANCH instead of calling a routine.
+ * PARAMETERS:	    SizeAsDWord (RecalcSizeArgs width, 
+ *				RecalcSizeArgs height)
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	edwin	10/24/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method HTGenFormTriggerClass, MSG_VIS_RECALC_SIZE
+{
+  VisCompInstance * vself;
+  SizeAsDWord size;
+
+  size = @callsuper();
+  /*
+   *  Tell the Geometry Manager to send a messaeg instead of caling a
+   *  a routine.
+   */
+  vself = ObjDerefVis(oself);
+  vself->VI_geoAttrs &= ~VGA_USE_VIS_SET_POSITION;
+
+  return size;
+}	/* End of MSG_VIS_RECALC_SIZE.	*/
+
+
+
+/***********************************************************************
+ *		MSG_VIS_POSITION_BRANCH for HTGenFormTriggerClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    Set its new X and Y positions.
+ * PARAMETERS:	    (int xOrigin, int yOrigin)
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	edwin	10/24/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method HTGenFormTriggerClass, MSG_VIS_POSITION_BRANCH
+{
+  XYValueAsDWord xy = @call @genParent::MSG_VIS_GET_POSITION();
+  word lineWidth, pWidth;
+
+@ifdef PRODUCT_RESPONDER
+    pself = ObjDerefGen(oself);
+@endif
+
+  if (@self->HTGFT_align == J_LEFT) {
+    xOrigin = DWORD_X(xy) + @self->HTGFT_xPos;
+  }
+  else {
+    lineWidth = @call @self->HTGFT_content::
+	MSG_GEN_HTML_CONTENT_GET_ROW_WIDTH(@self->HTGFT_pageRow);
+    pWidth = DWORD_WIDTH(@call @genParent::MSG_VIS_GET_SIZE());
+    if (@self->HTGFT_align == J_RIGHT) {
+	xOrigin = DWORD_X(xy) + (pWidth-lineWidth+@self->HTGFT_xPos);
+    }
+    else {
+	xOrigin = DWORD_X(xy) + (((pWidth-lineWidth)/2)+@self->HTGFT_xPos);
+    }
+  }
+
+  yOrigin = DWORD_Y(xy) + 
+	GetItsPotentialHeight(@self->HTGFT_content,
+			      @self->HTGFT_pageRow,
+			      oself);
+  @callsuper();
+  @call self::MSG_VIS_SET_ATTRS(VA_DRAWABLE, 0, VUM_DELAYED_VIA_APP_QUEUE);
+  return;
+}	/* End of MSG_VIS_POSITION_BRANCH.	*/
+
+
+@method HTGenFormTriggerClass, MSG_VIS_MARK_INVALID
+{
+  VisCompInstance *vself;
+  
+  vself = ObjDerefVis(oself);
+  if (!(vself->VI_attrs & VA_REALIZED))
+    /*
+     *  Avoid MSG_VIS_UPDATE_WINDOWS_AND_IMAGE.
+     */
+    @call self::MSG_VIS_OPEN(0);
+
+    return;
+}
+
+@ifdef PRODUCT_RESPONDER
+
+/***********************************************************************
+ *		MSG_VIS_DRAW for HTGenFormTriggerClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    
+ * PARAMETERS:	    
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	edwin	4/18/97   	Initial Revision
+ *
+ ***********************************************************************/
+@method HTGenFormTriggerClass, MSG_VIS_DRAW
+{
+  Rectangle bound;
+
+  @callsuper();
+  @call self::MSG_VIS_GET_BOUNDS(&bound);
+  GrSaveState(gstate);
+  GrSetLineMaskSys( gstate, SDM_50);
+  GrSetMixMode(gstate, MM_COPY);
+  GrSetLineColor(gstate, CF_INDEX, C_BLACK, 0, 0);
+  GrDrawRect(gstate, bound.R_left, bound.R_top, 
+	     bound.R_right, bound.R_bottom);
+  GrRestoreState(gstate);
+  return;
+}
+@endif
+
+/***********************************************************************
+ *		MSG_UI_GET_ROW_POSITION for HTGenFormTriggerClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    
+ * PARAMETERS:	    
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:	    
+ *
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	edwin   	6/17/97   	Initial Revision
+ *	
+ ***********************************************************************/
+@method HTGenFormTriggerClass, MSG_UI_GET_ROW_POSITION
+{
+  return @self->HTGFT_pageRow;
+}	/* End of MSG_UI_GET_ROW_POSITION.	*/
+
+
+/***********************************************************************
+ *		MSG_UI_SET_NEW_POSITION for HTGenFormTriggerClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    
+ * PARAMETERS:	    
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:	    
+ *
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	edwin   	6/ 4/97   	Initial Revision
+ *	
+ ***********************************************************************/
+@method HTGenFormTriggerClass, MSG_UI_SET_NEW_POSITION
+{
+  @self->HTGFT_pageRow = row;
+  @self->HTGFT_xPos = xPos;
+  return;
+}	/* End of MSG_UI_SET_NEW_POSITION.	*/
+
+/***********************************************************************
+ *		MSG_SPEC_BUILD_BRANCH for HTGenFormTriggerClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    
+ * PARAMETERS:	    
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:	    
+ *
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	edwin   	6/11/97   	Initial Revision
+ *	
+ ***********************************************************************/
+@method HTGenFormTriggerClass, MSG_SPEC_BUILD_BRANCH
+{
+  @callsuper();
+  if (@self->HTGFT_guessSize)
+    @call self::MSG_VIS_SET_SIZE(DWORD_WIDTH(@self->HTGFT_guessSize),
+				 DWORD_HEIGHT(@self->HTGFT_guessSize));
+  return;
+}	/* End of MSG_SPEC_BUILD_BRANCH.	*/
+

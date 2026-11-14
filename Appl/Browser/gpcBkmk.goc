@@ -1,0 +1,1390 @@
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Geoworks 1996 -- All Rights Reserved
+
+PROJECT:	
+MODULE:		
+FILE:		
+
+AUTHOR:		
+
+ROUTINES:
+	Name			Description
+	----			-----------
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	
+
+DESCRIPTION:
+
+	This file and the other one, infoServBookmark2.goc contain all
+	the methods and functions which are related with bookmarks and 
+	folders.
+
+	This file has the functions to display the folders and bookmarks.
+
+	$Id: gpcBkmk.goc,v 1.1 98/08/13 15:09:30 edwin Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+@include "gpcDecl.goh"
+@include "gpcUI.goh"
+#include <graphics.h>
+
+@ifndef PRODUCT_RESPONDER
+
+/* data for bookmark and folder */
+word		ISCurrentSelection = GIGS_NONE;
+
+ISBFolderStruct ISBuildInFolder;
+ISBFolderStruct ISUserFolder;
+
+ISBookmarkViewType	ISBookmarkView = ISBVT_USER;
+
+word		ISLeftFirst = 0;
+word		ISRightFirst = ISB_LIST_LENGTH;
+
+extern VMFileHandle ISBookmarkFileHandle;
+@ifdef BROTHER_KERNEL
+@extern object ISBookmarkBox;
+@extern object ISBookmarkList;
+@extern object ISGotoBookmarkButton;
+
+@endif
+
+extern HTMemHandle _far _pascal ParseURL(HTMemHandle);
+
+void* _far _pascal GetBookmark(word item, ISBookmarkViewType type);
+
+@classdecl ISDialogClass;
+
+@classdecl ISDynamicListClass;
+@classdecl ISItemClass;
+
+
+
+/***********************************************************************
+ *		CreateLMemGString
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Create an LMeme-block-based grahpics string ready 
+ *		for filling by the caller.
+ * CALLED BY:	
+ * RETURN:	gstate through which to draw, plus optr of the storage
+ *		for the graphics string.
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	mzhu	9/ 4/96   	Initial Revision
+ *
+ ***********************************************************************/
+GStateHandle
+CreateLMemGString (optr *storagePtr)
+{
+    MemHandle		newBlock;
+    ChunkHandle		newChunk;
+    GStateHandle 	gstate;
+
+    newBlock = MemAllocLMem(LMEM_TYPE_GENERAL, sizeof(LMemBlockHeader)); 
+    ECCheckMemHandle(newBlock);
+    MemModifyFlags(newBlock, HF_SHARABLE, 0);
+
+    gstate = GrCreateGString(newBlock, GST_CHUNK, &newChunk);
+    ECCheckGStateHandle(gstate);
+
+    *storagePtr = ConstructOptr(newBlock, newChunk);
+ 
+    return(gstate);
+}	/* End of CreateLMemGString.	*/
+
+
+/***********************************************************************
+ *		MSG_GPC_BOOKMARK_INITIALIZE for GPCProcessClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    To open the bookmark db file and initialize the 
+ *		    bookmark object with data from the db file.
+ * PARAMETERS:	    
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	mzhu	9/24/96   	Initial Revision
+ *
+ ***********************************************************************/
+@extern method GPCProcessClass, MSG_GPC_BOOKMARK_INITIALIZE
+{
+    DBGroupAndItem	mapItem;
+    MapStruct		*map;
+
+    FileSetStandardPath(SP_DOCUMENT);
+    
+    ISBookmarkFileHandle = VMOpen(DB_FILE_NAME, VMAF_FORCE_READ_WRITE, VMO_CREATE, 0);
+    ECCheckFileHandle(ISBookmarkFileHandle);
+
+    mapItem = DBGetMap(ISBookmarkFileHandle);
+
+    if(mapItem == NULL) {
+
+	/* Create an ungrouped item to use for map item. */
+ 	mapItem = DBAllocUngrouped(ISBookmarkFileHandle, sizeof(MapStruct));
+        DBSetMapUngrouped(ISBookmarkFileHandle, mapItem);
+
+	map = DBLockUngrouped(ISBookmarkFileHandle, mapItem);
+
+	/*
+	 * Create the two folders
+	 */
+	map->MAP_buildin.ISBFS_group = DBGroupAlloc(ISBookmarkFileHandle);
+	map->MAP_user.ISBFS_group = DBGroupAlloc(ISBookmarkFileHandle);
+
+	map->MAP_buildin.ISBFS_size = 0;
+	map->MAP_buildin.ISBFS_head = 0;
+
+	map->MAP_user.ISBFS_size = 0;
+	map->MAP_user.ISBFS_head = 0;
+
+	DBDirty(map);
+	VMUpdate(ISBookmarkFileHandle);
+    } else {
+	map = DBLockUngrouped(ISBookmarkFileHandle, mapItem);
+    }
+
+
+    /* 
+     * Initialize the two global structures
+     */
+    ISBuildInFolder.ISBFS_size = map->MAP_buildin.ISBFS_size;
+    ISBuildInFolder.ISBFS_group = map->MAP_buildin.ISBFS_group;
+    ISBuildInFolder.ISBFS_head = map->MAP_buildin.ISBFS_head;
+
+    ISUserFolder.ISBFS_size = map->MAP_user.ISBFS_size;
+    ISUserFolder.ISBFS_group = map->MAP_user.ISBFS_group;
+    ISUserFolder.ISBFS_head = map->MAP_user.ISBFS_head;
+
+@ifdef PRODUCT_PENELOPE
+    if(ISBookmarkView == ISBVT_USER && ISUserFolder.ISBFS_size) {
+	@send ISLIModifyButton::MSG_GEN_SET_USABLE(VUM_NOW);
+	@send ISLIDeleteButton::MSG_GEN_SET_USABLE(VUM_NOW);
+	@send ISLIDeleteButton::MSG_SPEC_BUILD_BRANCH(0x0101);
+	@send ISLIModifyButton::MSG_SPEC_BUILD_BRANCH(0x0101);
+	@send ISLICreateBookmarkButton1::MSG_GEN_SET_USABLE(VUM_NOW);
+	@send ISLICreateBookmarkButton1::MSG_SPEC_BUILD_BRANCH(0x0101);
+
+	@send ViewTabGroup::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION
+	    (ISBVT_USER, 0);
+
+	if(ISCurrentSelection == GIGS_NONE) ISCurrentSelection = 0;
+    } else {
+	ISBookmarkView = ISBVT_BUILDIN;
+
+	@send ViewTabGroup::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION
+	    (ISBVT_BUILDIN, 0);
+
+	if(ISBuildInFolder.ISBFS_size) {
+	    @send ISLIModifyButton::MSG_GEN_SET_USABLE(VUM_NOW);
+	    @send ISLIModifyButton::MSG_SPEC_BUILD_BRANCH(0x0101);
+	    if(ISCurrentSelection == GIGS_NONE) 
+		ISCurrentSelection = 0;
+	}
+    }
+@endif
+
+@ifdef PRODUCT_PENELOPE
+    @send self::MSG_GPC_LISTS_INITIALIZE(ISCurrentSelection);
+@endif
+    DBUnlock(map);
+
+}	/* End of MSG_GPC_INITIALIZE.	*/
+
+
+@ifdef PRODUCT_PENELOPE
+
+/***********************************************************************
+ *		MSG_GPC_LISTS_INITIALIZE for GPCProcessClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    Initialize the two dynamic lists.
+ * PARAMETERS:	    word	selection (initially focus)
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:	    Devides the number of items into two lists
+ *		    and set them MSG_DYNAMIC_LIST_INITIALIZE.
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	mzhu	8/29/96   	Initial Revision
+ *
+ ***********************************************************************/
+@extern method GPCProcessClass, MSG_GPC_LISTS_INITIALIZE
+{
+    word size, leftSize, rightSize;
+
+    ISCurrentSelection = selection;
+
+    /* Finds the right size to display. */
+    if(ISBookmarkView == ISBVT_BUILDIN) 
+	size = ISBuildInFolder.ISBFS_size;
+    else
+	size = ISUserFolder.ISBFS_size;
+
+    if(selection != GIGS_NONE) {
+	if(selection < ISLeftFirst || 
+	   selection >= ISRightFirst + ISB_LIST_LENGTH) {
+	    ISLeftFirst = (selection / (ISB_LIST_LENGTH * 2)) 
+		* (ISB_LIST_LENGTH * 2);
+	    ISRightFirst = ISLeftFirst + ISB_LIST_LENGTH;
+	}
+    } else
+	ISLeftFirst = 0;
+    
+    /* The real item for both lists. */
+    leftSize = min(ISB_LIST_LENGTH, size - ISLeftFirst);
+    rightSize = min(ISB_LIST_LENGTH, size - ISLeftFirst - leftSize);
+    rightSize = max(rightSize, 0);
+
+    /* Check if it needs to show up the page-turn buttons. */
+    if(ISLeftFirst > 0) 
+	@send PrevPageButton::MSG_GEN_SET_USABLE(VUM_DELAYED_VIA_APP_QUEUE);
+    else
+	@send PrevPageButton::MSG_GEN_SET_NOT_USABLE(VUM_DELAYED_VIA_APP_QUEUE);
+
+    if(size > ISRightFirst + ISB_LIST_LENGTH) 
+	@send NextPageButton::MSG_GEN_SET_USABLE(VUM_DELAYED_VIA_APP_QUEUE);
+    else
+	@send NextPageButton::MSG_GEN_SET_NOT_USABLE(VUM_DELAYED_VIA_APP_QUEUE);
+
+    @call ISBLeftList::MSG_GEN_DYNAMIC_LIST_INITIALIZE(leftSize);
+    @call ISBRightList::MSG_GEN_DYNAMIC_LIST_INITIALIZE(rightSize);
+
+    /* Set the initial focus item. */
+    if(selection == GIGS_NONE) 
+	return;
+
+    if(selection - ISLeftFirst < leftSize) {
+	@call ISBRightList::MSG_GEN_ITEM_GROUP_SET_NONE_SELECTED(0);
+	@call ISBLeftList::MSG_META_GRAB_FOCUS_EXCL();
+
+	@call ISBLeftList::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION
+			   (selection - ISLeftFirst, 0);
+
+    } else if(selection - ISRightFirst < rightSize) {
+	@call ISBLeftList::MSG_GEN_ITEM_GROUP_SET_NONE_SELECTED(0);
+	@call ISBRightList::MSG_META_GRAB_FOCUS_EXCL();
+
+	@call ISBRightList::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION
+			   (selection - ISRightFirst, 0);
+    }
+
+}	/* End of MSG_GPC_LISTS_INITIALIZE.	*/
+
+
+
+/***********************************************************************
+ *	MSG_GPC_LEFT(RIGHT)_LIST_MONIKER_QUERY for GPCProcessClass
+ ***********************************************************************
+ * SYNOPSIS:	    To get and display the moniker for one item.
+ * PARAMETERS:	    void (optr list, word item)
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	MZ	8/24/96   	Initial Revision
+ *
+ ***********************************************************************/
+@extern method GPCProcessClass, MSG_GPC_LEFT_LIST_MONIKER_QUERY,
+			 MSG_GPC_RIGHT_LIST_MONIKER_QUERY
+{
+    ISBookmarkStruct* 	bookmark;
+    char 		str[ITEM_TEXT_LENGTH+1];
+    char 		tmp_str[ITEM_TEXT_LENGTH+1];
+    word		realItem;
+    int 		tmp_len, i;
+    GStateHandle	gstate;
+    optr		gstring;
+    Bitmap 		*bmp;
+
+    strcpy(str, "");
+
+    /* Finds the real number in the real folders/bookmarks lists. */
+    if(message == MSG_GPC_LEFT_LIST_MONIKER_QUERY)
+    	realItem = item + ISLeftFirst;
+    else 
+    	realItem = item + ISRightFirst;
+
+    /* Gets the string to display. */
+    bookmark = GetBookmark(realItem, ISBookmarkView);
+
+    if(bookmark) {
+	strcpy(str, (char *)((char *)bookmark + bookmark->ISBS_name));
+	DBUnlock(bookmark);
+    }
+
+    /* Create the gstring.*/
+    gstate = CreateLMemGString(&gstring);
+
+    if(!str[0]) {
+	/* If this is an empty item, just draws the vertical line. */
+    	GrDrawLine(gstate, TEXT_START - 4, -9, TEXT_START - 4, MONIKER_SIZE+7);
+    } else {
+    	GrSetAreaColor(gstate, CF_INDEX, C_BLACK, 0, 0);
+
+	/* Draw defferent logo for the item. */
+	if(ISBookmarkView == ISBVT_BUILDIN) {
+	    MemLock(OptrToHandle(@BuildInBookmarksBmpMoniker));
+	    bmp = LMemDeref(@BuildInBookmarksBmpMoniker);
+	    GrDrawBitmap(gstate, 0, 0, bmp, 0);
+	    MemUnlock(OptrToHandle(@BuildInBookmarksBmpMoniker));
+	} else {
+	    MemLock(OptrToHandle(@UserBookmarksBmpMoniker));
+	    bmp = LMemDeref(@UserBookmarksBmpMoniker);
+	    GrDrawBitmap(gstate, 0, 0, bmp, 0);
+	    MemUnlock(OptrToHandle(@UserBookmarksBmpMoniker));
+	}
+
+    	GrDrawLine(gstate, TEXT_START - 4, -9, TEXT_START - 4, MONIKER_SIZE+7);
+/*    	GrSetTextColor(gstate, CF_INDEX, C_BLACK, 0, 0);*/
+
+	if(GrTextWidth(gstate, str, strlen(str)) + TEXT_START > ITEM_LENGTH){
+	    strncpy(tmp_str, str, NUM_TEXT_GUESS);
+	    tmp_len = GrTextWidth(gstate, tmp_str, NUM_TEXT_GUESS) 
+		+ TEXT_START;
+	    for(i=NUM_TEXT_GUESS; i<=ITEM_TEXT_LENGTH; i++) {
+		tmp_len += GrTextWidth(gstate, str+i, 1);
+		if(tmp_len >= ITEM_LENGTH - 10)   break;
+		tmp_str[i] = str[i];
+	    }
+	    tmp_str[i] = 0;
+	    strcat(tmp_str, "...");
+	    GrDrawText(gstate, TEXT_START, 0, tmp_str, i+3);
+	} else {
+	    GrDrawText(gstate, TEXT_START, 0, str, strlen(str));
+	}	
+    }
+   
+    GrEndGString(gstate);
+    GrDestroyGString(gstate, 0, GSKT_LEAVE_DATA);
+
+    /* Lets the dynamic list to display this gstring for the item.*/
+    @call list::MSG_GEN_DYNAMIC_LIST_REPLACE_ITEM_MONIKER
+	(item, 0, MONIKER_SIZE, MONIKER_SIZE, sizeof(gstring),
+	 VMDT_GSTRING, VMST_OPTR, (dword)gstring );
+
+    MemFree(HandleOf(gstring));
+    
+}	/* End of MSG_GPC_LEFT(RIGHT)_LIST_MONIKER_QUERY.	*/
+
+@endif
+
+
+
+@ifdef PRODUCT_PENELOPE
+/***********************************************************************
+ *	MSG_GPC_LEFT(RIGHT)_LIST_APPLY for GPCProcessClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    The method for the two dynamic lists' apply and/or 
+ *			double press messages.
+ * PARAMETERS:	    void (word selection, numSelections, flags)
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *		   For apply messages, just sets the new currentSelection.
+ *		   For double press messages, sets the new currentSelection,
+ *		   and also call MSG_GPC_LIST_APPLY.
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	mzhu	8/29/96   	Initial Revision
+ *
+ ***********************************************************************/
+/****
+@extern method GPCProcessClass, MSG_GPC_LEFT_LIST_APPLY,
+			 MSG_GPC_RIGHT_LIST_APPLY,
+			 MSG_GPC_LEFT_LIST_DOUBLE_PRESS,
+			 MSG_GPC_RIGHT_LIST_DOUBLE_PRESS
+{
+    switch(message) {
+    case MSG_GPC_LEFT_LIST_APPLY:
+	@send ISBRightList::MSG_GEN_ITEM_GROUP_SET_NONE_SELECTED(0);
+    	ISCurrentSelection = selection + ISLeftFirst;
+	break;
+
+    case MSG_GPC_RIGHT_LIST_APPLY:
+	@send ISBLeftList::MSG_GEN_ITEM_GROUP_SET_NONE_SELECTED(0);
+    	ISCurrentSelection = selection + ISRightFirst;
+	break;
+
+    case MSG_GPC_LEFT_LIST_DOUBLE_PRESS:
+    	ISCurrentSelection = selection + ISLeftFirst;
+	@send self::MSG_GPC_LIST_APPLY();
+	break;
+
+    case MSG_GPC_RIGHT_LIST_DOUBLE_PRESS:
+    	ISCurrentSelection = selection + ISRightFirst;
+	@send self::MSG_GPC_LIST_APPLY();
+	break;
+    }
+}	/* End of MSG_GPC_LEFT(RIGHT)_LIST_APPLY.	*/
+
+@extern method GPCProcessClass, MSG_GPC_LEFT_SHORT_TOUCH,
+			       MSG_GPC_LEFT_LONG_TOUCH,
+			       MSG_GPC_RIGHT_SHORT_TOUCH,
+			       MSG_GPC_RIGHT_LONG_TOUCH
+{
+    word selection;
+
+    selection = @call sourceObj::MSG_GEN_ITEM_GROUP_GET_SELECTION();
+
+    switch(message) {
+    case MSG_GPC_LEFT_LONG_TOUCH:
+	@send ISBRightList::MSG_GEN_ITEM_GROUP_SET_NONE_SELECTED(0);
+    	ISCurrentSelection = selection + ISLeftFirst;
+	break;
+
+    case MSG_GPC_RIGHT_LONG_TOUCH:
+	@send ISBLeftList::MSG_GEN_ITEM_GROUP_SET_NONE_SELECTED(0);
+    	ISCurrentSelection = selection + ISRightFirst;
+	break;
+
+    case MSG_GPC_LEFT_SHORT_TOUCH:
+    	ISCurrentSelection = selection + ISLeftFirst;
+	@send self::MSG_GPC_LIST_APPLY();
+	break;
+
+    case MSG_GPC_RIGHT_SHORT_TOUCH:
+    	ISCurrentSelection = selection + ISRightFirst;
+	@send self::MSG_GPC_LIST_APPLY();
+	break;
+    }
+}
+			       
+
+
+/***********************************************************************
+ *		MSG_GPC_LIST_APPLY for GPCProcessClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    When double click an item or press enter key for an
+ *		    item, sends this message to open a folder or a bookmark.
+ * PARAMETERS:	    nothing
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	mzhu	9/ 8/96   	Initial Revision
+ *
+ ***********************************************************************/
+@extern method GPCProcessClass, MSG_GPC_LIST_APPLY
+{
+    ISBookmarkStruct 	*bookmark;
+    char 		*cptr;
+    HTMemHandle		urlHtmh, titleHtmh;
+    HTMemHandle sreqHtmh;
+    word		size;
+
+    /* Current view is a opened folder. So gets the current selected *
+     * bookmark.							 */
+    bookmark = GetBookmark(ISCurrentSelection, ISBookmarkView);
+
+    /* Also if the item is an empty item, do nothing more. */
+    if(bookmark == NULL) return;    
+
+    size = strlen((char *)((char *)bookmark + bookmark->ISBS_url))+1;
+
+    cptr = HTMemAllocAndLock(&urlHtmh, size);
+    strcpy(cptr, (char *)((char *)bookmark + bookmark->ISBS_url));
+    HTMemUnlock(urlHtmh);
+
+    size = strlen((char *)((char *)bookmark + bookmark->ISBS_name))+1;
+    cptr = HTMemAllocAndLock(&titleHtmh, size);
+    strcpy(cptr, (char *)((char *)bookmark + bookmark->ISBS_name));
+    HTMemUnlock(titleHtmh);
+
+    DBUnlock(bookmark);
+
+    /* Tell the process to open a url. */
+    urlHtmh = ParseURL(urlHtmh);
+
+    sreqHtmh = SReqCreateMainRequest(urlHtmh, 0, 0, HTM_GET,0);
+    @send process::MSG_GPC_OPEN_URL(sreqHtmh, UST_BOOKMARK);
+
+}	/* End of MSG_GPC_LIST_APPLY.	*/
+
+@endif
+
+@ifdef PRODUCT_PENELOPE
+
+/***********************************************************************
+ *		MSG_GPC_VIEW_CHANGED for GPCProcessClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    Changing the view among the folder, all-bookmark,
+ *		    server-bookmark, and internet-bookmark.
+ * PARAMETERS:	    void (word selection, numSelections, byte stateFlags)
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	mzhu	8/30/96   	Initial Revision
+ *
+ ***********************************************************************/
+@extern method GPCProcessClass, MSG_GPC_VIEW_CHANGED
+{
+    ISLeftFirst = 0;
+    ISRightFirst = ISB_LIST_LENGTH;
+
+    @call application::MSG_GEN_APPLICATION_IGNORE_INPUT();
+
+    ISBookmarkView = selection;
+    
+    if(selection == ISBVT_USER) {
+	if(ISUserFolder.ISBFS_size) {
+	    ISCurrentSelection = 0;
+	    @send ISLIModifyButton::MSG_GEN_SET_USABLE(VUM_NOW);
+	    @send ISLIDeleteButton::MSG_GEN_SET_USABLE(VUM_NOW);
+	    @send ISLIDeleteButton::MSG_SPEC_BUILD_BRANCH(0x0101);
+	    @send ISLIModifyButton::MSG_SPEC_BUILD_BRANCH(0x0101);
+	} else {
+	    ISCurrentSelection = GIGS_NONE;
+	    @send ISLIModifyButton::MSG_GEN_SET_NOT_USABLE(VUM_NOW);
+	    @send ISLIDeleteButton::MSG_GEN_SET_NOT_USABLE(VUM_NOW);
+	}
+
+	if(!(@call ISLIStopButton1::MSG_GEN_GET_USABLE())) {
+	    @send ISLICreateBookmarkButton1::MSG_GEN_SET_USABLE(VUM_NOW);
+	    @send ISLICreateBookmarkButton1::MSG_SPEC_BUILD_BRANCH(0x0101);
+	}
+    } else {
+	if(ISBuildInFolder.ISBFS_size) {
+	    ISCurrentSelection = 0;
+	    @send ISLIModifyButton::MSG_GEN_SET_USABLE(VUM_NOW);
+	    @send ISLIModifyButton::MSG_SPEC_BUILD_BRANCH(0x0101);
+	} else {
+	    ISCurrentSelection = GIGS_NONE;
+	    @send ISLIModifyButton::MSG_GEN_SET_NOT_USABLE(VUM_NOW);
+	}
+
+	@send ISLIDeleteButton::MSG_GEN_SET_NOT_USABLE(VUM_NOW);
+	@send ISLICreateBookmarkButton1::MSG_GEN_SET_NOT_USABLE(VUM_NOW);
+    }
+
+    /* To initilize the two lists with the initial focus selection. */
+    @send self::MSG_GPC_LISTS_INITIALIZE(ISCurrentSelection);
+
+    @call application::MSG_GEN_APPLICATION_ACCEPT_INPUT();
+}	/* End of MSG_GPC_VIEW_CHANGED.	*/
+
+@endif
+
+
+@ifdef PRODUCT_PENELOPE 
+
+/***********************************************************************
+ *		MSG_GPC_PREV_PAGE for GPCProcessClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    Goes back to the previous page.
+ * PARAMETERS:	    nothing
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:	    For MSG_GPC_PREV_PAGE ( from pressing the prevButton),
+ *		    	sets the focus on current focus position.
+ *		    For MSG_GPC_SCROLL_PREV_PAGE (from Up key),
+ *			sets the focus on the last one of the right list.
+ *		    For MSG_GPC_KEY_PREV_PAGE (from Left key),
+ *			set the focus on the current position on the 
+ *			right list.
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	mzhu	9/ 3/96   	Initial Revision
+ *
+ ***********************************************************************/
+@extern method GPCProcessClass, MSG_GPC_PREV_PAGE,
+			 MSG_GPC_SCROLL_PREV_PAGE,
+			 MSG_GPC_KEY_PREV_PAGE
+{
+    @call application::MSG_GEN_APPLICATION_IGNORE_INPUT();
+
+    /* If there is no previous page, do nothing. */
+    if(!(@call PrevPageButton::MSG_GEN_GET_USABLE())){
+	@call application::MSG_GEN_APPLICATION_ACCEPT_INPUT();
+	return;
+    }
+
+    /* Sets the right start items for both lists. */
+    ISLeftFirst -= ISB_LIST_LENGTH * 2;
+    ISRightFirst = ISLeftFirst + ISB_LIST_LENGTH;
+
+    /* Sets the next focus item based on the message. */
+    if(message == MSG_GPC_PREV_PAGE){
+	ISCurrentSelection = ISLeftFirst;
+    } else if(message == MSG_GPC_KEY_PREV_PAGE) {
+	ISCurrentSelection -= ISB_LIST_LENGTH;
+    }
+
+    /* To initialize the two lists with the focus item. */
+    @call self::MSG_GPC_LISTS_INITIALIZE(ISCurrentSelection);
+
+    @call application::MSG_GEN_APPLICATION_ACCEPT_INPUT();
+}	/* End of MSG_GPC_PREV_PAGE.	*/
+
+
+/***********************************************************************
+ *		MSG_GPC_NEXT_PAGE for GPCProcessClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    Goes to the next page.
+ * PARAMETERS:	    
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:	    For MSG_GPC_NEXT_PAGE ( from pressing the nextButton),
+ *		    	sets the focus on current focus position.
+ *		    For MSG_GPC_SCROLL_NEXT_PAGE (from Down key),
+ *			sets the focus on the first one of the left list.
+ *		    For MSG_GPC_KEY_NEXT_PAGE (from Right key),
+ *			set the focus on the current position on the 
+ *			left list.
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	mzhu	9/ 3/96   	Initial Revision
+ *
+ ***********************************************************************/
+@extern method GPCProcessClass, MSG_GPC_NEXT_PAGE,
+			 MSG_GPC_SCROLL_NEXT_PAGE,
+			 MSG_GPC_KEY_NEXT_PAGE
+{
+    word size;
+
+    @call application::MSG_GEN_APPLICATION_IGNORE_INPUT();
+
+    if(ISBookmarkView == ISBVT_BUILDIN) 
+	size = ISBuildInFolder.ISBFS_size;
+    else 
+	size = ISUserFolder.ISBFS_size;
+
+    /* If there is no more items on the next page, do nothing. */
+    if(!(@call NextPageButton::MSG_GEN_GET_USABLE())) {
+	@call application::MSG_GEN_APPLICATION_ACCEPT_INPUT();
+	return;
+    }
+
+    /* Initializes the two lists' start items. */
+    ISLeftFirst += ISB_LIST_LENGTH * 2;
+    ISRightFirst = ISLeftFirst + ISB_LIST_LENGTH;
+
+    /* Sets the next focus item based on the message. */
+    if(message == MSG_GPC_NEXT_PAGE) {
+	ISCurrentSelection = ISLeftFirst;
+    } else if(message == MSG_GPC_KEY_NEXT_PAGE) {
+	ISCurrentSelection = min(size-1, ISCurrentSelection + ISB_LIST_LENGTH);
+    }
+
+    /* To initialize the two lists with the focus item. */
+    @call self::MSG_GPC_LISTS_INITIALIZE(ISCurrentSelection);
+    
+    @call application::MSG_GEN_APPLICATION_ACCEPT_INPUT();
+}	/* End of MSG_GPC_NEXT_PAGE.	*/
+
+@endif
+
+/***********************************************************************
+ *		MSG_GPC_GET_BOOKMARK for GPCProcessClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    Get one bookmark from current folder.
+ * PARAMETERS:	    void *(word item, ISBookmarkViewType type)
+ * SIDE EFFECTS:    DBUnlock after successfully calling this.
+ *
+ * STRATEGY:	    return NULL when no valid bookmark there.
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	mzhu	9/17/96   	Initial Revision
+ *
+ ***********************************************************************/
+void* _far _pascal
+GetBookmark(word item, ISBookmarkViewType type)
+{
+    ISBookmarkStruct 	*bookmark;
+    ISBookmarkStruct 	*tmpBookmark;
+    DBItem		dbItem;
+    DBGroup             dbGroup;
+    int		     	i, lastItem;
+
+    if(type == ISBVT_BUILDIN) {
+	lastItem = ISBuildInFolder.ISBFS_size;
+	dbItem = ISBuildInFolder.ISBFS_head;
+	dbGroup = ISBuildInFolder.ISBFS_group;
+    } else {
+	lastItem = ISUserFolder.ISBFS_size;
+	dbItem = ISUserFolder.ISBFS_head;
+	dbGroup = ISUserFolder.ISBFS_group;
+    }
+
+    /* If the currentSelection is an empty item, return NULL.*/
+    if(item >= lastItem) return NULL;
+
+    bookmark = DBLock(ISBookmarkFileHandle, dbGroup, dbItem);
+    
+    for(i=0; i<lastItem && i<item; i++) {
+	dbItem = bookmark->ISBS_next;
+	tmpBookmark = DBLock(ISBookmarkFileHandle, dbGroup, dbItem);
+	DBUnlock(bookmark);
+	bookmark = tmpBookmark;
+    }
+
+    return bookmark;
+}	/* End of MSG_GPC_GET_BOOKMARK.	*/
+
+
+
+
+@ifdef PRODUCT_PENELOPE
+
+/***********************************************************************
+ *		MSG_META_FUP_KBD_CHAR for ISDynamicListClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    To intercept the Enter and the arrow keys.
+ * PARAMETERS:	    void(word character, flags, state)
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:	    Just for the Enter and the arrow keys.
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	mzhu	9/ 6/96   	Initial Revision
+ *
+ ***********************************************************************/
+@extern method ISDynamicListClass, MSG_META_FUP_KBD_CHAR
+{
+    word size;
+
+    /* Don't handle releases or state keys */
+    if( (flags & CF_RELEASE) || (flags & CF_STATE_KEY) )
+    	return @callsuper();
+
+    if(ISBookmarkView == ISBVT_BUILDIN) 
+	size = ISBuildInFolder.ISBFS_size;
+    else 
+	size = ISUserFolder.ISBFS_size;
+
+    /* 
+     * On the PC keyboard, Shift + arrow keys are mapped to
+     * numpad chars by the keyboard driver. We want to ignore
+     * these key combinations, otherwise the SPUI will handle
+     * them.
+     */ 
+    if(character > ((VC_ISCTRL << 8) | VC_NUMPAD_ENTER) &&
+       character <= ((VC_ISCTRL << 8) | VC_NUMPAD_9)) 
+       return TRUE;
+
+    /*
+     * Handle Tab, Shift + Tab navigation 
+     */
+    if(character == ((VC_ISCTRL << 8) | VC_TAB)) {
+	if((flags >> 8 & SS_LSHIFT) || (flags >> 8 & SS_RSHIFT)) {
+	    character = (VC_ISCTRL << 8) | VC_UP;
+	} else
+	    character = (VC_ISCTRL << 8) | VC_DOWN;
+
+	flags &= ~((SS_LCTRL << 8) | (SS_RCTRL << 8) | 
+	           (SS_LSHIFT << 8) | (SS_RSHIFT << 8) |
+	    	   (SS_LALT << 8) | (SS_RALT << 8));
+
+    }
+
+    /*
+     * Handle Tool Menu shortcuts
+     */
+    if( ((flags >> 8) & SS_LALT) || ((flags >> 8) & SS_RALT) )
+    {
+	/* 
+	 * Shortcut keys
+	 */
+	switch(character) {
+	    case (VC_ISANSI << 8) | 'M':
+	    case (VC_ISANSI << 8) | 'm':
+	    	/*
+		 * Modify
+		 */
+	    	@send process::MSG_GPC_MODIFY_BOOKMARK_BEFORE();
+		return TRUE;
+
+     	    case (VC_ISANSI << 8) | 'D':
+	    case (VC_ISANSI << 8) | 'd':
+		/*
+		 * Delete
+		 */
+		if(ISBookmarkView == ISBVT_USER) {
+		    @send process::MSG_GPC_DELETE_BOOKMARK();
+		}
+		return TRUE;
+
+	    case (VC_ISANSI << 8) | 'C' :
+	    case (VC_ISANSI << 8) | 'c' :
+	      /*
+	       * Create
+	       */
+	    	@send process::MSG_GPC_CREATE_BOOKMARK_BEFORE();
+	    	return TRUE;
+
+	   /*
+	    * On the device, 2nd (Alt) + Up/Down maps to VC_PREVIOUS/VC_NEXT, 
+	    * and we want the PC to mimic this behavior.
+	    * 2nd + Left/Right are defined as the previous/next page shortcuts
+	    */
+	    case ((VC_ISCTRL << 8) | VC_UP):
+	    case ((VC_ISCTRL << 8) | VC_LEFT):
+	    	character = ((VC_ISCTRL << 8) | VC_PREVIOUS);
+		break;
+
+	    case ((VC_ISCTRL << 8) | VC_DOWN):
+	    case ((VC_ISCTRL << 8) | VC_RIGHT):
+		character = ((VC_ISCTRL << 8) | VC_NEXT);
+		break;
+
+
+	    }
+    } else {
+
+	/* Ignore arrow keys if Shift or Ctrl are pressed */
+
+	if((flags >> 8 & SS_LSHIFT) || (flags >> 8 & SS_RSHIFT) ||
+	   (flags >> 8 & SS_LCTRL) || (flags >> 8 & SS_RCTRL)) 
+	{
+	    switch(character) {
+	    	case ((VC_ISCTRL << 8) | VC_UP):
+	    	case ((VC_ISCTRL << 8) | VC_DOWN):
+	    	case ((VC_ISCTRL << 8) | VC_RIGHT):
+	    	case ((VC_ISCTRL << 8) | VC_LEFT):
+		  return TRUE;
+	      }
+	}
+
+    }
+
+    /*
+     * Clear unwanted ShiftState from flags.
+     * From here on out, we will ignore shift state, and we don't want
+     * our superclass to get the shift state either, should it be called.
+     */
+    flags &= ~((SS_LCTRL << 8) | (SS_RCTRL << 8) | 
+	       (SS_LSHIFT << 8) | (SS_RSHIFT << 8) |
+	       (SS_LALT << 8) | (SS_RALT << 8));
+
+    switch(character) {
+	/* For the Enter key, sends the MSG_GPC_LIST_APPLY message. */
+	case (VC_ISCTRL << 8) | VC_ENTER:
+	    @send process::MSG_GPC_LIST_APPLY();
+	    return TRUE;
+
+	case (VC_ISCTRL << 8) | VC_LEFT:
+	    if(oself != @ISBLeftList) 
+		ISCurrentSelection -= ISB_LIST_LENGTH;
+
+	    break;
+
+	case (VC_ISCTRL << 8) | VC_RIGHT:
+	    if(oself != @ISBRightList) {
+		if(size - 1 >= ISRightFirst) {
+		    if(size >= ISCurrentSelection + ISB_LIST_LENGTH)
+			ISCurrentSelection += ISB_LIST_LENGTH;
+		    else
+			ISCurrentSelection = ISRightFirst;
+		} else
+		    return TRUE;
+	    }
+	    break;
+
+	case (VC_ISCTRL << 8) | VC_DOWN:
+	    if(ISCurrentSelection < size - 1)
+		ISCurrentSelection ++;
+	    else
+		return TRUE;
+	    break;
+
+	case (VC_ISCTRL << 8) | VC_UP:
+	    if(ISCurrentSelection > 0) ISCurrentSelection --;
+	    break;
+
+	case (VC_ISCTRL << 8) | VC_NEXT:
+	    @send process::MSG_GPC_NEXT_PAGE();
+	    return TRUE;
+
+	case (VC_ISCTRL << 8) | VC_PREVIOUS:
+	    @send process::MSG_GPC_PREV_PAGE();
+	    return TRUE;
+
+	case ((VC_ISCTRL << 8) | VC_HOME):
+	case ((VC_ISCTRL << 8) | VC_END):
+	    return TRUE;
+
+	}
+
+    return @callsuper();
+
+}	/* End of MSG_META_CHAR. */
+
+
+/***********************************************************************
+ *		MSG_VIS_DRAW for ISDynamicListClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    Draw the lines for the list item.
+ * PARAMETERS:	    
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:	    
+ *
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	mzhu    	5/28/97   	Initial Revision
+ *	
+ ***********************************************************************/
+@method ISDynamicListClass, MSG_VIS_DRAW
+{
+    Rectangle bounds;
+
+    @callsuper();
+
+    @call oself::MSG_VIS_GET_BOUNDS(&bounds);
+
+    GrSetLineColor(gstate, CF_INDEX, C_BLACK, 0, 0);
+
+    GrDrawRect(gstate, 0, 0, bounds.R_right-1, 147);
+
+    GrDrawLine(gstate, TEXT_START - 1, 0, TEXT_START - 1, 147);
+
+    GrDrawLine(gstate, 0, 148/ISB_LIST_LENGTH-1,
+	       bounds.R_right-1, 148/ISB_LIST_LENGTH-1); 
+   
+    GrDrawLine(gstate, 0, 148*2/ISB_LIST_LENGTH-1,
+	       bounds.R_right-1, 148*2/ISB_LIST_LENGTH-1);
+
+    GrDrawLine(gstate, 0, 148*3/ISB_LIST_LENGTH-1,
+	       bounds.R_right-1, 148*3/ISB_LIST_LENGTH-1);
+
+} 	/* End of MSG_VIS_DRAW.	*/
+
+
+/***********************************************************************
+ *		MSG_VIS_RECALC_SIZE for ISDynamicListClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    
+ * PARAMETERS:	    
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:	    
+ *
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	mzhu    	6/ 2/97   	Initial Revision
+ *	
+ ***********************************************************************/
+@method ISDynamicListClass, MSG_VIS_RECALC_SIZE
+{
+    @callsuper();
+
+    return MAKE_SIZE_DWORD(width, 148);
+
+}	/* End of MSG_VIS_RECALC_SIZE.	*/
+
+
+/***********************************************************************
+ *		MSG_GEN_DYNAMIC_LIST_GET_ITEM_CLASS for ISDynamicListClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    Set the Class for the items.
+ * PARAMETERS:	    
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:	    
+ *
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	mzhu    	6/ 3/97   	Initial Revision
+ *	
+ ***********************************************************************/
+@method ISDynamicListClass, MSG_GEN_DYNAMIC_LIST_GET_ITEM_CLASS
+{
+    return (ClassStruct *)&ISItemClass;
+}	/* End of MSG_GEN_DYNAMIC_LIST_GET_ITEM_CLASS.	*/
+
+
+optr ISCurrentFocusItem;
+
+
+/***********************************************************************
+ *		MSG_GEN_INTERACTION_INITIATE for ISDialogClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    Select current bookmark item
+ * PARAMETERS:	    void(void)
+ * SIDE EFFECTS:    none
+ *
+ * STRATEGY:	    REMEMBER--This is PENELOPE only code.	    
+ *
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	sean		11/21/97   	Initial Revision
+ *	
+ ***********************************************************************/
+@method ISDialogClass, MSG_GEN_INTERACTION_INITIATE
+{
+    if(ISCurrentFocusItem) 
+    {
+	@send ISCurrentFocusItem::MSG_ISI_SET_SELECTION(TRUE);
+	@send ISCurrentFocusItem::MSG_VIS_REDRAW_ENTIRE_OBJECT();
+    }
+
+    @callsuper();
+
+}	/* End of MSG_GEN_INTERACTION_INITIATE.	*/
+
+
+
+/***********************************************************************
+ *		MSG_GEN_GUP_INTERACTION_COMMAND for ISDialogClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    	De-selects the selected bookmark item
+ *			if we are dismissing the dialog.
+ * PARAMETERS:		Boolean(InteractionCommand command)	    
+ * SIDE EFFECTS:    	none
+ *
+ * STRATEGY:	if(dismissing dialog)
+ *		  de-select current bookmark selection    
+ *		Default functionality
+ *
+ *		REMEMBER--This is PENELOPE only code.	    
+ *
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	sean		11/21/97   	Initial Revision
+ *	
+ ***********************************************************************/
+@method ISDialogClass, MSG_GEN_GUP_INTERACTION_COMMAND
+{
+@ifdef PRODUCT_PENELOPE
+    if((ISCurrentFocusItem) && (command == IC_DISMISS))
+    {
+	@send ISCurrentFocusItem::MSG_ISI_SET_SELECTION(FALSE);
+	@send ISCurrentFocusItem::MSG_VIS_REDRAW_ENTIRE_OBJECT();
+    }
+@endif        
+
+    return(@callsuper());
+
+}	/* End of MSG_GEN_GUP_INTERACTION_COMMAND.	*/
+
+
+/***********************************************************************
+ *		MSG_META_GAINED_FOCUS_EXCL for ISItemClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    	Take care of drawing the focus for 
+ *			bookmark items.
+ *
+ * PARAMETERS:	    	void(void)
+ * SIDE EFFECTS:    	none
+ *
+ * STRATEGY:		if(not already focus)
+ *			  self->focus = TRUE
+ *			  if(previous focus)
+ *			    tell previous no no longer focus
+ *			    redraw previous focus item 
+ *			  current focus = self
+ *			  redraw self (to redraw focus rectangle)
+ *			Default functionality	    
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	mzhu    	6/ 3/97   	Initial Revision
+ *	sean		11/20/97	Re-organization
+ *	
+ ***********************************************************************/
+@method ISItemClass, MSG_META_GAINED_FOCUS_EXCL
+{
+    if(ISCurrentFocusItem != oself)
+    {
+        @self->ISI_focus = TRUE;
+
+	if(ISCurrentFocusItem)
+	{
+            @call ISCurrentFocusItem::MSG_ISI_CLEAR_FOCUS();
+            @send ISCurrentFocusItem::MSG_VIS_REDRAW_ENTIRE_OBJECT();
+	}
+
+        ISCurrentFocusItem = oself;
+        @call self::MSG_VIS_REDRAW_ENTIRE_OBJECT();
+    }
+
+    @callsuper();
+
+}	/* End of MSG_META_GAINED_FOCUS_EXCL.	*/
+
+
+/***********************************************************************
+ *		MSG_ISI_CLEAR_FOCUS for ISItemClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:		Set focus instance data false    
+ * PARAMETERS:	    	void(void)
+ * SIDE EFFECTS:    	none
+ *
+ * STRATEGY:	    
+ *
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	sean		11/21/97   	Initial Revision
+ *	
+ ***********************************************************************/
+@method ISItemClass, MSG_ISI_CLEAR_FOCUS
+{
+
+    @self->ISI_focus = FALSE;
+
+}	/* End of MSG_ISI_CLEAR_FOCUS.	*/
+
+/***********************************************************************
+ *		MSG_ISI_SET_SELECTION for ISItemClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    Sets the selection instance data Boolean.
+ * PARAMETERS:	    void(Boolean selection)
+ * SIDE EFFECTS:    none
+ *
+ * STRATEGY:	    
+ *
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	mzhu    	6/ 4/97   	Initial Revision
+ *	
+ ***********************************************************************/
+@method ISItemClass, MSG_ISI_SET_SELECTION
+{
+    @self->ISI_selection = selection;
+
+}	/* End of MSG_ISI_SET_SELECTION.      */
+
+
+/***********************************************************************
+ *		MSG_VIS_DRAW for ISItemClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    Draw the bookmark item
+ * PARAMETERS:	    void(DrawFlags drawFlags, GState gstate)
+ * SIDE EFFECTS:    none
+ *
+ * STRATEGY:	    
+ *		Call superclass
+ *		if(focus item)
+ *		  Draw focus rectangle
+ *		else
+ *		  Clear focus rectangle
+ *		if(selected)
+ *		  invert entire item rectangle
+ *
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	sean		11/21/97   	Initial Revision
+ *	
+ ***********************************************************************/
+@method ISItemClass, MSG_VIS_DRAW
+{
+    Rectangle rect;
+    const unsigned char mask[8] = {0xcc, 0xcc, 0x33, 0x33, 0xcc, 0xcc, 0x33, 0x33};
+
+    @callsuper();
+
+    GrSaveState(gstate);
+
+    /* Draw the focus rectangle for the item */
+    if(@self->ISI_focus)
+        GrSetLineColor(gstate, CF_INDEX, C_BLACK, 0, 0);
+    else
+        GrSetLineColor(gstate, CF_INDEX, C_WHITE, 0, 0);
+
+    @call self::MSG_VIS_GET_BOUNDS(&rect);
+    GrSetLineMaskCustom(gstate, &mask);
+    GrDrawRect(gstate, rect.R_left + 1, rect.R_top + 1,
+	               rect.R_right - 2, rect.R_bottom - 2);
+
+    /* Draw the selection for the bookmark item */
+    if(@self->ISI_selection)
+    {
+        GrSetMixMode(gstate, MM_XOR);
+	GrSetAreaColor(gstate, CF_INDEX, C_WHITE, 0, 0);
+	GrFillRect(gstate, rect.R_left + 1, rect.R_top + 1,
+	               rect.R_right - 2, rect.R_bottom - 2);
+    }
+    GrRestoreState(gstate);
+
+}	/* End of MSG_VIS_DRAW.	*/
+
+
+@endif
+@ifdef BROTHER_KERNEL
+/***********************************************************************
+ *		MSG_GPC_BRING_UP_BOOKMARKS for GPCProcessClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    
+ * PARAMETERS:	    
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:	    
+ *
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	jeremyb 	10/06/97   	Initial Revision
+ *	
+ ***********************************************************************/
+@extern method GPCProcessClass, MSG_GPC_BRING_UP_BOOKMARKS
+{
+    word size ;
+/* you can only open the VM file once dude 
+ *    @send process::MSG_GPC_BOOKMARK_INITIALIZE();
+ */
+	size = ISUserFolder.ISBFS_size;
+	@send ISBookmarkList::MSG_GEN_DYNAMIC_LIST_INITIALIZE(size);
+    
+    /* Need to make sure the delete trigger is disabled every time we 
+     * open the box.
+	 */
+	@send ISBookmarkList::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(GIGS_NONE,
+								  TRUE);
+
+	// bring up the dialog
+	@send ISBookmarkBox::MSG_GEN_INTERACTION_INITIATE();
+	@send HistoryList :: MSG_META_GRAB_FOCUS_EXCL();
+	@send HistoryList :: MSG_META_GRAB_TARGET_EXCL();
+
+}	/* End of MSG_GPC_BRING_UP_BOOKMARKS.	*/
+
+
+
+/***********************************************************************
+ *		MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION for ISDynamicListClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    intercept message to set global variable
+ * PARAMETERS:	    identifier
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:	    Grab it and set global.
+ *
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	jeremyb 	10/07/97   	Initial Revision
+ *	
+ ***********************************************************************/
+@method ISDynamicListClass, MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION
+{
+
+    ISCurrentSelection = identifier ;
+	if (identifier == GIGS_NONE) {
+		@send ISLIDeleteButton::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+		@send ISGotoBookmarkButton::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+	} else {
+		@send ISLIDeleteButton::MSG_GEN_SET_ENABLED(VUM_NOW);
+		@send ISGotoBookmarkButton::MSG_GEN_SET_ENABLED(VUM_NOW);
+    }
+    @callsuper();
+
+}	/* End of MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION.	*/
+
+/***********************************************************************
+ *		MSG_GPC_GOTO_BOOKMARK for GPCProcessClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    User hits the goto button under bookmarks
+ * PARAMETERS:	    
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:	    Grab the selection, ISCurrentSelection
+ *                  get that numbered selection url out of the db
+ *                  load the url
+ *
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	jeremyb 	10/07/97   	Initial Revision
+ *	
+ ***********************************************************************/
+@extern method GPCProcessClass, MSG_GPC_GOTO_BOOKMARK
+{
+    ISBookmarkStruct 	*bookmark;
+    char 		*cptr;
+    HTMemHandle		urlHtmh, titleHtmh;
+    HTMemHandle sreqHtmh, sreqHeadHtmh;
+    word		size;
+
+    bookmark = GetBookmark(ISCurrentSelection, ISBVT_USER);
+
+    /* Also if the item is an empty item, do nothing more. */
+    if(bookmark == NULL) return;    
+
+    size = strlen((char *)((char *)bookmark + bookmark->ISBS_url))+1;
+
+    cptr = HTMemAllocAndLock(&urlHtmh, size);
+    strcpy(cptr, (char *)((char *)bookmark + bookmark->ISBS_url));
+    HTMemUnlock(urlHtmh);
+
+    size = strlen((char *)((char *)bookmark + bookmark->ISBS_name))+1;
+    cptr = HTMemAllocAndLock(&titleHtmh, size);
+    strcpy(cptr, (char *)((char *)bookmark + bookmark->ISBS_name));
+    HTMemUnlock(titleHtmh);
+
+    DBUnlock(bookmark);
+
+    /* Tell the process to open a url. */
+    urlHtmh = ParseURL(urlHtmh);
+
+    sreqHtmh = SReqCreateMainRequest(urlHtmh, 0, 0, HTM_GET,0);
+    @send process::MSG_GPC_OPEN_URL(sreqHtmh, UST_BOOKMARK);
+
+}	/* End of MSG_GPC_GOTO_BOOKMARK.	*/
+
+@endif
+@endif
+

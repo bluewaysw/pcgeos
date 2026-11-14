@@ -1,0 +1,1731 @@
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Geoworks 1997.  All rights reserved.
+	GEOWORKS CONFIDENTIAL
+
+PROJECT:	WWW UI Generation
+MODULE:		factory
+FILE:		factory.goc
+
+AUTHOR:		Kok Kin Kee, Sep 18, 1997
+
+ROUTINES:
+	Name			Description
+	----			-----------
+
+REVISION HISTORY:
+	Name		Date		Description
+	----		----		-----------
+	kkee    	9/18/97   	Initial version.
+
+DESCRIPTION:
+
+	UIFactory for UI creation. It was supposed to be the job of
+	UIGenerator, but UIGenerator has become unwieldy and so I am
+	reorganizing the code -- kkee 9/18/97
+
+	$Id: factory.goc,v 1.1.2.28 98/01/09 19:15:59 mzhu Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+@include <WWW/HTCore/htreqMan.goh>
+@include <WWW/HTCore/htutils.goh>
+@include <WWW/HTCore/htobj.goh>
+@include <WWW/HTCore/htanchor.goh>
+@include <WWW/html.goh>
+@include "htfatals.goh"
+#include <Ansi/stdio.h>
+#include <Ansi/string.h>
+#include <Ansi/stdlib.h>        /* atoi defined */
+#include <WWW/htmem.h>
+@include "UIG/uifact.goh"
+#include <sysstats.h>           /* SysGetInfo */
+#include <fileEnum.h>
+#include <file.h>
+#include <sem.h>
+
+/*
+ * Design Note: 
+ * ===========
+ *
+ * All creational APIs are tied directly to the management of UI memory
+ * usage. We will use it for caching.
+ *
+ */
+
+@extern method PresentationManagerClass, MSG_GEN_PREPARE_FOR_DESTROY;
+@extern method HTGenTextClass, MSG_GEN_PREPARE_FOR_DESTROY;
+@extern method HTGenFormTextClass, MSG_GEN_PREPARE_FOR_DESTROY;
+@extern method HTGenInputClass, MSG_GEN_PREPARE_FOR_DESTROY;
+@extern method HTGenFormTriggerClass, MSG_GEN_PREPARE_FOR_DESTROY;
+@extern method TextAreaClass, MSG_GEN_PREPARE_FOR_DESTROY;
+@extern method TextAreaTextClass, MSG_GEN_PREPARE_FOR_DESTROY;
+@extern method HTMLSelectClass, MSG_GEN_PREPARE_FOR_DESTROY;
+@extern method HTOtherOptionClass, MSG_GEN_PREPARE_FOR_DESTROY;
+
+/*
+ * For object instantiation and memory usage estimated.
+ */
+typedef struct {
+    ClassStruct *UI_class;       /* The class name itself */
+    word         UI_size;        /* Its estimated size */
+} UIClass;
+
+UIManager uiMgr;
+
+/*
+ *  Define the estimated size for each object.  The data have been collected
+ *  from SWAT after the object is set usable.
+ */
+#define ESTIMATED_SIZE_PMANAGER 200
+#define ESTIMATED_SIZE_TEXT (222+40+166+24+162+24+37+40+40)
+#define ESTIMATED_SIZE_FORM_TEXT (198+3+40+37+40+40)
+#define ESTIMATED_SIZE_TEXT_AREA_TEXT (187+3+40+37)
+#define ESTIMATED_SIZE_TEXT_AREA 127
+#define ESTIMATED_SIZE_IMAGE 119
+#define ESTIMATED_SIZE_TABLE (134+52+12)
+#define ESTIMATED_SIZE_TCELL 245
+#define ESTIMATED_SIZE_FORM 253
+#define ESTIMATED_SIZE_INPUT 144
+#define ESTIMATED_SIZE_GEN_ITEM_GROUP 124
+#define ESTIMATED_SIZE_FORM_TRIGGER (79+7)
+#define ESTIMATED_SIZE_OTHER_OPTION (76+8)
+#define ESTIMATED_SIZE_HTML_SELECT 146
+#define ESTIMATED_SIZE_HR 67
+#define ESTIMATED_SIZE_CAPTION 253
+#define ESTIMATED_SIZE_HTML_CONTENT (327+148)
+#define ESTIMATED_SIZE_GEN_ITEM 58
+
+
+UIClass uiClass[] = {
+    {&HTGenTextClass,           ESTIMATED_SIZE_TEXT},
+    {&HTGenFormTextClass,       ESTIMATED_SIZE_FORM_TEXT},
+    {&TextAreaTextClass,        ESTIMATED_SIZE_TEXT_AREA_TEXT},
+    {&TextAreaClass,            ESTIMATED_SIZE_TEXT_AREA},
+    {&HTGenImageClass,          ESTIMATED_SIZE_IMAGE},
+    {&HTGenTableClass,          ESTIMATED_SIZE_TABLE},
+    {&HTGenTCellClass,          ESTIMATED_SIZE_TCELL},
+    {&HTGenInputClass,          ESTIMATED_SIZE_INPUT},
+    {&HTGenFormTriggerClass,    ESTIMATED_SIZE_FORM_TRIGGER},
+    {&HTOtherOptionClass,       ESTIMATED_SIZE_OTHER_OPTION},
+    {&HTMLSelectClass,          ESTIMATED_SIZE_HTML_SELECT},
+    {&GenItemGroupClass,        ESTIMATED_SIZE_GEN_ITEM_GROUP},
+    {&HTGenHRClass,             ESTIMATED_SIZE_HR},
+    {&HTGenCaptionClass,        ESTIMATED_SIZE_CAPTION},
+    {&HTGenHtmlContentClass,    ESTIMATED_SIZE_HTML_CONTENT},
+    {&GenItemClass,             ESTIMATED_SIZE_GEN_ITEM},
+    {0,0}
+};
+
+
+/* Internal routines declared here for safety in passing params */
+static void _pascal UIInitializeDoc ();
+static void _pascal UICacheDoc (HTMemHandle uiDoc);
+static void _pascal UIGarbageCollect (void);
+static void cleanFormQuery();
+
+#if ERROR_CHECK
+/***********************************************************************
+ *		ECCheckUIDoc
+ ***********************************************************************
+ *
+ * SYNOPSIS:	
+ * CALLED BY:	
+ * RETURN:	
+ *	
+ * STRATEGY:	
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	kkee    	9/19/97   	Initial Revision
+ *	
+ ***********************************************************************/
+static void _pascal
+ECCheckUIDoc (HTMemHandle uiDoc)
+{
+    HTUIDoc *doc;
+
+    PUSHDS;
+    SET_DS_LIB_DGROUP;
+
+    doc = (HTUIDoc*) HTMemLock(uiDoc);
+    ECCheckThreadHandle(doc->HTUI_threadID);
+    ECCheckHTList(doc->HTUI_areaMaps);
+    ECCheckHTList(doc->HTUI_objList);
+    HTMemUnlock(uiDoc);
+
+    POPDS;
+}	/* End of ECCheckUIDoc.	*/
+#endif
+
+
+/***********************************************************************
+ *		UIDocRegister
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Initial the uiMgr
+ * CALLED BY:	
+ * RETURN:	
+ *	
+ * STRATEGY:	
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	mzhu    	10/ 6/97   	Initial Revision
+ *	
+ ***********************************************************************/
+void _far _pascal
+UIDocRegister (GeodeHandle client, word message, optr view)
+{
+    int i, count;
+    FEDosInfo *info;
+    MemHandle mh;
+    word remain;
+    FileEnumParams fep;
+
+    PUSHDS;
+    SET_DS_LIB_DGROUP;
+    
+    fep.FEP_searchFlags = FILE_ENUM_ALL_FILE_TYPES;
+    fep.FEP_returnAttrs = (FileExtAttrDesc *) (((dword)0 << 16) | (word)FESRT_DOS_INFO);
+    fep.FEP_returnSize = sizeof(FEDosInfo);
+    fep.FEP_matchAttrs = NULL;
+    fep.FEP_bufSize = FE_BUFSIZE_UNLIMITED;      /* Enum all files at once */
+    fep.FEP_skipCount = 0;
+    fep.FEP_callback, 0;
+    fep.FEP_headerSize = 0;
+
+    uiMgr.UIM_client = client;
+    uiMgr.UIM_message = message;
+    uiMgr.UIM_access = ThreadAllocSem(1);
+    uiMgr.UIM_currentDocHandle = 0;
+    uiMgr.UIM_currentDoc = NULL;
+    uiMgr.UIM_formQuery = 0;
+
+    /* Estimated total amount of memory allocated */
+    uiMgr.UIM_memoryAllocated = 0;
+    /* Current document being built */
+    uiMgr.UIM_memID = HTMID_HTML_START-1;  /* Last id is HTMID_HTML_END */
+    uiMgr.UIM_cacheList = 0;  /* List of cached ui docs */
+    uiMgr.UIM_delayFreeDoc = 0;
+
+    uiMgr.UIM_view = view;
+
+    POPDS;
+    /*
+     * Here we need to clean the image vm files left last time.
+     */
+    FilePushDir();
+    FileSetStandardPath(SP_PRIVATE_DATA);
+    
+    if ((count = FileEnum(&fep, &mh, &remain)) > 0) {
+	info = (FEDosInfo *) MemLock(mh);
+	for (i=0; i<count; i++) {
+	    if (info->DFIS_name[0] == 'X' && 
+		info->DFIS_name[1] == '~') {
+		FileDelete(info->DFIS_name);
+	    }
+	    info += 1;
+	}
+	MemFree(mh);
+    }
+
+    FilePopDir();
+}	/* End of UIDocRegister.	*/
+
+
+/***********************************************************************
+ *		UIDocExit
+ ***********************************************************************
+ *
+ * SYNOPSIS:	
+ * CALLED BY:	
+ * RETURN:	
+ *	
+ * STRATEGY:	
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	mzhu    	10/13/97   	Initial Revision
+ *	
+ ***********************************************************************/
+void _far _pascal
+UIDocExit ()
+{
+    word count, i;
+    HTMemHandle doc;
+    optr obj;
+
+    PUSHDS;
+    SET_DS_LIB_DGROUP;
+    
+    if (uiMgr.UIM_delayFreeDoc) {
+	UIFreeDoc(uiMgr.UIM_delayFreeDoc);
+	uiMgr.UIM_delayFreeDoc = 0;
+    }
+
+    /*
+     * Now we need to free all the documents in the cache list,
+     * and delete the list.
+     */
+    if(uiMgr.UIM_cacheList) {
+	count = HTListGetCount(uiMgr.UIM_cacheList);
+	for(i=0; i<count; i++) {
+	    HTListRemoveItem(uiMgr.UIM_cacheList, 0, (void*)&doc, 
+			     sizeof(HTMemHandle));
+	    UIFreeDoc(doc);
+	}
+    }
+
+    if(uiMgr.UIM_currentDocHandle) {
+	UIFreeDoc(uiMgr.UIM_currentDocHandle);
+    }
+    uiMgr.UIM_currentDocHandle = 0;
+    uiMgr.UIM_currentDoc = NULL;
+    uiMgr.UIM_client = 0;
+    uiMgr.UIM_message = 0;
+    if(uiMgr.UIM_access) ThreadFreeSem(uiMgr.UIM_access);
+    uiMgr.UIM_access = 0;
+    uiMgr.UIM_view = 0;
+
+    cleanFormQuery();
+
+    uiMgr.UIM_memoryAllocated = 0;
+    uiMgr.UIM_memID = HTMID_HTML_START-1;  
+    
+    POPDS;
+}	/* End of UIDocExit.	*/
+
+
+
+/***********************************************************************
+ *		UIDocCleanMemCache
+ ***********************************************************************
+ *
+ * SYNOPSIS:	
+ * CALLED BY:	
+ * RETURN:	
+ *	
+ * STRATEGY:	
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	mzhu    	12/ 8/97   	Initial Revision
+ *	
+ ***********************************************************************/
+void _far _pascal
+UIDocCleanMemCache()
+{
+    word count, i;
+    HTMemHandle doc;
+    optr obj;
+
+    PUSHDS;
+    SET_DS_LIB_DGROUP;
+    
+    if (uiMgr.UIM_delayFreeDoc) {
+	UIFreeDoc(uiMgr.UIM_delayFreeDoc);
+	uiMgr.UIM_delayFreeDoc = 0;
+    }
+
+    /*
+     * Now we need to free all the documents in the cache list,
+     * and delete the list.
+     */
+    if(uiMgr.UIM_cacheList) {
+	count = HTListGetCount(uiMgr.UIM_cacheList);
+	for(i=0; i<count; i++) {
+	    HTListRemoveItem(uiMgr.UIM_cacheList, 0, (void*)&doc, 
+			     sizeof(HTMemHandle));
+	    UIFreeDoc(doc);
+	}
+    }
+    POPDS;
+}	/* End of UIDocCleanMemCache.	*/
+
+
+
+/***********************************************************************
+ *		UINewDoc
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Create a UI document.  To create for current 
+ *              thread, pass 0. pmClass must be inherited from 
+ *              PresentationManagerClass and contentClass must be 
+ *              inherited from GenContentClass.
+ * CALLED BY:	request manager
+ * RETURN:	HTMemHandle.
+ *	
+ * STRATEGY:	genView belongs to the client, we can't delete. Increment
+ *              the inUseCount of the new document.
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	kkee    	9/19/97   	Initial Revision
+ *	
+ ***********************************************************************/
+void _far _pascal
+UINewDoc (HTRequestHandle request, ThreadHandle threadID, 
+	  const char *anchor, Boolean loadImage)
+{
+    HTUIDoc *doc;
+    HTMemHandle htmh;
+@ifdef BROTHER_KERNEL
+    ColorQuad defBackColor;
+@endif
+
+    PUSHDS;
+    SET_DS_LIB_DGROUP;
+
+    if (!threadID) threadID = ThreadGetInfo(0, TGIT_THREAD_HANDLE);
+EC( if (threadID) ECCheckThreadHandle(threadID);                        )
+
+    doc = HTMemAllocAndLock(&htmh, sizeof(HTUIDoc));
+
+    /* Bind the current doc as memory cache to the anchor object */
+    doc->HTUI_anchor = HTRequestAnchor(request);
+    HTAnchorSetMemCache(doc->HTUI_anchor, htmh);
+
+    uiMgr.UIM_currentDoc = doc;  /* Keep it lock until UIDeleteDoc */
+    uiMgr.UIM_memID = (uiMgr.UIM_memID > HTMID_HTML_END) 
+	? HTMID_HTML_START : (uiMgr.UIM_memID+1);
+    doc->HTUI_memID = uiMgr.UIM_memID;
+    doc->HTUI_threadID = threadID;
+    uiMgr.UIM_currentDocHandle= htmh;
+
+    doc->HTUI_waitToFree = ThreadAllocSem(0);
+    doc->HTUI_hrefToken = -1; /* Initially we are not in the <A> element */
+    doc->HTUI_objList = HTListNewWID(doc->HTUI_memID);
+    doc->HTUI_areaMaps = HTListNewWID(doc->HTUI_memID);
+
+    doc->HTUI_pmContent = UICreateObj(&HTGenHtmlContentClass);
+
+    doc->PM_loadImage = loadImage;
+
+    /* 
+     * For 'refresh' in META or the HTTP header.
+     */
+    doc->HTUI_refreshTime = -1;
+    doc->HTUI_newURL = 0;
+
+    /*
+     * VM file to store image bitmaps. We don't want to use the clipboard 
+     * anymore, since its header can grow too big.
+     */
+    memset(doc->HTUI_vmFileName, 0, 32);
+    strcpy(doc->HTUI_vmFileName, "X~");
+    UtilHex32ToAscii((char *)&doc->HTUI_vmFileName[2], TimerGetCount(), 
+		     UHTAF_SBCS_STRING | UHTAF_NULL_TERMINATE);
+    FilePushDir();
+    FileSetStandardPath(SP_PRIVATE_DATA);
+    doc->HTUI_vmFileHandle = VMOpen(doc->HTUI_vmFileName, 
+				    VMAF_FORCE_READ_WRITE, 
+				    VMO_CREATE, 0);
+EC(    ECCheckFileHandle(doc->HTUI_vmFileHandle);                            )
+    FilePopDir();
+
+    /* 
+     * genContent will get MSG_GEN_PREPARE_FOR_DESTROY from 
+     * genView method handler MSG_GEN_PREPARE_FOR_DESTROY.
+     */
+    doc->HTUI_genContent = HTObjInstantiateForThreadWID(doc->HTUI_memID,
+							threadID, 
+							&HTMLContentClass);
+    doc->HTUI_pmanager = HTObjInstantiateForThreadWID(doc->HTUI_memID,
+						      threadID,
+						      &PresentationManagerClass);
+    /* pmClass needs MSG_GEN_PREPARE_FOR_DESTROY */
+    HTListAppend(doc->HTUI_objList, (void*)&(doc->HTUI_pmanager), sizeof(optr));
+
+    /* Initialize them */
+    /*
+     *  Clear variables that keep track of row information.
+     */
+    @call doc->HTUI_pmContent::MSG_GEN_HTML_CONTENT_RESET_ROW_COUNTER();
+    @call doc->HTUI_pmContent::MSG_GEN_HTML_CONTENT_SET_PM(doc->HTUI_pmanager);
+    @call doc->HTUI_pmContent::MSG_GEN_HTML_CONTENT_SET_HREF_TOKEN(-1);
+
+    /* Don't unlock Keep the document locked */
+    UIInitializeDoc();
+
+    if ((uiMgr.UIM_currentDoc)->HTUI_genView)
+	@call (uiMgr.UIM_currentDoc)->HTUI_genView::
+	    MSG_HT_GEN_VIEW_ACCEPT_INPUT();
+
+@ifdef BROTHER_KERNEL
+    defBackColor.CQ_redOrIndex = C_WHITE ;
+    defBackColor.CQ_info = CF_INDEX ;
+    defBackColor.CQ_green = 0;
+    defBackColor.CQ_blue = 0;
+
+    (uiMgr.UIM_currentDoc)->HTUI_backgroundColor = defBackColor;
+    @send (uiMgr.UIM_currentDoc)->HTUI_genView::MSG_GEN_VIEW_SET_COLOR
+	(C_WHITE, CF_INDEX, 0);
+@endif
+
+    /* Garbage collect old docs until we have enough space for new doc */
+    UIGarbageCollect();
+
+    POPDS;
+    return;
+}	/* End of UINewDoc.	*/
+
+
+/***********************************************************************
+ *		UIFindDoc
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Find a cached doc for a request.
+ * CALLED BY:	request manager
+ * RETURN:	HTMemHandle or NULL if no cache copy was found.
+ *	
+ * STRATEGY:	Increment the cached document inUseCount so it won't be
+ *              garbage collected.
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	kkee    	10/ 3/97   	Initial Revision
+ *	
+ ***********************************************************************/
+HTMemHandle _far _pascal
+UIFindDoc (HTRequestHandle request)
+{
+    HTMemHandle ret = NULL;
+    HTRequest *rptr;
+    word i;
+
+    PUSHDS;
+    SET_DS_LIB_DGROUP;
+
+    rptr = (HTRequest *) MemThreadGrab(request);
+    ret = HTAnchorMemCache(rptr->HTR_anchor);
+    if (ret) {
+	/*
+	 * Then we want to remove the itme from the cache list.
+	 */
+	i = HTListFindItem(uiMgr.UIM_cacheList, (void*)&ret, 
+			   sizeof(HTMemHandle));
+	if (i != -1) {
+	    HTListRemoveItem(uiMgr.UIM_cacheList, i, NULL, 
+			     sizeof(HTMemHandle));
+	}
+    }
+    MemThreadRelease(request);
+    
+    POPDS;
+    return ret;
+}	/* End of UIFindDoc.	*/
+
+
+/***********************************************************************
+ *		UIDocGetCurrentDocHandle
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Return current doc handle.
+ * CALLED BY:	
+ * RETURN:	
+ *	
+ * STRATEGY:	
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	mzhu    	12/12/97   	Initial Revision
+ *	
+ ***********************************************************************/
+HTMemHandle _far _pascal
+UIDocGetCurrentDocHandle ()
+{
+    HTMemHandle ret = 0;
+
+    PUSHDS;
+    SET_DS_LIB_DGROUP;
+    ret = uiMgr.UIM_currentDocHandle;
+    
+    POPDS;
+    return ret;
+}	/* End of UIDocGetCurrentDocHandle.	*/
+
+
+
+/***********************************************************************
+ *		UILoadDoc
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Load a document into view. The doc must have been 
+ *              created using UINewDoc or UIFindDoc (as these two 
+ *              functions increment the doc inUseCount so the doc
+ *              will not be garbage collected).
+ * CALLED BY:	request manager
+ * RETURN:	Nothing
+ *	
+ * STRATEGY:	Set the content of genView to uiDoc->HTUI_genContent.
+ *              If there is a current doc, delete or cache it. Does not
+ *              increment the doc inUseCount.
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	kkee    	10/ 3/97   	Initial Revision
+ *	
+ ***********************************************************************/
+void _far _pascal
+UILoadDoc (HTMemHandle uiDoc)
+{
+@ifdef BROTHER_KERNEL
+    ColorQuad tempColor;
+    word greenBlueValue;
+@endif
+EC( ECCheckUIDoc(uiDoc);                                                )
+
+    PUSHDS;
+    SET_DS_LIB_DGROUP;
+#if ERROR_CHECK
+    /* (uiMgr.UIM_currentDoc) must have been deleted via UIDeleteDoc! */
+    if ((uiMgr.UIM_currentDoc)) EC_ERROR(1);
+#endif
+
+    /* Change current doc and keep it locked until UIDeleteDoc is called */
+    uiMgr.UIM_currentDoc = (HTUIDoc*) HTMemLock(uiDoc);
+    uiMgr.UIM_currentDocHandle = uiDoc;
+
+    /* Bring it into current view */
+    @call (uiMgr.UIM_currentDoc)->HTUI_genView::
+	MSG_GEN_VIEW_SET_CONTENT((uiMgr.UIM_currentDoc)->HTUI_genContent);
+
+    if ((uiMgr.UIM_currentDoc)->HTUI_genView) {
+	@call (uiMgr.UIM_currentDoc)->HTUI_genView::
+	    MSG_HT_GEN_VIEW_ACCEPT_INPUT();
+
+@ifdef BROTHER_KERNEL
+     /* Although the current Doc knows it's background color, you must tell
+      * the Gen View object of it.
+      */
+    tempColor = ((uiMgr.UIM_currentDoc)->HTUI_backgroundColor) ;
+
+    /* By default (if it's indexed), don't send along any ggbb value, as 
+     *	MSG_GEN_VIEW_SET_COLOR api suggests.
+     */
+    greenBlueValue = 0;
+
+    if((tempColor.CQ_info) != CF_INDEX) {
+       	/* background color is in the rrggbb format so must make up that ggbb 
+ 	 * stuff again 
+	 */
+	greenBlueValue = (((tempColor.CQ_blue) << 8) | (tempColor.CQ_green)) ;
+    }
+    @send (uiMgr.UIM_currentDoc)->HTUI_genView::MSG_GEN_VIEW_SET_COLOR
+	(tempColor.CQ_redOrIndex, tempColor.CQ_info, greenBlueValue);
+
+@endif
+}
+    POPDS;
+}	/* End of UILoadDoc.	*/
+
+
+
+/***********************************************************************
+ *		UICreateObj
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Create a UI object. Must not be a PManager class as it
+ *              should be created wiht UINewDoc.
+ * CALLED BY:	Client
+ * RETURN:	optr or NULL.
+ *	
+ * STRATEGY:	
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	kkee    	9/19/97   	Initial Revision
+ *	
+ ***********************************************************************/
+optr _far _pascal
+UICreateObj (ClassStruct *objClass)
+{
+    optr ret;
+    word i=0;
+
+    PUSHDS;
+    SET_DS_LIB_DGROUP;
+
+EC( ECCheckUIDoc(uiMgr.UIM_currentDocHandle);                                  )
+
+    ret = HTObjInstantiateForThreadWID((uiMgr.UIM_currentDoc)->HTUI_memID,
+				       (uiMgr.UIM_currentDoc)->HTUI_threadID, 
+				       (ClassStruct *)objClass);
+
+    /* Tally the memory usage */
+    do {
+	if (uiClass[i].UI_class == objClass) {
+	    uiMgr.UIM_memoryAllocated += uiClass[i].UI_size;
+	    break;
+	} else if (!uiClass[i].UI_class) {
+	    EC_ERROR(1);
+	    break;
+	}
+	i++;
+    } while (1);
+
+    /* Only some objects need to receive MSG_GEN_PREPARE_DESTROY */
+    if ((objClass == (ClassStruct *)&HTGenTextClass) ||
+	(objClass == (ClassStruct *)&HTGenImageClass) ||
+	(objClass == (ClassStruct *)&HTGenFormTextClass) ||
+	(objClass == (ClassStruct *)&TextAreaTextClass) ||
+	(objClass == (ClassStruct *)&TextAreaClass) ||
+	(objClass == (ClassStruct *)&HTMLSelectClass)) {
+	HTListAppend((uiMgr.UIM_currentDoc)->HTUI_objList, (void*)&ret, sizeof(optr));
+    }
+
+    POPDS;
+    return ret;
+}	/* End of UICreateObj.	*/
+
+
+/*
+ * Design Note: 
+ * ===========
+ *
+ * All deletion APIs are tied directly to the management of UI memory
+ * usage. We will use it for caching.
+ *
+ */
+
+/***********************************************************************
+ *		UIFreeDoc
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Final free doc routine. 
+ * CALLED BY:	UICacheDoc
+ * RETURN:	Nothing
+ *	
+ * STRATEGY:	Cleanup all the memory taken by a doc.
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	kkee    	10/ 3/97   	Initial Revision
+ *	
+ ***********************************************************************/
+void _far _pascal
+UIFreeDoc (HTMemHandle uiDoc)
+{
+    word i, count;
+    optr obj;
+    HTUIDoc *doc;
+
+    PUSHDS;
+    SET_DS_LIB_DGROUP;
+
+    if(uiDoc == uiMgr.UIM_currentDocHandle) {
+	doc = uiMgr.UIM_currentDoc;
+
+	if ((uiMgr.UIM_currentDoc)->HTUI_genView)
+	    @call (uiMgr.UIM_currentDoc)->HTUI_genView::
+		MSG_HT_GEN_VIEW_IGNORE_INPUT();
+
+	if ((uiMgr.UIM_currentDoc)->HTUI_genView)
+	    @call (uiMgr.UIM_currentDoc)->HTUI_genView::
+		MSG_GEN_VIEW_SET_CONTENT(0);
+
+	uiMgr.UIM_memoryAllocated = 0;
+
+    /* 
+     * This message will in turn send MSG_GEN_PREPARE_FOR_DESTROY to 
+     * doc->HTUI_genContent.
+     */
+    /* 
+     * This code is causing some problems. I remove this code to 
+     * avoid deadlock in UIDeleteDoc while quitting and also in quick
+     * switching back and forth between pages.
+     */
+
+/*
+     @send, forceQueue doc->HTUI_genView::
+                             MSG_GEN_PREPARE_FOR_DESTROY();
+     ThreadPSem(doc->HTUI_waitToFree);
+*/
+
+	uiMgr.UIM_currentDoc = 0;
+	uiMgr.UIM_currentDocHandle = 0;
+	cleanFormQuery();
+    } else
+	doc = (HTUIDoc *) HTMemLock(uiDoc);
+
+    /*
+     * Unhook the mem cache from the anchor object so that
+     * anchor object can be garbage collected as well.
+     */
+    if (doc->HTUI_anchor) {
+	HTAnchorSetMemCache(doc->HTUI_anchor, 0);
+    }
+
+    /* The rest of the memory, htlist, objects are allocated using WID APIs */
+    if (doc->PM_linkUnderMouse) {
+	MemFree(doc->PM_linkUnderMouse);
+    }
+
+    count = HTListGetCount(doc->HTUI_objList);
+    for (i=0; i<count; i++) {
+	HTListGetItem(doc->HTUI_objList, i, (void*)&obj, sizeof(optr));
+	@call obj::MSG_GEN_PREPARE_FOR_DESTROY();
+    }
+
+    if(doc->HTUI_newURL) 
+	HTMemFree(doc->HTUI_newURL);
+
+    ThreadFreeSem(doc->HTUI_waitToFree);
+
+    FilePushDir();
+    FileSetStandardPath(SP_PRIVATE_DATA);
+    if(doc->HTUI_vmFileHandle) {
+	    VMClose(doc->HTUI_vmFileHandle, FILE_NO_ERRORS); 
+    }
+    FileDelete(doc->HTUI_vmFileName);
+    FilePopDir();
+
+    /* Safe to delete all object blocks */
+    HTObjDestroyAllWID(doc->HTUI_memID);
+    HTMemFreeAllWID(doc->HTUI_memID);
+    HTListDeleteAllWID(doc->HTUI_memID);
+
+    HTMemUnlockAndFree(uiDoc);
+
+    POPDS;
+}	/* End of UIFreeDoc.	*/
+
+
+/***********************************************************************
+ *		UIGarbageCollect
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Garbage collect cached docs so that we have enough mem
+ *              to create a new document.
+ * CALLED BY:	UINewDoc
+ * RETURN:	Nothing
+ *	
+ * STRATEGY:	
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	kkee    	10/ 3/97   	Initial Revision
+ *	
+ ***********************************************************************/
+static void _pascal
+UIGarbageCollect (void)
+{
+/* Must match SGIT_NUMBER_OF_FREE_HANDLES in Internal/heapInt.def */
+#define TOTAL_FREE_HANDLES 0x800e
+/* Must match LOW_ON_FREE_HANDLES_THRESHOLD in Internal/heapInt.def */
+#define FREE_HANDLES_THRESHOLD  450  /* +50 for building next uiDoc */
+
+    word i, count;
+    HTMemHandle oldDoc;
+    HTUIDoc *doc;
+    Boolean free;
+
+    PUSHDS;
+    SET_DS_LIB_DGROUP;
+
+    if (uiMgr.UIM_delayFreeDoc) {
+	UIFreeDoc(uiMgr.UIM_delayFreeDoc);
+	uiMgr.UIM_delayFreeDoc = 0;
+    }
+
+    if (!uiMgr.UIM_cacheList) {
+	POPDS;	
+	return;
+    }
+
+    /* Make sure we have enough handles to build the next page */
+    count = HTListGetCount(uiMgr.UIM_cacheList);
+    for (i=0; i<count; i++) {
+	if (SysGetInfo(TOTAL_FREE_HANDLES) <= FREE_HANDLES_THRESHOLD) {
+	    /* Delete old docs in LRU fashion */
+	    HTListRemoveItem(uiMgr.UIM_cacheList, 0, (void*)&oldDoc, 
+			     sizeof(HTMemHandle));
+	    UIFreeDoc(oldDoc);
+	} else {
+	    /* 
+	     * Should be enough free handles to build a new UIDoc, if
+	     * not we should increase FREE_HANDLES_THRESHOLD
+	     */
+	    break;
+	}
+    }
+
+    POPDS;
+}	/* End of UIGarbageCollect.	*/
+
+
+
+/***********************************************************************
+ *		UICacheDoc
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Internal routine for caching a doc. Assume DS is
+ *              setup to library dgroup.
+ * CALLED BY:	UIDeleteDoc
+ * RETURN:	Nothing
+ *	
+ * STRATEGY:	
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	kkee    	10/ 3/97   	Initial Revision
+ *	
+ ***********************************************************************/
+static void _pascal
+UICacheDoc (HTMemHandle uiDoc)
+{
+    dword memUsed, memAvail;
+    word count, i;
+    HTUIDoc *doc;
+    HTMemHandle oldDoc;
+    Boolean free;
+
+/* Must match SGIT_SWAP_FREE_SIZE in Internal/heapInt.def */
+#define TOTAL_FREE_SWAP_SPACE  0x801a
+
+    PUSHDS;
+    SET_DS_LIB_DGROUP;
+
+    if (!uiMgr.UIM_cacheList) {
+	uiMgr.UIM_cacheList = HTListNew();
+    }
+
+    /* 
+     * Make sure we have enough swap space to swap out uiDoc.
+     * If not, start deleting cached docs in LRU fashion until
+     * we do. If still don't have enough swap space, then don't 
+     * cache uiDoc.
+     */
+    doc = (HTUIDoc *) HTMemLock(uiDoc);
+    memUsed = HTObjUsedSpaceWID(doc->HTUI_memID);
+    memUsed += HTListUsedSpaceWID(doc->HTUI_memID);
+    memUsed += HTMemUsedSpaceWID(doc->HTUI_memID);
+    HTMemUnlock(uiDoc);
+
+    /* Add a 10K fudge factor for safety */
+    memUsed += 10000;
+    memAvail = SysGetInfo(TOTAL_FREE_SWAP_SPACE);
+
+    count = HTListGetCount(uiMgr.UIM_cacheList);
+@if 0
+    for (i=0; i<count; i++) {
+	if (memAvail > memUsed) break;
+	HTListRemoveItem(uiMgr.UIM_cacheList, 0, (void*)&oldDoc, sizeof(HTMemHandle));
+	UIFreeDoc(oldDoc);
+	memAvail = SysGetInfo(TOTAL_FREE_SWAP_SPACE);
+    }
+@else /*for penelope test only - we just cache one page */
+    for (i=0; i<count; i++) {
+	HTListRemoveItem(uiMgr.UIM_cacheList, 0, (void*)&oldDoc, sizeof(HTMemHandle));
+	UIFreeDoc(oldDoc);
+	memAvail = SysGetInfo(TOTAL_FREE_SWAP_SPACE);
+    }
+@endif
+
+    /* Enter into cache list and rely on system to swap it out on demand */
+    if (memAvail > memUsed) {
+	if (HTListFindItem(uiMgr.UIM_cacheList, (void*)&uiDoc, 
+			   sizeof(HTMemHandle)) == -1) {
+	    /* Enter into cache if does not already exist */
+	    HTListAppend(uiMgr.UIM_cacheList, (void*)&uiDoc, sizeof(HTMemHandle));
+	}
+    } else {
+	UIFreeDoc(uiDoc);
+    }
+
+    POPDS;
+}	/* End of UICacheDoc.	*/
+
+
+/***********************************************************************
+ *		UIDeleteDoc
+ ***********************************************************************
+ *
+ * SYNOPSIS:	
+ * CALLED BY:	
+ * RETURN:	
+ *	
+ * STRATEGY:	uiDoc has to be freed using UIFreeDoc, but do it later.
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	kkee    	11/26/97   	Initial Revision
+ *	
+ ***********************************************************************/
+void _far _pascal
+UIDeleteDoc (HTMemHandle uiDoc)
+{
+    HTUIDoc *doc;
+
+    PUSHDS;
+    SET_DS_LIB_DGROUP;
+
+    if(uiDoc == uiMgr.UIM_currentDocHandle) {
+	doc = uiMgr.UIM_currentDoc;
+
+	if ((uiMgr.UIM_currentDoc)->HTUI_genView)
+	    @call (uiMgr.UIM_currentDoc)->HTUI_genView::
+		MSG_HT_GEN_VIEW_IGNORE_INPUT();
+
+	/* prevent crash */
+	ThreadPSem(uiMgr.UIM_access);
+
+	if ((uiMgr.UIM_currentDoc)->HTUI_genView)
+	    @call (uiMgr.UIM_currentDoc)->HTUI_genView::
+		MSG_GEN_VIEW_SET_CONTENT(0);
+
+	uiMgr.UIM_memoryAllocated = 0;
+	uiMgr.UIM_currentDoc = 0;
+	uiMgr.UIM_currentDocHandle = 0;
+	cleanFormQuery();
+
+	ThreadVSem(uiMgr.UIM_access);
+    } else {
+	doc = (HTUIDoc *) HTMemLock(uiDoc);
+    }
+
+    /*
+     * Unhook the mem cache from the anchor object so that
+     * anchor object can be garbage collected as well.
+     */
+    if (doc->HTUI_anchor) {
+	HTAnchorSetMemCache(doc->HTUI_anchor, 0);
+	doc->HTUI_anchor = 0;
+    }
+
+    HTMemUnlock(uiDoc);
+    if (uiMgr.UIM_delayFreeDoc) {
+	UIFreeDoc(uiDoc);
+    }
+    uiMgr.UIM_delayFreeDoc = uiDoc;
+
+    POPDS;
+}	/* End of UIDeleteDoc.	*/
+
+
+
+/***********************************************************************
+ *		UIDeleteCurrentDoc
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Delete the UI doc.
+ * CALLED BY:	Client
+ * RETURN:	Nothing
+ *	
+ * STRATEGY:	We may alternatively cache this page if it is not expired.
+ *              If caching, we simply set the genView content to 0 to 
+ *              detach the cachable UI tree from genView. Also decrement 
+ *              the docment inUseCount so it can garbage collected if 
+ *              necessary.
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	kkee    	9/18/97   	Initial Revision
+ *	
+ ***********************************************************************/
+void _far _pascal
+UIDeleteCurrentDoc ()
+{
+    Boolean cacheIt;
+    HTMemHandle docHandle;
+
+    PUSHDS;
+    SET_DS_LIB_DGROUP;
+
+    if(!uiMgr.UIM_currentDocHandle) {
+	POPDS;
+	return;
+    }
+
+EC( ECCheckUIDoc(uiMgr.UIM_currentDocHandle);                                )
+
+    /* 
+     * Since this is public API, we must only be deleting
+     * the (uiMgr.UIM_currentDoc).
+     */
+
+    if ((uiMgr.UIM_currentDoc)->HTUI_genView)
+	@call (uiMgr.UIM_currentDoc)->HTUI_genView::
+	    MSG_HT_GEN_VIEW_IGNORE_INPUT();
+
+    /* Detach from the genView as (uiMgr.UIM_currentDoc) is attached to the view */
+    /* It is not safe to delete objects below a genView while attached */
+
+    ThreadPSem(uiMgr.UIM_access);
+
+    if ((uiMgr.UIM_currentDoc)->HTUI_genView)
+	@call (uiMgr.UIM_currentDoc)->HTUI_genView::MSG_GEN_VIEW_SET_CONTENT(0);
+    /* 
+     * This message will in turn send MSG_GEN_PREPARE_FOR_DESTROY to 
+     * doc->HTUI_genContent.
+     */
+    /* 
+     * This code is causing some problems. I remove this code to 
+     * avoid deadlock in UIDeleteDoc while quitting and also in quick
+     * switching back and forth between pages.
+     */
+/*
+     @send, forceQueue uiMgr.UIM_currentDoc->HTUI_genView::
+                             MSG_GEN_PREPARE_FOR_DESTROY();
+     ThreadPSem(uiMgr.UIM_currentDoc->HTUI_waitToFree);
+*/
+    docHandle = uiMgr.UIM_currentDocHandle;
+
+    /* Current doc is removed, so reset vars */
+    uiMgr.UIM_memoryAllocated = 0;
+    uiMgr.UIM_currentDoc = 0;
+    uiMgr.UIM_currentDocHandle = 0;
+    cleanFormQuery();
+
+    ThreadVSem(uiMgr.UIM_access);
+
+    /* Was locked in UINewDoc or UIFindDoc */
+    HTMemUnlock(docHandle);
+
+    /* May optionally cache it or pass it to UIFreeDoc 
+       if not enough space */
+    UICacheDoc(docHandle);
+
+    POPDS;
+}	/* End of UIDeleteCurrentDoc.	*/
+
+
+
+/*
+ * Design Note: 
+ * ===========
+ *
+ * All navigational and interaction APIs are mapped to some methods in the 
+ * presentation manager of the HTUIDoc.
+ *
+ */
+
+/***********************************************************************
+ *		UIInitializeDoc
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Set current document to be viewed.
+ * CALLED BY:	Client
+ * RETURN:	Nothing
+ *	
+ * STRATEGY:	We set up the UI tree to be:
+ *              genView <---> genContent ---> PMananger.
+ *              The document will remain locked until UIDeleteDoc is called.
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	kkee    	9/19/97   	Initial Revision
+ *	
+ ***********************************************************************/
+static void _pascal
+UIInitializeDoc ()
+{
+    optr parent;
+    SizeAsDWord size;
+    WindowHandle win;
+    RectDWord viewBound;
+
+    PUSHDS;
+    SET_DS_LIB_DGROUP;
+
+EC( ECCheckOD(uiMgr.UIM_view);                                                 )
+    
+    (uiMgr.UIM_currentDoc)->HTUI_genView = uiMgr.UIM_view;
+    @call (uiMgr.UIM_currentDoc)->HTUI_genContent
+	::MSG_GEN_ADD_CHILD((uiMgr.UIM_currentDoc)->HTUI_pmanager, 
+						  CCF_MARK_DIRTY);
+    @call uiMgr.UIM_view::MSG_GEN_VIEW_SET_CONTENT((uiMgr.UIM_currentDoc)->HTUI_genContent);
+    @call (uiMgr.UIM_currentDoc)->HTUI_pmanager::MSG_GEN_SET_USABLE(VUM_NOW);
+
+    /* Initialize them */
+    @call (uiMgr.UIM_currentDoc)->HTUI_pmanager::MSG_VIS_SET_SIZE(X_SCREEN_SIZE, Y_SCREEN_SIZE);
+    parent = @call (uiMgr.UIM_currentDoc)->HTUI_pmanager::MSG_GEN_FIND_PARENT();
+    @call parent::MSG_VIS_SET_SIZE(X_SCREEN_SIZE, Y_SCREEN_SIZE);
+    @call (uiMgr.UIM_currentDoc)->HTUI_pmanager::MSG_VIS_POSITION_BRANCH(0,0);
+    size = MAKE_SIZE_DWORD(X_SCREEN_SIZE, Y_SCREEN_SIZE);
+    @call parent::MSG_HTML_CONTENT_SET_VIEW_DOC_BOUNDS(size);
+
+    /*
+     *  Invalidate all the objects on the screen!
+     */
+    win = @call (uiMgr.UIM_currentDoc)->HTUI_pmanager::MSG_VIS_QUERY_WINDOW();
+    if(win) {
+	@call uiMgr.UIM_view::MSG_GEN_VIEW_GET_VISIBLE_RECT(&viewBound);
+	WinInvalReg(win, 0, 0, 0, viewBound.RD_right - viewBound.RD_left,
+		    viewBound.RD_bottom - viewBound.RD_top);
+    }
+
+    /* Self manage geometry is set in MSG_PM_INITIALIZE */
+    @call (uiMgr.UIM_currentDoc)->HTUI_pmanager::MSG_PM_INITIALIZE();
+
+    POPDS;
+}	/* End of UIInitializeDoc.	*/
+
+/***********************************************************************
+ *		UILastModifiedTime
+ ***********************************************************************
+ *
+ * SYNOPSIS:	
+ * CALLED BY:	
+ * RETURN:	
+ *	
+ * STRATEGY:	
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	mzhu    	10/ 9/97   	Initial Revision
+ *	
+ ***********************************************************************/
+HTMemHandle _far _pascal
+UILastModifiedTime ()
+{
+    HTMemHandle ret = 0;
+
+    PUSHDS;
+    SET_DS_LIB_DGROUP;
+
+    if(uiMgr.UIM_currentDoc && uiMgr.UIM_currentDoc->HTUI_anchor)    
+	ret = HTAnchorLastModified((uiMgr.UIM_currentDoc)->HTUI_anchor);
+
+    POPDS;
+    return ret;
+}	/* End of UILastModifiedTime.	*/
+
+
+/***********************************************************************
+ *		UIDocCurrentTitle
+ ***********************************************************************
+ *
+ * SYNOPSIS:	
+ * CALLED BY:	
+ * RETURN:	
+ *	
+ * STRATEGY:	
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	kkee    	9/20/97   	Initial Revision
+ *	
+ ***********************************************************************/
+HTMemHandle _far _pascal
+UIDocCurrentTitle ()
+{
+    HTMemHandle ret = 0;
+    char *title;
+
+    PUSHDS;
+    SET_DS_LIB_DGROUP;
+    if(uiMgr.UIM_currentDoc && uiMgr.UIM_currentDoc->HTUI_title) {
+	title = HTMemLock((uiMgr.UIM_currentDoc)->HTUI_title);
+	ret = HTStrAllocCopyWID(uiMgr.UIM_currentDoc->HTUI_memID, title);
+	HTMemUnlock((uiMgr.UIM_currentDoc)->HTUI_title);
+    }
+    POPDS;
+    return ret;
+	
+}	/* End of UIDocTitle.	*/
+
+
+/***********************************************************************
+ *		UICurrentBaseURL
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Get the current base URL. Caller must NOT delete the
+ *              return HTMemHandle. 
+ * CALLED BY:	Client
+ * RETURN:	HTMemHandle or NULL.
+ *	
+ * STRATEGY:	
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	kkee    	9/19/97   	Initial Revision
+ *	
+ ***********************************************************************/
+HTMemHandle _far _pascal
+UIDocCurrentBaseURL ()
+{
+    HTMemHandle ret = 0;
+    char *url;
+
+    PUSHDS;
+    SET_DS_LIB_DGROUP;
+
+    if(uiMgr.UIM_currentDoc && uiMgr.UIM_currentDoc->HTUI_baseURL) {
+	url = HTMemLock((uiMgr.UIM_currentDoc)->HTUI_baseURL);
+	ret = HTStrAllocCopyWID(uiMgr.UIM_currentDoc->HTUI_memID,url);
+	HTMemUnlock((uiMgr.UIM_currentDoc)->HTUI_baseURL);
+    }
+    POPDS;
+    return ret;
+}	/* End of UICurrentBaseURL.	*/
+
+
+HTMemHandle _far _pascal
+UIDocCurrentURL ()
+{
+    HTMemHandle ret;
+
+    PUSHDS;
+    SET_DS_LIB_DGROUP;
+
+    if(uiMgr.UIM_currentDoc && uiMgr.UIM_currentDoc->HTUI_anchor) 
+	ret = HTAnchorAddress(uiMgr.UIM_currentDoc->HTUI_anchor);
+    else
+	ret = 0;
+
+    POPDS;
+    return ret;
+}	/* End of UICurrentBaseURL.	*/
+
+
+/***********************************************************************
+ *		UIGetFocusImage
+ ***********************************************************************
+ *
+ * SYNOPSIS:	
+ * CALLED BY:	
+ * RETURN:	
+ *	
+ * STRATEGY:	
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	mzhu    	10/ 9/97   	Initial Revision
+ *	
+ ***********************************************************************/
+optr _far _pascal
+UIGetFocusImage ()
+{
+    optr ret = 0, target;
+    word index;
+    HTListHandle list;
+
+    PUSHDS;
+    SET_DS_LIB_DGROUP;
+
+    if(uiMgr.UIM_currentDoc) 
+	ret = uiMgr.UIM_currentDoc->PM_focalImage;
+
+    /* 
+     * remove this image from the image list, so later Load All will not
+     *  load it again.
+     */
+    if(ret) {
+	target = @call ret::MSG_GEN_IMAGE_GET_TARGET();
+	list = uiMgr.UIM_currentDoc->HTUI_imageList;
+	index = HTListFindItem(list, &target, sizeof(optr));
+	if(index != -1) HTListRemoveItem(list, index, &ret, sizeof(optr));
+    }
+
+    POPDS;
+    return ret;
+}	/* End of UIGetFocusImage.	*/
+
+
+optr _far _pascal
+UIGetNextImage ()
+{
+    HTListHandle list;
+    word count;
+    optr image;
+
+    PUSHDS;
+    SET_DS_LIB_DGROUP;
+
+    list = uiMgr.UIM_currentDoc->HTUI_imageList;
+    count  = HTListGetCount(list);
+
+    if(!list || !count) 
+	image = 0;
+    else 
+	HTListRemoveItem(list, 0, &image, sizeof(optr));
+
+    POPDS;
+    return image;
+}	/* End of UIGetFocusImage.	*/
+
+
+Boolean _far _pascal
+UIUnloadImage()
+{
+    HTListHandle list;
+    word count;
+    Boolean ret = FALSE;
+
+    PUSHDS;
+    SET_DS_LIB_DGROUP;
+
+    if(uiMgr.UIM_currentDoc) {
+	list = uiMgr.UIM_currentDoc->HTUI_imageList;
+	if(list && HTListGetCount(list))
+	    ret = TRUE;
+    }
+
+    POPDS;
+    return ret;
+}
+
+
+HTMemHandle _far _pascal 
+UIGetFocusLink()
+{
+    HTMemHandle ret = 0;
+    word len;
+    char *url;
+
+    PUSHDS;
+    SET_DS_LIB_DGROUP;
+
+    if(uiMgr.UIM_currentDoc && 
+       uiMgr.UIM_currentDoc->PM_focalLink != -1 && 
+       uiMgr.UIM_currentDoc->PM_hrefs) {
+	len = HTListGetItemSize((uiMgr.UIM_currentDoc)->PM_hrefs, 
+				(uiMgr.UIM_currentDoc)->PM_focalLink);
+	url = HTMemAllocAndLock(&ret, len + 1);
+	HTListGetItem((uiMgr.UIM_currentDoc)->PM_hrefs, 
+		      (uiMgr.UIM_currentDoc)->PM_focalLink,
+		      url, len);
+	*(url + len) = 0;
+	HTMemUnlock(ret);
+    }
+
+    POPDS;
+
+    return ret;
+}
+
+
+int _far _pascal 
+UIGetRefreshTimeAndURL(HTMemHandle *newURL)
+{
+    word ret = -1;
+    char *url, *ptr;
+    HTMemHandle mh;
+
+    PUSHDS;
+    SET_DS_LIB_DGROUP;
+
+    if(uiMgr.UIM_currentDoc && uiMgr.UIM_currentDoc->HTUI_newURL) {
+	ret = uiMgr.UIM_currentDoc->HTUI_refreshTime;
+	/*
+	 * 25/11/97. We don't want the same document refresh twice 
+	 * (use Back, Forward, or from Histroy),
+	 * so we clean these fields at the first time.
+	 */
+	*newURL = uiMgr.UIM_currentDoc->HTUI_newURL;
+	uiMgr.UIM_currentDoc->HTUI_newURL = 0;
+
+	/*
+	 * Probably we can tolerate missing time.
+	 */
+	if(ret == -1) ret = 0;
+    } /* else 
+       *
+       * And also, we don't want to refresh to the same doc.
+       *
+       * *newURL = UIDocCurrentURL();
+       *
+    } */
+
+    if(uiMgr.UIM_currentDoc)
+	uiMgr.UIM_currentDoc->HTUI_refreshTime = -1;
+
+    POPDS;
+
+    return ret;
+}
+
+
+HTMemHandle _far _pascal 
+UIDocGetFormQuery()
+{
+    HTMemHandle ret = 0;
+    word len;
+    char *url;
+
+    PUSHDS;
+    SET_DS_LIB_DGROUP;
+
+    if(ThreadPTimedSem(uiMgr.UIM_access, 1) != SE_TIMEOUT) {
+	if(uiMgr.UIM_currentDoc) {
+	    ret = uiMgr.UIM_formQuery; 
+	    uiMgr.UIM_formQuery = 0;
+	}
+	ThreadVSem(uiMgr.UIM_access);
+    }
+
+    POPDS;
+
+    return ret;
+}
+
+
+VMFileHandle _far _pascal
+UIDocCurrentVMFileHandle()
+{
+    VMFileHandle ret;
+
+    PUSHDS;
+    SET_DS_LIB_DGROUP;
+
+    if(uiMgr.UIM_currentDoc && uiMgr.UIM_currentDoc->HTUI_anchor) 
+	ret = uiMgr.UIM_currentDoc->HTUI_vmFileHandle;
+    else
+	ret = 0;
+
+    POPDS;
+    return ret;
+}	/* End of UICurrentBaseURL.	*/
+
+/***********************************************************************
+ *		UIGotoNextFocusableField
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Move to the next focusable field in the UIDoc.
+ * CALLED BY:	Client
+ * RETURN:	Nothing
+ *	
+ * STRATEGY:	
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	kkee    	9/19/97   	Initial Revision
+ *	
+ ***********************************************************************/
+void _far _pascal
+UIGotoNextFocusableField ()
+{
+    PUSHDS;
+    SET_DS_LIB_DGROUP;
+
+    if(uiMgr.UIM_currentDoc && uiMgr.UIM_currentDoc->HTUI_pmanager) 
+	@send, forceQueue, checkDuplicate \
+	    (uiMgr.UIM_currentDoc)->HTUI_pmanager::
+		MSG_PM_SEARCH_NEXT_FOCUSABLE_OBJECT();
+
+    POPDS;
+}	/* End of UIGotoNextFocusableField.	*/
+
+
+/***********************************************************************
+ *		UIDocSize
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Get document size.
+ * CALLED BY:	Client
+ * RETURN:	SizeAsDWord.
+ *	
+ * STRATEGY:	
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	kkee    	9/19/97   	Initial Revision
+ *	
+ ***********************************************************************/
+SizeAsDWord _far _pascal
+UIDocSize ()
+{
+    SizeAsDWord ret = 0;
+
+    PUSHDS;
+    SET_DS_LIB_DGROUP;
+
+    if(uiMgr.UIM_currentDoc && uiMgr.UIM_currentDoc->HTUI_pmanager) 
+	ret = @call (uiMgr.UIM_currentDoc)->HTUI_pmanager::MSG_VIS_GET_SIZE();
+
+    POPDS;
+    return ret;
+}	/* End of UIDocSize.	*/
+
+
+
+/***********************************************************************
+ *		UIDocPrint
+ ***********************************************************************
+ *
+ * SYNOPSIS:	
+ * CALLED BY:	
+ * RETURN:	
+ *	
+ * STRATEGY:	
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	kkee    	9/19/97   	Initial Revision
+ *	
+ ***********************************************************************/
+void _far _pascal
+UIDocPrint (GStateHandle gstate)
+{
+    PUSHDS;
+    SET_DS_LIB_DGROUP;
+
+    if(uiMgr.UIM_currentDoc && uiMgr.UIM_currentDoc->HTUI_pmanager) 
+	@call (uiMgr.UIM_currentDoc)->HTUI_pmanager::MSG_VIS_DRAW(DF_PRINT, gstate);
+
+    POPDS;
+}	/* End of UIDocPrint.	*/
+
+
+
+/***********************************************************************
+ *		UIDocSearch
+ ***********************************************************************
+ *
+ * SYNOPSIS:	
+ * CALLED BY:	
+ * RETURN:	
+ *	
+ * STRATEGY:	
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	kkee    	9/19/97   	Initial Revision
+ *	
+ ***********************************************************************/
+void _far _pascal
+UIDocSearch (MemHandle searchInfo)
+{
+    PUSHDS;
+    SET_DS_LIB_DGROUP;
+
+    if(uiMgr.UIM_currentDoc && uiMgr.UIM_currentDoc->HTUI_pmanager) 
+	@call (uiMgr.UIM_currentDoc)->HTUI_pmanager::MSG_SEARCH(searchInfo);
+
+    POPDS;
+}	/* End of UIDocSearch.	*/
+
+
+
+/***********************************************************************
+ *		UIDocCopySelected
+ ***********************************************************************
+ *
+ * SYNOPSIS:	
+ * CALLED BY:	
+ * RETURN:	
+ *	
+ * STRATEGY:	
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	kkee    	9/19/97   	Initial Revision
+ *	
+ ***********************************************************************/
+void _far _pascal
+UIDocCopySelected ()
+{
+    PUSHDS;
+    SET_DS_LIB_DGROUP;
+
+    if(uiMgr.UIM_currentDoc && uiMgr.UIM_currentDoc->HTUI_pmanager) 
+	@send (uiMgr.UIM_currentDoc)->HTUI_pmanager::MSG_PM_COPY_SELECTED_OBJECTS();
+
+    POPDS;
+}	/* End of UIDocCopySelected.	*/
+
+
+/***********************************************************************
+ *		UIDocMemoryNeeded
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Tally the amount of memory used so far.
+ * CALLED BY:	Client
+ * RETURN:	dword, document width, and document height.
+ *	
+ * STRATEGY:	
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	kkee    	9/20/97   	Initial Revision
+ *	
+ ***********************************************************************/
+dword _far _pascal
+UIDocMemoryNeeded (word *width, word *height)
+{
+    dword ret;
+
+    PUSHDS;
+    SET_DS_LIB_DGROUP;
+
+    ret = uiMgr.UIM_memoryAllocated;
+    @call (uiMgr.UIM_currentDoc)->HTUI_pmContent::MSG_GEN_HTML_CONTENT_GET_ACCUMULATED_HEIGHTS
+	(width, height);
+
+    POPDS;
+    return ret;
+}	/* End of UIDocMemoryNeeded.	*/
+
+
+
+/***********************************************************************
+ *		UIDocAddMemory
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Add needed UI memory for a document.
+ * CALLED BY:	Internal to UIGenerator
+ * RETURN:	
+ *	
+ * STRATEGY:	
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	kkee    	9/21/97   	Initial Revision
+ *	
+ ***********************************************************************/
+void _far _pascal
+UIDocAddMemory (dword len)
+{
+    PUSHDS;
+    SET_DS_LIB_DGROUP;
+    /* No need to push and pop DS as called from UIGenerator */
+    uiMgr.UIM_memoryAllocated += len;
+    POPDS;
+}	/* End of UIDocAddMemory.	*/
+
+
+void cleanFormQuery()
+{
+    word i, count;
+    HTMemHandle temp = 0;
+
+    if(uiMgr.UIM_formQuery) {
+	count = HTListGetCount(uiMgr.UIM_formQuery);
+	for(i=0; i<count; i ++) {
+	    HTListGetItem(uiMgr.UIM_formQuery, i, &temp, sizeof(HTMemHandle));
+	    if (i!=1 && temp) HTMemFree(temp);
+	    temp = 0;
+	}
+	HTListDelete(uiMgr.UIM_formQuery);
+    }
+
+    uiMgr.UIM_formQuery = 0;
+}

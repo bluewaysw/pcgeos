@@ -1,0 +1,134 @@
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Geoworks 1997.  All rights reserved.
+	GEOWORKS CONFIDENTIAL
+
+PROJECT:	Geos WWW Library
+MODULE:		scan
+FILE:		scan.goh
+
+AUTHOR:		Kok Kin Kee, May 24, 1997
+
+ROUTINES:
+	Name			Description
+	----			-----------
+
+REVISION HISTORY:
+	Name		Date		Description
+	----		----		-----------
+	kkee    	5/24/97   	Initial version.
+
+DESCRIPTION:
+
+	Scanner for IMAP.
+
+	$Id: scan.goh,v 1.6.6.1 97/09/05 10:52:21 jeremyb Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+
+@ifndef __IMAPSCAN_GOH__
+@define __IMAPSCAN_GOH__
+
+#include <WWW/htmem.h>
+@include <WWW/HTCore/htstream.goh>
+@include <WWW/HTCore/htsock.goh>
+
+
+/*
+ * IMAP tokens.
+ */
+typedef enum {
+    IMT_INVALID = -1
+
+   /* Strictly IMAP tokens here */
+   ,IMT_BAD
+   ,IMT_BODY
+   ,IMT_BODYSTRUCTURE
+   ,IMT_BYE
+   ,IMT_CAPABILITY
+   ,IMT_ENVELOPE
+   ,IMT_EXISTS
+   ,IMT_EXPUNGE
+   ,IMT_FETCH
+   ,IMT_FLAGS
+   ,IMT_IMAP4
+   ,IMT_IMAP4REV1
+   ,IMT_INTERNALDATE
+   ,IMT_LIST
+   ,IMT_LSUB
+   ,IMT_MAILBOX
+   ,IMT_MESSAGE
+   ,IMT_NIL
+   ,IMT_NO
+   ,IMT_OK
+   ,IMT_RECENT
+   ,IMT_RFC822
+   ,IMT_RFC822_HEADER        /* RFC822.HEADER */
+   ,IMT_RFC822_SIZE          /* RFC822.SIZE */
+   ,IMT_RFC822_TEXT          /* RFC822.TEXT */
+   ,IMT_SEARCH
+   ,IMT_SEEN
+   ,IMT_STATUS
+   ,IMT_TEXT
+   ,IMT_UID
+   ,IMT_UIDVALIDITY
+   ,IMT_UNSEEN
+
+   /* Other misc tokens */
+   ,IMT_CR                  /* Carriage return */
+   ,IMT_LF                  /* Linefeed */
+   ,IMT_LBRACKET            /* "[" */
+   ,IMT_RBRACKET            /* "]" */
+   ,IMT_LPAREN              /* "(" */
+   ,IMT_RPAREN              /* ")" */
+   ,IMT_LBRACE              /* "{" */
+   ,IMT_RBRACE              /* "}" */
+   ,IMT_ASTERIK             /* "*" */
+   ,IMT_PLUS                /* "+" */
+   ,IMT_DQUOTE              /* """ */
+   ,IMT_BSLASH              /* "\" */
+   ,IMT_TAG                 /* aXX */
+   ,IMT_NUM                 /* A number */
+} IMAPToken;
+
+/*
+ * IMAP scanner data.
+ */
+#define MAX_IMAP_WORD_LENGTH 128
+typedef struct {
+    /* This is where data flows to our scanner */
+    HTSocket          *sock;                /* Locked socket */
+    HTSocketHandle    socket;
+    word              index;                /* Index to read data */
+    Boolean           ungottenSym;          /* So that the next GobbleSym
+					       does not eat an extra token */
+    char              thisWord[MAX_IMAP_WORD_LENGTH];
+    dword             thisNum;
+    int               thisSym;
+} IMAPScanner;
+
+/*
+ * IMAP reserved word.
+ */
+typedef struct {
+    char *name;                  /* Some generic string */
+    int  kind;                   /* Some generic token */
+} IMAPKey;
+
+/* Parameter mode to pass to GobbleQString and GobbleNString */
+#define SAVE_STRING 0            /* Gobble and save it to strhtmh */
+#define PUSH_STRING 1            /* Gobble and push it to strtarget */
+#define SKIP_STRING 2            /* Gobble and skip the string */
+
+extern int _pascal IMAPBinSearch (char *wordBuffer, IMAPKey tab[], int n);
+extern int _pascal GobbleSym (IMAPScanner *s);
+extern void _pascal UnGobbleSym (IMAPScanner *s);
+extern int _pascal GobbleTill (IMAPScanner *s, byte b);
+extern int _pascal GobbleTillWhite (IMAPScanner *s);
+extern int _pascal GobbleQString (IMAPScanner *s, int mode, HTMemHandle *str,
+				  HTStreamHandle target, dword *length);
+extern int _pascal GobbleNString (IMAPScanner *s, dword nbyte, int mode, 
+				  HTMemHandle *str, HTStreamHandle target);
+
+@endif  /* __IMAPSCAN_GOH__ */

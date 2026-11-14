@@ -1,0 +1,547 @@
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Geoworks 1996 -- All Rights Reserved
+
+PROJECT:	Geos WWW Library
+MODULE:		Net Manager
+FILE:		htnet.goc
+
+AUTHOR:		Kok Kin Kee, May 23, 1996
+
+ROUTINES:
+	Name			Description
+	----			-----------
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	kkee	5/23/96   	Initial version.
+
+DESCRIPTION:
+	The Net Manager. Manages platform independent cooperative
+        multithreaded I/O model using Geos synchronous socket 
+	Library.
+
+	$Id: htnet.goc,v 1.1 97/04/07 11:48:31 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+@include <WWW/HTCore/htreq.goh>
+@include <WWW/HTCore/htpolicy.goh>
+@include <WWW/HTCore/htnet.goh>
+@include <WWW/HTCore/htlist.goh>
+@include <socket.goh>
+
+@include "HTNet/htnetMan.goh"
+@include "HTNet/htnetS.goh"
+@include "HTPolicy/htpolMan.goh"
+
+#include <Ansi/string.h>
+
+/* --------------------------------------------------------------------------
+ * 		PRIVATE DATA
+ * --------------------------------------------------------------------------*/
+
+#define HTNET_THREAD_STACK_SIZE               4096  /* 4K stack for scheduler */
+
+/*
+ * Library won't compile unless there is a dgroup, this dummy does the job! :)
+ */
+byte htNetDummy;
+
+
+/* 
+ * List of clients using the HTNet Library.
+ */
+static word htNetClientCount = 0;
+
+/*
+ * The HTNetScheduler process object for scheduling Net threads.
+ */
+static optr htNetScheduler = NULL;
+
+
+/* --------------------------------------------------------------------------
+ * 		PRIVATE ROUTINES
+ * --------------------------------------------------------------------------*/
+
+
+/***********************************************************************
+ *		HTNetLibraryEntry
+ ***********************************************************************
+ * SYNOPSIS:	1. Keep track of clients so we can terminate the HTNet 
+ *              process thread when there are no more clients.
+ *              2. Bring sharable resources, if any, in memory so that 
+ *		we can MemThreadGrab the resources in private/public 
+ * 		routines. These are all nondiscardable resources.
+ * CALLED BY:	HTCoreLibraryEntry
+ * RETURN:	Must return 0 to indicate all ok to Geos.
+ * SIDE EFFECTS:
+ * STRATEGY:	
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	kkee	5/31/96   	Initial Revision
+ *
+ ***********************************************************************/
+int _far _pascal
+HTNetLibraryEntry (LibraryCallType ty, GeodeHandle client)
+{
+    PUSHDS;
+    SET_DS_LIB_DGROUP;
+
+    if (ty == LCT_ATTACH) {
+	htNetClientCount = 0;
+
+    } else if (ty == LCT_NEW_CLIENT) {
+	htNetClientCount += 1;
+
+	if (htNetClientCount == 1) {
+	    ThreadHandle thread;
+
+	    @call ConstructOptr(ThreadGetInfo(0, TGIT_THREAD_HANDLE), 
+				GeodeGetCodeProcessHandle())::
+	     MSG_PROCESS_CREATE_EVENT_THREAD_WITH_OWNER(
+				&thread,
+				&HTNetSchedulerClass,			
+				HTNET_THREAD_STACK_SIZE);
+	    htNetScheduler = ConstructOptr(thread, 0);
+	    /*
+	     * Inform other Library components of this thread so that 
+	     * objects created by them run in HTNet library thread.
+	     */
+	    HTPolicySetThread(thread);
+	}
+
+    } else if (ty == LCT_CLIENT_EXIT) {
+	htNetClientCount -= 1;
+
+	if (htNetClientCount == 0) {
+
+	    /* Destroy scheduler object */
+	    @call htNetScheduler::MSG_META_DETACH(0, NullOptr);
+
+	    htNetScheduler = NullOptr;
+	}
+    }
+
+    POPDS;
+
+    return 0; /* Return value required by Geos */
+}	/* End of HTNetLibraryEntry.	*/
+
+
+
+/***********************************************************************
+ *		HTNetAddCallbackCommon
+ ***********************************************************************
+ * SYNOPSIS:	Common routine for adding a callback to a list.
+ * CALLED BY:	HTNETADDBEFORECALLBACK, HTNETADDAFTERCALLBACK, 
+ *              HTNETADDREQUESTCALLBACK.
+ * RETURN:	
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	kkee	8/23/96   	Initial Revision
+ *
+ ***********************************************************************/
+int _far _pascal
+HTNetAddCallbackCommon (HTListHandle list, HTNetCallback cbf, int status)
+{
+    HTNetCall netCall;
+
+    netCall.HTNC_cbf = cbf;
+    netCall.HTNC_status = status;
+    HTListAppend(list, &netCall, sizeof(HTNetCall));
+
+    return HT_OK;
+}	/* End of HTNetAddCallbackCommon.	*/
+
+
+/* --------------------------------------------------------------------------
+ * 		PUBLIC ROUTINES
+ * --------------------------------------------------------------------------*/
+
+
+/***********************************************************************
+ *		HTNetNewClient
+ ***********************************************************************
+ * SYNOPSIS:	Creates a new HTNet object as a new request to be 
+ *		handled. HTNet is basically the fiber for cooperative
+ *		multitasking. 	
+ * CALLED BY:	Request Manager (in HTRequestSubmit)
+ * PASS:        request = the request structure.
+ * RETURN:	HT_OK if ok, else HT_NO. HT_NO if a protocol object
+ *              is already attached to the request, i.e., has been 
+ *              called to HTNetNewClient before.
+ * SIDE EFFECTS:Nothing.
+ *	
+ * STRATEGY:	Call all the "before" callbacks in order to see if we 
+ * 		are to continue with this request or not. If we receive
+ *	 	a callback status that is not HT_OK, then jump directly
+ *		to the "after" callbacks. If we get HT_OK, then proceed
+ *		to create a protocol object to handle the request.
+ *		Enter the request in the scheduling queue. 
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	kkee	5/23/96   	Initial Revision
+ *
+ ***********************************************************************/
+int _far _pascal
+HTNetNewClient (HTRequestHandle request)
+{
+    int status;
+    HTStreamHandle protocol;
+    HTMemHandle physical;
+    HTListHandle beforeList, afterList;
+    HTRequest *rptr;
+
+    if (!request) return HT_NO;
+EC( ECCheckRequest(request);                                            )
+
+    rptr = (HTRequest *) MemThreadGrab(request);
+    beforeList = rptr->HTR_beforeList;
+    afterList = rptr->HTR_afterList;
+    protocol = rptr->HTR_protocol;
+    MemThreadRelease(request);
+
+    if (protocol != NullOptr) return HT_NO;
+
+    /* 
+     * Call "before" callbacks. We cannot lock the request during callback
+     * as the callback routine might use the request & cause a deadlock 
+     * (since all the HTRequest routines lock the request object).
+     */
+    if ((status = HTNetExecuteCallback(beforeList, request, HT_ALL)) 
+	         != HT_OK) {
+	HTNetExecuteCallback(afterList, request, status);
+	return HT_OK;
+    }
+
+    status = HT_OK;
+
+    /*
+     * If no URL address translation was provided by the application, 
+     * then use the anchor URL address directly.
+     */
+    rptr = (HTRequest *) MemThreadGrab(request);
+    physical = HTAnchorPhysical(rptr->HTR_anchor);
+
+    if (!physical) {
+	HTMemHandle addr = HTAnchorAddress(rptr->HTR_anchor);
+	if (addr) {
+	    char *cptr;
+	    cptr = (char *) HTMemLock(addr);
+	    HTAnchorSetPhysical(rptr->HTR_anchor, cptr);
+	    HTMemUnlockAndFree(addr);
+	} else 
+	    status = HT_OUT_OF_MEMORY;
+
+    } else 
+	HTMemFree(physical);
+
+    MemThreadRelease(request);
+
+    /* Create a new client with the network protocol scheduler. */
+    if (status == HT_OK) {
+	PUSHDS;            /* To access htNetScheduler */
+	SET_DS_LIB_DGROUP;
+	@send,forceQueue (htNetScheduler)::MSG_HTNS_NEW_CLIENT(request); 
+	POPDS;
+    }
+
+    return status;
+
+}	/* End of HTNetNewClient.	*/
+
+
+
+/***********************************************************************
+ *		HTNetKill
+ ***********************************************************************
+ * SYNOPSIS:	Kill a protocol client and delete the object.
+ * CALLED BY:	HTRequestKill (HTReq/htreq.goc).
+ * PASS:        protocol = the protocol object to kill.
+ *              status = the status code indicating the situation where the
+ *              request is killed.
+ * RETURN:	HT_OK or HT_NO.
+ * SIDE EFFECTS:You should not use the request pointer after calling
+ *              HTNetKill. This is because the request handle is used in
+ *              HTNetExecuteCallback which passes the handle to client
+ *              callbacks. And these callbacks can do whatever they wish
+ *              to the request.
+ *
+ *              HTNetKill is used by HTRequestKill (initiated by client)
+ *              and MSG_HTNS_SCHEDULE_ROUND_ROBIN. Both run in different
+ *              threads. There is a very good chance that both the client
+ *              and the Library might be killing the same request.
+ *              This means HTNetExecuteCallback will be called on the 
+ *              same request twice! At the moment, we are relying on the
+ *              client "after" callbacks to check for the same request 
+ *              being passed more than once.
+ * STRATEGY:
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	kkee	6/ 5/96   	Initial Revision
+ *
+ ***********************************************************************/
+int _far _pascal
+HTNetKill (HTRequestHandle request, int status)
+{
+    HTRequest *rptr;
+    HTStreamHandle protocol;
+
+EC( ECCheckRequest(request);                                           )
+
+    rptr = (HTRequest *) MemThreadGrab(request);
+    protocol = rptr->HTR_protocol;
+
+    /* 
+     * If htsocket is doing something sychronous, we interrupt from 
+     * outside. If it is doing something asych, we stop it using
+     * MSG_HT_PROTOCOL_STOP.
+     */
+
+    if (rptr->HTR_sockfd) { 
+	SocketInterrupt(rptr->HTR_sockfd); 
+    }	
+
+    /* Can't lock request while calling protocol */
+    MemThreadRelease(request);
+
+    @call protocol::MSG_HT_PROTOCOL_STOP();
+
+    /*
+     * Block to dequeue the protocol from the scheduler queue to make
+     * sure the protocol is dequeued (stop servicing the request) before
+     * we go to "after" callback (as one of the callbacks might delete
+     * the request invalidating the copy in the protocol.). Since the  
+     * scheduler is run by a different thread (htcore:0), make sure we
+     * don't lock the request.
+     */
+    PUSHDS;
+    SET_DS_LIB_DGROUP;
+    if (protocol)
+	@call (htNetScheduler)::MSG_HTNS_DEQUEUE_THREAD(protocol, status); 
+    POPDS;
+
+    return HT_OK;
+}	/* End of HTNetKill.	*/
+
+
+
+
+/***********************************************************************
+ *		HTNetKillAll
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Kill all Net threads of a client. 
+ * CALLED BY:	GLOBAL
+ * RETURN:	HT_OK
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	kkee	12/12/96   	Initial Revision
+ *
+ ***********************************************************************/
+int _far _pascal
+HTNetKillAll (GeodeHandle client, int status)
+{
+    /* Dequeue all Net threads of a client */
+    PUSHDS;
+    SET_DS_LIB_DGROUP;
+    @call (htNetScheduler)::MSG_HTNS_DEQUEUE_THREADS_FOR(client, status); 
+    POPDS;
+
+    return HT_OK;
+}	/* End of HTNetKillAll.	*/
+
+
+
+
+/***********************************************************************
+ *		HTNetAddBeforeCallback
+ ***********************************************************************
+ * SYNOPSIS:	Add a "before" callback function to a list. To use "before"
+ *              callbacks, you need to bind it to a request using
+ *              API HTRequestSetBeforeCallback list. Callbacks are 
+ *              called in a first-register-first-call basis.
+ * CALLED BY:	Client.
+ * PASS:        list = the list for before callbacks.
+ *              cbf = the callback function.
+ *              status = the condition to call cbf. If this the first cbf,
+ *              then the state must be HT_OK or HT_ALL. If not, the "before"
+ *              callback loop will be executed at all.
+ *              The return value from one callback will be used to decide
+ *              if the next callback will be called and so on.
+ *
+ * RETURN:	HT_OK if registration ok, else HT_NO.
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	kkee	6/ 4/96   	Initial Revision
+ *
+ ***********************************************************************/
+/* 
+ * int _far _pascal
+ * HTNetAddBeforeCallback (HTListHandle list, HTNetCallback cbf, int status)
+ * {
+ * return HTNetAddCallbackCommon(list, cbf, status);
+ *}
+ */
+
+
+
+
+/***********************************************************************
+ *		HTNetAddAfterCallback
+ ***********************************************************************
+ * SYNOPSIS:	Add an  "after" callback to a list. You must bind this
+ *              list to a request so that these functions are called 
+ *              in the "after" callback loop. "After" callbacks
+ *              are called in a first-register-first-call basis. By the 
+ *              time your function gets called, you can delete the request
+ *              as the Library does not need it anymore.
+ * CALLED BY:	Client.
+ * PASS:        list = the list of aftercallbacks.
+ *              cbf = the callback function.
+ *              status = the condition to call cbf, must be one of the 
+ *              following values:
+ *              HT_OK,
+ *      	HT_LOADED,	 
+ *              HT_NO_PROTOCOL,
+ *              HT_STALLED_AND_CANNOT_RETRY,
+ *              HT_CANNOT_OPEN_FILE,
+ *              HT_INTERRUPTED,
+ *              HT_NO_CONTENT,         - not implemented.
+ *	        HT_MOVED_PERMANENTLY,  - not implemented.
+ *	        HT_MOVED_TEMPORARILY,  - not implemented.
+ *	        HT_UNAUTHORIZED,       - not implemented.
+ *	        HT_PAYMENT_REQUIRED,   - not implemented.
+ *	        HT_ALL
+ * 
+ *              You can register other state values, however, these states 
+ *              will not be generated by the Library, hence your callbacks 
+ *              will not be called. 
+ *       
+ * RETURN:	HT_OK if registration ok, else HT_NO.
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	kkee	6/ 4/96   	Initial Revision
+ *
+ ***********************************************************************/
+/* 
+ * int _far _pascal
+ * HTNetAddAfterCallback (HTListHandle list, HTNetCallback cbf, int status)
+ * {
+ *   return HTNetAddCallbackCommon(list, cbf, status);
+ * }
+ */
+
+
+
+
+/***********************************************************************
+ *		HTNetAddRequestCallback
+ ***********************************************************************
+ * SYNOPSIS:	Register a "request" callback to a list. You need to bind
+ *              the list to a request using API 
+ *              HTRequestSetRequestCallbackList so that "request" callbacks
+ *              are called in the "request" callback loop.
+ *              Your callback must NOT modify the request using 
+ *              HTReqeuestSet APIs. But you can inspect the request using 
+ *              HTRequestGet APIs. Status to register for:
+ *                  HT_RESOLVING_HOST
+ *                  HT_CONNECTING_TO_SERVER
+ *                  HT_RETRY_CONNECTING_TO_SERVER
+ *                  HT_WAITING_FOR_REPLY 
+ *                  HT_LOADING_DATA
+ *                  HT_ALL
+ * 
+ *              You can register other values, but the callback just won't
+ *              get called, that's all.
+ *
+ * CALLED BY:	Client.
+ * RETURN:	HT_OK or HT_NO.
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	kkee	8/23/96   	Initial Revision
+ *
+ ***********************************************************************/
+/*
+ * int _far _pascal
+ * HTNetAddRequestCallback (HTListHandle list, HTNetCallback cbf, int status)
+ * {
+ *    return HTNetAddCallbackCommon(list, cbf, status);
+ * }
+ */
+
+
+
+/***********************************************************************
+ *		HTNETREPORTPROGRESS
+ ***********************************************************************
+ * SYNOPSIS:	Execute the list of "request" callbacks of a request.
+ * CALLED BY:	Protocol and content handlers.
+ * RETURN:	Whatever integer value that is returned from the
+ *              "request" callback that terminated the "request" callback
+ *              loop.
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:    We *MUST NOT* lock the request as we make callback to 
+ *              client's code.
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	kkee	8/23/96   	Initial Revision
+ *
+ ***********************************************************************/
+int _far _pascal
+HTNETREPORTPROGRESS (HTRequestHandle request, int status)
+{
+    HTRequest *rptr;
+    HTListHandle cbfList;
+    int ret = HT_OK;
+
+EC( ECCheckRequest(request);                                            )
+
+    rptr = (HTRequest *) MemThreadGrab(request);
+    cbfList = rptr->HTR_requestList;
+    MemThreadRelease(request);
+
+    if (cbfList) 
+	ret = HTNetExecuteIntermediateCallback(cbfList, request, 
+					       status);
+    return ret;
+}	/* End of HTNETREPORTPROGRESS.	*/
+
+
+

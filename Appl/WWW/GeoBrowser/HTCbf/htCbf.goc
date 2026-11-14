@@ -1,0 +1,376 @@
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Geoworks 1996 -- All Rights Reserved
+
+PROJECT:	GeoBrowser
+MODULE:		Callbacks
+FILE:		htCbf.goc
+
+AUTHOR:		Kok Kin Kee, Jun  4, 1996
+
+ROUTINES:
+	Name			Description
+	----			-----------
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	kkee	6/ 4/96   	Initial version.
+
+DESCRIPTION:
+	GeoBrowser (i.e., application-specific) "before" and "after"
+ 	callback functions.
+
+	$Id: htCbf.goc,v 1.1 97/04/04 17:20:27 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+
+@include <WWW/HTCore/htreq.goh>
+@include <WWW/HTCore/htstream.goh>
+@include <Ansi/string.h>
+@include "GeoBrowser/geobrowser.goh"
+
+/* In geobrowser.goc */
+@extern object GBStatus; 
+@extern object GBTextView;
+
+static optr processOptr = NULL;
+
+/*
+ * Status strings. Should be in a resource. Right now i am testing.
+ */
+static char resolving[] = "Resolving host........";
+static char connecting[] = "Contacting host........";
+static char retry[] = "Retry contacting host........";
+static char waiting[] = "Waiting for reply........";
+static char loading[] = "Loading data........";
+static char interrupted[] = "Interrupted.....";
+static char linkFailed[] = "Link failed....";
+static char cannotConnect[] = "Cannot connect....";
+static char cannotOpenFile[] = "Cannot open file....";
+static char cannotResolveName[] = "Cannot resolve name...";
+static char documentMoved[] = "Document moved. Trying...";
+static char noProtocol[] = "No protocol handler...";
+static char noContent[] = "No content handler...";
+static char outOfMemory[] = "Out of memory...";
+static char loaded[] = "DONE!";
+static char nothing[] = " ";
+
+
+/***********************************************************************
+ *		GBSetProcessHandle
+ ***********************************************************************
+ * SYNOPSIS:	Set the application process thread optr here so we 
+ *              send messages to the process thread when these callbacks
+ *              get called from the Library HTCore thread.
+ * CALLED BY:	MSG_META_ATTACH_GENPROCESSCLASS
+ * RETURN:	Nothing
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	kkee	8/22/96   	Initial Revision
+ *
+ ***********************************************************************/
+void _far _pascal
+GBSetProcessHandle (ThreadHandle appProcess)
+{
+    processOptr = ConstructOptr(appProcess, 0);
+}	/* End of GBSetProcessHandle.	*/
+
+
+
+
+/***********************************************************************
+ *		GBCheckCache
+ ***********************************************************************
+ * SYNOPSIS:	Check cache. A "before" callback.
+ * CALLED BY:	The Library in the "before" callback loop.
+ * RETURN:	HT_OK or HT_NO.
+ * SIDE EFFECTS:Nothing
+ *	
+ * STRATEGY:
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	kkee	6/ 4/96   	Initial Revision
+ *
+ ***********************************************************************/
+int _far _pascal
+GBCheckCache (HTRequestHandle request, int status)
+{
+    return HT_OK;
+}	/* End of GBStartLoad.	*/
+
+
+
+
+/***********************************************************************
+ *		GBRequestCallback
+ ***********************************************************************
+ * SYNOPSIS:	Callback from WWW Library to indicate to us what is 
+ *              going on with our request.
+ * CALLED BY:	Library.
+ * RETURN:	HT_OK, if we want to request continue being serviced
+ *              by the Library. Any code other than HT_OK will cause
+ *              the request to be terminated and returned to us in the 
+ *              "after" callback loop. We *MUST* not delete the request
+ *              as the Library relies on getting it back.
+ *
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	kkee	8/22/96   	Initial Revision
+ *
+ ***********************************************************************/
+int _far _pascal 
+GBRequestCallback (HTRequestHandle request, int status)
+{
+    PUSHDS;
+    SET_DS_LIB_DGROUP;  /* To local static variables since we are
+			   called WWW Library HTCore thread. */
+    switch (status) {
+    case HT_RESOLVING_HOST:
+	@call GBStatus::
+	    MSG_VIS_TEXT_REPLACE_ALL_PTR(resolving, 
+					 strlen(resolving));
+	break;
+
+    case HT_CONNECTING_TO_SERVER:
+	@call GBStatus::
+	    MSG_VIS_TEXT_REPLACE_ALL_PTR(connecting, 
+					 strlen(connecting));
+	break;
+
+    case HT_RETRY_CONNECTING_TO_SERVER:
+	@call GBStatus::
+	    MSG_VIS_TEXT_REPLACE_ALL_PTR(retry, 
+					 strlen(retry));
+	break;
+
+    case HT_WAITING_FOR_REPLY:
+	@call GBStatus::
+	    MSG_VIS_TEXT_REPLACE_ALL_PTR(waiting, 
+					 strlen(waiting));
+	break;
+
+    case HT_LOADING_DATA:
+	@call GBStatus::
+	    MSG_VIS_TEXT_REPLACE_ALL_PTR(loading, 
+					 strlen(loading));
+	/* Remove old stuff on the screen */
+	@call GBTextView::MSG_VIS_TEXT_DELETE_ALL();
+	break;
+
+    default:
+	break;  /* We are not interested in other states */
+    }
+
+    POPDS;
+    return HT_OK;
+}	/* End of GBRequestCallback.	*/
+
+
+
+
+/***********************************************************************
+ *		GBTerminateRequest
+ ***********************************************************************
+ * SYNOPSIS:	Terminate request handler for handling requests that
+ *              are completed. An "after" callback.
+ * CALLED BY:	The Library in "after" callback loop.
+ * RETURN:	HT_NO (Terminate the "after" callback loop in the Net 
+ *              Manager).
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:    You should register this as the last "after" callback
+ *              with the Net Manager. Since this callback runs in the
+ *              Library HTCore thread, we need to send a message to our
+ *              process to synch access to request.
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	kkee	6/ 4/96   	Initial Revision
+ *
+ ***********************************************************************/
+int _far _pascal
+GBTerminateRequest (HTRequestHandle request, int status)
+{
+    PUSHDS; 
+    SET_DS_LIB_DGROUP;  /* To use static vars */
+
+    switch (status) {
+	
+    case HT_UNAUTHORIZED:
+	/* 
+	 * We prompt the user for username and password and then 
+	 * reissue the request.
+	 */
+	@send,forceQueue processOptr::MSG_GBP_UNAUTHORIZED(request);
+	break;
+
+    case HT_INTERRUPTED:
+	@send,forceQueue processOptr::MSG_GBP_DELETE_REQUEST(request);
+	@call GBStatus::MSG_VIS_TEXT_REPLACE_ALL_PTR(interrupted, 0);
+	break;
+
+    case HT_OUT_OF_MEMORY:
+	@send,forceQueue processOptr::MSG_GBP_DELETE_REQUEST(request);
+	@call GBStatus::MSG_VIS_TEXT_REPLACE_ALL_PTR(outOfMemory, 0);
+	break;
+
+    case HT_CANNOT_RESOLVE_HOST_NAME:
+	@send,forceQueue processOptr::MSG_GBP_DELETE_REQUEST(request);
+	@call GBStatus::
+	    MSG_VIS_TEXT_REPLACE_ALL_PTR(cannotResolveName, 0);
+	break;
+
+    case HT_LINK_FAILED:
+	@send,forceQueue processOptr::MSG_GBP_DELETE_REQUEST(request);
+	@call GBStatus::MSG_VIS_TEXT_REPLACE_ALL_PTR(linkFailed, 0);
+	break;
+
+    case HT_NO_PROTOCOL:
+	@send,forceQueue processOptr::MSG_GBP_DELETE_REQUEST(request);
+	@call GBStatus::MSG_VIS_TEXT_REPLACE_ALL_PTR(noProtocol, 0);
+	break;
+
+    case HT_NO_CONTENT:
+	@send,forceQueue processOptr::MSG_GBP_DELETE_REQUEST(request);
+	@call GBStatus::MSG_VIS_TEXT_REPLACE_ALL_PTR(noContent, 0);
+	break;
+
+    case HT_CANNOT_CONNECT:
+	@send,forceQueue processOptr::MSG_GBP_DELETE_REQUEST(request);
+	@call GBStatus::MSG_VIS_TEXT_REPLACE_ALL_PTR(cannotConnect, 0);
+	break;
+
+    case HT_CANNOT_OPEN_FILE:
+	@send,forceQueue processOptr::MSG_GBP_DELETE_REQUEST(request);
+	@call GBStatus::MSG_VIS_TEXT_REPLACE_ALL_PTR(cannotOpenFile, 0);
+	break;
+
+    case HT_DOCUMENT_MOVED:
+	/* 
+	 * We reissue the request with the new URL already updated by
+	 * the Web Library.
+	 */
+	@send,forceQueue processOptr::MSG_GBP_DOCUMENT_MOVED(request);
+	@call GBStatus::MSG_VIS_TEXT_REPLACE_ALL_PTR(documentMoved, 0);
+	break;
+
+    case HT_LOADED:
+	@send,forceQueue processOptr::MSG_GBP_DELETE_REQUEST(request);
+	@call GBStatus::MSG_VIS_TEXT_REPLACE_ALL_PTR(loaded, 0);
+	break;
+
+    default:
+	@send,forceQueue processOptr::MSG_GBP_DELETE_REQUEST(request);
+	@call GBStatus::MSG_VIS_TEXT_REPLACE_ALL_PTR(nothing, 0);
+	break;
+    }
+
+    POPDS;
+
+    return HT_NO;    /* Stop the callback loop */
+}	/* End of GBTerminateRequest.	*/
+
+
+
+
+/***********************************************************************
+ *		GBPostCallback
+ ***********************************************************************
+ * SYNOPSIS:	For pushing data to the network. Use this function 
+ *              callback if the headers and data you want to push are 
+ *              not supported by the Library. You can use this function
+ *              to override all the headers (except the HTTP request-line)
+ *              provided by the Library.
+ * CALLED BY:	Library
+ * RETURN:	You must return the code returned by MSG_HT_STREAM_PUT_BLOCK.
+ * SIDE EFFECTS:You should only use MSG_HT_STREAM_PUT_BLOCK to put data to
+ *              the network, don't use MSG_HT_STREAM_FLUSH.
+ *              Since you take over pushing extra headers and data, you 
+ *              must know the right syntax for HTTP request headers.
+ * 
+ *              You MUST at least put a CRLF to terminate the request header.
+ *              (Although the Library can't enforce it.)
+ *
+ *              You SHOULD not send 'Connection: close' as this will severely
+ *              affect performance.
+ *	
+ * STRATEGY:
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	kkee	6/23/96   	Initial Revision
+ *
+ ***********************************************************************/
+int _far _pascal
+GBPostCallback (HTRequestHandle request, HTStreamHandle stream)
+{
+    int ret;
+    char *cptr;
+
+EC( ECCheckRequest(request);                                            )
+EC( ECCheckStream(stream);                                              )
+
+    PUSHDS;
+    SET_DS_LIB_DGROUP; 
+    cptr = "Connection: Keep-Alive\r\n\r\n";
+    ret = @call stream::MSG_HT_STREAM_PUT_BLOCK((byte *)cptr, strlen(cptr));
+    POPDS;
+
+    return ret;
+}	/* End of GBPostCallback.	*/
+
+
+
+
+/***********************************************************************
+ *		GBProgressCallback
+ ***********************************************************************
+ * SYNOPSIS:	For reporting loading progress. Use this function 
+ *              callback to report progress loading a requested 
+ *              data object to GeoBrowser.
+ * CALLED BY:	Library.
+ * RETURN:	HT_OK.
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	kkee	7/23/96   	Initial Revision
+ *
+ ***********************************************************************/
+int _far _pascal
+GBProgressCallback (HTRequestHandle request, int status)
+{
+    dword contentLength, bytesRead;
+ 
+    contentLength = HTRequestGetResponseContentLength(request);
+    bytesRead = HTRequestGetBytesRead(request);
+    
+    /*
+     * Use contentLength and bytesRead to update progress bar.
+     */
+
+    return HT_OK;
+}	/* End of GBProgressCallback.	*/
+
+
+
+

@@ -1,0 +1,287 @@
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Geoworks 1997.  All rights reserved.
+	GEOWORKS CONFIDENTIAL
+
+PROJECT:	
+MODULE:		
+FILE:		message.goh
+
+AUTHOR:		Kok Kin Kee, Mar 12, 1997
+
+ROUTINES:
+	Name			Description
+	----			-----------
+
+REVISION HISTORY:
+	Name		Date		Description
+	----		----		-----------
+	kkee    	3/12/97   	Initial version.
+
+DESCRIPTION:
+
+	
+
+	$Id: message.goh,v 1.1 97/04/04 15:56:11 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+/***********************************************************************
+ *
+ *      Copyright (c) STNC Enterprises Ltd. 1996 -- All Rights Reserved
+ *
+ * PROJECT:			Tungsten
+ * MODULE:			Message library header
+ * FILE:				message.goh
+ *
+ * AUTHOR:  Bill Godfrey, <bgodfrey@stnc.com>
+ *
+ ***********************************************************************/
+
+#ifndef INCLUDE_MESSAGE_GOH
+#define INCLUDE_MESSAGE_GOH
+
+@include <mtools/memutils.goh>
+#include <geos.h>
+#include <heap.h>
+@include <mtools/mterror.goh>
+
+	/* MessageAppendLineState - Identifies the last header (or otherwise) just processed. */
+typedef enum {
+	MALS_EMPTY,		/* Nothing loaded. */
+	MALS_FROM_HEADER,	/* Just started the From: header. */
+	MALS_DATE_HEADER,	/* Just atarted the Date: header. */
+	MALS_TO_HEADER,		/* Just started the To: header. */
+	MALS_CC_HEADER,		/* Just started the Cc: header. */
+	MALS_BCC_HEADER,	/* Just started the Bcc: header. */
+	MALS_SUBJECT_HEADER,	/* Just started the Subject: header. */
+	MALS_CONTENT_TYPE_HEADER,	/* Just started the Content-Type: header. */
+	MALS_RETURN_RECEIPT_TO_HEADER,	/* Just started a Return_Receipt-To: header. */
+	MALS_MIME_VERSION_HEADER,		/* Just started a Mime-Version: header. */
+	MALS_MISC_HEADER,	/* Just started any othe header. */
+	MALS_BLANK_LINE,	/* Just done the blank line. */
+	MALS_IN_BODY		/* In the body of the message. */
+} MessageAppendLineState;
+
+	/* MessageHeaderState - Where a word wrap happened, where the last header left off. */
+typedef enum {
+		/* First line */
+	MHLS_NORMAL,		/* Finished a header. */
+		/* Split lines */
+	MHLS_STD_HEADER,	/* Perfectly normal header. From: Subject: Just add the space. */
+	MHLS_LIST_NORMAL,			/* In a CSV-list header, To: Cc: Bcc: Just seen a comma. */
+	MHLS_LIST_QUOTE	/* In a " state ". */
+} MessageHeaderState;
+
+/* types of entries in 'to' field address list */
+typedef enum {
+	TO_TYPE_TO = MALS_TO_HEADER,  /* can't appear together with newsgroup */
+	TO_TYPE_CC = MALS_CC_HEADER,  /* CC field */
+	TO_TYPE_BCC = MALS_BCC_HEADER  /* A BCC field */
+} RcptType;
+
+#define MESSAGE_FLAG_ACK (0x01)
+#define MESSAGE_FLAG_MIME (0x02)
+#define MESSAGE_FLAG_QP (0x04)	// Message body will be QP'd.
+
+	/**** OBSOLETE ****/
+typedef struct sar {
+	char *fname;		/* Malloc'd file name. */
+	char *mimetype;	/* Malloc'd mime type or NULL for UU code. */
+	struct sar *next;	/* Next in list. */
+} SendAttachRef;
+	/**** END OBSOLETE ****/
+
+	/* Generic linked list node for headers. */
+typedef struct en {
+	HTHANDLE text;			/* ht_alloc'd text. char */
+	RcptType type;			/* field id */
+	HTHANDLE next;  /* next in list. entry */
+} entry;
+#define ht_entry(e) ((entry*)ht_lock(e))
+
+	/* MimeArg - Stores Content-Type: parameters */
+typedef struct ma {
+//	char *name;			/* Arg Name */
+	HTHANDLE value;		/* Arg value  char */
+	HTHANDLE next;			/* next item or NULL. MimeArg */
+} MimeArg;
+#define ht_MimeArg(m) ((MimeArg*)ht_lock(m))
+
+	/* Stores a single line in a message. */
+typedef struct {
+	optr line;		/* Handles to char array of a single line. */
+	optr next;		/* Next in list. */
+} MessageNode;
+
+	/* MailMessage - Stores everything needed about a single message. */
+typedef struct {
+	optr head;		/* The first element. Points to MessageNode. */
+	optr last;		/* The last element. Points to MessageNode. */
+	optr body;		/* The first line after the first blank line. */
+
+	optr curr;		/* The current item in the list. */
+	optr prev;		/* Previous item in the list. */
+
+	MemHandle heap;		/* Current Lmem Heap to allocate into. */
+
+	/* Lots more stuff. */
+
+	short int flags;		/* Flags for surrent message. */
+	HTHANDLE mime_type;		/* malloc'd string of mime type. char*/
+	HTHANDLE mime_subtype;	/* malloc'd string of mime subtype. char */
+
+	HTHANDLE from;		/* From: field. */
+	HTHANDLE date;		/* Date: field. */
+	HTHANDLE to;			/* To: and Cc: fields, split up into single address parts. */
+	HTHANDLE subject;	/* Subject: field. */
+
+	MessageAppendLineState msgstate;		/* Current state of Message_AppendLine. */
+
+	HTHANDLE to_pointer;		/* Pointer to pointer of current recpient (head/next elements) */
+
+	HTHANDLE mime_args;		/* Mime headers list. mimearg*/
+
+	MessageAppendLineState alstate;		/* Current status of append line. */
+	MessageHeaderState hstate;				/* Where the last header line left off. */
+
+	short int braket;			/* Braket level for reading in To: type */
+	Boolean midway;			/* If (during a To:) we may have been interrupted during a list element. */
+
+	/* Now handled by attach.goc */
+
+//	Boolean sendMime;			/* Are there any mime attachmnets? */
+//	SendAttachRef *attach;	/* Any attachments to send out. Head of list. */
+//	char *sendBoundary;		/* Generated boundary for sending. */
+
+} MailMessage;
+
+	/* Message_Init - Initialises a MailMessage structure. */
+extern Message_Error Message_Init(MailMessage *m);
+
+	/* Message_Start - Starts the reading in process. */
+extern Message_Error Message_Start(MailMessage *m);
+
+	/* Message_StartBody - Starts the reading process from the first line of the body of
+			the message. */
+extern Message_Error Message_StartBody(MailMessage *m);
+
+	/* Message_EndOfList - Jumps to the end of the list. */
+extern Message_Error Message_EndOfList(MailMessage *m);
+
+	/* Message_GetLine - Retrieves a line from the message and moves on one line.
+			Call Message_LockCurr before hand and if it works, Message_UnlockPrev afterwards or
+			Message_UnlockPrev if it has reched the end.
+			Use LMemDeref to get at the string.
+		Returns error code or ME_END_OF_LIST after the last line has been read in. */
+extern Message_Error Message_GetLine(MailMessage *m, optr *s);
+
+	/* Message_GetLineDontMove - As Message_GetLine, but the interal list pointers stay on the
+			same line just read in. */
+extern Message_Error Message_GetLineDontMove(MailMessage *m, optr *s);
+
+	/* Message_Forward - Moves on one line without reading it in. */
+extern Message_Error Message_Forward(MailMessage *m);
+
+	/* Adds a line onto the end of the Message. Unless a blank line has already been added, the
+			822 readers will be scanned in. */
+extern Message_Error Message_AppendLine(MailMessage *m, char *s);
+
+	/* Locks the blocks on the global heap which relates to the current line.
+			Use before either Message_GetLine or Message_GetLineDontMove. */
+extern Message_Error Message_LockCurr(MailMessage *m);
+
+	/* Unlocks the blocks on the global heap which relate to the current line.
+			Use after an unsuccessful Message_GetLine. */
+extern Message_Error Message_UnlockCurr(MailMessage *m);
+
+	/* Unlocks the blocks on the global heap which relate to the previous line.
+			Use after a successful Message_GetLine. */
+extern Message_Error Message_UnlockPrev(MailMessage *m);
+
+	/* Loads a file into a MailMessage structure. */
+extern Message_Error Message_LoadFile(MailMessage *m, char *fname);
+
+	/* Saves out a message to file. */
+extern Message_Error Message_SaveFile(MailMessage *m, char *fname);
+
+	/* Loads a message from a single block of memory. The block must be terminated with \0 and
+			any one of \r\n, \n\r, \r or \n may be used to specify the end of line, so long as
+			a mixture is not used. */
+extern Message_Error Message_LoadMemBlock(MailMessage *m, char *mb);
+
+	/* Frees the message and any related resources from memory. */
+extern Message_Error Message_Delete(MailMessage *m);
+
+	/* Message_Size - Calculates the size of a message in octets, optionally including
+		attachments encoding. See foot of this file for suggested values. Note that the calculation
+		is heuristic based, erring for higher values.
+			size - Returned result.
+			eol - Number of characters overhead for the end of line.
+			attach - TRUE to calculate attachment encoding. FALSE to not do so.
+			*/
+extern Message_Error Message_Size(MailMessage *m, unsigned long int *size, short int eol, Boolean attach);
+
+
+	/* Message_GetAddress - Gets the address portion from an email address, possibly including a
+				comment.
+			full    - Full address, possibly with comment.
+			buf     - Buffer to store extracted address.
+			bufsize - Amount of allocated space for buf. */
+extern Message_Error Message_GetAddress(char *full, char *buf, short int buflen);
+
+	/* Message_GetDate - Extracts the date string for a MailMessage structure. */
+extern Message_Error Message_GetDate(MailMessage *m, HTHANDLE *date);
+
+	/* Message_GetDomain - Extracts the domain of an email address (after the "@" sign). */
+extern Message_Error Message_GetDomain(char *full, char *buf, short int buflen);
+
+	/* Message_GetFlags - Gets flag information from the message.
+					MESSAGE_FLAG_ACK  - Acknowledgement required.
+					MESSAGE_FLAG_MIME - MIME format. */
+extern Message_Error Message_GetFlags(MailMessage *m, short int *flags);
+
+	/* Message_GetHdrValue - Returns the value of an arbitary header, unfolded. */
+extern Message_Error Message_GetHdrValue(MailMessage *m, char *hdr_line, char *buffer, short int buflen);
+
+	/* Message_GetOriginator - Returns the address of the sender of the message. */
+extern Message_Error Message_GetOriginator(MailMessage *m, HTHANDLE *address);
+
+	/* Message_GetRecipient - Returns the address of the next recipient in the list. Start by
+				calling Message_ResetTo first. */
+extern Message_Error Message_GetRecipient(MailMessage *m, HTHANDLE *address, RcptType *flags);
+
+	/* Message_GetSubject - Gets the subject line, unfolded. */
+extern Message_Error Message_GetSubject(MailMessage *m, HTHANDLE *subject);
+
+	/* Message_GetUser - Extracts the user part of an email address (before the "@" sign). */
+extern Message_Error Message_GetUser(char *full, char *buf, short int buflen);
+
+	/* Message_ResetTo - Starts the recipient list for Message_GetRecipient. */
+extern Message_Error Message_ResetTo(MailMessage *m);
+
+
+//extern Message_Error Mime_Decode(MailMessage *m, char *mimecap, char *message, char *attachments);
+
+	/* Mime_GetArgValue - Gets the specified parameter to the Content-Type: header. */
+extern Message_Error Mime_GetArgValue(MailMessage *msg, char *arg, HTHANDLE *value);
+
+	/* Mime_GetContentType - Gets the mime type and subtype of the message. */
+extern Message_Error Mime_GetContentType(MailMessage *msg, HTHANDLE *type, HTHANDLE *subtype);
+
+	/* Message_SendAsQuotedPrinatble - Message body will be sent as Quoted Printable. */
+#define Message_SendAsQuotedPrintable(msg) (((msg)->flags) |= MESSAGE_FLAG_QP)
+
+#endif
+
+/* Suggested values for Message_Size
+
+Calculation                                                     eol  attach
+
+Sending through a socket.													  2    TRUE
+Storing on disk. (GEOS/DOS)                                      2    FALSE
+Storing on a disk. (UNIX/Mac)                                    1    FALSE
+Storing in a MailMessage strusture.                             12    FALSE
+*/
+
+
+

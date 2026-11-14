@@ -1,0 +1,1360 @@
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Geoworks 1997.  All rights reserved.
+	GEOWORKS CONFIDENTIAL
+
+PROJECT:	
+MODULE:		
+FILE:		html.goh
+
+AUTHOR:		Kok Kin Kee, Sep 24, 1997
+
+ROUTINES:
+	Name			Description
+	----			-----------
+
+REVISION HISTORY:
+	Name		Date		Description
+	----		----		-----------
+	kkee    	9/24/97   	Initial version.
+
+DESCRIPTION:
+
+	HTMLConverter Library.
+
+	$Id: html.goh,v 1.1.2.38 98/07/16 09:50:11 jeremyb Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+
+@ifndef __HTMLCONVERTER_GOH__
+@define __HTMLCONVERTER_GOH__
+
+@deflib html
+
+@include <stdapp.goh>
+#include <ec.h>
+@include <WWW/HTCore/htlist.goh>
+@include <WWW/HTCore/htstring.goh>
+@include <WWW/HTCore/htreq.goh>
+@include <WWW/sgml.goh>
+@include <WWW/htmlDTD.goh>
+@include <Objects/Text/tCtrlC.goh>  /* SearchReplaceControlClass */
+@include <WWW/htmem.h>              /* memory allocation routines */
+
+
+
+/*
+ * Feature compile-time constants.  Add your new feature constants to each
+ * product entry here.  (Use "0" and "!0", not "FALSE" and "TRUE".)
+ */
+@ifdef PRODUCT_RESPONDER
+
+@define SHORT_LONG_TOUCH 0
+
+@elifdef BROTHER_KERNEL
+
+@define SHORT_LONG_TOUCH 0
+
+@else /* generic version */
+
+/* SHORT_LONG_TOUCH: Unfortunately, for now we need to keep the source	*/
+/* files on the trunk and on the Responder and Brother branches		*/
+/* identical, so that those folks can do cmpgeo on generic versions on	*/
+/* those branches.  Since short/long-touch API doesn't exist on those	*/
+/* branches, we need to disable SHORT_LONG_TOUCH on branches so that	*/
+/* generic versions compile without error.				*/
+@ifdef (TRUNK)
+@define SHORT_LONG_TOUCH (!0)
+@else
+@define SHORT_LONG_TOUCH 0
+@endif
+
+@endif
+
+
+/*** UIGENERATOR PART ***/
+
+#define TAB_SIZE		168	/* tab point size * 8 */
+#define TAB_POINT		TAB_SIZE / 8
+@ifdef BROTHER_KERNEL
+#define X_SCREEN_SIZE		620	/* screen width for ensdemo */
+#define Y_SCREEN_SIZE		460	/* screen height for ensdemo */
+@else
+#define X_SCREEN_SIZE		383	/* screen width for penelope */
+#define Y_SCREEN_SIZE		165	/* screen height for penelope */
+@endif
+#define HR_HEIGHT_Y		5	/* default height for <HR> */
+#define ROW_SIZE		25      /* table's intial number of rows */
+#define COLUMN_SIZE		5       /* table's inital number of columns */
+#define BITMAP_X                4       /* x 32 = num of table columns */
+#define BITMAP_Y                8       /* x 32 = num of table rows */
+#define BITS_N_DWORD            (sizeof(dword)*8)   /* 8 bits in a byte */
+#define NESTED_MARGIN		14
+#define MARGIN                  3       /* space between ui objects */
+#define IMAGE_DEFAULT_SIZE	28	/* default wdth & hgt of image icon */
+#define MEMORY_THRESHOLD	75000
+
+#define DEFAULT_TEXT_MAX_LENGTH 2048
+
+typedef ByteEnum ErrorCode;
+#define UI_GEN_NO_ERROR 	0
+#define UI_GEN_ERROR		1
+
+typedef ByteEnum StyleType;
+#define STYLE_STRIKE		40
+#define STYLE_FONT		41
+#define STYLE_ITALIC		42
+#define STYLE_BOLD		43
+#define STYLE_ANCHOR		44
+#define STYLE_SUPERSCRIPT	45
+#define STYLE_SUBSCRIPT		46
+#define STYLE_HEADER		47
+#define STYLE_FW_FONT		48
+#define STYLE_PRE		49
+#define STYLE_UL		50
+#define STYLE_OL		51
+#define STYLE_DL		52
+#define STYLE_BQ		53
+#define STYLE_ALIGN		54
+#define STYLE_PARAGRAPH		55
+#define STYLE_NOBR		56
+
+typedef ByteEnum FontType;
+#define STYLE_FONT_0		9
+#define STYLE_FONT_1		11
+#define STYLE_FONT_2		12
+#define STYLE_FONT_3		14	/* default font size */
+#define STYLE_FONT_4		18
+#define STYLE_FONT_5		20
+#define STYLE_FONT_6		22
+#define STYLE_FONT_7		24
+#define STYLE_FONT_8		30
+
+
+typedef ByteEnum ElementType;
+#define	ELEMENT_START		0
+#define	ELEMENT_END		1
+
+typedef ByteEnum CellType;
+#define	CELL_DATA		0
+#define	CELL_HEADER		1
+
+typedef enum {
+    ILS_UNLOAD = 0,
+    ILS_LOADED = 1,
+    ILS_BROKEN,
+    ILS_NO_ACCESS
+} ImageLoadStatus;
+
+typedef enum {
+    FE_TEXT,
+    FE_PASSWORD,
+    FE_CHECKBOX,
+    FE_RADIO,
+    FE_SUBMIT,
+    FE_RESET,
+    FE_HIDDEN,
+    FE_IMAGE,
+    FE_TEXTAREA,
+    FE_SELECTION
+} FormElementType;
+
+typedef ByteEnum AlignType;
+#define ALIGN_TOP		0
+#define ALIGN_MIDDLE		1
+#define ALIGN_BOTTOM		2
+
+typedef ByteEnum AreaType;
+#define AREA_RECT		0
+#define AREA_CIRC		1
+#define AREA_POLY		2
+#define AREA_DEFAULT		3
+
+typedef ByteEnum TriggerType;
+#define	TRIGGER_RESET		FE_RESET
+#define	TRIGGER_SUBMIT		FE_SUBMIT
+
+
+#define DEFAULT_STYLE_FONT	STYLE_FONT_3
+#define DEFAULT_BASEFONT	3
+#define DEFAULT_ALIGNMENT	J_LEFT
+
+
+/*
+ * listGroup defines a stack element.  It stores information about the list
+ * groups like <UL> and <OL>.
+ */
+typedef struct {
+	StyleType	LG_groupType;	/* <OL> or <UL>			*/
+	dword		LG_counter;	/* keep track the number for the 
+					   next ordered list item.	*/
+	char		LG_displayType;	/* style of items:
+					   A = use large letters
+					   a = use small letters
+					   I = use large Roman numerials
+					   i = use small Roman numerials
+					   1 = use numbers		*/
+} ListGroup;
+
+/* ************************************************************************
+	Class definitions and Messages
+************************************************************************ */
+
+@importMessage MetaApplicationMessages, void MSG_META_UIG_SELECT_ALL();
+@importMessage MetaApplicationMessages, void MSG_META_UIG_SELECT_NONE();
+@importMessage MetaApplicationMessages, void MSG_META_UIG_CALC_POSITION();
+@if @SHORT_LONG_TOUCH
+@importMessage MetaApplicationMessages, void MSG_META_UIG_SHORT_TOUCH_NOTIFY();
+@importMessage MetaApplicationMessages, void MSG_META_UIG_LONG_TOUCH_NOTIFY();
+@endif /* SHORT_LONG_TOUCH */
+
+@importMessage MetaApplicationMessages, void MSG_HTML_FORM_RESET();
+
+@importMessage MetaApplicationMessages, void MSG_UI_CALC_SIZE_POSITION();
+@importMessage MetaApplicationMessages, int MSG_UI_GET_ROW_POSITION();
+@importMessage MetaApplicationMessages, void MSG_UI_SET_NEW_POSITION(int xPos, int row);
+@importMessage MetaApplicationMessages, void MSG_GEN_PREPARE_FOR_DESTROY();
+
+/************************************************************************
+ *  HTGenViewClass represent the view of the UI doc.
+ */
+@class HTGenViewClass, GenViewClass;
+ @message void MSG_HT_GEN_VIEW_ALLOW_DESTROY
+    	(SemaphoreHandle waitToFree, optr genContent);
+ @message void MSG_HT_GEN_VIEW_IGNORE_INPUT();
+ @message void MSG_HT_GEN_VIEW_ACCEPT_INPUT();
+ 
+@instance Boolean HTGV_ignore;
+@instance Boolean HTGV_ignoreMouse;
+@instance Boolean HTGV_ignoreKbd;
+@endc;
+
+
+/************************************************************************
+ *  HTGenTextClass represent the text on the page.
+ */
+@class HTGenTextClass, GenTextClass;
+ @message void MSG_GEN_TEXT_CHANGE_SIMPLE_RENDERING
+	(ElementType type, TextStyle style);
+ @message GStateHandle MSG_GEN_TEXT_INITIALIZE(optr content);
+ @message void MSG_GEN_TEXT_RECORD_HREF
+	(ElementType type, int token);
+ @message int MSG_GEN_TEXT_FIND_LINK_UNDER_MOUSE
+	(word xPosition, word yPosition, dword *start, dword *end,
+	int *anchor);
+ @message void MSG_GEN_TEXT_DRAW_FOCUS
+	(int direction, Rectangle *obj, RectDWord *rect, 
+	RectDWord *ret, Rectangle *box);
+ @message void MSG_GEN_TEXT_UNDRAW_FOCUS(optr newLink);
+ @message Boolean MSG_GEN_TEXT_FIND_LINK_IN_RECT
+	(RectDWord rect, int direction);
+ @message Boolean MSG_GEN_TEXT_IS_MULTILINE();
+	/*
+	 *  gstate used to calculate the min width requre to draw
+	 *  the text. Not allocated by HTGenTextClass, but reuse
+	 *  VTI_gstate. So no need to free.
+	 */
+	@instance GStateHandle HTGT_gstate;
+	/*
+	 *  Accumulate the length of the text, used to set the width
+	 *  of the text object.  MaxLen keeps the max length seen so
+	 *  so far.
+	 */
+	@instance int	HTGT_maxLen;
+	@instance int	HTGT_accLen;
+	/*
+	 *  Is this object being selected?
+	 */
+	@instance Boolean HTGT_selected;
+        /*
+	 *  Store the hyperlink segments in the text body.
+	 */
+	@instance HTListHandle HTGT_anchorList;
+	/*
+	 *  Anchor index of the link in focus.  Used to do quick search.
+	 *  -1 if the text object doesn't have the focus.
+	 */
+	@instance int	HTGT_focalAnchor;
+	/*
+	 *  if HTGT_focalAnchor != -1, HTGT_focalBound has the bound.
+	 */
+	@instance RectDWord	HTGT_focalBound;
+        @instance Rectangle     HTGT_focalBox;
+	/*
+	 *  HTGT_content contains all the formating info and the page
+	 *  height array information.
+	 */
+	@instance optr   HTGT_content;
+	/*
+	 *  Suggested x Postion in a row.
+	 */
+	@instance int   HTGT_xPos;
+	/*
+	 *  Suggested row position.
+	 */
+	@instance int   HTGT_pageRow = -1;
+	/*
+	 *  the calculated size before the object vis part is built.
+	 */
+	@instance SizeAsDWord   HTGT_guessSize;
+	/*
+	 *  Alignment.
+	 */
+	@instance Justification HTGT_align = J_LEFT;
+	/*
+	 *  Is the text object has more than one line?  This bit saves
+	 *  me the effort of calculating the line positions of first and
+	 *  last text offsets.
+	 */
+	@instance Boolean	HTGT_multiline = FALSE;
+@if @SHORT_LONG_TOUCH
+	/*
+	 *  Mouse co-ordinates recorded during MSG_META_END_SELECT.  This is
+	 *  needed when short/long touch notifications is processed.
+	 */
+	@instance Point HTGT_rawMouseCoord;
+@endif /* SHORT_LONG_TOUCH */
+	/*
+	 *  Stores the drawing width(in pixels) of the longest word
+	 *  in this text object.  This is used to determine the 
+	 *  minimun width the text object can be without wrapping words.
+	 */
+        @instance int           HTGT_maxWordWidth = 0;
+
+@endc;
+
+
+/************************************************************************
+ *  HTGenFormTextClass represents <INPUT TYPE = "TEXT" or "PASSWORD">
+ */
+@class HTGenFormTextClass, GenTextClass;
+ @message void MSG_GEN_FORM_TEXT_INITIALIZE(optr content);
+ @message void MSG_GEN_FORM_TEXT_SET_FOCUS(RectDWord *ret);
+ @message void MSG_GEN_FORM_TEXT_CLEAR_FOCUS();
+	 /*
+	  *  HTGT_content contains all the formating info and the page
+	  *  height array information.
+	  */
+	@instance optr	        HTGFT_content;
+	 /*
+	  *  HTGFT_xPos is the suggested x postion (in pixels) for the
+	  *  object to appear in the row.
+	  */
+	@instance int	        HTGFT_xPos = 0;
+	 /*
+	  *  Suggested row position.
+	  */
+	@instance int	        HTGFT_pageRow= 0;
+	/*
+	 *  the calculated size before the object vis part is built.
+	 */
+	@instance SizeAsDWord   HTGFT_guessSize;
+	 /*
+	  *  The drawing bound for showing the navigation focus.
+	  *  If RD_right != RD_left, it means this object is currently
+	  *  having the navigation focus.
+	  */
+	@instance RectDWord	HTGFT_focalBound;
+	/*
+	 *  Alignment.
+	 */
+	@instance Justification HTGFT_align = J_LEFT;
+	/*
+	 *  Keep track of being in <NOBR> or not.
+	 */
+	@instance word		HTGFT_noBr;
+@endc;
+
+
+@class TextAreaClass, GenInteractionClass;
+ @message void MSG_TEXT_AREA_APPEND_TEXT_PTR(char *text, word len);
+ @message HTMemHandle MSG_TEXT_AREA_GET_TEXT_HANDLE();
+ @message void MSG_TEXT_AREA_INITIAL(word cols, word rows, optr content);
+ @message void MSG_TEXT_AREA_FINISH();
+ @message void MSG_TEXT_AREA_SET_FOCUS(RectDWord *rect);
+ @message void MSG_TEXT_AREA_CLEAR_FOCUS();
+
+	@instance optr	        TAI_content;
+	@instance int	        TAI_xPos = 0;
+	@instance int	        TAI_pageRow= 0;
+	@instance SizeAsDWord   TAI_guessSize;
+	@instance optr 		TAI_textObj;
+	@instance HTMemHandle 	TAI_text;
+	@instance Justification TAI_align = J_LEFT;
+	@instance word		TAI_noBr;
+	@instance word 		TAI_width;
+	@instance word 		TAI_length;
+	@instance RectDWord	TAI_focalBound;
+  	@instance word          TAI_rows;
+	@instance word          TAI_columns;
+        /*
+	 * the form's id which we belong to 
+	 */
+        @instance int          TAI_formId;  
+@endc;
+
+
+@class TextAreaTextClass, GenTextClass;
+@message void MSG_TAT_SET_SIZE(word width, word length);
+@message void MSG_TAT_SET_POSITION(word x, word y);
+@message void MSG_TAT_SET_ROWS(word rows);
+@message void MSG_TAT_SET_COLUMNS(word columns);
+@message void MSG_TAT_INITIALIZE();
+@message void MSG_TAT_RESET();
+@message void MSG_TAT_DISPLAY_POSITION(word line);
+
+/* the display window size */
+@instance word TATI_width;
+@instance word TATI_length;
+
+/* the display window's position */
+@instance word TATI_x;
+@instance word TATI_y;
+
+@instance word TATI_height; 
+
+@instance Point TATI_origin;
+@instance word TATI_rows;
+@instance word TATI_columns;
+@instance Point TATI_firstChar;
+@instance word TATI_lineHeight;
+@instance word TATI_charWidth;
+
+@instance GStateHandle TATI_lastGState;
+@instance word TATI_lastTMe32;
+
+@endc;
+
+@class HTGenFormTriggerClass, GenTriggerClass;
+ @message void MSG_GEN_FORM_TRIGGER_INITIALIZE
+	(int formId, int nameId, FormElementType type, optr container);
+	/*
+	 *  HTGFT_type is either a SUBMIT or RESET button.
+	 */
+	@instance TriggerType	HTGFT_type;
+	 /*
+	  *  HTGT_content contains all the formating info and the page
+	  *  height array information.
+	  */
+        @instance optr          HTGFT_content;
+	 /*
+	  *  HTGFT_xPos is the suggested x position for the object to
+	  *  appear in the row.
+	  */
+	@instance int	        HTGFT_xPos;
+	 /*
+	  *  Suggested row position.
+	  */
+	@instance int    	HTGFT_pageRow;
+	/*
+	 *  the calculated size before the object vis part is built.
+	 */
+        @instance SizeAsDWord   HTGFT_guessSize;
+	/*
+	 *  Alignment.
+	 */
+        @instance Justification HTGFT_align = J_LEFT;
+	/*
+	 *  keep track of being in <NOBR> content or not.
+	 */
+	@instance word 		HTGFT_noBr;
+        /*
+	 * the form's id which we belong to 
+	 */
+        @instance int          HTGFT_formId;  
+        @instance int          HTGFT_nameId;  
+@endc;
+
+
+/************************************************************************
+ *  HTMLSelectClass represents <SELECT>
+ */
+@class HTMLSelectClass, GenInteractionClass;
+ @message void MSG_HTML_SELECT_PROCESS_ATTRIBUTE
+        (MemHandle block, SGMLEntity *entity);
+ @message void MSG_HTML_SELECT_ADD_OPTION_VALUE(char *value, Boolean selected);
+ @message void MSG_HTML_SELECT_ADD_OPTION_TEXT(char *text);
+ @message void MSG_HTML_SELECT_COMPLETE_SELECT_CONSTRUCT();
+ @message void MSG_HTML_SELECT_SET_ALL_MONIKER();
+ @message void MSG_HTML_SELECT_SCROLL_UP();
+ @message void MSG_HTML_SELECT_SCROLL_DOWN();
+
+ @message void MSG_HTML_SELECT_CHANGE_SELECT(optr item);
+ @message void MSG_HTML_SELECT_STORE_CONTENT(optr content);
+ @message void MSG_HTML_SELECT_SET_FOCUS(RectDWord *rect);
+ @message void MSG_HTML_SELECT_CLEAR_FOCUS();
+ @message void MSG_HTML_SELECT_SUBMIT(HTListHandle query);
+	/*
+	 * HTGS_size determines the number of OPTIONS physically 
+	 * visible when the browser displays the FORM.
+	 */
+	@instance int		HTMLS_size = 0;
+	@instance int		HTMLS_len = 0; /* pixels */
+	@instance Boolean	HTMLS_exclusive = TRUE;
+	@instance HTMemHandle	HTMLS_name = 0;
+
+        @instance optr          HTMLS_itemGroup = 0;
+
+	@instance int	 	HTMLS_pressUpOrDown = 0;
+
+   	@instance word		HTMLS_currentFirst = 0;
+	@instance int 		HTMLS_optionsNum = 0;
+
+	@instance HTListHandle 	HTMLS_optionsList = 0;
+	@instance HTListHandle  HTMLS_itemList = 0;
+
+	@instance TimerHandle	HTMLS_timerHandle = NullHandle;
+	@instance word		HTMLS_timerId = 0;
+
+	 /*
+	  *  HTGS_xPos is the suggested x position for the object to
+	  *  appear in the HTGS_pageRow.
+	  */
+	@instance int	        HTMLS_xPos;
+	 /*
+	  *  The object is in this row position.
+	  */
+	@instance int    	HTMLS_pageRow;
+	/*
+	 *  Content object that stores row heights and formatting info.
+	 */
+	@instance optr    	HTMLS_content;
+	/*
+	 *  the calculated size before the object vis part is built.
+	 */
+	@instance SizeAsDWord   HTMLS_guessSize;
+	/*
+	 *  Alignment
+	 */
+	@instance SizeAsDWord   HTMLS_align = J_LEFT;
+	/*
+	 *  Keep track of being in <NOBR> content or not.
+	 */
+	@instance word		HTMLS_noBr;
+	/*
+	 *  focalBound stores the focal bound.
+	 */
+	@instance RectDWord	HTMLS_focalBound;
+        /*
+	 * the form's id which we belong to 
+	 */
+        @instance int          HTMLS_formId;  
+@endc;
+
+
+@class HTOtherOptionClass, GenGlyphClass;
+ @message void MSG_HTOO_SET_ML(optr ml);
+ @message void MSG_HTOO_SET_SEL(Boolean sel);
+ @message Boolean MSG_HTOO_GET_SEL();
+	@instance optr		HTOO_multiLine;
+	@instance Boolean	HTOO_selected;
+	@instance SizeAsDWord	HTOO_guessSize;
+@endc;
+
+
+/************************************************************************
+ *  HTGenInputClass represents <INPUT TYPE = "RADIO" or "CHECKBOX">
+ */
+@class HTGenInputClass, GenItemGroupClass;
+ @message void MSG_GEN_INPUT_STORE_DATA
+         (int formId, int nameId, FormElementType type, optr content);
+ @message void MSG_GEN_INPUT_ADD_SIBLING(optr inputObj);
+ @message optr MSG_GEN_INPUT_CLEAR_SELECTIONS
+	(HTMemHandle name, optr selectedObj);
+ @message void MSG_GEN_INPUT_DRAW_FOCUS(RectDWord *ret);
+ @message void MSG_GEN_INPUT_UNDRAW_FOCUS();
+        /*
+	 *  Content stores the alignments and the array of row heights.
+	 */
+        @instance optr	        HTGI_content;
+	/*
+	 *  HTGI_xPos is the suggested x position for the object to
+	 *  appear in the HTGI_pageRow.
+	 */
+	@instance int	        HTGI_xPos;
+	/*
+	 *  The object is in this row position.
+	 */
+	@instance int    	HTGI_pageRow;
+        /*
+	 *  the calculated size before the object vis part is built.
+	 */
+        @instance SizeAsDWord   HTGI_guessSize = 0;
+	/*
+	 *  The drawing bound for showing the navigation focus.
+	 *  If RD_right != RD_left, it means this object is currently
+	 *  having the navigation focus.
+	 */
+	@instance RectDWord	HTGI_focalBound;
+	/*
+	 *  Alignment.
+	 */
+	@instance Justification	HTGI_align = J_LEFT;
+	/*
+	 *  keep track of being in <NOBR> or not.
+	 */
+	@instance word 		HTGI_noBr;
+        /*
+	 * the form's id which we belong to 
+	 */
+        @instance int          HTGI_formId;  
+        @instance int          HTGI_nameId;  
+@endc;
+
+
+/************************************************************************
+ *  HTGenTableClass - presentation of a TABLE object, responsible for
+ *  containing and maitaining table cells.
+ */
+@class HTGenTableClass, GenInteractionClass;
+ @message void MSG_GEN_TABLE_PROCESS_ATTRIBUTE
+        (MemHandle block, SGMLEntity *entity, optr content);
+ @message void MSG_GEN_TABLE_INCREMENT_ROW_COUNT();
+ @message void MSG_GEN_TABLE_GET_NEXT_TABLE_CELL_POSITION
+	(int *row, int *col, int rowSpan, int colSpan, int width);
+ @message void MSG_GEN_TABLE_UPDATE_MAX_CELL_HEIGHT
+        (int row, int height, word rowSpan);
+ @message void MSG_GEN_TABLE_GET_FINAL_CELL_PIXEL_POSITION
+	(int row, int col, int *xPixel, int *yPixel);
+ @message int MSG_GEN_TABLE_GET_ROWSPAN_SIZE(int rowNo, int rowSpan);
+ @message int MSG_GEN_TABLE_GET_COLSPAN_SIZE(int colNo, int colSpan);
+ @message int MSG_GEN_TABLE_GET_SUGGESTED_COLSPAN_SIZE(int colNo, int colSpan);
+ @message Boolean MSG_GEN_TABLE_SHOW_BORDER();
+ @message void MSG_GEN_TABLE_SET_FINAL_CELL_WIDTH
+	(int colPos, int width, word colSpan);
+ @message void MSG_GEN_TABLE_RECALC_POSITIONS(optr cell, SizeAsDWord newSize);
+ @message int MSG_GEN_TABLE_SHRINK_ROW(optr cell, SizeAsDWord newSize);
+ @message void MSG_GEN_TABLE_EXPAND_ROW_HEIGHT(word row, word span, word hgt);
+ @message void MSG_GEN_TABLE_SET_CAPTION(optr caption);
+ @message optr MSG_GEN_TABLE_GET_CAPTION();
+ @message Boolean MSG_GEN_TABLE_SHOULD_EXPAND();
+	/*
+	 * Store BORDER attribute.
+	 */
+	@instance Boolean	HTGT_showBorder;
+	/*
+	 * Store CELLPADDING attribute.
+	 */
+	@instance int		HTGT_cellpadding;
+	/*
+	 * Store CELLSPACING attribute.
+	 */
+	@instance int		HTGT_cellspacing;
+	/*
+	 * Store optr to the caption object.
+	 */
+	@instance optr		HTGT_caption = NULL;
+	/*
+	 * Store WIDTH attribute.  Negative if the value is in %
+	 */
+	@instance int		HTGT_width = 0;
+	/*
+	 * Store ALIGN attribute.
+	 */
+	@instance int		HTGT_align;
+	/*
+	 * HTGT_rowNo and HTGT_colNo contain a suggested (row, col)
+	 * cell position for the next new cell.
+	 */
+	@instance int		HTGT_rowNo;
+	@instance int		HTGT_colNo;
+	/*
+	 *  bitmap stores what cells are being occupied.
+	 *  In Y dimension, long = bit, because each cell in the table
+	 *  is not 2 dimension; it's not bit^2 cell; it's only 
+	 *  one-dimesion cell.
+	 */
+	@instance HTMemHandle	HTGT_bitmap;
+	/*
+	 *  This is a bit array to record if the the table cell have
+	 *  WIDTH attribute in the html source file.
+	 */
+	@instance dword		HTGT_widthAttr[BITMAP_X];
+	/*
+	 * HTGT_numCols keeps track of number of columns in this table.
+	 * This info is used to calculate the column widths.
+	 */
+	@instance word		HTGT_numCols;
+	/*
+	 * Keep track the maximum cell width in each table column and 
+	 * maximum cell height of each table row.  Used to set cell 
+	 * positions and minimum table size.
+	 */
+	@instance ChunkHandle	HTGT_rowHeight;  /* table row array */
+	@instance int   	HTGT_rowSize;    /* arry size */
+	@instance ChunkHandle	HTGT_colWidth;   /* height array */
+	@instance int   	HTGT_columnSize; /* array size */
+	/*
+	 *  Content object that stores row heights and formatting info.
+	 */
+	@instance optr		HTGT_content;
+	/*
+	 *  Suggested x position in the row.
+	 */
+	@instance int		HTGT_xPos;
+	/*
+	 *  Suggested row position.
+	 */
+	@instance int		HTGT_pageRow = -1;
+	/*
+	 *  the calculated size before the object vis part is built.
+	 */
+	@instance SizeAsDWord	HTGT_guessSize;
+	/*
+	 *  If the table has WIDTH attribute, has the width been 
+	 *  distributed among all the table cells?
+	 */
+	@instance Boolean	HTGT_distrWidth == FALSE;
+@endc;
+
+
+/************************************************************************
+ *  HTGenHtmlContentClass - responsible for keeping track of HTML 
+ *  style contents.
+ */
+@class HTGenHtmlContentClass, GenInteractionClass;
+ @message void MSG_GEN_HTML_CONTENT_FORMAT_TEXT_OBJECT
+	(optr text, GStateHandle gstate);
+ @message void MSG_GEN_HTML_CONTENT_SET_CONTENT(StyleType type);
+ @message StyleType MSG_GEN_HTML_CONTENT_REMOVE_CONTENT(int *counter);
+ @message void MSG_GEN_HTML_CONTENT_SET_BR(word status);
+ @message StyleType MSG_GEN_HTML_CONTENT_GET_CONTENT_TYPE();
+ @message int  MSG_GEN_HTML_CONTENT_GET_STYLE_COUNT(StyleType type);
+ @message FontType MSG_GEN_HTML_CONTENT_GET_FONT_SIZE();
+ @message void MSG_GEN_HTML_CONTENT_PUSH_FONT_SIZE(FontType size);
+ @message FontType MSG_GEN_HTML_CONTENT_POP_FONT_SIZE();
+ @message int MSG_GEN_HTML_CONTENT_GET_BASEFONT();
+ @message void MSG_GEN_HTML_CONTENT_SET_BASEFONT(int size);
+ @message void MSG_GEN_HTML_CONTENT_PUSH_JUSTIFICATION(Justification align);
+ @message Justification MSG_GEN_HTML_CONTENT_POP_JUSTIFICATION();
+ @message Justification MSG_GEN_HTML_CONTENT_GET_JUSTIFICATION(word *br);
+ @message void MSG_GEN_HTML_CONTENT_PUSH_LIST_GROUP
+	(StyleType groupType, int start, char displayType);
+ @message void MSG_GEN_HTML_CONTENT_POP_LIST_GROUP();
+ @message void MSG_GEN_HTML_CONTENT_GET_LIST_GROUP
+	(StyleType *group, dword *counter,char *type,int *level);
+ @message void MSG_GEN_HTML_CONTENT_UPDATE_COUNTER(dword start);
+ @message void MSG_GEN_HTML_CONTENT_INCREMENT_COUNTER();
+ @message void MSG_GEN_HTML_CONTENT_SET_TEXT_ALIGNMENT(optr text);
+ @message void MSG_GEN_HTML_CONTENT_SET_HREF_TOKEN(int token);
+ @message int  MSG_GEN_HTML_CONTENT_GET_PREV_SIBLING_R_EDGE
+        (optr obj, SizeAsDWord size, int *row, optr *prevObj, word *br,
+	 int *sumMargin);
+ @message void MSG_GEN_HTML_CONTENT_RESET_ROW_COUNTER();
+ @message int  MSG_GEN_HTML_CONTENT_GET_ROW_HEIGHT(int row);
+ @message int  MSG_GEN_HTML_CONTENT_GET_ROW_WIDTH(int row);
+ @message int MSG_GEN_HTML_CONTENT_START_NEW_ROW
+        (SizeAsDWord size, int *row, optr currentObj);
+ @message void MSG_GEN_HTML_CONTENT_GET_DIMENSION(word *width, word *height);
+ @message void MSG_GEN_HTML_CONTENT_UPDATE_MAX_HEIGHT();
+ @message RecalcSizeArgs MSG_GEN_HTML_CONTENT_GET_SUGGESTED_SIZE();
+ @message optr MSG_GEN_HTML_CONTENT_GET_PM_IF_GLOBAL();
+ @message void MSG_GEN_HTML_CONTENT_SET_PM(optr pm);
+ @message SizeAsDWord MSG_GEN_HTML_CONTENT_RECALC_POSITIONS
+        (optr startObj, optr parent);
+ @message void MSG_GEN_HTML_CONTENT_GET_ACCUMULATED_HEIGHTS
+	(word *width, word *height);
+ @message void MSG_GEN_HTML_CONTENT_SET_ROW_RESIZE(optr startObj, int diff);
+	/*
+	 *  If this is the global formating content object, then
+	 *  pmObj store the PresentationManager object;
+	 */
+	@instance optr  	HTGHC_pmObj;
+	@instance HTListHandle	HTGHC_formatStack;
+	@instance int 		HTGHC_formatIndex = 0;
+
+	@instance HTListHandle 	HTGHC_fontStack;
+	@instance int 		HTGHC_fontIndex = 0;
+
+	@instance HTListHandle 	HTGHC_listStack;
+	@instance int 		HTGHC_listIndex = 0;
+
+	@instance HTListHandle	HTGHC_alignStack;
+	@instance int 		HTGHC_alignIndex = 0;
+	/*
+	 * Counters for different text style.  Default is 0.
+	 * The purpose of counters is to handle nesting of text 
+	 * styles.  No counter for font size because the the font 
+	 * stack handles nestings.
+	 */
+	@instance int		HTGHC_cntUnderline = 0;
+	@instance int		HTGHC_cntBold = 0;
+	@instance int		HTGHC_cntItalic = 0;
+	@instance int		HTGHC_cntStrike = 0;
+	@instance int		HTGHC_cntSuperscript = 0;
+	@instance int		HTGHC_cntSubscript = 0;
+	@instance int		HTGHC_cntFWFont = 0;
+	/*
+	 *  baseFont is the current n in <BASEFONT size=n>.
+	 */
+	@instance int		HTGHC_baseFont = 0;
+        /*
+	 *  Store the href token for the current <A HREF> content.
+	 *  This is used when a new text object is created in the
+	 *  <A>...</A> content.
+	 *  -1 means currently there is no <A>...</A> content.
+	 */
+	@instance int		HTGHC_hrefToken = -1;
+	/*
+	 *  HTGHC_heightArray keeps track of the absolute y 
+	 *  position of each row in the document.  NOTE!,
+	 *  pageRow in each object is 0-based indexing to 
+	 *  HTGHC_heightArray.  HTGHC_owArray doesn't include the
+	 *  left/right margins.
+	 */
+	@instance HTListHandle  HTGHC_heightArray = 0;
+	@instance HTListHandle  HTGHC_rowArray = 0;
+	@instance word          HTGHC_sumOfHeights= 0;
+	 /*
+	  *  
+	  */
+	@instance int		HTGHC_accumulatedPrevWidth;
+	 /*
+	  *  keep track of the sum of spaces between object in a row.
+	  *  This is used when positioning the objects.
+	  */
+	@instance int		HTGHC_accumulatedMargin;
+	 /*
+	  *  rowIndex stores the max index of HTGHC_heightArray and
+	  *  HTGHC_rowArray.  Thus, it's 0-based.
+	  */
+	@instance int		HTGHC_rowIndex;
+	 /*
+	  *  
+	  */
+	@instance int		HTGHC_widthCurrentObj;
+	 /*
+	  *  
+	  */
+	@instance int		HTGHC_heightCurrentObj;
+	 /*
+	  *  
+	  */
+	@instance int		HTGHC_maxHeightInRow;
+	 /*
+	  *  The maximum row width in the document, including the left/
+	  *  right margins.
+	  */
+	@instance int		HTGHC_maxRowWidth;
+	 /*
+	  *  
+	  */
+	@instance optr		HTGHC_currentObj;
+	 /*
+	  *  noBr keeps track of the <NOBR> content.
+	  */
+	@instance word		HTGHC_noBr;
+@endc;
+
+
+/************************************************************************
+ *  HTGenFormClass representsn a form, <FORM>
+ */
+/* changed the form to a struct - mzhu, moved to uifact.goh*/
+/* and the messages to functions */
+
+/************************************************************************
+ *  HTGenTCellClass - representing a table cell, <TH> or <TD>.
+ */
+@class HTGenTCellClass, HTGenHtmlContentClass;
+ @message void MSG_GEN_TCELL_PROCESS_ATTRIBUTE
+	(MemHandle block, SGMLEntity *entity, int type, 
+	 int *rowSpan, int *colSpan, int *width);
+ @message void MSG_GEN_TCELL_SET_CELL_POSITION(int row, int col);
+ @message void MSG_GEN_TCELL_GET_CELL_INFO(int *row, int *col,
+					   word *rowSpan, word *colSpan);
+ @message void MSG_GEN_TCELL_SET_MAX_ROW_WIDTH_N_NEW_HEIGHT
+        (int row, int width, int height);
+ @message void MSG_GEN_TCELL_SET_ROW_RESIZE(optr child, int diff);
+	@instance CellType	HTGTC_cellType = CELL_DATA;
+	@instance byte		HTGTC_rowSpan = 1;
+	@instance byte		HTGTC_colSpan = 1;
+	/*
+	 *  HTGTC_width stores the attribute WIDTH.
+	 */
+	@instance word		HTGTC_width = 0;
+	/*
+	 *  (HTGTC_rowPos, HTGTC_colPos) is (row number, column number)
+	 *  of the table.
+	 */
+	@instance int		HTGTC_rowPos = 0;
+	@instance int		HTGTC_colPos = 0;
+	@instance SizeAsDWord	HTGTC_guessSize = 0;
+        /*
+	 *  Does the text object expand itself to fit tcell's width?
+	 *  If so, the cell may shrink in height, and causing the table
+	 *  to shrink too.
+	 */
+	@instance Boolean	HTGTC_resize = FALSE;
+@endc;
+
+
+/*
+ * HTGenCaptionClass - representing a table caption.
+ */
+@class HTGenCaptionClass, HTGenHtmlContentClass;
+ @message void MSG_GEN_CAPTION_SAVE_UIG_STATE
+        (optr obj, ClassStruct *class, optr content, Justification align);
+ @message void MSG_GEN_CAPTION_RESTORE_UIG_STATE
+        (optr *obj, ClassStruct** class);
+ @message Justification MSG_GEN_CAPTION_GET_ALIGN();
+	/*
+	 * HTGC_table stores the UI Generator's target optr before 
+	 * caption object is created.
+	 */
+	@instance optr		HTGC_targetObj;
+        @instance ClassStruct   *HTGC_targetClass;
+        /*
+	 *  Content stores the alignments and the array of row heights.
+	 */
+	@instance optr	        HTGC_content;
+	/*
+	 *  Suggested x position in that row.
+	 */
+	@instance int	        HTGC_xPos;
+	/*
+	 *  Suggested row position.
+	 */
+	@instance int	        HTGC_pageRow;
+        /*
+	 *  the calculated size before the object vis part is built.
+	 */
+	@instance SizeAsDWord	HTGC_guessSize;
+	/*
+	 * Here valign is either TOP or BOTTOM.
+	 */
+	@instance Justification HTGC_valign;
+	/*
+	 * Here align can be J_LEFT, J_CENTER, J_RIGHT.
+	 */
+	@instance Justification HTGC_align;
+@endc;
+
+
+/************************************************************************
+ *  HTGenImageClass - representing a image <IMG> on the HTML page.
+ */
+@class HTGenImageClass, GenGlyphClass;
+ @message void MSG_GEN_IMAGE_PROCESS_ATTRIBUTE
+   (MemHandle block, SGMLEntity *entity, optr content);
+ @message void MSG_GEN_IMAGE_REQUEST(HTMemHandle srcOptr);
+ @message void MSG_GEN_IMAGE_SET_HYPERLINK(int hrefToken);
+ @message HTMemHandle MSG_GEN_IMAGE_GET_SRC();
+ @message HTMemHandle MSG_GEN_IMAGE_GET_SRC_NO_COPY();
+@ifdef BROTHER_KERNEL
+ @message HTMemHandle MSG_GEN_IMAGE_GET_FULL_PATH();
+@endif
+ @message void MSG_GEN_IMAGE_DUPLICATE_RESIZE();
+ @message void MSG_GEN_IMAGE_SET_BITMAP(VMFileHandle bitmapFile,
+					VMBlockHandle bitmapBlock,
+					word scaleDividend, 
+					word scaleDivisor);
+ @message ErrorCode MSG_GEN_IMAGE_SET_BOUNDS(word width, word height);
+ @message void MSG_GEN_IMAGE_DRAW_FOCUS
+	(Rectangle *objRect, RectDWord *rect);
+ @message void MSG_GEN_IMAGE_UNDRAW_FOCUS();
+ @message Boolean MSG_GEN_IMAGE_IS_ISMAP();
+ @message void MSG_GEN_IMAGE_SET_LOAD_STATUS(ImageLoadStatus status);
+ @message void MSG_GEN_IMAGE_MARK_INPUT
+    (int formId, int nameId, HTMemHandle nameHandle, optr content);
+ @message void MSG_GEN_IMAGE_STORE_CONTENT(optr content);
+ @message void MSG_GEN_IMAGE_UPDATE_FOCAL_BOUND();
+ @message void MSG_GEN_IMAGE_SET_NEXT(optr next);
+ @message optr MSG_GEN_IMAGE_GET_TARGET();
+ @message Boolean MSG_GEN_IMAGE_IS_REPOSITION();
+ @message void MSG_GEN_IMAGE_GET_REQUESTED_SIZE(word *width, word *height);
+ @message void MSG_HTML_IMAGE_SUBMIT(HTListHandle query);
+	/*
+	 *  HTGI_src stores the URL of the image source: SRC
+	 */
+	@instance HTMemHandle	HTGI_src = 0;
+	/*
+	 *  HTGI_width stores the WIDTH attribute of the image.
+	 */
+	@instance int		HTGI_width = 0;
+	/*
+	 *  HTGI_height stores the HEIGHT attribute of the image.
+	 */
+	@instance int		HTGI_height = 0;
+
+	/* Here we keep the 'original' size (for alt text). */
+	@instance int		HTGI_altWidth = 0;
+	@instance int		HTGI_altHeight = 0;
+	/*
+	 *  HTGI_ismap identifies the image as a server-side image map.
+	 */
+	@instance Boolean	HTGI_ismap = FALSE;
+	@instance Boolean	HTGI_input = FALSE;
+	/*
+	 *  HTGI_input identifies the image as an input under a form.
+	 *  _x and _y is the mouse coordinate when user clicks on it.
+	 */
+	@instance HTMemHandle	HTGI_name = 0;
+	@instance int		HTGI_input_x;
+	@instance int		HTGI_input_y;
+
+        @instance int	        HTGI_formId = -1;
+        @instance int           HTGI_nameId;  
+
+	/*
+	 *  HTGI_alt Specifies text that will be displayed in place of
+	 *  the picture if Show Pictue Option is turned off.
+	 */
+	@instance HTMemHandle	HTGI_alt = 0;
+	/*
+	 *  HTGI_usemap identifies the picture as a client-side image
+	 *  map and specifies a MAP to use for acting on the user's click.
+	 */
+	@instance HTMemHandle	HTGI_usemap = 0;
+	/*
+	 *  HTGI_border store the BORDER attribute.
+	 */
+	@instance Boolean	HTGI_border = FALSE;
+        /*
+	 *  HTGI_hrefToken store the href token on this image.
+	 *  -1 means the image doesn't have a hyperlink on it.
+         */  
+        @instance int	        HTGI_hrefToken = -1;
+	/*
+	 *  HTGI_anchrListIndex stores the index into PM_anchorList
+	 *  in pmanager.
+	 */
+	@instance word		HTGI_anchrListIndex;
+        /*
+	 *  Content stores the alignments and the array of row heights.
+	 */
+        @instance optr	        HTGI_content;
+        /*
+	 *  Suggested position of the object.
+	 */
+        @instance int	        HTGI_xPos = 0;
+        /*
+	 *  Row position of the object.
+	 */
+        @instance int	        HTGI_pageRow = 0;
+        /*
+	 *  the calculated size before the object vis part is built.
+	 */
+        @instance SizeAsDWord   HTGI_guessSize = 0;
+
+ 	@instance VMFileHandle	HTGI_bitmapFile = NullHandle;
+ 	@instance VMBlockHandle	HTGI_bitmapBlock = NullHandle;
+	@instance optr		HTGI_next = NullHandle;
+	@instance optr		HTGI_target = NullHandle;
+
+	@instance Boolean first_draw = TRUE;
+        /*
+	 *  -1 if it doesn't have focal anchor ponit.
+	 *  focalBound is the bound of the outline for showing the focus.
+	 */
+        @instance Boolean       HTGI_focalAnchor = -1;
+        @instance RectDWord     HTGI_focalBound;
+	/*
+	 * if the image been loaded
+	 */
+	@instance ImageLoadStatus	HTGI_load;
+	/*
+	 *  Alignment.
+	 */
+	@instance Justification	HTGI_align = J_LEFT;
+	/*
+	 *  <NOBR> content;
+	 */
+	@instance word HTGI_noBr;
+	/*
+	 *  Does the image need to resize and reposition following objects?
+	 */
+	@instance Boolean HTGI_reposition = FALSE;
+        /*
+	 *  scaling factor = high_word / low_word
+	 */
+	@instance SizeAsDWord HTGI_scaleRatio;
+@if @SHORT_LONG_TOUCH
+	/*
+	 *  Mouse co-ordinates recorded during MSG_META_END_SELECT.  This is
+	 *  needed when short/long touch notifications is processed.
+	 */
+	@instance Point HTGI_rawMouseCoord;
+@endif /* SHORT_LONG_TOUCH */
+@endc;
+
+
+/************************************************************************
+ *  HTGenHRClass - representing a horizonatal rule: <HR>
+ */
+@class HTGenHRClass, GenGlyphClass;
+ @message void MSG_GEN_HR_PROCESS_ATTRIBUTE
+	(MemHandle block, SGMLEntity *entity, optr content);
+	/*
+	 * HTGHR_size = n, sets the height of the rule, in pixels
+	 */
+	@instance int		HTGHR_size = 0;
+	/*
+	 * HTGHR_width = n, sets the width of the rule, either in 
+	 * pixels or as a percentage of window width.
+	 */
+	@instance int		HTGHR_width = 0;
+	/*
+	 * HTGHR_noshade, draws the rule without 3-D shading.
+	 */
+	@instance Boolean	HTGHR_noshade = FALSE;
+	/*
+	 * HTGHR_align, draws the rule without 3-D shading.
+	 */
+	@instance Justification	HTGHR_align = J_CENTER;
+        /*
+	 *  Content stores the alignments and the array of row heights.
+	 */
+        @instance optr	        HTGHR_content = 0;
+        /*
+	 *  Suggested position of the object.
+	 */
+        @instance int	        HTGHR_xPos = 0;
+        /*
+	 *  Row position of the object.
+	 */
+        @instance int	        HTGHR_pageRow = -1;
+	/*
+	 *  the calculated size before the object vis part is built.
+	 */
+	@instance SizeAsDWord   HTGHR_guessSize;
+
+@endc;
+
+/*
+ * UIDoc APIs. Client must use these APIs ONLY. These are implemented
+ * by Library/WWW/UIGenera/factory.goc.
+ *
+ */
+/* this message is used by the client */
+void _far _pascal UIDocRegister(GeodeHandle client, word message, optr view);
+
+void _far _pascal UIDocExit();
+
+void _far _pascal UIDocCleanMemCache();
+
+void _far _pascal UINewDoc (HTRequestHandle request,
+	    ThreadHandle threadID, const char *anchor, Boolean loadImage);
+
+void _far _pascal UIDeleteDoc (HTMemHandle uiDoc);
+
+void _far _pascal UIDeleteCurrentDoc ();
+
+HTMemHandle _far _pascal UIFindDoc (HTRequestHandle request);
+
+HTMemHandle _far _pascal UIDocGetCurrentDocHandle ();
+
+void _far _pascal UILoadDoc(HTMemHandle uiDoc);
+
+void _far _pascal UIFreeDoc (HTMemHandle uiDoc);
+
+HTMemHandle _far _pascal UILastModifiedTime();
+
+HTMemHandle _far _pascal UIDocCurrentTitle ();
+
+HTMemHandle _far _pascal UIDocCurrentBaseURL ();
+
+HTMemHandle _far _pascal UIDocCurrentURL ();
+
+optr _far _pascal UIGetFocusImage();
+
+optr _far _pascal UIGetNextImage();
+
+Boolean _far _pascal UIUnloadImage();
+
+HTMemHandle _far _pascal UIGetFocusLink();
+
+HTMemHandle _far _pascal UIDocGetFormQuery();
+
+VMFileHandle _far _pascal UIDocCurrentVMFileHandle();
+
+void _far _pascal UIGotoNextFocusableField ();
+
+SizeAsDWord _far _pascal UIDocSize ();
+
+void _far _pascal UIDocPrint (GStateHandle gstate);
+
+void _far _pascal UIDocSearch (MemHandle searchInfo);
+
+void _far _pascal UIDocCopySelected ();
+
+dword _far _pascal UIDocMemoryNeeded (word *width, word *height);
+
+int _far _pascal UIGetRefreshTimeAndURL(HTMemHandle *newURL);
+
+@ifdef BROTHER_KERNEL
+HTMemHandle _far _pascal GetPathToFocusImage ();
+@endif
+
+typedef enum {
+    UI_TITLE,
+    UI_MOUSE_OVER_LINK,
+    UI_MOUSE_OVER_IMAGE,
+    UI_MOUSE_OVER_NOTHING,
+    UI_FOCUS_ON_LINK,
+    UI_FOCUS_ON_IMAGE,
+    UI_FOCUS_ON_IMAGE_LINK,
+    UI_APPLY_ON_LINK,
+    UI_APPLY_ON_IMAGE,
+    UI_APPLY_ON_FORM,
+    UI_SEARCH_FOUND,
+    UI_SEARCH_NOT_FOUND,
+    UI_SEARCH_NO_MORE_FOUND,
+    UI_ANCHOR_NOT_FOUND
+} UIDocMsgType;
+
+@prototype void MSG_FROM_UI_DOCUMENT(UIDocMsgType msg, HTMemHandle value);
+
+/*
+ * APIs for building a document.
+ */
+ErrorCode _pascal UIGen_START_TITLE(MemHandle block, SGMLEntity *entity);
+ErrorCode _pascal UIGen_END_TITLE();
+ErrorCode _pascal UIGen_CREATE_BASE(MemHandle block, SGMLEntity *entity);
+ErrorCode _pascal UIGen_CREATE_HR(MemHandle block, SGMLEntity *entity);
+ErrorCode _pascal UIGen_APPEND_TEXT_PTR(char *ptr, int len);
+ErrorCode _pascal UIGen_CREATE_TEXT_OBJECT(char *text, optr cell, int len);
+ErrorCode _pascal UIGen_START_FORM(MemHandle block, SGMLEntity *entity);
+ErrorCode _pascal UIGen_END_FORM();
+ErrorCode _pascal UIGen_START_SELECT(MemHandle block, SGMLEntity *entity);
+ErrorCode _pascal UIGen_END_SELECT();
+ErrorCode _pascal UIGen_CREATE_OPTION(MemHandle block, SGMLEntity *entity);
+ErrorCode _pascal UIGen_CREATE_INPUT(MemHandle block, SGMLEntity *entity);
+ErrorCode _pascal UIGen_START_TEXTAREA(MemHandle block, SGMLEntity *entity);
+ErrorCode _pascal UIGen_END_TEXTAREA();
+ErrorCode _pascal UIGen_START_TABLE(MemHandle block, SGMLEntity *entity);
+ErrorCode _pascal UIGen_END_TABLE();
+ErrorCode _pascal UIGen_START_CAPTION(MemHandle block, SGMLEntity *entity);
+ErrorCode _pascal UIGen_END_CAPTION();
+ErrorCode _pascal UIGen_START_TR(MemHandle block, SGMLEntity *entity);
+ErrorCode _pascal UIGen_CREATE_TH(MemHandle block, SGMLEntity *entity);
+ErrorCode _pascal UIGen_CREATE_TD(MemHandle block, SGMLEntity *entity);
+ErrorCode _pascal UIGen_CREATE_IMAGE(MemHandle block, SGMLEntity *entity);
+ErrorCode _pascal UIGen_START_MAP(MemHandle block, SGMLEntity *entity);
+ErrorCode _pascal UIGen_END_MAP();
+ErrorCode _pascal UIGen_CREATE_AREA(MemHandle block, SGMLEntity *entity);
+ErrorCode _pascal UIGen_END_FORMAT();
+ErrorCode _pascal UIGen_END_FORMAT_TWICE();
+optr _pascal UIGen_GET_CONTENT();
+ErrorCode _pascal UIGen_START_BOLD(MemHandle block, SGMLEntity *entity);
+ErrorCode _pascal UIGen_START_ITALIC(MemHandle block, SGMLEntity *entity);
+ErrorCode _pascal UIGen_START_BOLD_ITALIC(MemHandle block, SGMLEntity *entity);
+ErrorCode _pascal UIGen_START_KBD(MemHandle block, SGMLEntity *entity);
+ErrorCode _pascal UIGen_START_STRIKE(MemHandle block, SGMLEntity *entity);
+ErrorCode _pascal UIGen_START_SUPERSCRIPT(MemHandle block, SGMLEntity *entity);
+ErrorCode _pascal UIGen_START_SUBSCRIPT(MemHandle block, SGMLEntity *entity);
+ErrorCode _pascal UIGen_START_FONT_SIZE(MemHandle block, SGMLEntity *entity);
+ErrorCode _pascal UIGen_START_ADDRESS(MemHandle block, SGMLEntity *entity);
+ErrorCode _pascal UIGen_END_ADDRESS();
+ErrorCode _pascal UIGen_CHANGE_SMALL_FONT(MemHandle block, SGMLEntity *entity);
+ErrorCode _pascal UIGen_CHANGE_BIG_FONT(MemHandle block, SGMLEntity *entity);
+ErrorCode _pascal UIGen_SET_BASEFONT(MemHandle block, SGMLEntity *entity);
+ErrorCode _pascal UIGen_ADD_BR(MemHandle block, SGMLEntity *entity);
+ErrorCode _pascal UIGen_START_HEADER6(MemHandle block, SGMLEntity *entity);
+ErrorCode _pascal UIGen_START_HEADER5(MemHandle block, SGMLEntity *entity);
+ErrorCode _pascal UIGen_START_HEADER4(MemHandle block, SGMLEntity *entity);
+ErrorCode _pascal UIGen_START_HEADER3(MemHandle block, SGMLEntity *entity);
+@ifdef BROTHER_KERNEL
+ErrorCode _pascal UIGen_START_HEADER2(MemHandle block, SGMLEntity *entity);
+ErrorCode _pascal UIGen_START_HEADER1(MemHandle block, SGMLEntity *entity);
+@endif
+ErrorCode _pascal UIGen_START_FIXED_WIDTH_FONT(MemHandle block, SGMLEntity *entity);
+ErrorCode _pascal UIGen_START_PRE(MemHandle block, SGMLEntity *entity);
+ErrorCode _pascal UIGen_START_UNORDERED_LIST(MemHandle block, SGMLEntity *entity);
+ErrorCode _pascal UIGen_END_LIST();
+ErrorCode _pascal UIGen_START_ORDERED_LIST(MemHandle block, SGMLEntity *entity);
+ErrorCode _pascal UIGen_CREATE_LIST_ITEM(MemHandle block, SGMLEntity *entity);
+ErrorCode _pascal UIGen_CREATE_UNORDERED_LIST_ITEM(char displayType, int level);
+ErrorCode _pascal UIGen_CREATE_ORDERED_LIST_ITEM(dword counter, char displayType, int level);
+ErrorCode _pascal UIGen_START_DEFINITION_LIST(MemHandle block, SGMLEntity *entity);
+ErrorCode _pascal UIGen_CREATE_DEFINITION_DT(MemHandle block, SGMLEntity *entity);
+ErrorCode _pascal UIGen_CREATE_DEFINITION_DD(MemHandle block, SGMLEntity *entity);
+ErrorCode _pascal UIGen_START_BLOCKQUOTE(MemHandle block, SGMLEntity *entity);
+@ifdef BROTHER_KERNEL
+ErrorCode _pascal UIGen_START_BODY(MemHandle block, SGMLEntity *entity);
+@endif
+ErrorCode _pascal UIGen_START_CENTER(MemHandle block, SGMLEntity *entity);
+ErrorCode _pascal UIGen_END_ALIGN();
+ErrorCode _pascal UIGen_START_PARAGRAPH(MemHandle block, SGMLEntity *entity);
+ErrorCode _pascal UIGen_START_DIV(MemHandle block, SGMLEntity *entity);
+void _pascal UIGen_START_NOBR(MemHandle block, SGMLEntity *entity);
+void _pascal UIGen_END_NOBR();
+ErrorCode _pascal UIGen_START_ANCHOR(MemHandle block, SGMLEntity *entity);
+void _pascal UIGen_PROCESS_A_ATTRIBUTE(MemHandle block, SGMLEntity *entity);
+void _pascal UIGen_END_HTML();
+ErrorCode _pascal UIGen_START_META(MemHandle block, SGMLEntity *entity);
+
+/* for jpg test */
+optr _pascal UIGen_CREATE_SINGLE_IMAGE();
+void _pascal UIGen_BROADCAST_RESIZE_POSITION(optr object);
+
+
+/*** PMANAGER PART ***/
+
+typedef ByteEnum ErrorMsg;
+#define PM_NO_ERROR 	0
+#define PM_ERROR	1
+/*
+ *  Define constants for searching backward and forward.
+ */
+#define SEARCH_BACKWARD 0
+#define SEARCH_FORWARD 1
+
+typedef struct {
+  optr         NE_object;
+  int          NE_offset;
+} NameElement;
+
+@class PresentationManagerClass, GenInteractionClass;
+@message void MSG_PM_INITIALIZE();
+@message void MSG_PM_SET_LOADING_OPTION(Boolean load);
+@message ErrorMsg MSG_PM_TAKE_UNFINISHED_UI_OBJ(optr newObj);
+@message ErrorMsg MSG_PM_TAKE_FINISHED_UI_OBJ(optr newObj);
+@message ErrorMsg MSG_PM_MARK_RECV_OBJECT_DONE(optr* parent,
+					       ClassStruct **class);
+@message ErrorMsg MSG_PM_MARK_RECV_OBJECT_NOT_DONE(optr* parent,
+						   ClassStruct **class);
+@message void MSG_PM_GET_RECV_OBJ_OPTR_AND_CLASS(optr *recvObj,
+						 ClassStruct **class);
+@message void MSG_PM_ONE_LEVEL_DOWN_UI_TREE(optr child);
+@message void MSG_PM_COPY_SELECTED_OBJECTS();
+@message void MSG_PM_PRINT_UI_TREE(GStateHandle gstate);
+@message int  MSG_PM_SAVE_HREF(char *href);
+@message void MSG_PM_SAVE_ANCHOR_NAME
+         (char *name, optr object, dword offset);
+@message void MSG_PM_REFER_HYPERLINK(int hrefToken);
+@message void MSG_PM_REFER_AREAMAP_LINK(HTMemHandle src);
+@message void MSG_PM_REFER_ISMAP_LINK(int rel_x, int rel_y, int hrefToken);
+@message void MSG_PM_CLEAR_HREF_LINK();
+@message void MSG_PM_SEARCH_FOUND(int direction);
+@message void MSG_PM_SEARCH_NOT_FOUND();
+@message void MSG_PM_SEARCH_NO_MORE_FOUND(int direction);
+@message void MSG_PM_ENTER_CAPTION_MODE
+         (ClassStruct *table, char align, optr caption);
+@message void MSG_PM_EXIT_CAPTION_MODE();
+@message void MSG_PM_GRAB_NEW_FOCUS
+	(optr focus, Rectangle bound, Rectangle box, ClassStruct *textClass,
+	ClassStruct *imageClass, ClassStruct *inputClass);
+@message void MSG_PM_SEARCH_NEXT_FOCUSABLE_OBJECT();
+@message void MSG_PM_UPDATE_FOCUS(RectDWord bound);
+@message void MSG_PM_DISPLAY_HREF_TARGET(int hrefToken, optr imageOptr);
+@message Boolean MSG_PM_SHOW_ANCHOR(NameElement elm, int contentHeight);
+@message void MSG_PM_SET_ANCHOR(optr obj, int offset);
+@message void MSG_PM_RECORD_ANCHOR_OBJECT(optr object);
+@endc
+
+@class HTMLContentClass, GenContentClass;
+@message void MSG_HTML_CONTENT_VIEW_OBJECT(sword left, sword bottom);
+@message void MSG_HTML_CONTENT_SET_VIEW_DOC_BOUNDS(SizeAsDWord size);
+@endc
+
+@class PMSearchCtrClass, SearchReplaceControlClass;
+@endc;
+
+void UpdateGlobalSearchVariables
+	(int direction, RectDWord *rect, Boolean scrollUpDown);
+
+@endlib
+
+@endif /* __HTMLCONVERTER_GOH__ */

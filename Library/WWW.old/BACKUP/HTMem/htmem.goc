@@ -1,0 +1,597 @@
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Geoworks 1996.  All rights reserved.
+	GEOWORKS CONFIDENTIAL
+
+PROJECT:	Geos WWW Library
+MODULE:		htmem
+FILE:		htmem.goc
+
+AUTHOR:		Kok Kin Kee, Sep 16, 1996
+
+ROUTINES:
+	Name			Description
+	----			-----------
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	kkee	9/16/96   	Initial version.
+
+DESCRIPTION:
+
+        IMPORTANT:
+	This is a thread safe memory manager. All blocks are created 
+	and owned by the Library. We wrote this specifically for WWW
+	Library and the Web browser and all its future functionalities. 
+	I would *not* recommend other clients using it because all the 
+	blocks are owned by the Library and shared by all clients that 
+	use HTMemory manager.
+
+        WARNING:
+	If you write a routine that uses HTMemory. Please indicate
+        clearly the following at the routine description header:
+
+            Uses HTMemeory. So all stored pointers to HTMemory
+            may be invalidated!!
+
+	If you use this routine, you must dereference any of their own 
+        HTMemHandle pointers after calling the routine. This **only**
+	applies to sychronous call (i.e., affects the caller if the 
+        callee runs in the same thread). You need not dereference stored
+        pointers after asynchronous call (i.e., caller and callee run 
+        in different threads).
+
+	$Id: htmem.goc,v 1.1 97/04/07 11:49:19 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+@include <WWW/HTCore/htmem.goh>
+@include <WWW/HTCore/htlist.goh>
+@include <WWW/HTCore/htutils.goh>
+@include <sem.h>
+@include "htfatals.goh"
+
+#define DESIRED_HTMEM_BLOCK_SIZE  0x1000  /* 4K bytes */
+
+/* 
+ * HTMemory information. Since we are using LMem for maintainng 
+ * HTMemory chunks, the first element in the structure must be
+ * LMemBlockHeader.
+ */
+typedef struct {
+    LMemBlockHeader    HTMH_blockHeader;
+    HTListHandle       HTMH_htMemChunkList;
+} HTMemHeader;
+
+/*
+ * HTMH_htMemChunkList maintains the following information about a
+ * HTMemory chunk.
+ */
+typedef struct {
+    ChunkHandle HTMC_chunkHandle;
+    byte HTMC_lockCount;
+} HTMemChunk;
+
+/*
+ * List of memory blocks kept by memory manager. Each block is 
+ * an LMem block.
+ */
+static HTListHandle htMemBlockList = NULL;
+
+/*
+ * Synch access to htMemBlockList by multiple threads.
+ */
+static SemaphoreHandle htMemSem = NULL;
+
+
+
+/***********************************************************************
+ *		ECCHECKHTMEMHANDLE
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Check HTMemory.
+ * CALLED BY:	
+ * RETURN:	
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	kkee	9/17/96   	Initial Revision
+ *
+ ***********************************************************************/
+void _far _pascal
+ECCHECKHTMEMHANDLE (HTMemHandle htmh)
+{
+#if ERROR_CHECK
+    MemHandle block = OptrToHandle(htmh);
+
+    PUSHDS;
+    SET_DS_LIB_DGROUP;
+
+    ThreadPSem(htMemSem);
+
+    if (HTListFindItem(htMemBlockList, &block, sizeof(MemHandle)) < 0)
+	EC_ERROR(INVALID_HTMEMORY);
+
+    ThreadVSem(htMemSem);
+    
+    POPDS;
+#endif
+}	/* End of ECCHECKHTMEMHANDLE.	*/
+
+
+
+
+/***********************************************************************
+ *		HTMemLibraryEntry
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Initialize HTMemory Library component.
+ * CALLED BY:	HTCoreLibraryEntry
+ * RETURN:	0, required by kernel.
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:    All the stuff allocated here must be own by the HTCore
+ *              Library otherwise it will go away when the owner
+ *              exits.
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	kkee	9/16/96   	Initial Revision
+ *
+ ***********************************************************************/
+int _far _pascal
+HTMemLibraryEntry (LibraryCallType ty, GeodeHandle client)
+{
+
+    if (ty == LCT_ATTACH) {
+	htMemBlockList = HTListNew();
+	htMemSem = ThreadAllocSem(1);   /* Only one thread can grab */	
+	HandleModifyOwner(htMemSem, GeodeGetCodeProcessHandle());
+
+    } else if (ty == LCT_DETACH) {
+
+	HTListDelete(htMemBlockList);
+	htMemBlockList = NULL;
+
+	ThreadFreeSem(htMemSem);
+	htMemSem = NULL;
+    }
+
+    return 0;
+}	/* End of HTMemLibraryEntry.	*/
+
+
+
+/***********************************************************************
+ *		HTMEMALLOCNOLOCK
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Allocate and lock a HTMemory block. This call may 
+ *              invalidate pointers to memory allocated using HTMemory
+ *              manager by the same thread.
+ * CALLED BY:	Client.
+ * RETURN:	HTMemHandle or NULL.
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:    If you are allocating a lot of small little blocks at one
+ *              time, do not use HTMemory manager. Use Geos LMem instead. 
+ *              HTMemory manager is written specifically to support
+ *              the stream approach of Geos WWW Library.
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	kkee	12/ 6/96   	Initial Revision
+ *
+ ***********************************************************************/
+HTMemHandle _far _pascal
+HTMEMALLOCNOLOCK (word size)
+{
+    word count, sz, i;
+    ChunkHandle chunk;
+    HTMemHeader *hptr;
+    HTMemChunk htchunk;
+    ThreadHandle callerThread;
+    MemHandle block;
+    HTMemHandle ret = NullOptr;
+
+    PUSHDS;
+    SET_DS_LIB_DGROUP;
+
+    ThreadPSem(htMemSem);
+    count = HTListGetCount(htMemBlockList);
+    sz = sizeof(MemHandle);
+
+    if (count) {
+
+	for (i=0; i<count; i++) {
+	    HTListGetItem(htMemBlockList, i, &block, sz);
+
+	    /* This cast (word) may generate a warning, but its
+	     * correct. We want to get the offset of MemThreadGrabNB.
+	     */
+	    if ((word)MemThreadGrabNB(block) == BLOCK_GRABBED) 
+		/* 
+		 * Can't grab. The block is being used by another 
+		 * thread. 
+		 */
+		continue;
+
+	    hptr = (HTMemHeader *) MemDeref(block);
+
+	    /* 
+	     * If the in-used bytes of a block is below desired size, 
+	     * we allocate a HTMem using this block.
+	     */
+	    if (hptr->HTMH_blockHeader.LMBH_blockSize - 
+		hptr->HTMH_blockHeader.LMBH_totalFree <
+		DESIRED_HTMEM_BLOCK_SIZE) {
+
+		chunk = LMemAlloc(block, size);
+		htchunk.HTMC_chunkHandle = chunk;
+		htchunk.HTMC_lockCount = 0;
+		
+		/* hptr is invalidated after LMemAlloc */
+		hptr = (HTMemHeader *) MemDeref(block);
+		HTListAppend(hptr->HTMH_htMemChunkList, &htchunk, 
+			     sizeof(HTMemChunk));
+
+		ret = ConstructOptr(block, chunk);
+		MemThreadRelease(block);
+		break;
+	    }
+	    
+	    MemThreadRelease(block);
+	}
+
+    }    
+
+    if (!ret) {
+	/* 
+	 * Could not find a desired block, so allocate a new LMem block.
+	 * Also change the owner of block to the Library.
+	 */
+	block = MemAllocLMem(LMEM_TYPE_GENERAL, sizeof(HTMemHeader));
+
+	if (block) {
+	    HandleModifyOwner(block, GeodeGetCodeProcessHandle());
+	    MemModifyFlags(block, HF_SHARABLE, 0);
+	
+	    HTListAppend(htMemBlockList, &block, sz);
+	
+	    hptr = (HTMemHeader *) MemThreadGrab(block);
+	    hptr->HTMH_htMemChunkList = HTListNew();
+
+	    chunk = LMemAlloc(block, size);
+	    htchunk.HTMC_chunkHandle = chunk;
+	    htchunk.HTMC_lockCount = 0;
+
+	    /* hptr is no longer valid after LMemAlloc */
+	    hptr = (HTMemHeader *) MemDeref(block);
+	    HTListAppend(hptr->HTMH_htMemChunkList, &htchunk, 
+			 sizeof(HTMemChunk));
+	    MemThreadRelease(block);
+
+	    ret = ConstructOptr(block, chunk);
+	    
+	} 
+    }
+
+    ThreadVSem(htMemSem); 
+    POPDS;
+
+    return ret;
+}	/* End of HTMEMALLOCNOLOCK.	*/
+
+
+
+
+/***********************************************************************
+ *		HTMEMALLOC
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Same as HTMemAllocNoLock, but here we lock the HTMem.
+ * CALLED BY:	Client.
+ * RETURN:	void *  = dereferenced HTMem block.
+ *              htmh = modified to contain the HTMemHandle.
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:    If you are allocating a lot of small little blocks at one
+ *              time, do not use HTMemory manager. Use Geos LMem instead. 
+ *              HTMemory manager is written specifically to support
+ *              the stream approach of Geos WWW Library.
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	kkee	9/16/96   	Initial Revision
+ *
+ ***********************************************************************/
+void * _far _pascal
+HTMEMALLOC (HTMemHandle *htmh, word size)
+{
+    *htmh = HTMemAllocNoLock(size);
+    if (*htmh)
+	return HTMemLock(*htmh);
+    return NULL;
+}	/* End of HTMEMALLOC.	*/
+
+
+
+
+/***********************************************************************
+ *		HTMEMREALLOC
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Resize a HTMemory. May invalidate stored HTMemory 
+ *              pointers. The passed in htmh needs not be locked.
+ * CALLED BY:	Client.
+ * RETURN:	TRUE if success, else FALSE.
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	kkee	12/10/96   	Initial Revision
+ *
+ ***********************************************************************/
+Boolean _far _pascal
+HTMEMREALLOC (HTMemHandle htmh, word size)
+{
+    Boolean ret;
+
+    HTMemLock(htmh);
+    ret = LMemReAlloc(htmh, size);
+    HTMemUnlock(htmh);
+    return ret;
+}	/* End of HTMEMREALLOC.	*/
+
+
+
+
+/***********************************************************************
+ *		HTMEMFREE
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Free a HTMemory. You don't have to unlock to free a 
+ *              HTMemory.
+ * CALLED BY:	Client.
+ * RETURN:	Nothing
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:    If a HTMemory lock count is not zero, we unlock its
+ *              block handle the same number of times as HTMemory
+ *              lock count.
+ *
+ *              If a HTMemory lock count is zero, we simply free it.
+ *
+ *              In both cases, we delete the HTMemChunk associated with
+ *              the HTMemory.
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	kkee	9/16/96   	Initial Revision
+ *
+ ***********************************************************************/
+void _far _pascal
+HTMEMFREE (HTMemHandle htmh)
+{
+    HTMemHeader *hptr;
+    HTMemChunk htchunk;
+    word count, i, j, size = sizeof(HTMemChunk);
+    Boolean blockInUse = TRUE;
+    MemHandle block = OptrToHandle(htmh);
+    ChunkHandle chunk = OptrToChunk(htmh);
+
+EC( ECCheckHTMemHandle(htmh);                                           )
+
+    PUSHDS;
+    SET_DS_LIB_DGROUP;
+
+    ThreadPSem(htMemSem);
+
+    /* We have to grab it since the block may not be locked */
+    hptr = (HTMemHeader *) MemThreadGrab(block);
+    
+    count = HTListGetCount(hptr->HTMH_htMemChunkList);
+
+    /* 
+     * Find the chunk. No need to check to see if the chunk 
+     * has been deleted as LMemFree will fatal error if is
+     */
+    for (i=0; i<count; i++) {
+	HTListGetItem(hptr->HTMH_htMemChunkList, i, &htchunk, size);
+
+	if (htchunk.HTMC_chunkHandle == chunk) {
+
+	    /* Found! Use its count to unlock block */
+	    for (j=0; j<htchunk.HTMC_lockCount; j++)
+		MemThreadRelease(block);
+
+	    /* Delete htchunk from the list */
+	    HTListRemoveItem(hptr->HTMH_htMemChunkList, i, 
+			     &htchunk, size);
+
+	    if (!HTListGetCount(hptr->HTMH_htMemChunkList))
+		blockInUse = FALSE;
+
+	    break;
+	}
+    }
+
+    LMemFree(htmh); 
+    MemThreadRelease(block);
+
+    /* If the block is no longer in use, free it as well */
+    if (!blockInUse) { 
+	MemFree(block);
+	i = HTListFindItem(htMemBlockList, &block, sizeof(MemHandle));
+	HTListRemoveItem(htMemBlockList, i, &block, sizeof(MemHandle));
+    }
+
+    ThreadVSem(htMemSem);
+    POPDS;
+}	/* End of HTMEMFREE.	*/
+
+
+
+
+/***********************************************************************
+ *		HTMEMLOCK
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Lock a HTMemory.
+ * CALLED BY:	Client.
+ * RETURN:	Dereference pointer.
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:    MemTheadGrab the block, and increment the lock count on
+ *              the chunk (a chunk is a HTMemory).
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	kkee	9/17/96   	Initial Revision
+ *
+ ***********************************************************************/
+void * _far _pascal
+HTMEMLOCK (HTMemHandle htmh)
+{
+    HTMemHeader *hptr;
+    HTMemChunk htchunk;
+    MemHandle block = OptrToHandle(htmh);
+    ChunkHandle chunk = OptrToChunk(htmh);
+    word count, i, index, size = sizeof(HTMemChunk);
+
+EC ( ECCheckHTMemHandle(htmh);                                          )
+
+    PUSHDS;
+    SET_DS_LIB_DGROUP;
+
+    ThreadPSem(htMemSem);
+
+    /* Lock the block */
+    hptr = (HTMemHeader *) MemThreadGrab(block);
+
+    count = HTListGetCount(hptr->HTMH_htMemChunkList);
+
+    /* Lock the chunk */
+    for (i=0; i<count; i++) {
+	HTListGetItem(hptr->HTMH_htMemChunkList, i, &htchunk, size);
+
+	if (htchunk.HTMC_chunkHandle == chunk) {
+	    /* Found the HTMemory */
+	    HTListRemoveItem(hptr->HTMH_htMemChunkList, i, 
+			     &htchunk, size);
+	    (htchunk.HTMC_lockCount)++;
+	    HTListAppend(hptr->HTMH_htMemChunkList, &htchunk, size);
+	    break;
+	}
+    }
+
+    ThreadVSem(htMemSem);
+    POPDS;
+	
+    return (void *) LMemDeref(htmh);
+}	/* End of HTMEMLOCK.	*/
+
+
+
+
+/***********************************************************************
+ *		HTMEMUNLOCK
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Unlock a HTMemory.
+ * CALLED BY:	Client.
+ * RETURN:	Nothing.
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	kkee	9/17/96   	Initial Revision
+ *
+ ***********************************************************************/
+void _far _pascal
+HTMEMUNLOCK (HTMemHandle htmh)
+{
+
+    HTMemHeader *hptr;
+    HTMemChunk htchunk;
+    MemHandle block = OptrToHandle(htmh);
+    ChunkHandle chunk = OptrToChunk(htmh);
+    word count, i, index, size = sizeof(HTMemChunk);
+
+EC( ECCheckHTMemHandle(htmh);                                           )
+
+    PUSHDS;
+    SET_DS_LIB_DGROUP;
+
+    ThreadPSem(htMemSem);
+
+    /* htmh is locked to begin with, so we can just dereference */
+    hptr = (HTMemHeader *) MemDeref(block);
+
+    count = HTListGetCount(hptr->HTMH_htMemChunkList);
+
+    /* Unlock the chunk first */
+    for (i=0; i<count; i++) {
+	HTListGetItem(hptr->HTMH_htMemChunkList, i, &htchunk, size);
+
+	if (htchunk.HTMC_chunkHandle == chunk) {
+	    /* Found the HTMemory */
+	    HTListRemoveItem(hptr->HTMH_htMemChunkList, i, 
+			     &htchunk, size);
+	    (htchunk.HTMC_lockCount)--;
+	    HTListAppend(hptr->HTMH_htMemChunkList, &htchunk, size);
+	    break;
+	}
+    }
+
+    /* Unlock the MemHandle last */
+    MemThreadRelease(block);
+
+    ThreadVSem(htMemSem);
+
+    POPDS;
+}	/* End of HTMEMUNLOCK.	*/
+
+
+
+
+/***********************************************************************
+ *		HTMEMDEREF
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Dereference a HTMemHandle.
+ * CALLED BY:	Client
+ * RETURN:	void *
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	kkee	9/17/96   	Initial Revision
+ *
+ ***********************************************************************/
+void * _far _pascal
+HTMEMDEREF (HTMemHandle htmh)
+{
+EC( ECCheckHTMemHandle(htmh);                                           )
+
+    return LMemDeref(htmh);
+}	/* End of HTMEMDEREF.	*/

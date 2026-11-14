@@ -1,0 +1,176 @@
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Geoworks 1998.  All rights reserved.
+	GEOWORKS CONFIDENTIAL
+
+PROJECT:	Geobrowser
+MODULE:		ftp
+FILE:		ftpexit.goc
+
+AUTHOR:		Jeremy Broestl, Jul 13, 1998
+
+ROUTINES:
+	Name			Description
+	----			-----------
+
+REVISION HISTORY:
+	Name		Date		Description
+	----		----		-----------
+	jeremyb 	7/13/98   	Initial version.
+
+DESCRIPTION:
+
+	Does all the stuff required so that ftp can exit ok.
+
+	$Id: ftpexit.goc,v 1.1.1.5 98/08/04 14:45:06 jeremyb Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+@include <nsftp.goh>
+@include <WWW/HTCore/htfwrite.goh>
+
+extern MemHandle bufferedReadHandle;
+extern HTMemHandle appFilenameHandle;
+
+/***********************************************************************
+ *		FreeAllData
+ ***********************************************************************
+ *
+ * SYNOPSIS:	free everything to prevent leakage
+ * CALLED BY:	ftp_done
+ * RETURN:	none
+ *	
+ * PASS:        *cd ptr's to instance data
+ * STRATEGY:	frees a whole lot of instance data.  
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	jeremyb 	7/20/98   	Initial Revision
+ *	
+ ***********************************************************************/
+void
+FTPFreeAllData (FTPConData *cd)
+{
+    if (cd->addressHandle) {
+	HTMemFree(cd->addressHandle);
+    }
+
+    if (cd->path_handle) {
+	HTMemFree(cd->path_handle);
+	cd->path_handle = 0;
+    }
+
+    PUSHDS;
+    SET_DS_LIB_DGROUP;
+    if (bufferedReadHandle) {
+	MemFree(bufferedReadHandle);
+	bufferedReadHandle = 0;
+    }
+    POPDS;
+    
+    if (cd->login_message_handle) {
+	HTMemFree(cd->login_message_handle);
+	cd->login_message_handle = 0;
+    }
+
+    if (cd->cwd_message_handle) {
+	HTMemFree(cd->cwd_message_handle);
+	cd->cwd_message_handle = 0;
+    }
+
+    if (cd->usernameHandle) {
+	HTMemFree(cd->usernameHandle);
+	cd->usernameHandle = 0;
+    }
+    if (cd->passwordHandle) {
+	HTMemFree(cd->passwordHandle);
+	cd->passwordHandle = 0;
+    }
+    if (cd->filenameHandle) {
+	HTMemFree(cd->filenameHandle);
+	cd->filenameHandle = 0;
+    }
+    if (cd->hostnameHandle) {
+	HTMemFree(cd->hostnameHandle);
+	cd->hostnameHandle = 0;
+    }
+    if (appFilenameHandle) {
+	HTMemFree(appFilenameHandle);
+	appFilenameHandle = 0;
+    }
+
+}	/* End of FTPFreeAllData.	*/
+
+
+
+/***********************************************************************
+ *		ftp_done
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Clean up after ftp complete, or on error
+ * CALLED BY:	ftp state machine
+ * RETURN:	0
+ *	
+ * STRATEGY:	free variables, flush the stream to disk, just in case
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	jeremyb 	7/13/98   	Initial Revision
+ *	
+ ***********************************************************************/
+int
+ftp_done (HTMemHandle *ftpConHandle, HTNetThread *net)
+{
+    FTPConData *cd;
+
+    net->HTNT_socket = (HTSocketHandle) 0;
+
+    cd = (FTPConData *) HTMemLock(*ftpConHandle);
+
+    /* this should be done after every request, so I think we're there...*/
+    @call (cd->stream)::MSG_HT_STREAM_FLUSH();
+
+    HTSocketDelete(cd->csock);
+    cd->csock = (HTSocketHandle) 0;
+    FTPFreeAllData(cd);
+
+    HTMemUnlockAndFree(*ftpConHandle);
+
+    return (0);
+}	/* End of ftp_done.	*/
+
+/***********************************************************************
+ *		ftp_logout_and_done
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Send QUIT to server to say we're done
+ * CALLED BY:	ftp state machine
+ * RETURN:	0
+ *	
+ * STRATEGY:	You don't really have to say soyonara to the server when
+ *               done, but just to be a nice guy, and for debugging...
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	jeremyb 	7/20/98   	Initial Revision
+ *	
+ ***********************************************************************/
+int
+ftp_logout_and_done (HTMemHandle ftpConHandle)
+{
+    FTPConData *cd;
+    char outBuf[] = "QUIT\n";
+
+    cd = (FTPConData *) HTMemLock(ftpConHandle);
+
+    HTSocketSend(cd->csock, outBuf, strlen(outBuf));
+    cd->next_state = FTP_WAIT_FOR_RESPONSE;
+    cd->next_state_after_response = FTP_DONE;
+
+    HTMemUnlock(ftpConHandle);
+
+    return (0);
+}	/* End of ftp_logout_and_done.	*/

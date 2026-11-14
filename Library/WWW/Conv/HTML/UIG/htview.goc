@@ -1,0 +1,254 @@
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Geoworks 1997.  All rights reserved.
+	GEOWORKS CONFIDENTIAL
+
+PROJECT:	Geos WWW Library
+MODULE:		htview
+FILE:		htview.goc
+
+AUTHOR:		Kok Kin Kee, Sep 24, 1997
+
+ROUTINES:
+	Name			Description
+	----			-----------
+
+REVISION HISTORY:
+	Name		Date		Description
+	----		----		-----------
+	kkee    	9/24/97   	Initial version.
+
+DESCRIPTION:
+
+	HTGenView for maintain the view of a UI tree. It is the top
+        object which has a HTGenHtmlContent.
+
+	$Id: htview.goc,v 1.1.2.5 97/12/11 18:12:42 edwin Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+
+@include <stdapp.goh>
+@include <WWW/html.goh>
+@include "htfatals.goh"
+@include "UIG/utility.goh"
+@include "UIG/uifact.goh"
+
+@classdecl	HTGenViewClass;
+
+
+/***********************************************************************
+ *		MSG_GEN_PREPARE_FOR_DESTROY for HTGenViewClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    Prepare the object to be destroyed. This message is
+ *                  sent after we have called MSG_GEN_VIEW_SET_CONTENT(0)
+ *                  on currentDoc->HTUI_genView.
+ * PARAMETERS:	    void (void)
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:	    Here we send MSG_GEN_PREPARE_FOR_DESTROY to 
+ *                  currentDoc->HTUI_genContent via MSG_META_OBJ_FLUSH_QUEUE.
+ *
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	kkee    	9/24/97   	Initial Revision
+ *	
+ ***********************************************************************/
+@method HTGenViewClass, MSG_GEN_PREPARE_FOR_DESTROY
+{
+    EventHandle      msgToSend;
+
+    if (uiMgr.UIM_currentDoc) {
+	msgToSend = @record (uiMgr.UIM_currentDoc->HTUI_genContent)::MSG_GEN_PREPARE_FOR_DESTROY();
+	@send, forceQueue uiMgr.UIM_currentDoc->HTUI_genContent::
+	    MSG_META_OBJ_FLUSH_INPUT_QUEUE(msgToSend, 0,
+		   OptrToHandle(uiMgr.UIM_currentDoc->HTUI_genView));
+    }
+}	/* End of MSG_GEN_PREPARE_FOR_DESTROY.	*/
+
+/***********************************************************************
+ *		MSG_HT_GEN_VIEW_ALLOW_DESTROY for HTGenViewClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    Allow the object to be destroyed. This message is
+ *                  sent when the content receives MSG_GEN_PREPARE_FOR_DESTROY.
+ * PARAMETERS:	    void (SemaphoreHandle waitToFree, optr genContent)
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:	    @call content to ensure its thread finishes before
+ *	    	    we V waitToFree and allow the content object blocks
+ *	    	    to be freed
+ *
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	brianc    	9/26/97   	Initial Revision
+ *	
+ ***********************************************************************/
+@method HTGenViewClass, MSG_HT_GEN_VIEW_ALLOW_DESTROY
+{
+    @call genContent::MSG_META_DUMMY();
+    ThreadVSem(waitToFree);
+}	/* End of MSG_HT_GEN_VIEW_ALLOW_DESTROY.	*/
+
+
+/***********************************************************************
+ *		MSG_HTGV_IGNORE_INPUT for HTGenViewClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    
+ * PARAMETERS:	    
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:	    
+ *
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	mzhu    	10/15/97   	Initial Revision
+ *	
+ ***********************************************************************/
+@method HTGenViewClass, MSG_HT_GEN_VIEW_IGNORE_INPUT
+{
+    @self->HTGV_ignore = TRUE;
+}	/* End of MSG_HTGV_IGNORE_INPUT.	*/
+
+/***********************************************************************
+ *		MSG_HTGV_ACCEPT_INPUT for HTGenViewClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    
+ * PARAMETERS:	    
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:	    
+ *
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	mzhu    	10/15/97   	Initial Revision
+ *	
+ ***********************************************************************/
+@method HTGenViewClass, MSG_HT_GEN_VIEW_ACCEPT_INPUT
+{
+    @self->HTGV_ignore = FALSE;
+}	/* End of MSG_HTGV_ACCEPT_INPUT.	*/
+
+
+/* all the messages will be ignored when flag set */
+@method HTGenViewClass, MSG_META_START_SELECT
+{
+    if(@self->HTGV_ignore) {
+	retVal->flags = MRF_PROCESSED;
+	@self->HTGV_ignoreMouse = TRUE;
+	return;
+    } else {
+	@self->HTGV_ignoreMouse = FALSE;
+	@callsuper();
+    }
+}
+
+@method HTGenViewClass, MSG_META_END_SELECT
+{
+    if(@self->HTGV_ignoreMouse) {
+	retVal->flags = MRF_PROCESSED;
+	return;
+    } else 
+	@callsuper();
+}
+
+@method HTGenViewClass, MSG_META_LARGE_PTR
+{
+    if(@self->HTGV_ignore) {
+	retVal->flags = MRF_PROCESSED;
+	return;
+    } else 
+	@callsuper();
+}
+
+@method HTGenViewClass, MSG_META_PTR
+{
+    if(@self->HTGV_ignore) {
+	retVal->flags = MRF_PROCESSED;
+	return;
+    } else 
+	@callsuper();
+}
+
+@method HTGenViewClass, MSG_META_KBD_CHAR
+{
+    if(!(flags & CF_RELEASE)) {
+	if(@self->HTGV_ignore) {
+	    @self->HTGV_ignoreKbd = TRUE;
+	    return;
+	} else {
+	    @self->HTGV_ignoreKbd = FALSE;
+	    @callsuper();
+	}
+    } else {
+	if(@self->HTGV_ignoreKbd)
+	    return;
+	else 
+	    @callsuper();
+    }
+}                     
+
+/***********************************************************************
+ *		MSG_GEN_VIEW_TRACKING_COMPLETE for HTGenViewClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    Record the current view origin, used to restore
+ *                  the view origin when loading from cache.
+ * PARAMETERS:	    
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:	    
+ *
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	edwin   	12/11/97   	Initial Revision
+ *	
+ ***********************************************************************/
+@method HTGenViewClass, MSG_GEN_VIEW_TRACKING_COMPLETE
+{
+    PointDWord origin;
+
+    @callsuper();
+    if (uiMgr.UIM_currentDoc) {
+	@call self::MSG_GEN_VIEW_GET_ORIGIN(&origin);
+	(uiMgr.UIM_currentDoc)->HTUI_viewOrigin = origin;
+    }
+}	/* End of MSG_GEN_VIEW_TRACKING_COMPLETE.	*/
+
+/***********************************************************************
+ *		MSG_GEN_VIEW_MAKE_RECT_VISIBLE for HTGenViewClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    Record the current view origin, used to restore
+ *                  the view origin when loading from cache.
+ * PARAMETERS:	    
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:	    
+ *
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	edwin   	12/11/97   	Initial Revision
+ *	
+ ***********************************************************************/
+@method HTGenViewClass, MSG_GEN_VIEW_MAKE_RECT_VISIBLE
+{
+    PointDWord origin;
+
+    @callsuper();
+    if (uiMgr.UIM_currentDoc) {
+	@call self::MSG_GEN_VIEW_GET_ORIGIN(&origin);
+	(uiMgr.UIM_currentDoc)->HTUI_viewOrigin = origin;
+    }
+    return;
+}	/* End of MSG_GEN_VIEW_MAKE_RECT_VISIBLE.	*/
+

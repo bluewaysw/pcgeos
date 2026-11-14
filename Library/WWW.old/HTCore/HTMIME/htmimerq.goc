@@ -1,0 +1,409 @@
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Geoworks 1996 -- All Rights Reserved
+
+PROJECT:	Geos WWW Library.
+MODULE:		HTMIMERq
+FILE:		htmimerq.goc
+
+AUTHOR:		Kok Kin Kee, Jun 17, 1996
+
+ROUTINES:
+	Name			Description
+	----			-----------
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	kkee	6/17/96   	Initial version.
+
+DESCRIPTION:
+	MIME generator.
+
+	$Id: htmimerq.goc,v 1.1 97/04/07 11:48:22 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+@include <stdapp.goh>
+@include <WWW/HTCore/htmime.goh>
+@include <WWW/HTCore/htancMan.goh>
+@include "htfatals.goh"
+#include <Ansi/stdio.h>              /* sprintf */
+#include <Ansi/string.h>             /* strcat */
+
+/* --------------------------------------------------------------------------
+ * 		PRIVATE DATA
+ * --------------------------------------------------------------------------*/
+
+#define PUTBLOCK(target, data)  \
+        @call target::MSG_HT_STREAM_PUT_BLOCK(data, strlen((char *)data))
+
+/***********************************************************************
+		Class Declaration
+***********************************************************************/
+
+@classdecl	HTMIMERqClass;
+
+
+/***********************************************************************
+		Private Routine
+***********************************************************************/
+
+
+
+/***********************************************************************
+ *		HTMIMEMakeRequest
+ ***********************************************************************
+ * SYNOPSIS:	Generate the BODY part of a MIME message.
+ * CALLED BY:	MSG_HT_STREAM_PUT_BLOCK
+ * RETURN:	HT_OK or HT_ERROR
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:    The headers put here are all entity headers as described
+ *              in HTTP/1.1.
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	kkee	6/26/96   	Initial Revision
+ *
+ ***********************************************************************/
+static int _far _pascal
+HTMIMEMakeRequest (HTRequestHandle request, HTStreamHandle target, 
+		   Boolean endHeader)
+{
+    HTRequest *rptr;
+    HTParentAnchor *entity;
+    char linebuf[256], *p;
+
+    rptr = (HTRequest *) MemThreadGrab(request);
+
+    /* Must have a source anchor */
+EC( ECCheckHTAnchor(rptr->HTR_source);                                  )
+    
+    entity = (HTParentAnchor *) HTMemLock(rptr->HTR_source);
+
+    if (rptr->HTR_entityHdMask & HTEH_CONTENT_ENCODING &&
+	entity->HTPA_content_encoding) {
+	sprintf(linebuf, "Content-Encoding: %s%c%c",
+		HTStringLock(entity->HTPA_content_encoding), CR, LF);
+	HTStringUnlock(entity->HTPA_content_encoding);
+	PUTBLOCK(target, (byte *) linebuf);
+    }
+
+    if (rptr->HTR_entityHdMask & HTEH_CONTENT_LANGUAGE &&
+	entity->HTPA_content_language) {
+	sprintf(linebuf, "Content-Language: %s%c%c",
+		HTStringLock(entity->HTPA_content_language), CR, LF);
+	HTStringUnlock(entity->HTPA_content_language);
+	PUTBLOCK(target, (byte *) linebuf);
+    }
+
+    if (rptr->HTR_entityHdMask & HTEH_CONTENT_LENGTH &&
+	entity->HTPA_content_length) {
+	sprintf(linebuf, "Content-Length: %ld%c%c",
+		entity->HTPA_content_length, CR, LF);
+	PUTBLOCK(target, (byte *) linebuf);
+    }
+#if ERROR_CHECK 
+    else {
+	/* Must have content-length */
+	EC_ERROR(SOURCE_ANCHOR_MUST_HAVE_CONTENT_LENGTH);
+    }
+#endif
+
+    if (rptr->HTR_entityHdMask & HTEH_CONTENT_TYPE &&
+	entity->HTPA_content_type) {
+	int len;
+	sprintf(linebuf, "Content-Type: %s",
+		HTStringLock(entity->HTPA_content_type));
+	HTStringUnlock(entity->HTPA_content_type);
+	if (entity->HTPA_charset) {
+	    strcat(linebuf, "; level=");
+	    strcat(linebuf, HTStringLock(entity->HTPA_level));
+	    HTStringUnlock(entity->HTPA_level);
+	}
+	len = strlen(linebuf);
+	*(linebuf+len) = CR;
+	*(linebuf+len+1) = LF;
+	*(linebuf+len+2) = 0;
+	PUTBLOCK(target, (byte *) linebuf);
+    }
+
+    if (rptr->HTR_entityHdMask & HTEH_TRANSFER_ENCODING &&
+	entity->HTPA_content_transfer_encoding) {
+	sprintf(linebuf, "Content-Transfer-Encoding: %s%c%c",
+		HTStringLock(entity->HTPA_content_transfer_encoding), CR, LF);
+	HTStringUnlock(entity->HTPA_content_transfer_encoding);
+	PUTBLOCK(target, (byte *) linebuf);
+    }
+
+    if (endHeader) {
+	sprintf(linebuf, "%c%c", CR, LF);
+	PUTBLOCK(target, (byte *) linebuf);
+    }
+
+    MemThreadRelease(request);
+    return HT_OK;
+}	/* End of HTMIMEMakeRequest.	*/
+
+
+
+/***********************************************************************
+ *		HTMIMEPutEntity
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Put a MIME entity to the target. Depending on the method
+ *              of the request, the data will be formatted accordingly.
+ *              The data is stored in request->HTR_source->HTPA_document.
+ * CALLED BY:	MSG_HT_STREAM_PUT_BLOCK
+ * RETURN:	HT_OK or HT_ERROR.
+ *	
+ * STRATEGY:	If request->HTR_method is POST, items in document appears
+ *              in pairs, name and value pairs.
+ *
+ *              Note:              
+ *              I can also put multipart MIME messages using this same 
+ *              method, though this is not implemented yet. With multi-
+ *              part messages, we can send email as well as attachments,
+ *              much like what WMI is doing.
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	kkee    	3/24/97   	Initial Revision
+ *	
+ ***********************************************************************/
+static int _far _pascal
+HTMIMEPutEntity (HTRequestHandle request, HTStreamHandle target)
+{
+    int status = HT_OK;
+    word i, count;
+    HTRequest *rptr;
+    HTParentAnchor *anchor;
+    HTMemHandle htmh;
+    byte *p;
+
+EC( ECCheckRequest(request);                                            )
+
+    rptr = (HTRequest *) MemThreadGrab(request);
+
+EC( ECCheckHTAnchor(rptr->HTR_source);                                  )
+
+    anchor = (HTParentAnchor *) HTMemLock(rptr->HTR_source);
+
+EC( ECCheckHTList(anchor->HTPA_document);                               )
+
+    /* Push the data in document to target */
+    switch (rptr->HTR_method) {
+    case HTM_POST:
+	count = HTListGetCount(anchor->HTPA_document);
+
+EC ( if (count%2 != 0) EC_ERROR(INVALID_HTDOCUMENT);                    )
+
+	for (i=0; i<count; i += 2) {
+
+	    if (i) PUTBLOCK(target, (byte *) "&");
+		
+	    /*  Variable name */
+	    HTListRemoveItem(anchor->HTPA_document, 0, &htmh, 
+			     sizeof(HTMemHandle));
+	    p = (byte *) HTMemLock(htmh);
+	    PUTBLOCK(target, p);
+	    HTMemUnlockAndFree(htmh);
+
+	    PUTBLOCK(target, (byte *) "=");
+
+	    /* Variable value */
+	    HTListRemoveItem(anchor->HTPA_document, 0, &htmh,
+			     sizeof(HTMemHandle));
+	    p = (byte *) HTMemLock(htmh);
+	    status = PUTBLOCK(target, p);
+	    HTMemUnlockAndFree(htmh);
+
+	    /* Error? Remove all items and abort POST-ing document */
+	    if (status != HT_OK) {
+		count = HTListGetCount(anchor->HTPA_document);
+		for (i=0; i<count; i++) {
+		    HTListRemoveItem(anchor->HTPA_document, 0, &htmh,
+				     sizeof(HTMemHandle));
+		    HTMemFree(htmh);
+		}
+		break;
+	    }
+	}
+
+	break;
+
+    default:
+	EC_ERROR(NOT_IMPLEMENTED);
+	break;
+    }
+
+    /* Cleanup */
+    HTListDelete(anchor->HTPA_document);
+    anchor->HTPA_document = 0;
+    HTMemUnlockAndFree(rptr->HTR_source);
+    rptr->HTR_source = 0;
+
+    MemThreadRelease(request);
+
+    return status;
+}	/* End of HTMIMEPutEntity.	*/
+
+
+
+
+/***********************************************************************
+		Message Handlers
+***********************************************************************/
+
+
+/***********************************************************************
+ *		MSG_HTMIME_RQ_END_HEADER for HTMIMERqClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    Indicates whether to end header by putting an empty
+ *                  line consisting only of CRLF.
+ * PARAMETERS:	    void (Boolean endHeader);
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:	    
+ *
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	kkee    	3/23/97   	Initial Revision
+ *	
+ ***********************************************************************/
+@method HTMIMERqClass, MSG_HTMIME_RQ_END_HEADER
+{
+    @self->HTMRI_endHeader = endHeader;
+}	/* End of MSG_HTMIME_RQ_END_HEADER.	*/
+
+
+
+
+/***********************************************************************
+ *		MSG_HT_STREAM_FLUSH for HTMIMERqClass
+ ***********************************************************************
+ * SYNOPSIS:	    Flush header data down the stream pipe.
+ * PARAMETERS:	    int (void)
+ *                  return HT_OK if sucessful, else HT_NO.
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	kkee	6/24/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method HTMIMERqClass, MSG_HT_STREAM_FLUSH
+{
+    int status = @call oself::MSG_HT_STREAM_PUT_BLOCK(NULL, 0);
+
+EC( ECCheckStream(@self->HTSI_target);                                  )
+
+    if (status == HT_OK)
+	return @call @self->HTSI_target::MSG_HT_STREAM_FLUSH();
+    return status;
+}	/* End of MSG_HT_STREAM_FLUSH.	*/
+
+
+
+
+/***********************************************************************
+ *		MSG_HT_STREAM_PUT_BLOCK for HTMIMERqClass
+ ***********************************************************************
+ * SYNOPSIS:	    Puts the MIME request header down the stream pipe.
+ * PARAMETERS:	    int (const byte *data, word len)
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:        The MIME request headers are kept by the request 
+ *                  itself.
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	kkee	6/24/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method HTMIMERqClass, MSG_HT_STREAM_PUT_BLOCK
+{
+    int status = HT_OK;
+
+    if (@self->HTSI_transparent == TRUE)
+	return @call @self->HTSI_target::MSG_HT_STREAM_PUT_BLOCK(
+					data, len);
+    else {
+	/* Put MIME headers */
+	status = HTMIMEMakeRequest(@self->HTSI_request, 
+				   @self->HTSI_target,
+				   @self->HTMRI_endHeader);
+
+	/* Put the entity */
+	if (status == HT_OK)
+	    status = HTMIMEPutEntity(@self->HTSI_request,
+				     @self->HTSI_target);
+
+	if (status == HT_OK) 
+	    status = @call @self->HTSI_target::MSG_HT_STREAM_PUT_BLOCK(
+                                        data, len);
+	@self->HTSI_transparent = TRUE;
+    }
+    return status;
+}	/* End of MSG_HT_STREAM_PUT_BLOCK.	*/
+
+
+
+/***********************************************************************
+		Public Functions
+***********************************************************************/
+
+
+/***********************************************************************
+ *		HTMIMERqNew
+ ***********************************************************************
+ * SYNOPSIS:	Create a MIME request generator. endHeader 
+ *              indicates whether HTMIMERq stream is going to terminate
+ *              the headers by putting an empty line consisting of CRLF.
+ * CALLED BY:	Library
+ * RETURN:	HTStreamHandle, NullOptr if not created.
+ * SIDE EFFECTS:Nothing
+ *	
+ * STRATEGY:   This routine is called from outside of this library,
+ *             so DS is not pointing to the library dgroup.
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	kkee	6/17/96   	Initial Revision
+ *
+ ***********************************************************************/
+HTStreamHandle _far _pascal
+HTMIMERqNew (HTRequestHandle request, Boolean endHeader)
+{
+    HTStreamHandle stream;
+
+EC( ECCheckRequest(request);                                            )
+
+    PUSHDS;
+    SET_DS_LIB_DGROUP;
+    stream = ObjInstantiateForThread(0, &HTMIMERqClass);
+    POPDS;
+
+    if (!stream) {
+	/* Log error */
+    } else {
+	/* Initialize the stream instance data */
+	@call stream::MSG_HT_STREAM_SET_REQUEST(request);
+	@call stream::MSG_HTMIME_RQ_END_HEADER(endHeader);
+    }
+    return stream;
+}	/* End of HTMIMERqNew.	*/
+
+
+
+

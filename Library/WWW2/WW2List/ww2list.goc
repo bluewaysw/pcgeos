@@ -1,0 +1,314 @@
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Geoworks 1996 -- All Rights Reserved
+
+PROJECT:	WWW2 Library
+MODULE:		FIFO and LIFO list
+FILE:		wwlist.cpp
+
+AUTHOR:		Kok Kin Kee: Jan 13, 1998
+
+ROUTINES:
+	Name			Description
+	----			-----------
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+        kkee    1/13/98         Initial version
+
+DESCRIPTION:
+        FIFO and LIFO list
+	
+
+	$Id: ww2list.goc,v 1.3 98/08/04 16:47:42 edwin Exp $
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+@include <WWW2/WW2Core/ww2list.goh>
+@include <WWW2/WW2Core/wwutils.goh>
+#include <ec.h>
+#include <WWW2/wwMacro.h>
+
+#define _count pself->__count
+#define _firstElement pself->__firstElement
+#define _lastElement pself->__lastElement
+#define _next pself->__next
+
+@classdecl	WWListElementClass;
+@classdecl	WWListClass;
+
+@method WWListElementClass, WWListElement
+{
+    _next = 0;
+}
+
+@method WWListElementClass, SetNext
+{
+    _next = next;
+}
+
+@method WWListElementClass, GetNext
+{
+    return _next;
+}
+
+@method WWListClass, WWList
+{
+    _count = 0;
+    _firstElement = NULL;
+    _lastElement = NULL;
+}
+
+
+/*---------------------------------------------------------------------------
+//		WWList::~WWList()
+//---------------------------------------------------------------------------
+// 
+// SYNOPSIS: 	Destructor.
+// SCOPE:	Public
+// RETURN:	Nothing
+// STRATEGY:	EC crash if the list is not empty.
+// 
+// REVISION HISTORY: 
+//	Name		Date		Description 
+//	----		----		----------- 
+//	kkee    	4/08/98 	Initial version 
+//	
+//-------------------------------------------------------------------------*/
+@method WWListClass, MSG_META_OBJ_FREE
+{
+    ASSERTS(_firstElement == NULL,
+            "WWList::~WWList() memory leak, list not empty");
+    @callsuper();
+    return;
+}	/* End of WWList::~WWList() */
+
+
+
+/*---------------------------------------------------------------------------
+//		WWList::PrependElt()
+//---------------------------------------------------------------------------
+// 
+// SYNOPSIS: 	Add an element to the head of list. Use Prepend() and
+//              Get() to implement a LIFO list.
+// SCOPE:	Public
+// RETURN:	Nothing
+// STRATEGY:	
+// 
+// REVISION HISTORY: 
+//	Name		Date		Description 
+//	----		----		----------- 
+//	kkee    	1/30/98 	Initial version 
+//	
+//-------------------------------------------------------------------------*/
+@method WWListClass, PrependElt  /* (WWListElement *element) */
+{
+    PARAM_ASSERT(element != NULL);
+
+    @call element::SetNext(_firstElement);
+    _firstElement = element;
+
+    if (!_lastElement) {
+        _lastElement = element;
+    }
+    _count++;
+}	/* End of WWList::PrependElt() */
+
+
+/*---------------------------------------------------------------------------
+//		WWList::AppendElt()
+//---------------------------------------------------------------------------
+// 
+// SYNOPSIS: 	Add an element to the tail of list.
+// SCOPE:	Public
+// RETURN:	Nothing
+// STRATEGY:	
+// 
+// REVISION HISTORY: 
+//	Name		Date		Description 
+//	----		----		----------- 
+//	kkee    	1/28/98 	Initial version 
+//	
+//-------------------------------------------------------------------------*/
+@method WWListClass, AppendElt /* (WWListElement *element) */
+{
+    PARAM_ASSERT(element != NULL);
+    @call element::SetNext(NULL);
+    
+    if (!_firstElement) {
+        _firstElement = element;
+        _lastElement = element;
+    } else {
+        @call _lastElement::SetNext(element);
+        _lastElement = element;
+    }
+    _count++;
+}	/* End of WWList::AppendElt() */
+
+
+/*---------------------------------------------------------------------------
+//		WWList::Get()
+//---------------------------------------------------------------------------
+// 
+// SYNOPSIS: 	Remove an element from head of list.
+// SCOPE:	Public
+// RETURN:	WWListElement or NULL
+// STRATEGY:	
+// 
+// REVISION HISTORY: 
+//	Name		Date		Description 
+//	----		----		----------- 
+//	kkee    	1/28/98 	Initial version 
+//	
+//-------------------------------------------------------------------------*/
+@method WWListClass, Get /* () */
+{
+    optr /* WWListElement */ ret = _firstElement;
+
+    if (!ret) {
+        return NULL;
+    }
+
+    _firstElement = @call ret::GetNext();
+    @call ret::SetNext(NULL);
+
+    if (ret == _lastElement) {
+        _lastElement = NULL;
+    }
+
+    _count--;
+    return ret;
+}	/* End of WWList::Get() */
+
+
+/*---------------------------------------------------------------------------
+//		WWList::Remove()
+//---------------------------------------------------------------------------
+// 
+// SYNOPSIS: 	Remove an element from list.
+// SCOPE:	Public
+// RETURN:	WWListElement or NULL if element not found in list.
+// STRATEGY:	
+// 
+// REVISION HISTORY: 
+//	Name		Date		Description 
+//	----		----		----------- 
+//	kkee    	1/28/98 	Initial version 
+//	
+//-------------------------------------------------------------------------*/
+@method WWListClass, Remove /* (WWListElement *element) */
+{
+    optr /* WWListElement */ prev = NULL, tmp = _firstElement;
+    while (tmp) {
+        if (tmp == element) {
+            break;
+        }
+        prev = tmp;
+        tmp = @call tmp::GetNext();
+    }
+    // There is a match
+    if (tmp) {
+        if (tmp == _firstElement) {
+            _firstElement = @call tmp::GetNext();
+        }
+        if (tmp == _lastElement) {
+            _lastElement = prev;
+        }
+        if (prev) {
+	    optr temp2 = @call tmp::GetNext();
+            @call prev::SetNext(temp2);
+        }
+        @call tmp::SetNext(NULL);
+
+        _count--;
+        return tmp;
+    }
+    return NULL;
+}	/* End of WWList::Remove() */
+
+
+
+/*---------------------------------------------------------------------------
+//		WWList::Size()
+//---------------------------------------------------------------------------
+// 
+// SYNOPSIS: 	Length of list.
+// SCOPE:	Public
+// RETURN:	uint32, Length of list.
+// STRATEGY:	
+// 
+// REVISION HISTORY: 
+//	Name		Date		Description 
+//	----		----		----------- 
+//	kkee    	1/30/98 	Initial version 
+//	
+//-------------------------------------------------------------------------*/
+@method WWListClass, Size /* () const  */
+{
+#if ERROR_CHECK
+    word count = 0;
+    optr /* WWListElement */ ptr = _firstElement;
+    while(ptr != NULL) {
+	ptr = @call ptr::GetNext();
+	count++;
+    }
+    ASSERTS(count == _count, "WWList::Size() size of list is corrupted");
+#endif
+    return _count;
+}	/* End of WWList::Size() */
+
+
+@method WWListClass, Head /* () const  */
+{
+    return _firstElement;
+}
+
+
+/*---------------------------------------------------------------------------
+//		WWList::InsertAfter(WWListElement *, WWListElement *)
+//---------------------------------------------------------------------------
+// 
+// SYNOPSIS: 	Insert a new element after one element
+// SCOPE:	Public
+// RETURN:	void
+// STRATEGY:	
+// 
+// REVISION HISTORY: 
+//	Name		Date		Description 
+//	----		----		----------- 
+//	mzhu    	3/11/98 	Initial version 
+//	kkee    	3/16/98 	Added EC code
+//	
+//-------------------------------------------------------------------------*/
+@method WWListClass, InsertAfter /* (WWListElement *newElement, WWListElement *afterThis) */
+{
+    PARAM_ASSERT(newElement);
+    PARAM_ASSERT(afterThis);
+
+#if ERROR_CHECK
+    // Make sure afterThis element is actually in the list
+    Boolean found=FALSE;
+    optr /* WWListElement */ t = _firstElement;
+    while (t) {
+        if (t == afterThis) {
+            found = TRUE;
+            break;
+        }
+        t = @call t::GetNext();
+    }
+    ASSERTS(found, "WWList::InsertAfer() afterThis element invalid");
+#endif
+
+    // Insert to list
+    optr temp = @call afterThis::GetNext();
+    @call newElement::SetNext(temp);
+    @call afterThis::SetNext(newElement);
+
+    if(!(@call newElement::GetNext())) {
+        _lastElement = newElement;
+    }
+
+    _count++;
+}

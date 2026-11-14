@@ -1,0 +1,2570 @@
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Geoworks 1996 -- All Rights Reserved
+
+PROJECT:	Penelope
+MODULE:		Text formating module
+FILE:		uitext.goc
+
+AUTHOR:		Edwin Yu, Apr 28, 1996
+
+ROUTINES:
+	Name			Description
+	----			-----------
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	EY	4/28/96   	Initial version.
+
+DESCRIPTION:
+	This files defines all the mesage handlers that are 
+	responsible for setting different text styles.
+	
+
+	$Id: uitext.goc,v 1.1 97/04/07 11:49:32 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+@include <stdapp.goh>
+@include <WWW/pmanager.goh>
+@include <WWW/uigenera.goh>
+@include "uifatals.goh"
+#include <Ansi/string.h>
+#include <Ansi/stdlib.h>        /* atoi defined */
+
+@classdecl	HTGenTextClass;
+@extern method HTGenTextClass, MSG_META_LOST_SYS_TARGET_EXCL;
+@extern method HTGenTextClass, MSG_META_GAINED_SYS_TARGET_EXCL;
+@extern method HTGenTextClass, MSG_META_LOST_SYS_FOCUS_EXCL;
+
+/*
+@extern method HTGenTextClass, MSG_META_START_SELECT;
+*/
+@extern method HTGenTextClass, MSG_META_END_SELECT;
+@extern method HTGenTextClass, MSG_META_UIG_SELECT_ALL;
+@extern method HTGenTextClass, MSG_META_UIG_SELECT_NONE;
+
+/*
+ *  Variables used to disable the default wrap-around search.
+ */
+VisTextRange searchWrapRange;
+optr searchWrapObj;
+
+Rectangle
+GetDocumentCoordFromOffsets(optr text, dword start, dword end, 
+			    sdword *left, sdword *top, 
+			    sdword *right, sdword *bottom);
+
+@start MouseImage;
+
+@chunk PointerDef16 BoxCursor = {16,16,6,0,
+                /* PD_mask */
+                0x07, 0x00, 0x0f, 0x80, 0x0f, 0x08, 0x0f, 0xf0, 
+                0x0f, 0xfc, 0x1f, 0xfe, 0x3f, 0xfe, 0x3f, 0xfe, 
+                0x3f, 0xfe, 0xef, 0xfe, 0x3f, 0xfe, 0x3f, 0xfe, 
+                0x3f, 0xfe, 0x1f, 0xfe, 0x0f, 0xfe, 0x0f, 0xfe, 
+                /* PD_image */
+                0x07, 0x00, 0x0d, 0x80, 0x0a, 0x80, 0x0a, 0xf0, 
+                0x0a, 0x5c, 0x1a, 0xa6, 0x3a, 0xaa, 0x32, 0xaa, 
+                0x2a, 0xaa, 0x2a, 0xfa, 0x2a, 0xfa, 0x2f, 0xfa, 
+                0x37, 0xfa, 0x30, 0x02, 0x08, 0x02, 0x0f, 0xfe };
+
+@end MouseImage;
+
+
+/***********************************************************************
+ *	MSG_UI_GENERATOR_APPEND_TEXT_PTR for UIGeneratorClass
+ ***********************************************************************
+ * SYNOPSIS:	Append the character data in a text object.  If there is
+ *		no text object available, a text object will be created.
+ * PARAMETERS:	(char *ptr, int len)
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *		- assume the data character has no entity references
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	EY	4/16/96   	Initial Revision
+ *
+ ***********************************************************************/
+@extern method UIGeneratorClass, MSG_UI_GENERATOR_APPEND_TEXT_PTR
+{
+  char old;
+
+  if (!(pself->UIG_target.obj)) {
+    /* 
+     *  No target.obj.  Thus, create a text object,
+     *  initialize it, and store character data.
+     */
+    @call self::MSG_UI_GENERATOR_CREATE_TEXT_OBJECT
+	(ptr, pself->UIG_content, len);
+  }
+  else if(pself->UIG_target.class == (ClassStruct *)&HTGenTextClass ||
+	  pself->UIG_target.class == (ClassStruct *)&HTGenFormTextClass) {
+    if ((@call pself->UIG_target.obj::MSG_VIS_TEXT_GET_TEXT_SIZE() + len) 
+	> 5000) {
+      @call pself->UIG_pmObj::MSG_PM_TAKE_FINISHED_UI_OBJ
+	 (pself->UIG_target.obj);
+#if 1
+      @call self::MSG_UI_GENERATOR_BROADCAST_RESIZE_POSITION
+	 (pself->UIG_target.obj);
+#endif
+      @call self::MSG_UI_GENERATOR_CREATE_TEXT_OBJECT
+	 (ptr, pself->UIG_content, len);
+      EC_WARNING(UIG_TEXT_SPLITS_AT_5K_BYTES);
+    }
+    else 
+      /*
+       * The target is a text object, so we simply append the text to it.
+       */
+      @call pself->UIG_target.obj::MSG_VIS_TEXT_APPEND_PTR(ptr, len);
+  }
+  /* Added for HTTextAreaClass */
+/*******
+  else if( pself->UIG_target.class == (ClassStruct *)&HTTextAreaClass) {
+    pself->UIG_target.obj::MSG_HTTA_SET_TEXT_PTR(ptr, len);
+  }
+*******/
+  else if(pself->UIG_target.class == (ClassStruct *)&HTGenOptionClass) {
+    /*
+     *  The target is an <option> obj in the <form>.  So the text
+     *  is assumed to be the vis_moniker for the <option> object.
+     */
+    old = ptr[len];
+    ptr[len] = '\0';
+    if (len == 1 && ptr[0] == ' ')
+      ;
+    else
+      @call pself->UIG_target.obj::MSG_GEN_REPLACE_VIS_MONIKER_TEXT
+	(ptr, VUM_DELAYED_VIA_UI_QUEUE);
+    ptr[len] = old;
+  }
+  /* Added for HTGenMultiLineSelectClass. */
+  else if(pself->UIG_target.class == (ClassStruct *)&HTGenMultiLineSelectClass) {
+    old = ptr[len];
+    ptr[len] = '\0';
+    @call pself->UIG_target.obj::MSG_HTGMLS_ADD_OPTION_TEXT
+       (ptr);
+    ptr[len] = old;
+  }
+  else if(pself->UIG_target.class == (ClassStruct *)&HTGenTCellClass ||
+	  pself->UIG_target.class == (ClassStruct*)&HTGenCaptionClass) {
+    /*
+     *  Create a text object which will be inside the table cell.
+     *  Note, the TCell object contains text formating contents.
+     */
+    @call pself->UIG_pmObj::MSG_PM_TAKE_UNFINISHED_UI_OBJ
+				(pself->UIG_target.obj);
+    @call self::MSG_UI_GENERATOR_CREATE_TEXT_OBJECT
+	(ptr, pself->UIG_target.obj, len);
+  }
+  else if(pself->UIG_target.class == (ClassStruct *)&HTGenFormClass) {
+    /*
+     *  Now we have text inside a table.  This text is formated 
+     *  according to the global text contents.
+     */
+    @call pself->UIG_pmObj::MSG_PM_TAKE_UNFINISHED_UI_OBJ
+				(pself->UIG_target.obj);
+    @call self::MSG_UI_GENERATOR_CREATE_TEXT_OBJECT
+	(ptr, pself->UIG_target.obj, len);
+
+  }
+  else if(pself->UIG_target.class==(ClassStruct*)&PresentationManagerClass){
+    /*
+     * We're in the <TITLE>....</TITLE> content.  Tell the PManager to
+     * store the title of the document.
+     */
+    @call pself->UIG_target.obj::MSG_PM_SAVE_TITLE(ptr);
+  }
+  return UI_GEN_NO_ERROR;
+}
+
+
+/***********************************************************************
+ *	MSG_UI_GENERATOR_CREATE_TEXT_OBJECT for UIGeneratorClass
+ ***********************************************************************
+ * SYNOPSIS:	    Create a text object and initialize it
+ * PARAMETERS:	    (char *text, optr cell, int len)
+ *		    if cell is NULL, that means we don't do any text
+ *		    formatting according to the global HTML contents.
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *		1) Instantiate a text object
+ *		2) Add HINTs to the object
+ *		3) Format it according to the current HTML content
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	EY	6/10/96   	Initial Revision
+ *
+ ***********************************************************************/
+@extern method UIGeneratorClass, MSG_UI_GENERATOR_CREATE_TEXT_OBJECT
+{
+  GStateHandle gstate;
+  /*
+   * Create a text object.
+   */
+  pself->UIG_target.obj = @call pself->UIG_pmObj::\
+	MSG_PM_OBJECT_INSTANTIATE(&HTGenTextClass);
+  pself->UIG_target.class = (ClassStruct *)&HTGenTextClass;
+  /*
+   * Initialization:
+   * 1) Create gstate, used to calculate the min width required for
+   *	the text object.
+   * 2) Create a text storage for the object.
+   * 3) Mark text non-editable, non-scrollable, add HINTs
+   */
+  gstate = @call pself->UIG_target.obj::MSG_GEN_TEXT_INITIALIZE();
+  /*
+   *  Set text output object to be the PManager, which has all the HREF
+   *  information.  Thus, when a hyperlink is clicked, the text object
+   *  can send HREF token to the output object(PManager) to fetch.
+   */
+  @call pself->UIG_target.obj::MSG_META_SET_OBJ_BLOCK_OUTPUT
+     (pself->UIG_pmObj);
+  /*
+   * Do text formating stuff...
+   *    Format the text object, i.g. bold, font size, alignment, 
+   *	according to the current HTML content.  Note, the cell object 
+   *	contains information about the current HTML content.
+   */
+  if (cell != NULL)
+    @call cell::MSG_GEN_HTML_CONTENT_FORMAT_TEXT_OBJECT
+	(pself->UIG_target.obj, gstate);
+
+  /*
+   * Append the text.
+   */
+  if (text != NULL)
+    @call pself->UIG_target.obj::MSG_VIS_TEXT_APPEND_PTR(text, len);
+
+  return UI_GEN_NO_ERROR;
+}	/* End of MSG_UI_GENERATOR_CREATE_TEXT_OBJECT.	*/
+
+
+
+/***********************************************************************
+ *	MSG_UI_GENERATOR_START_BOLD for UIGeneratorClass
+ ***********************************************************************
+ * SYNOPSIS:	    Mark the beginning of bold character rending
+ * PARAMETERS:	    none
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *		This method is intended to render the text in the
+ *		contents of:  <B>, <STRONG>
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	EY	4/28/96   	Initial Revision
+ *
+ ***********************************************************************/
+@extern method UIGeneratorClass, MSG_UI_GENERATOR_START_BOLD
+{
+  optr content;
+  /*
+   * Tell a HTML content object, which will be parent of this text 
+   * object, to begin the bold mode.
+   */
+  content = @call self::MSG_UI_GENERATOR_GET_CONTENT();
+  @call content::MSG_GEN_HTML_CONTENT_SET_CONTENT(STYLE_BOLD);
+  /*
+   * If the current target.obj is a text, do the bold rendering now.
+   */
+  if (pself->UIG_target.class == (ClassStruct *)&HTGenTextClass)
+    @call pself->UIG_target.obj::MSG_GEN_TEXT_CHANGE_SIMPLE_RENDERING
+				(ELEMENT_START, TS_BOLD);
+
+  return UI_GEN_NO_ERROR;
+}	/* End of MSG_UI_GENERATOR_START_BOLD	*/
+
+
+
+/***********************************************************************
+ *		MSG_UI_GENERATOR_START_ITALIC for UIGeneratorClass
+ ***********************************************************************
+ * SYNOPSIS:	    Render text in italic
+ * PARAMETERS:	    none
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *		This method is inteded to render the text in the content
+ *		of:  <I>, <ADDRESS>, <CITE>, <EM>, <VAR> and <DFN>
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	EY	4/30/96   	Initial Revision
+ *
+ ***********************************************************************/
+@extern method UIGeneratorClass, MSG_UI_GENERATOR_START_ITALIC
+{
+  optr content;
+  /*
+   * Tell a HTML content object, which will be parent of a text 
+   * object, to begin the italic mode.
+   */
+  content = @call self::MSG_UI_GENERATOR_GET_CONTENT();
+  @call content::MSG_GEN_HTML_CONTENT_SET_CONTENT(STYLE_ITALIC);
+  /*
+   * If the current target.obj is a text, do the italic now.
+   */
+  if (pself->UIG_target.class == (ClassStruct *)&HTGenTextClass)
+    @call pself->UIG_target.obj::MSG_GEN_TEXT_CHANGE_SIMPLE_RENDERING
+				(ELEMENT_START, TS_ITALIC);
+
+  return UI_GEN_NO_ERROR;
+}	/* End of MSG_UI_GENERATOR_START_ITALIC.	*/
+
+
+
+/***********************************************************************
+ *		MSG_UI_GENERATOR_START_STRIKE for UIGeneratorClass
+ ***********************************************************************
+ * SYNOPSIS:	    Render text in strike-through
+ * PARAMETERS:	    none
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *		This method is intended to render the text in the
+ *		content of: <S>, <STRIKE>
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	EY	4/30/96   	Initial Revision
+ *
+ ***********************************************************************/
+@extern method UIGeneratorClass, MSG_UI_GENERATOR_START_STRIKE
+{
+  optr content;
+  /*
+   * Tell a HTML content object, which will be parent of this text 
+   * object, to begin the strike mode.
+   */
+  content = @call self::MSG_UI_GENERATOR_GET_CONTENT();
+  @call content::MSG_GEN_HTML_CONTENT_SET_CONTENT(STYLE_STRIKE);
+  /*
+   * If the current target.obj is a text, do the strike now.
+   */
+  if (pself->UIG_target.class == (ClassStruct *)&HTGenTextClass)
+    @call pself->UIG_target.obj::MSG_GEN_TEXT_CHANGE_SIMPLE_RENDERING
+				(ELEMENT_START, TS_STRIKE_THRU);
+  return UI_GEN_NO_ERROR;
+}	/* End of MSG_UI_GENERATOR_START_STRIKE.	*/
+
+
+/***********************************************************************
+ *		MSG_UI_GENERATOR_START_SUPERSCRIPT for UIGeneratorClass
+ ***********************************************************************
+ * SYNOPSIS:	    Render text in superscript
+ * PARAMETERS:	    none
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *		Specifically to handle <SUPERSCRIPT>
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	EY	4/30/96   	Initial Revision
+ *
+ ***********************************************************************/
+@extern method UIGeneratorClass, MSG_UI_GENERATOR_START_SUPERSCRIPT
+{
+  optr content;
+  /*
+   * Tell a HTML content object, which will be parent of this text 
+   * object, to begin the superscript mode.
+   */
+  content = @call self::MSG_UI_GENERATOR_GET_CONTENT();
+  @call content::MSG_GEN_HTML_CONTENT_SET_CONTENT(STYLE_SUPERSCRIPT);
+  /*
+   * If the current target.obj is a text, do the superscript now.
+   */
+  if (pself->UIG_target.class == (ClassStruct *)&HTGenTextClass)
+    @call pself->UIG_target.obj::MSG_GEN_TEXT_CHANGE_SIMPLE_RENDERING
+				(ELEMENT_START, TS_SUPERSCRIPT);
+
+  return UI_GEN_NO_ERROR;
+}	/* End of MSG_UI_GENERATOR_START_SUPERSCRIPT.	*/
+
+
+/***********************************************************************
+ *		MSG_UI_GENERATOR_START_SUBSCRIPT for UIGeneratorClass
+ ***********************************************************************
+ * SYNOPSIS:	    Render text in subscript
+ * PARAMETERS:	    none
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *		Specifically to handle <SUBSCRIPT>
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	EY	4/30/96   	Initial Revision
+ *
+ ***********************************************************************/
+@extern method UIGeneratorClass, MSG_UI_GENERATOR_START_SUBSCRIPT
+{
+  optr content;
+  /*
+   * Tell a HTML content object, which will be parent of this text 
+   * object, to begin the subscript mode.
+   */
+  content = @call self::MSG_UI_GENERATOR_GET_CONTENT();
+  @call content::MSG_GEN_HTML_CONTENT_SET_CONTENT(STYLE_SUBSCRIPT);
+  /*
+   * If the current target.obj is a text, do the subscript now.
+   */
+  if (pself->UIG_target.class == (ClassStruct *)&HTGenTextClass)
+    @call pself->UIG_target.obj::MSG_GEN_TEXT_CHANGE_SIMPLE_RENDERING
+				(ELEMENT_START, TS_SUBSCRIPT);
+  return UI_GEN_NO_ERROR;
+}	/* End of MSG_UI_GENERATOR_START_SUBSCRIPT.	*/
+
+
+
+/***********************************************************************
+ *	MSG_UI_GENERATOR_START_FIXED_WIDTH_FONT for UIGeneratorClass
+ ***********************************************************************
+ * SYNOPSIS:	    Render text in fixed-width font
+ * PARAMETERS:	    none
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:	This method is intended to handle <CODE>, <KBD>, 
+ *		<SAMP>, and <TT>.
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	EY	5/ 6/96   	Initial Revision
+ *
+ ***********************************************************************/
+@extern method UIGeneratorClass, MSG_UI_GENERATOR_START_FIXED_WIDTH_FONT
+{
+  optr content;
+  /*
+   * Tell a HTML content object, which will be parent of this text 
+   * object, to begin the subscript mode.
+   */
+  content = @call self::MSG_UI_GENERATOR_GET_CONTENT();
+  @call content::MSG_GEN_HTML_CONTENT_SET_CONTENT(STYLE_FW_FONT);
+  /*
+   * If the current target.obj is a text, change the font now.
+   */
+  if (pself->UIG_target.class == (ClassStruct *)&HTGenTextClass) {
+	@send pself->UIG_target.obj::MSG_VIS_TEXT_SET_FONT_ID(
+				FID_DTC_URW_MONO,
+				TEXT_ADDRESS_PAST_END,
+				TEXT_ADDRESS_PAST_END);
+  }
+  return UI_GEN_NO_ERROR;
+}	/* End of MSG_UI_GENERATOR_START_FIXED_WIDTH_FONT.	*/
+
+
+
+/***********************************************************************
+ *		MSG_UI_GENERATOR_START_FONT_SIZE for UIGeneratorClass
+ ***********************************************************************
+ * SYNOPSIS:	    Change the text font size.
+ * PARAMETERS:	    (MemHandle block, SGMLEntity *entity)
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *		This method is intended to handle:
+ *		<FONT SIZE=n>, <BASEFONT SIZE=n>, 
+ *		where n = [+|-] 1 | 2 | 3 | 4 | 5 | 6 | 7
+ *		n = 3 is default.
+ *		
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	EY	5/ 1/96   	Initial Revision
+ *
+ ***********************************************************************/
+@extern method UIGeneratorClass, MSG_UI_GENERATOR_START_FONT_SIZE
+{
+  char *value;
+  int	index, size;
+  WWFixed number;
+  optr content;
+  /*
+   * Tell a HTML content object, which will be parent of this text 
+   * object, to begin a new font size.
+   */
+  content = @call self::MSG_UI_GENERATOR_GET_CONTENT();
+  @call content::MSG_GEN_HTML_CONTENT_SET_CONTENT(STYLE_FONT);
+
+  for(index = 0; entity[index].SGMLE_token; index++) {
+    if (!entity[index].SGMLE_value)
+      continue;
+    value = (char *)LMemDerefHandles(block, entity[index].SGMLE_value);
+    switch(entity[index].SGMLE_token) {
+    case HTML_ATTR_SIZE:
+      /*
+       * get the 'size' attribute.  calculate the value if necessary.
+       */
+      size = @call content::MSG_GEN_HTML_CONTENT_GET_FONT_SIZE();
+      size = MapPointSizeToAttrSize (size);
+
+      if (value[0] == '+') {		/* Is this +size ? */
+	size += atoi(value+1);
+      }
+      else if ( value[0] == '-' || value[0] == '-')
+	size -= atoi(value+1);         /* Is this -size ? */
+      else
+	size = atoi(value);	       /* It's absolute size */
+      /*
+       * Map the attribute size to the actual font point size.
+       */
+      MapAttrSizeToPointSize(size, &number);
+      /* 
+       * Store the font point size in the fontStack, so later we know
+       * what font point size to return from.
+       */
+      @send content::MSG_GEN_HTML_CONTENT_PUSH_FONT_SIZE
+	 (number.WWF_int);
+      /*
+       * If the current target.obj is a text, change the font now.
+       */
+      if (pself->UIG_target.class == (ClassStruct *)&HTGenTextClass) {
+	@call pself->UIG_target.obj::MSG_VIS_TEXT_SET_POINT_SIZE
+	   (number,TEXT_ADDRESS_PAST_END,TEXT_ADDRESS_PAST_END);
+      }
+      break;
+    }
+  }
+  return UI_GEN_NO_ERROR;
+}	/* End of MSG_UI_GENERATOR_START_FONT_SIZE.	*/
+
+
+/***********************************************************************
+ *		MSG_UI_GENERATOR_CHANGE_SMALL_FONT for UIGeneratorClass
+ ***********************************************************************
+ * SYNOPSIS:	    Change font size smaller than the current one.
+ * PARAMETERS:	    none
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:	Get the current font size.  Change to the next smaller
+ *		size.  This method is intended to handle <SMALL>.
+ *		We treat <SMALL> as <FONT SIZE = -1>.
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	EY	5/ 2/96   	Initial Revision
+ *
+ ***********************************************************************/
+@extern method UIGeneratorClass, MSG_UI_GENERATOR_CHANGE_SMALL_FONT
+{
+  int size;
+  WWFixed number;
+  optr content;
+  /*
+   * Tell a HTML content object, which will be parent of this text 
+   * object, to begin a new font size.
+   */
+  content = @call self::MSG_UI_GENERATOR_GET_CONTENT();
+  @call content::MSG_GEN_HTML_CONTENT_SET_CONTENT(STYLE_FONT);
+  /*
+   * Get current font size
+   */
+  size = @call content::MSG_GEN_HTML_CONTENT_GET_FONT_SIZE();
+  /*
+   * change to a smaller size than the current one.  i.e. SIZE = -1
+   */
+  switch(size) {
+	case STYLE_FONT_0:
+		number.WWF_int = STYLE_FONT_0;	/* can't be any smaller */
+		break;
+	case STYLE_FONT_1:
+		number.WWF_int = STYLE_FONT_0;
+		break;
+	case STYLE_FONT_2:
+		number.WWF_int = STYLE_FONT_1;
+		break;
+	case STYLE_FONT_3:
+		number.WWF_int = STYLE_FONT_2;
+		break;
+	case STYLE_FONT_4:
+		number.WWF_int = STYLE_FONT_3;
+		break;
+	case STYLE_FONT_5:
+		number.WWF_int = STYLE_FONT_4;
+		break;
+	case STYLE_FONT_6:
+		number.WWF_int = STYLE_FONT_5;
+		break;
+	case STYLE_FONT_7:
+		number.WWF_int = STYLE_FONT_6;
+		break;
+	default:
+		number.WWF_int = STYLE_FONT_3;	/* error checking */
+		break;
+  }
+  number.WWF_frac= 0;
+  /* 
+   * Store the font point size in the fontStack, so later we know
+   * what font point size to return from.
+   */
+  @send content::MSG_GEN_HTML_CONTENT_PUSH_FONT_SIZE
+		(number.WWF_int);
+  /*
+   * If the current target.obj is a text, change the font now.
+   */
+  if (pself->UIG_target.class == (ClassStruct *)&HTGenTextClass) {
+	@call pself->UIG_target.obj::MSG_VIS_TEXT_SET_POINT_SIZE
+		(number,TEXT_ADDRESS_PAST_END,TEXT_ADDRESS_PAST_END);
+  }
+  return UI_GEN_NO_ERROR;
+}	/* End of MSG_UI_GENERATOR_CHANGE_SMALL_FONT.	*/
+
+
+
+/***********************************************************************
+ *		MSG_UI_GENERATOR_CHANGE_BIG_FONT for UIGeneratorClass
+ ***********************************************************************
+ * SYNOPSIS:	    Change font size smaller than the current one.
+ * PARAMETERS:	    none
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:	Get the current font size.  Change to the next larger
+ *		size.  This method is intended to handle <LARGE>. 
+ *		We treat <BIG> as <FONT SIZE = +1>.
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	EY	5/ 2/96   	Initial Revision
+ *
+ ***********************************************************************/
+@extern method UIGeneratorClass, MSG_UI_GENERATOR_CHANGE_BIG_FONT
+{
+  int size;
+  WWFixed number;
+  optr content;
+  /*
+   * Tell a HTML content object, which will be parent of this text 
+   * object, to begin a new font size.
+   */
+  content = @call self::MSG_UI_GENERATOR_GET_CONTENT();
+  @call content::MSG_GEN_HTML_CONTENT_SET_CONTENT(STYLE_FONT);
+  /*
+   * Get current font size
+   */
+  size = @call content::MSG_GEN_HTML_CONTENT_GET_FONT_SIZE();
+  /*
+   * change to a larger size than the current one.  i.e. SIZE = +1
+   */
+  switch(size) {
+	case STYLE_FONT_1:
+		number.WWF_int = STYLE_FONT_2;
+		break;
+	case STYLE_FONT_2:
+		number.WWF_int = STYLE_FONT_3;
+		break;
+	case STYLE_FONT_3:
+		number.WWF_int = STYLE_FONT_4;
+		break;
+	case STYLE_FONT_4:
+		number.WWF_int = STYLE_FONT_5;
+		break;
+	case STYLE_FONT_5:
+		number.WWF_int = STYLE_FONT_6;
+		break;
+	case STYLE_FONT_6:
+		number.WWF_int = STYLE_FONT_7;
+		break;
+	case STYLE_FONT_7:
+		number.WWF_int = STYLE_FONT_8;
+		break;
+	case STYLE_FONT_8:
+		number.WWF_int = STYLE_FONT_8;	/* can't be any larger */
+		break;
+	default:
+		number.WWF_int = STYLE_FONT_3;	/* error checking */
+		break;
+  }
+  number.WWF_frac= 0;
+  /* 
+   * Store the font point size in the fontStack, so later we know
+   * what font point size to return from.
+   */
+  @send content::MSG_GEN_HTML_CONTENT_PUSH_FONT_SIZE
+		(number.WWF_int);
+  /*
+   * If the current target.obj is a text, change the font now.
+   */
+  if (pself->UIG_target.class == (ClassStruct *)&HTGenTextClass) {
+	@call pself->UIG_target.obj::MSG_VIS_TEXT_SET_POINT_SIZE
+		(number,TEXT_ADDRESS_PAST_END,TEXT_ADDRESS_PAST_END);
+  }
+  return UI_GEN_NO_ERROR;
+}	/* End of MSG_UI_GENERATOR_CHANGE_BIG_FONT.	*/
+
+
+
+/***********************************************************************
+ *		MSG_UI_GENERATOR_START_HEADER for UIGeneratorClass
+ ***********************************************************************
+ * SYNOPSIS:	    Set header font
+ * PARAMETERS:	    (MemHandle block, SGMLEntity *entity)
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *		Assume the HTML parser will generate the size attribute
+ *		like
+ *		<H1 size=6>
+ *		<H2 size=5>
+ *		<H3 size=4>
+ *		<H4 size=3>
+ *		<H5 size=2>
+ *		<H6 size=1>
+ *		Supported attributes: ALIGN
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	EY	5/ 3/96   	Initial Revision
+ *
+ ***********************************************************************/
+@extern method UIGeneratorClass, MSG_UI_GENERATOR_START_HEADER
+{
+  optr content;
+  if (pself->UIG_target.class == (ClassStruct *)&HTGenOptionClass) {
+    FinishCurrentObjectInForm(pself->UIG_pmObj,&(pself->UIG_target));
+    @call pself->UIG_pmObj::MSG_PM_GET_RECV_OBJ_OPTR_AND_CLASS
+       (&(pself->UIG_target.obj), &(pself->UIG_target.class));
+  }
+  /*
+   * Push format token onto the format stack.
+   * Note, here we're pushing three format tokens, so we'll pop four 
+   * tokens all together later in the MSG_UI_GENERATOR_END_FORMAT.
+   */
+  content = @call self::MSG_UI_GENERATOR_GET_CONTENT();
+  @call content::MSG_GEN_HTML_CONTENT_SET_CONTENT(STYLE_ALIGN);
+  @call content::MSG_GEN_HTML_CONTENT_SET_CONTENT(STYLE_BOLD);
+  @call content::MSG_GEN_HTML_CONTENT_SET_CONTENT(STYLE_FONT);
+  @call content::MSG_GEN_HTML_CONTENT_SET_CONTENT(STYLE_HEADER);
+  /*
+   * Add a blank line for the header.
+   */
+  AddNewLine(&(pself->UIG_target), 2, pself->UIG_pmObj, pself->UIG_content);
+  /*
+   * Process the attribute list.
+   */
+  ProcessHeaderAttr(block, entity, &(pself->UIG_target), content);
+
+  return UI_GEN_NO_ERROR;
+}	/* End of MSG_UI_GENERATOR_START_HEADER.	*/
+
+
+/***********************************************************************
+ *	MSG_UI_GENERATOR_START_UNORDERED_LIST for UIGeneratorClass
+ ***********************************************************************
+ * SYNOPSIS:	    Draws lines of text as a bulleted list.
+ * PARAMETERS:	    (MemHandle block, SGMLEntity *entity)
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:	This method is intended to handle <UL>, <MENU>, <DIR>
+ *		Supported Attributes:
+ *		<UL>	: TYPE = disk | circle | square
+ *		<MENU>	: same as above
+ *		<DIR>	: same as above
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	EY	5/ 7/96   	Initial Revision
+ *
+ ***********************************************************************/
+@extern method UIGeneratorClass, MSG_UI_GENERATOR_START_UNORDERED_LIST
+{
+  optr content;
+  StyleType groupType;
+  int	counter, level;
+  char	displayType;
+  /*
+   * Do some initializing work common to both <UL> and <OL>.
+   * This function does:
+   * 	1) Push format token onto the format stack.
+   *	2) Add a line break before the first list item if we're in the
+   *	   first list level.
+   */
+  content = @call self::MSG_UI_GENERATOR_GET_CONTENT();
+  @call content::MSG_GEN_HTML_CONTENT_SET_CONTENT(STYLE_UL);
+  /*
+   * Get the list group info before creating the list item.
+   */
+  @call content::MSG_GEN_HTML_CONTENT_GET_LIST_GROUP
+	(&groupType, &counter, &displayType, &level);
+  if (level == -1)
+    AddNewLine(&(pself->UIG_target), 1, pself->UIG_pmObj, pself->UIG_content);
+  /*
+   * Process the attribute list, push the list info to the list stack.
+   */
+  ProcessUnorderedListAttr(block, entity, content);
+
+  return UI_GEN_NO_ERROR;
+ }	/* End of MSG_UI_GENERATOR_START_UNORDERED_LIST.	*/
+
+
+
+/***********************************************************************
+ *	MSG_UI_GENERATOR_START_ORDERED_LIST for UIGeneratorClass
+ ***********************************************************************
+ * SYNOPSIS:	    Draws lines of text as an ordered list.
+ * PARAMETERS:	    (MemHandle block, SGMLEntity *entity)
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:	This method is intended to handle <OL>
+ *		Supported Attributes:
+ *		<OL>	: START=n, TYPE= A | a | I| i | 1
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	EY	5/ 7/96   	Initial Revision
+ *
+ ***********************************************************************/
+@extern method UIGeneratorClass, MSG_UI_GENERATOR_START_ORDERED_LIST
+{
+  optr content;
+  StyleType groupType;
+  int	counter, level;
+  char	displayType;
+  /*
+   * Do some initializing work common to both <UL> and <OL>.
+   * This function does:
+   * 	1) Push format token onto the format stack.
+   *	2) Add a line break before the first list item if we're in the
+   *	   first list level.
+   */
+  content = @call self::MSG_UI_GENERATOR_GET_CONTENT();
+  @call content::MSG_GEN_HTML_CONTENT_SET_CONTENT(STYLE_OL);
+  /*
+   * If it's a nested list, we don't need to insert a new-line.  <LI>
+   * will add a new line.
+   */
+  @call content::MSG_GEN_HTML_CONTENT_GET_LIST_GROUP
+	(&groupType, &counter, &displayType, &level);
+  if (level == -1)
+    AddNewLine(&(pself->UIG_target),1,pself->UIG_pmObj, pself->UIG_content);
+  /*
+   * Process the attribute list, push the list info to the list stack.
+   */
+  ProcessOrderedListAttr(block, entity, content);
+
+  return UI_GEN_NO_ERROR;
+}	/* End of MSG_UI_GENERATOR_START_ORDERED_LIST.	*/
+
+
+
+/***********************************************************************
+ *		MSG_UI_GENERATOR_END_LIST for UIGeneratorClass
+ ***********************************************************************
+ * SYNOPSIS:	    Mark the text object the end of a list group.
+ * PARAMETERS:	    none, 
+ * SIDE EFFECTS:    Called internally by MSG_UI_GENERATOR_END_FORMAT
+ *
+ * STRATEGY:	This method handles </UL>, </OL>, and </BQ>
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	EY	5/ 9/96   	Initial Revision
+ *
+ ***********************************************************************/
+@extern method UIGeneratorClass, MSG_UI_GENERATOR_END_LIST
+{
+  StyleType groupType;
+  int	counter, level;
+  char	displayType;
+  Tab	nextTab;
+  optr	content;
+  /*
+   * Pop format token onto the format stack.
+   */
+  content = @call self::MSG_UI_GENERATOR_GET_CONTENT();
+  @call content::MSG_GEN_HTML_CONTENT_POP_LIST_GROUP();
+
+  @call content::MSG_GEN_HTML_CONTENT_GET_LIST_GROUP
+	(&groupType, &counter, &displayType, &level);
+  /*
+   * Insert a line break to begin a new paragraph, whose left margin
+   * will be set as followed.
+   */
+  if (groupType == (StyleType)-1)
+    AddNewLine(&(pself->UIG_target),2,pself->UIG_pmObj, pself->UIG_content);
+  else
+    AddNewLine(&(pself->UIG_target),1,pself->UIG_pmObj, pself->UIG_content);
+  /*
+   * Mark the margin of the new paragraph.
+   */
+  if (pself->UIG_target.class == (ClassStruct *)&HTGenTextClass) {
+    @send pself->UIG_target.obj::MSG_VIS_TEXT_SET_LEFT_MARGIN(
+				TAB_SIZE * ( level + 1 ),
+				TEXT_ADDRESS_PAST_END,
+				TEXT_ADDRESS_PAST_END);
+    /*
+     * Restore the next tab which has been set an anchor from the
+     * previous nested list group.
+     */
+    nextTab.T_position	= TAB_SIZE * (level + 2);	/* reset the */
+    nextTab.T_attr	= TL_NONE | TT_LEFT;		/* next tab. */
+    nextTab.T_lineWidth	= nextTab.T_lineSpacing	=
+			  nextTab.T_grayScreen	= 0;
+    @call pself->UIG_target.obj::MSG_VIS_TEXT_SET_TAB(nextTab,		
+				TEXT_ADDRESS_PAST_END,
+				TEXT_ADDRESS_PAST_END);
+  }
+  return UI_GEN_NO_ERROR;
+}	/* End of MSG_UI_GENERATOR_END_LIST.	*/
+
+
+
+/***********************************************************************
+ *		MSG_UI_GENERATOR_START_LIST_ITEM for UIGeneratorClass
+ ***********************************************************************
+ * SYNOPSIS:	    Denotes one item of a list.
+ * PARAMETERS:	    (MemHandle block, SGMLEntity *entity)
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:	This method is intended to handle <LI>.
+ * 		- add a new line
+ *		- tab to the right position
+ *		- add a item header.  (message call)
+ *		- set left margine for the item text.
+ *
+ *		If this is under <OL>,
+ *
+ *		If this is under <UL>, <MENU>, or <DIR>,
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	EY	5/ 7/96   	Initial Revision
+ *
+ ***********************************************************************/
+@extern method UIGeneratorClass, MSG_UI_GENERATOR_CREATE_LIST_ITEM
+{
+  StyleType format, groupType;
+  int counter, level, i;
+  char displayType, tab[1] = { C_TAB };
+  optr content;
+
+  content = @call self::MSG_UI_GENERATOR_GET_CONTENT();
+  format = @call content::MSG_GEN_HTML_CONTENT_GET_CONTENT_TYPE();
+  if (format != STYLE_OL && format != STYLE_UL) {
+	EC_WARNING(UIG_INVALID_LI_ITEM); 
+	return UI_GEN_ERROR;
+  }
+
+  if (pself->UIG_target.class != (ClassStruct *)&HTGenTextClass) {
+    /* No text object, so create and initialize one */
+    @call pself->UIG_pmObj::
+	MSG_PM_TAKE_UNFINISHED_UI_OBJ(pself->UIG_target.obj);
+    @call self::MSG_UI_GENERATOR_CREATE_TEXT_OBJECT(NULL, content, 0);
+  }
+  /*
+   * The new item starts on a new line.  If there has been a nested
+   * list that just ended, then a new line has been added.  Thus
+   * we don't need to add another new line here.
+   */
+  if (@call content::\
+	MSG_HTGHC_MSG_GEN_HTML_CONTENT_GET_ANY_LAST_LIST_GROUP() == FALSE)
+    AddNewLine(&(pself->UIG_target),1,pself->UIG_pmObj, pself->UIG_content);
+  /*
+   * Get the list group info before creating the list item.
+   */
+  @call content::MSG_GEN_HTML_CONTENT_GET_LIST_GROUP
+	(&groupType, &counter, &displayType, &level);
+  EC_WARNING_IF(format != groupType, UIG_UNBALANCED_LIST_STACK);
+  /*
+   * Process any passed attributes list.
+   */
+  ProcessLIAttr(block, entity, groupType, &counter, &displayType,
+	content);
+  /*
+   * add a 'right' tab for the item header.
+   */
+  SetTabsForListGroup(level, pself->UIG_target.obj);
+  /*
+   * Since the new line break brought the cursor to position 1, we
+   * need to tab to the right position for the list item.
+   */
+  if (level == 0)
+    for(i = 0; i <= level; i++)
+      @send pself->UIG_target.obj::MSG_VIS_TEXT_APPEND_PTR(tab, 1);
+  else
+    for(i = 0; i < level; i++)
+      @send pself->UIG_target.obj::MSG_VIS_TEXT_APPEND_PTR(tab, 1);
+
+  if (format == STYLE_UL) {
+	/* create an unordered list header */
+	@call self::MSG_UI_GENERATOR_CREATE_UNORDERED_LIST_ITEM(
+		displayType, level);
+  }
+  else {					/* STYLE_OL */
+	/* create an ordered list header */
+	@call self::MSG_UI_GENERATOR_CREATE_ORDERED_LIST_ITEM(
+		counter, displayType, level);
+  }
+  /*
+   * Set the left margin so the item text wraps around at the right place
+   */
+  @send pself->UIG_target.obj::MSG_VIS_TEXT_SET_LEFT_MARGIN(
+				(TAB_SIZE * ( level + 1 )) + 24,
+				TEXT_ADDRESS_PAST_END,
+				TEXT_ADDRESS_PAST_END);
+
+  return UI_GEN_NO_ERROR;
+}	/* End of MSG_UI_GENERATOR_START_LIST_ITEM.	*/
+
+
+/***********************************************************************
+ *	MSG_UI_GENERATOR_CREATE_UNORDERED_LIST_ITEM for UIGeneratorClass
+ ***********************************************************************
+ * SYNOPSIS:	    Create an item header for an unordered list item.
+ * PARAMETERS:	    (char displayType, int level)
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:	- add a new line
+ *		- tab to the right position
+ *		- change to the symbol font
+ *		- add a symbol representing a item header.
+ *		- change the font back.
+ *		- set left margine for the item text.
+ *		  
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	EY	5/ 7/96   	Initial Revision
+ *
+ ***********************************************************************/
+@extern method UIGeneratorClass, MSG_UI_GENERATOR_CREATE_UNORDERED_LIST_ITEM
+{
+  char	bullet[3] = { C_U_SIGMA, C_TAB };
+  optr	content;
+  /*
+   * Different nesting level has a different item header, unless the
+   * attriute specifies otherwise.  This follows the Netscape style.
+   */
+  if (displayType == 'c')
+	bullet[0] = C_SMALL_O;
+  else if (displayType == 's')
+	bullet[0] = C_DBLDAGGER;
+  else if (displayType == 'd')
+	bullet[0] = C_U_SIGMA;
+  else if (level == 0)
+	bullet[0] = C_U_SIGMA;
+  else if (level == 1)
+	bullet[0] = C_SMALL_O;
+  else if (level > 1)
+	bullet[0] = C_DBLDAGGER;
+
+  /* change font to get a nice looking bullet */
+  @call pself->UIG_target.obj::MSG_VIS_TEXT_SET_FONT_ID(
+				FID_DTC_URW_SYMBOLPS,
+				TEXT_ADDRESS_PAST_END,
+				TEXT_ADDRESS_PAST_END);
+  /* 
+   * Add the item header 
+   */
+  @call pself->UIG_target.obj::MSG_VIS_TEXT_APPEND_PTR(bullet, 2);
+  /*
+   * change back the font
+   */
+  content = @call self::MSG_UI_GENERATOR_GET_CONTENT();
+  if (@call content::MSG_GEN_HTML_CONTENT_GET_STYLE_COUNT
+	(STYLE_FW_FONT)) {
+    @send pself->UIG_target.obj::MSG_VIS_TEXT_SET_FONT_ID(
+				FID_DTC_URW_MONO,
+				TEXT_ADDRESS_PAST_END,
+				TEXT_ADDRESS_PAST_END);
+  }
+  else {
+    @send pself->UIG_target.obj::MSG_VIS_TEXT_SET_FONT_ID(
+				FID_DTC_URW_SANS,
+				TEXT_ADDRESS_PAST_END,
+				TEXT_ADDRESS_PAST_END);
+  }
+
+  return UI_GEN_NO_ERROR;
+}	/* End of MSG_UI_GENERATOR_CREATE_UNORDERED_LI.	*/
+
+
+/***********************************************************************
+ *	MSG_UI_GENERATOR_CREATE_ORDERED_LIST_ITEM for UIGeneratorClass
+ ***********************************************************************
+ * SYNOPSIS:	    Create an item header for an ordered list item.
+ * PARAMETERS:	    (int counter, char displayType, int level)
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	EY	5/ 9/96   	Initial Revision
+ *
+ ***********************************************************************/
+@extern method UIGeneratorClass, MSG_UI_GENERATOR_CREATE_ORDERED_LIST_ITEM
+{
+  int	i;
+  char	temp[20];
+  optr	content;
+  /*
+   * Different level has a different item header.  Unless the attriute 
+   * of the list item specifies otherwise, we use the default item 
+   * headers.  This follows the Netscape style.
+   */
+  if (displayType == 'A')
+    MyVisTextFormatNumber(temp, counter, VTNT_LETTER_UPPER_A);
+  else if (displayType == 'a')
+    MyVisTextFormatNumber(temp, counter, VTNT_LETTER_LOWER_A);
+  else if (displayType == 'I')
+    VisTextFormatNumber(temp, counter, VTNT_ROMAN_NUMERAL_UPPER);
+  else if (displayType == 'i')
+    VisTextFormatNumber(temp, counter, VTNT_ROMAN_NUMERAL_LOWER);
+  else 
+    VisTextFormatNumber(temp, counter, VTNT_NUMBER);
+
+  for (i=0; temp[i] != '\0'; i++)
+	;
+  temp[i++]	= C_PERIOD;
+  temp[i++]	= C_TAB;
+  temp[i]	= '\0';
+
+  content = @call self::MSG_UI_GENERATOR_GET_CONTENT();
+  @send content::MSG_GEN_HTML_CONTENT_INCREMENT_COUNTER();
+  /* 
+   * Add the item header 
+   */
+  @call pself->UIG_target.obj::MSG_VIS_TEXT_APPEND_PTR(temp, 0);
+
+  return UI_GEN_NO_ERROR;
+}	/* End of MSG_UI_GENERATOR_CREATE_ORDERED_LIST_ITEM.	*/
+
+
+
+/***********************************************************************
+ *		MSG_UI_GENERATOR_START_PRE for UIGeneratorClass
+ ***********************************************************************
+ * SYNOPSIS:	    render text in a separated multi-line group
+ * PARAMETERS:	    none
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *		Add a new line, change to fixed-width font.  This
+ *		method is intended to handle <PRE>, <XMP> and <LISTING>
+ *
+ *		NOTE!!!!:
+ *		This message assumes the parser will not strip off
+ *		multiple spaces and line breaks in the source html file
+ *		from now on until the end element is seen.
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	EY	5/ 6/96   	Initial Revision
+ *
+ ***********************************************************************/
+@extern method UIGeneratorClass, MSG_UI_GENERATOR_START_PRE
+{
+  optr content;
+
+  AddNewLine(&(pself->UIG_target), 2, pself->UIG_pmObj, pself->UIG_content);
+  @call self::MSG_UI_GENERATOR_START_FIXED_WIDTH_FONT();
+  /*
+   * Push format token onto the format stack. 
+   */
+  content = @call self::MSG_UI_GENERATOR_GET_CONTENT();
+  @call content::MSG_GEN_HTML_CONTENT_SET_CONTENT(STYLE_PRE);
+
+  return UI_GEN_NO_ERROR;
+}	/* End of MSG_UI_GENERATOR_START_PRE.	*/
+
+
+
+/***********************************************************************
+ *	MSG_UI_GENERATOR_START_DEFINITION_LIST for UIGeneratorClass
+ ***********************************************************************
+ * SYNOPSIS:	    
+ * PARAMETERS:	    
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	EY	5/10/96   	Initial Revision
+ *
+ ***********************************************************************/
+@extern method UIGeneratorClass, MSG_UI_GENERATOR_START_DEFINITION_LIST
+{
+  optr content;
+  StyleType groupType;
+  int counter, level;
+  char displayType;
+
+  content = @call self::MSG_UI_GENERATOR_GET_CONTENT();
+  /*
+   * Push format token onto the format stack.
+   */
+  @call content::MSG_GEN_HTML_CONTENT_SET_CONTENT(STYLE_DL);
+  /*
+   * Add a line break before the first list item if it's the first
+   * level of list
+   */
+  @call content::MSG_GEN_HTML_CONTENT_GET_LIST_GROUP
+	(&groupType, &counter, &displayType, &level);
+  if (level == -1)
+    AddNewLine(&(pself->UIG_target),1,pself->UIG_pmObj, pself->UIG_content);
+  /*
+   * Push the list group info
+   */
+  @call content::MSG_GEN_HTML_CONTENT_PUSH_LIST_GROUP(STYLE_DL, 0, 0);
+
+  return UI_GEN_NO_ERROR;
+}	/* End of MSG_UI_GENERATOR_START_DEFINITION_LIST.	*/
+
+
+
+/***********************************************************************
+ *	MSG_UI_GENERATOR_CREATE_DEFINITION_DT for UIGeneratorClass
+ ***********************************************************************
+ * SYNOPSIS:	    
+ * PARAMETERS:	    
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	EY	5/10/96   	Initial Revision
+ *
+ ***********************************************************************/
+@extern method UIGeneratorClass, MSG_UI_GENERATOR_CREATE_DEFINITION_DT
+{
+  StyleType groupType;
+  int counter, level, i;
+  char displayType, tab[1] = { C_TAB }, null[] = { C_NULL };
+  optr content = @call self::MSG_UI_GENERATOR_GET_CONTENT();
+
+  if (pself->UIG_target.class != (ClassStruct *)&HTGenTextClass) {
+    /* No text object, so create and initialize one */
+    @call self::MSG_UI_GENERATOR_APPEND_TEXT_PTR(null,0);
+  }
+  /*
+   * the new item starts on a new line
+   */
+  AddNewLine(&(pself->UIG_target), 1, pself->UIG_pmObj, pself->UIG_content);
+  /*
+   * Get the list group info before creating the list item.
+   */
+  @call content::MSG_GEN_HTML_CONTENT_GET_LIST_GROUP
+	(&groupType, &counter, &displayType, &level);
+  EC_WARNING_IF(groupType != STYLE_DL, UIG_UNBALANCED_LIST_STACK);
+  /*
+   * Since the new line break brought the cursor to position 1, we
+   * need to tab to the right position for the list item.
+   */
+/*  if (listIndex > 1)	* if it's a nested definition list, *
+  	level++;			* then skip the right tab */
+	
+  for(i = 0; i < level; i++)
+    @call pself->UIG_target.obj::MSG_VIS_TEXT_APPEND_PTR(tab, 1);
+
+  return UI_GEN_NO_ERROR;
+}	/* End of MSG_UI_GENERATOR_CREATE_DEFINITION_DT.	*/
+
+
+
+/***********************************************************************
+ *	MSG_UI_GENERATOR_CREATE_DEFINITION_DD for UIGeneratorClass
+ ***********************************************************************
+ * SYNOPSIS:	    
+ * PARAMETERS:	    
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	EY	5/10/96   	Initial Revision
+ *
+ ***********************************************************************/
+@extern method UIGeneratorClass, MSG_UI_GENERATOR_CREATE_DEFINITION_DD
+{
+  StyleType groupType;
+  int counter, level, i;
+  char displayType, tab[1] = { C_TAB }, null[] = { C_NULL };
+  optr content = @call self::MSG_UI_GENERATOR_GET_CONTENT();
+
+  if (pself->UIG_target.class != (ClassStruct *)&HTGenTextClass) {
+    /* No text object, so create and initialize one */
+    @call self::MSG_UI_GENERATOR_APPEND_TEXT_PTR(null,0);
+  }
+  /*
+   * the new item starts on a new line
+   */
+  AddNewLine(&(pself->UIG_target), 1, pself->UIG_pmObj, pself->UIG_content);
+  /*
+   * Get the list group info before creating the list item.
+   */
+  @call content::MSG_GEN_HTML_CONTENT_GET_LIST_GROUP
+	(&groupType, &counter, &displayType, &level);
+  EC_WARNING_IF(groupType != STYLE_DL, UIG_UNBALANCED_LIST_STACK);
+  /*
+   * Since the new line break brought the cursor to position 1, we
+   * need to tab to the right position for the list item.
+   */
+/*  if (listIndex > 1)	* if it's a nested definition list, *
+  	level++;			* then skip the right tab */
+	
+  for(i = 0; i <= level; i++)
+    @call pself->UIG_target.obj::MSG_VIS_TEXT_APPEND_PTR(tab, 1);
+
+  return UI_GEN_NO_ERROR;
+}	/* End of MSG_UI_GENERATOR_CREATE_DEFINITION_DD.	*/
+
+
+
+/***********************************************************************
+ *	MSG_UI_GENERATOR_GET_CONTENT for UIGeneratorClass
+ ***********************************************************************
+ * SYNOPSIS:	    Get the current content object
+ * PARAMETERS:	    optr ()
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	EY	6/16/96   	Initial Revision
+ *
+ ***********************************************************************/
+@extern method UIGeneratorClass, MSG_UI_GENERATOR_GET_CONTENT
+{
+  optr obj;
+  ClassStruct *class;
+  /*
+   *  Is target.obj a content object?  Note, HTGenTCellClass is a 
+   *  content object.
+   */
+  if (pself->UIG_target.class == (ClassStruct *)&HTGenTCellClass ||
+      pself->UIG_target.class == (ClassStruct *)&HTGenFormClass)
+	return pself->UIG_target.obj;
+  /*
+   * Get PManager's current recvObj, i.e the leaf child of the ui tree.
+   */
+  @call pself->UIG_pmObj::MSG_PM_GET_RECV_OBJ_OPTR_AND_CLASS(&obj, &class);
+  /*
+   * Trace up the tree to find a content object.
+   */
+  while(!@call obj::MSG_META_IS_OBJECT_IN_CLASS(&PresentationManagerClass)) {
+    if (@call obj::MSG_META_IS_OBJECT_IN_CLASS(&HTGenHtmlContentClass)) {
+	/* 
+	 * add the new text format to the content object.
+	 */
+	return obj;
+    }
+    obj = @call obj::MSG_GEN_FIND_PARENT();
+  }
+  /*
+   * Return the global content object.  If not exists, create one.
+  if (!pself->UIG_content)
+    pself->UIG_content = @call pself->UIG_pmObj::\
+		MSG_PM_OBJECT_INSTANTIATE(&HTGenHtmlContentClass);
+
+   */
+  return pself->UIG_content;
+}	/* End of MSG_UI_GENERATOR_GET_CONTENT.	*/
+
+
+/***********************************************************************
+ *	MSG_GEN_TEXT_CHANGE_SIMPLE_RENDERING for HTGenTextClass
+ ***********************************************************************
+ * SYNOPSIS:	    Change the simple text rendering.
+ * PARAMETERS:	    (ElementType type, TextStyle style)
+ *			type - ELEMENT_START	starting element
+ *			       ELEMENT_END	ending element
+ *			style - TS_BOLD, TS_ITALIC, TS_SUPERSCRIPT,
+ *				TS_SUBSCRIPT, TS_STRIKE_THRU, 
+ *                              TS_UNDERLINE
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:  If the style is TS_UNDERLINE(which is the representation
+ *            of a hyperlink), then we need to store the link's starting
+ *            and ending positions of the text object.
+ *            
+ *		
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	EY	4/30/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method HTGenTextClass, MSG_GEN_TEXT_CHANGE_SIMPLE_RENDERING
+{
+
+  if (type == ELEMENT_START) {
+    /* 
+     * Start a new format
+     */
+    @call oself::MSG_VIS_TEXT_SET_TEXT_STYLE(0,0,0,style,
+					TEXT_ADDRESS_PAST_END,
+					TEXT_ADDRESS_PAST_END);
+    GrSetTextStyle(pself->HTGT_gstate, style, 0);
+  }
+  else {
+    /* 
+     * Clear a format
+     */
+    @call oself::MSG_VIS_TEXT_SET_TEXT_STYLE(0,0,style,0,
+					TEXT_ADDRESS_PAST_END,
+					TEXT_ADDRESS_PAST_END);
+    GrSetTextStyle(pself->HTGT_gstate, 0, style);
+  }
+  return;
+}	/* End of MSG_GEN_TEXT_CHANGE_SIMPLE_RENDERING */
+
+
+
+/***********************************************************************
+ *		MSG_VIS_TEXT_SET_POINT_SIZE for HTGenTextClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	   Update the gstate about the change in point size.
+ * PARAMETERS:     (WWFixed pointSize, dword rangeEnd, dword rangeStart)
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	edwin	11/ 9/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method HTGenTextClass, MSG_VIS_TEXT_SET_POINT_SIZE
+{
+  WWFixedAsDWord ptSize;
+  FontID id;
+
+  @callsuper();
+  id = GrGetFont(pself->HTGT_gstate, &ptSize);
+  ptSize = MAKE_SIZE_DWORD(pointSize.WWF_frac, pointSize.WWF_int);
+  GrSetFont(pself->HTGT_gstate, id, ptSize);
+  return;
+}	/* End of MSG_VIS_TEXT_SET_POINT_SIZE.	*/
+
+
+
+/***********************************************************************
+ *		MSG_GEN_TEXT_RECORD_HREF for HTGenTextClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    Record the HREF segments on the text objects.
+ * PARAMETERS:	    (ElementType type, int token)
+ *                  type - ELEMENT_START, this is <A>
+ *                         ELEMENT_END, this is </A>
+ *                  token - HREF token, used to get HREF value.
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	edwin	10/ 3/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method HTGenTextClass, MSG_GEN_TEXT_RECORD_HREF
+{
+  VisTextRange pos;
+  AnchorElement elm;
+  int cnt, n;
+
+  @call oself::MSG_VIS_TEXT_GET_SELECTION_RANGE(&pos);
+
+  if (type == ELEMENT_START) {
+    /*
+     *  Create an Anchor Element to store the current text position
+     *  for the current <A HREF=token> content.
+     */
+    elm.AE_token = token;
+    elm.AE_start = pos.VTR_start;
+    elm.AE_end   = -1;
+    n = HTListAppend(pself->HTGT_anchorList, &elm, sizeof(AnchorElement));
+    if (n > 0) {
+      /*
+       *  This is error checking to make sure that we don't have nested
+       *  <A>...</A> content.
+       */
+      HTListGetItem(pself->HTGT_anchorList,n-1,&elm,sizeof(AnchorElement));
+      if (elm.AE_end == -1) {
+	elm.AE_end = pos.VTR_start;
+	HTListReplaceItem(pself->HTGT_anchorList,
+			  n - 1, &elm, sizeof(AnchorElement));
+      }
+    }
+  }
+  else {
+    /*
+     *  </A> has been encountered.  Use the HREF token to retrieve the
+     *  associated Anchor Element and record the current text position
+     *  for the ending of the <A HREF=token> content.
+     */
+    cnt = HTListGetCount(pself->HTGT_anchorList) - 1;  /* 0 base */
+    HTListRemoveItem
+      (pself->HTGT_anchorList, cnt, &elm, sizeof(AnchorElement));
+    elm.AE_end = pos.VTR_start;
+    HTListAppend(pself->HTGT_anchorList, &elm, sizeof(AnchorElement));
+  }
+}	/* End of MSG_GEN_TEXT_RECORD_HREF.	*/
+
+
+/***********************************************************************
+ *	MSG_GEN_TEXT_INITIALIZE for HTGenTextClass
+ ***********************************************************************
+ * SYNOPSIS:	    Initialize the text object
+ * PARAMETERS:	    none
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	EY	6/ 3/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method HTGenTextClass, MSG_GEN_TEXT_INITIALIZE
+{
+  WindowHandle win;
+  ColorQuad color;
+  /*
+   * create gstate, used to calculate min width to set the text width.
+   */
+  win = @call self::MSG_VIS_QUERY_WINDOW();
+  pself->HTGT_gstate = GrCreateState(win);
+  /*
+   * Initialize the list for hyperlink storagge.
+   */
+  pself->HTGT_anchorList = HTListNew();
+  /*
+   * Set non-editable.
+   */
+  @call self::MSG_GEN_SET_ATTRS(GA_READ_ONLY | GA_TARGETABLE,0);
+  /*
+   * Create storage and set multiple attributes
+   */
+  @call self::MSG_VIS_TEXT_CREATE_STORAGE(
+	VTSF_MULTIPLE_CHAR_ATTRS | VTSF_MULTIPLE_PARA_ATTRS, 0);
+  /*
+   * Add ATTRs and HINTs
+   */
+  @call self::MSG_META_ADD_VAR_DATA
+	(ATTR_GEN_TEXT_NEVER_MAKE_SCROLLABLE, 0, NULL);
+  /*
+   * Mark text selectable so it can be a target and receive hilit.
+   */
+  @call self::MSG_META_ADD_VAR_DATA
+        (ATTR_GEN_TEXT_SELECTABLE, 0, NULL);
+  /*
+   * Add a hint to set light grey background.  This hint is needed
+   * because it set on the TDSS_COLOR_SET flag, and the flag allow
+   * me to make the white background for the print out.
+   */
+  color.CQ_redOrIndex = C_LIGHT_GREY;
+  color.CQ_info = CF_INDEX;
+  color.CQ_green = 0;
+  color.CQ_blue = 0;
+  @call self::MSG_META_ADD_VAR_DATA
+        (HINT_TEXT_WASH_COLOR, sizeof(ColorQuad), &color);
+
+  /*
+   *  Used to indicate the current hyperlink index that is in focus.
+   */
+  pself->HTGT_focalAnchor = -1;
+
+  return pself->HTGT_gstate;
+}	/* End of MSG_GEN_TEXT_INITIALIZE.	*/
+
+
+
+/***********************************************************************
+ *  MSG_GEN_TEXT_UPDATE_MAX_LEN_AND_RESET_ACC_LEN for HTGenTextClass
+ ***********************************************************************
+ * SYNOPSIS:	    Update the maxLen if neccessary.  Reset accLen.
+ * PARAMETERS:	    none
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:	maxLen is used to calculate the maximum length of the
+ *		widest line in the text object.  This length will be
+ *		the width of the text object.
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	EY	6/16/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method HTGenTextClass, MSG_GEN_TEXT_UPDATE_MAX_LEN_AND_RESET_ACC_LEN
+{
+  if (pself->HTGT_accLen > pself->HTGT_maxLen)
+    pself->HTGT_maxLen = pself->HTGT_accLen;
+  pself->HTGT_accLen = 0;
+}	/* End of MSG_GEN_TEXT_UPDATE_MAX_LEN_AND_RESET_ACC_LEN.	*/
+
+
+
+/***********************************************************************
+ *		MSG_GEN_TEXT_SET_MIN_SIZE for HTGenTextClass
+ ***********************************************************************
+ * SYNOPSIS:	    Set the size of text object to the length of its
+ *		    text.
+ * PARAMETERS:	    none
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	EY	6/11/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method HTGenTextClass, MSG_GEN_TEXT_SET_MIN_SIZE
+{
+  int len;
+
+  len = (pself->HTGT_accLen > pself->HTGT_maxLen) ?
+	pself->HTGT_accLen :
+	pself->HTGT_maxLen ;
+
+  if (len > X_SCREEN_SIZE)
+	len = X_SCREEN_SIZE - NESTED_MARGIN;
+
+  return;
+}	/* End of MSG_GEN_TEXT_SET_MIN_SIZE.	*/
+
+
+/***********************************************************************
+ *		MSG_GEN_TEXT_FIND_LINK_UNDER_MOUSE for HTGenTextClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    Find a <A HREF> link under the given mouse coord.
+ * PARAMETERS:	    int (word xPosition, word yPosition)
+ *                  return: HREF token, or
+ *                          -1 if no HREF is under the mouse.
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	edwin	10/ 7/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method HTGenTextClass, MSG_GEN_TEXT_FIND_LINK_UNDER_MOUSE
+{
+  PointDWFixed coord;
+  dword offset;
+  int i, hrefCnt, avg_w;
+  AnchorElement elm;
+  VisTextConvertOffsetParams params;
+
+  coord.PDF_x.DWF_int = xPosition;
+  coord.PDF_y.DWF_int = yPosition;
+  coord.PDF_x.DWF_frac = coord.PDF_y.DWF_frac = 0;
+
+  offset = @call self::MSG_VIS_TEXT_GET_TEXT_POSITION_FROM_COORD(&coord);
+  params.VTCOP_offset = offset;
+  @call self::MSG_VIS_TEXT_CONVERT_OFFSET_TO_COORDINATE(&params);
+  avg_w = @call self::MSG_VIS_TEXT_GET_AVERAGE_CHAR_WIDTH();
+  if ((params.VTCOP_xPos + avg_w) < xPosition)
+    return -1;    /* mouse is outside the right edge of this text line. */
+
+  for(i = 0, hrefCnt = HTListGetCount(pself->HTGT_anchorList);
+      i < hrefCnt;
+      i++) {
+    HTListGetItem(pself->HTGT_anchorList, i, &elm, sizeof(AnchorElement));
+    if (elm.AE_start <= offset && offset <= elm.AE_end) {
+      /* Found it! */
+      return elm.AE_token;
+    }
+    if (offset < elm.AE_end)
+      break;
+  }
+  return -1;
+}	/* End of MSG_GEN_TEXT_FIND_LINK_UNDER_MOUSE.	*/
+
+
+/***********************************************************************
+ *		GetDocumentCoordFromOffsets
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Give the text starting and ending offsets, return the
+ *              document coordinates for drawing a box surrounding the
+ *              text.
+ * CALLED BY:	
+ * RETURN:	
+ *	
+ * STRATEGY:	
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	edwin   	3/19/97   	Initial Revision
+ *	
+ ***********************************************************************/
+Rectangle
+GetDocumentCoordFromOffsets(optr text, dword start, dword end, 
+			    sdword *left, sdword *top, 
+			    sdword *right, sdword *bottom)
+{
+  VisTextConvertOffsetParams params;
+  VisTextGetLineInfoReturnValues retValue;
+  VisTextGetLineInfoParameters vtglip;
+  LineInfo startLineInfo, lastLineInfo;
+  int firstLine, firstLineHgt, secondLine;
+  Rectangle bound;
+
+  /*
+   *  Get the (left, top) doc coordinate of the start text offset.
+   */
+  params.VTCOP_offset = start;
+  @call text::MSG_VIS_TEXT_CONVERT_OFFSET_TO_COORDINATE(&params);
+  *left = params.VTCOP_xPos - 1;
+  *top = params.VTCOP_yPos;
+
+  /*
+   *  Get the line height of the starting text offset, which may or may
+   *  not be in the same line as the end offset.
+   */
+  vtglip.VTGLIP_buffer = &startLineInfo;
+  vtglip.VTGLIP_bsize = sizeof(LineInfo);
+  firstLine = vtglip.VTGLIP_line =
+      @call text::MSG_VIS_TEXT_GET_LINE_FROM_OFFSET(start);
+  @call text::MSG_VIS_TEXT_GET_LINE_INFO(&retValue, &vtglip);
+  firstLineHgt = startLineInfo.LI_hgt.WBF_int;
+
+  /*
+   *  Get the line height of the end text offset, which may or may not
+   *  be in the same line as the start offset.
+   */
+  vtglip.VTGLIP_buffer = &lastLineInfo;
+  vtglip.VTGLIP_bsize = sizeof(LineInfo);
+  secondLine = vtglip.VTGLIP_line =
+      @call text::MSG_VIS_TEXT_GET_LINE_FROM_OFFSET(end);
+  @call text::MSG_VIS_TEXT_GET_LINE_INFO(&retValue, &vtglip);
+  /*
+   *  Get the (right, bottom) doc coordinate of the end text offset.
+   */
+  params.VTCOP_offset = end;
+  @call text::MSG_VIS_TEXT_CONVERT_OFFSET_TO_COORDINATE
+      (&params);
+  *right = params.VTCOP_xPos + 1;
+  *bottom = params.VTCOP_yPos + lastLineInfo.LI_hgt.WBF_int + 1;
+
+  if (firstLine != secondLine) {
+    /*
+     *  Oh no!  The link wraps to mutiple lines!
+     */
+    @call text::MSG_VIS_GET_BOUNDS(&bound);
+    bound.R_top    = *top + firstLineHgt + 1;
+    bound.R_bottom = params.VTCOP_yPos + 1;
+    bound.R_right  -= 1;
+    bound.R_left   += 1;
+  }
+  else
+      bound.R_right = bound.R_left = bound.R_top = bound.R_bottom = 0;
+
+  return bound;
+}	/* End of GetDocumentCoordFromOffsets.	*/
+
+
+/***********************************************************************
+ *		MSG_GEN_TEXT_DRAW_FOCUS for HTGenTextClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    Draw the next focusable link.
+ * PARAMETERS:	    (in direction, GStateHandle han, Rectangle *obj, 
+ *                   RectDWord *rect, Rectangle *box, RectDWord *ret)
+ *                  Return the actual drawing region around the link.
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:	    
+ *
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	edwin   	3/18/97   	Initial Revision
+ *	
+ ***********************************************************************/
+@method HTGenTextClass, MSG_GEN_TEXT_DRAW_FOCUS
+{
+  int i, hrefCnt;
+  AnchorElement elm;
+  EventHandle msg;
+
+  hrefCnt = HTListGetCount(pself->HTGT_anchorList);
+  if (!hrefCnt) {
+    ret->RD_left = ret->RD_right = 0;   /* to indicate no draw region */
+    return;
+  }
+
+  if ((i = pself->HTGT_focalAnchor) == -1) {
+      if (direction == SEARCH_BACKWARD)
+	  i = hrefCnt;
+  }
+
+  while (1) {
+    if (direction == SEARCH_FORWARD)
+	i++;
+    else
+	i--;
+    if (i < 0 || i >= hrefCnt)
+      break;  /* no more hyperlink for this object */
+    /*
+     *  Find the bounds of the next hyperlink element.
+     */
+    HTListGetItem(pself->HTGT_anchorList, i, &elm, sizeof(AnchorElement));
+    *box = GetDocumentCoordFromOffsets
+	(oself, elm.AE_start, elm.AE_end, &(ret->RD_left),  &(ret->RD_top), 
+	 &(ret->RD_right), &(ret->RD_bottom));
+    /*
+     *  Is the hyperlink within the visible region?
+     */
+    if (ret->RD_left >= rect->RD_left && ret->RD_top >= rect->RD_top &&
+	ret->RD_right<=rect->RD_right && ret->RD_bottom<=rect->RD_bottom &&
+	ret->RD_right != ret->RD_left) {
+	if (box->R_right != box->R_left) {
+	  GrDrawLine(han, ret->RD_left, ret->RD_top, 
+		     box->R_right, ret->RD_top);
+	  GrDrawLine(han, box->R_right, ret->RD_top,
+		     box->R_right, box->R_bottom);
+	  GrDrawLine(han, box->R_right, box->R_bottom,
+		     ret->RD_right, box->R_bottom);
+	  GrDrawLine(han, ret->RD_right, box->R_bottom,
+		     ret->RD_right, ret->RD_bottom);
+	  GrDrawLine(han, ret->RD_right, ret->RD_bottom,
+		     box->R_left, ret->RD_bottom);
+	  GrDrawLine(han, box->R_left, ret->RD_bottom,
+		     box->R_left, box->R_top);
+	  GrDrawLine(han, box->R_left, box->R_top,
+		     ret->RD_left, box->R_top);
+	  GrDrawLine(han, ret->RD_left, box->R_top,
+		     ret->RD_left, ret->RD_top);
+	}
+	else
+	    GrDrawRect(han, ret->RD_left, ret->RD_top, 
+		       ret->RD_right, ret->RD_bottom);
+
+	pself->HTGT_focalAnchor = i;
+	pself->HTGT_focalBound = *ret;
+	pself->HTGT_focalBox = *box;
+
+	/*
+	 *  Get the href token from the text object and pass to the PManager.
+	 */
+	msg = @record PresentationManagerClass::MSG_PM_DISPLAY_HREF_TARGET
+	    (elm.AE_token);
+	@send self::MSG_VIS_VUP_SEND_TO_OBJECT_OF_CLASS(msg);
+	return;
+    }
+    /*
+     *  We've looped to a hyperlink that is beyond the visible range.
+     */
+    else if((direction == SEARCH_FORWARD && ret->RD_top > rect->RD_bottom) ||
+	    (direction == SEARCH_BACKWARD&& ret->RD_bottom < rect->RD_top)) {
+	break;
+    }
+  }
+/*  pself->HTGT_focalAnchor = -1;  */
+  /* To indicate no draw region: */
+  ret->RD_left = ret->RD_right = ret->RD_top = ret->RD_bottom = 0;
+  return;
+}	/* End of MSG_GEN_TEXT_DRAW_FOCUS.	*/
+
+/***********************************************************************
+ *		MSG_GEN_TEXT_UNDRAW_FOCUS for HTGenTextClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    Erase the focus drawing.
+ * PARAMETERS:	    (GState gstate, RectDWord *drawBound, 
+ *                   Rectangle *box, optr newLink)
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:	    
+ *
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	edwin   	3/19/97   	Initial Revision
+ *	
+ ***********************************************************************/
+@method HTGenTextClass, MSG_GEN_TEXT_UNDRAW_FOCUS
+{
+  if (box->R_left == box->R_right) {
+      GrDrawRect(gstate, drawBound->RD_left, drawBound->RD_top, 
+		 drawBound->RD_right, drawBound->RD_bottom);
+  }
+  else {
+	  GrDrawLine(gstate, drawBound->RD_left, drawBound->RD_top, 
+		     box->R_right, drawBound->RD_top);
+	  GrDrawLine(gstate, box->R_right, drawBound->RD_top,
+		     box->R_right, box->R_bottom);
+	  GrDrawLine(gstate, box->R_right, box->R_bottom,
+		     drawBound->RD_right, box->R_bottom);
+	  GrDrawLine(gstate, drawBound->RD_right, box->R_bottom,
+		     drawBound->RD_right, drawBound->RD_bottom);
+	  GrDrawLine(gstate, drawBound->RD_right, drawBound->RD_bottom,
+		     box->R_left, drawBound->RD_bottom);
+	  GrDrawLine(gstate, box->R_left, drawBound->RD_bottom,
+		     box->R_left, box->R_top);
+	  GrDrawLine(gstate, box->R_left, box->R_top,
+		     drawBound->RD_left, box->R_top);
+	  GrDrawLine(gstate, drawBound->RD_left, box->R_top,
+		     drawBound->RD_left, drawBound->RD_top);
+  }
+
+  if (oself != newLink)
+      /*
+       *  The new link is not in the same text object, so mark the 
+       *  text object not in focus.
+       */
+      pself->HTGT_focalAnchor = -1; 
+
+  return;
+}	/* End of MSG_GEN_TEXT_UNDRAW_FOCUS.	*/
+
+
+/***********************************************************************
+ *		MSG_GEN_TEXT_FIND_LINK_IN_RECT for HTGenTextClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    Given the rect, find the next focuable link.
+ * PARAMETERS:	    (RectDWord rect)
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:	    
+ *
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	edwin   	3/24/97   	Initial Revision
+ *	
+ ***********************************************************************/
+@method HTGenTextClass, MSG_GEN_TEXT_FIND_LINK_IN_RECT
+{
+  int i, hrefCnt;
+  AnchorElement elm;
+  RectDWord ret;
+
+  hrefCnt = HTListGetCount(pself->HTGT_anchorList);
+  if (!hrefCnt) {
+    return FALSE;
+  }
+
+  if (direction == SEARCH_BACKWARD)
+      i = hrefCnt;
+  else
+      i = -1;
+
+  while (1) {
+    if (direction == SEARCH_FORWARD)
+	i++;
+    else
+	i--;
+    if (i < 0 || i >= hrefCnt)
+      break;  /* no more hyperlink for this object */
+    /*
+     *  Find the bounds of the next hyperlink element.
+     */
+    HTListGetItem(pself->HTGT_anchorList, i, &elm, sizeof(AnchorElement));
+    GetDocumentCoordFromOffsets(oself, elm.AE_start, elm.AE_end, 
+				&(ret.RD_left),  &(ret.RD_top), 
+				&(ret.RD_right), &(ret.RD_bottom));
+    /*
+     *  Is the hyperlink within the visible region?
+     */
+    if (ret.RD_left > rect.RD_left && ret.RD_top > rect.RD_top &&
+	ret.RD_right< rect.RD_right && ret.RD_bottom < rect.RD_bottom &&
+	ret.RD_right != ret.RD_left) {
+	return TRUE;
+    }
+    /*
+     *  We've looped to a hyperlink that is beyond the visible range.
+     */
+    else if((direction == SEARCH_FORWARD && ret.RD_top > rect.RD_bottom) ||
+	    (direction == SEARCH_BACKWARD&& ret.RD_bottom < rect.RD_top)) {
+	break;
+    }
+  }
+  return FALSE;
+}	/* End of MSG_GEN_TEXT_FIND_LINK_IN_RECT.	*/
+
+
+/***********************************************************************
+ *		MSG_GEN_DESTROY for HTGenTextClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    Clear some instance data.
+ * PARAMETERS:	    
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:	    
+ *
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	edwin   	2/ 7/97   	Initial Revision
+ *	
+ ***********************************************************************/
+@method HTGenTextClass, MSG_GEN_DESTROY
+{
+  @callsuper();
+  HTListDelete(pself->HTGT_anchorList);
+  GrDestroyState(pself->HTGT_gstate);
+  return;
+}	/* End of MSG_GEN_DESTROY.	*/
+
+
+
+/***********************************************************************
+ *		MSG_VIS_RECALC_SIZE for HTGenTextClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    Recalculate the size of the text object to fit in
+ *		    its parent in the ui tree.
+ * PARAMETERS:	    SizeAsDWord MSG_VIS_RECALC_SIZE(
+ *    	    	    	    	RecalcSizeArgs width, 
+ *				RecalcSizeArgs height)
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	edwin	9/25/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method HTGenTextClass, MSG_VIS_RECALC_SIZE
+{
+  CompSizeHintArgs sizeArgs;
+  SizeAsDWord  size;
+  int minTextLen;
+  VisTextInstance  * vself;
+  /*
+   *  Get the parent's fixed size.
+   */
+  sizeArgs.CSHA_width = 0;
+  @call @genParent::MSG_META_GET_VAR_DATA
+	(HINT_FIXED_SIZE, sizeof(sizeArgs), &sizeArgs);
+  if (sizeArgs.CSHA_width > 0) {
+    /*
+     *  Set the size of the text object.
+     */
+    width = sizeArgs.CSHA_width;
+    minTextLen = (pself->HTGT_accLen > pself->HTGT_maxLen) ?
+	pself->HTGT_accLen :
+	pself->HTGT_maxLen ;
+    if (minTextLen < width)
+      sizeArgs.CSHA_width = SST_PIXELS | minTextLen;
+    else {
+      /*      if (width > NESTED_MARGIN)
+	sizeArgs.CSHA_width = SST_PIXELS | width - NESTED_MARGIN;
+      else */
+	sizeArgs.CSHA_width = SST_PIXELS | width;
+    }
+    sizeArgs.CSHA_height= SST_LINES_OF_TEXT | 1;
+    sizeArgs.CSHA_count = 0;
+    sizeArgs.CSHA_height = 0;
+    @call self::MSG_META_ADD_VAR_DATA
+		(HINT_FIXED_SIZE, sizeof(sizeArgs), &sizeArgs);
+  }
+
+  size = @callsuper();
+  /*
+   *  Tell the Geometry Manager to send a messaeg instead of caling a
+   *  a routine.
+   */
+  vself = ObjDerefVis(oself);
+  vself->VI_geoAttrs &= ~VGA_USE_VIS_SET_POSITION;
+  return size;
+}
+
+
+
+/***********************************************************************
+ *		MSG_VIS_OPEN for HTGenTextClass
+ ***********************************************************************
+ * SYNOPSIS:	    
+ * PARAMETERS:	    
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	EY	7/16/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method HTGenTextClass, MSG_VIS_OPEN
+{
+  VisTextStates	visTextState = 0;
+
+  @callsuper();
+  visTextState =/* VTS_SELECTABLE | */ VTS_TARGETABLE;
+  @call self::MSG_VIS_TEXT_MODIFY_EDITABLE_SELECTABLE(visTextState,0);
+  return;
+}	/* End of MSG_META_INITIALIZE.	*/
+
+
+
+/***********************************************************************
+ *		MSG_VIS_TEXT_SET_FONT_ID for HTGenTextClass
+ ***********************************************************************
+ * SYNOPSIS:	    Intercept the message and update its gstate.
+ * PARAMETERS:	    
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:	HTGT_gstate is used to calculate the width, in pixels,
+ *		needed to draw the text.  That width will be used to
+ *		set the width of text object.  Thus, the text won't 
+ *		appear wider than necesary.
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	EY	6/19/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method HTGenTextClass, MSG_VIS_TEXT_SET_FONT_ID
+{
+  GrSetFont(pself->HTGT_gstate, fid, 0);
+  @callsuper();
+  return;
+}	/* End of MSG_VIS_TEXT_SET_FONT_ID.	*/
+
+
+/***********************************************************************
+ *		MSG_VIS_TEXT_APPEND_PTR for HTGenTextClass
+ ***********************************************************************
+ * SYNOPSIS:	    Intercept this message and update the HTGT_accLen
+ * PARAMETERS:	    (const char *text, word textLen)
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:	HTGT_accLen is used to accumulate the text  length, 
+ *		in pixels to draw the current line of text.  This 
+ *		length will be used to set the width of text object.
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	EY	6/19/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method HTGenTextClass, MSG_VIS_TEXT_APPEND_PTR
+{
+  int len;
+  if (text[0] == C_TAB)
+    pself->HTGT_accLen += (textLen * TAB_POINT);
+  else if (text[0] == C_LF)
+    return;
+  else {
+    if (textLen == 0)
+      len = strlen(text);
+    else
+      len = textLen;
+    pself->HTGT_accLen += (GrTextWidth(pself->HTGT_gstate,text,len)+6);
+  }
+  @callsuper();
+  return;
+}	/* End of MSG_VIS_TEXT_APPEND_PTR.	*/
+
+
+/***********************************************************************
+ *		MSG_GEN_SET_USABLE for HTGenTextClass
+ ***********************************************************************
+ * SYNOPSIS:	    All the text object in our HTML document should be
+ *		    set the smallest as possible.
+ * PARAMETERS:	    (VisUpdateMode updateMode)
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	EY	8/ 7/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method HTGenTextClass, MSG_GEN_SET_USABLE
+{
+  @call self::MSG_GEN_TEXT_SET_MIN_SIZE();
+  @callsuper();
+  return;
+}	/* End of MSG_GEN_SET_USABLE.	*/
+
+
+/***********************************************************************
+ *		MSG_META_MOUSE_PTR for HTGenTextClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    Change Mouse pointer Image when it's over a link.
+ * PARAMETERS:	    (word xPosition,word yPosition, word inputState)
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	edwin	10/ 7/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method HTGenTextClass, MSG_META_PTR
+{
+  int hrefToken;
+
+  hrefToken = @call self::MSG_GEN_TEXT_FIND_LINK_UNDER_MOUSE
+    (xPosition, yPosition);
+
+  @callsuper();
+
+  if (hrefToken != -1) {
+    retVal->ptrImage = @BoxCursor;
+    /* this event processed */
+    retVal->flags = MRF_PROCESSED | MRF_SET_POINTER_IMAGE;
+  }
+
+  return;
+}	/* End of MSG_META_MOUSE_PTR.	*/
+
+
+/***********************************************************************
+ *		MSG_META_START_SELECT for HTGenTextClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    Detect hyperlink on the text object.
+ * PARAMETERS:	    (MouseReturnParams *retVal,
+ *			      sword xPosition,
+ *			      sword yPosition,
+ *			      word inputState) 
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	edwin	10/ 7/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method HTGenTextClass, MSG_META_START_SELECT
+{
+  int hrefToken;
+  optr pmanager;
+
+  pself->HTGT_selected = TRUE;
+  @callsuper();
+
+  if (!(GET_BUTTON_INFO(inputState) & BI_PRESS))
+    return;
+
+  hrefToken = @call self::MSG_GEN_TEXT_FIND_LINK_UNDER_MOUSE
+    (xPosition, yPosition);
+
+  pmanager = @call self::MSG_META_GET_OBJ_BLOCK_OUTPUT();
+  if (hrefToken != -1)
+    @call pmanager::MSG_PM_REFER_HYPERLINK(hrefToken);
+  else
+    @call pmanager::MSG_PM_CLEAR_HREF_LINK();
+
+  return;
+}	/* End of MSG_META_START_SELECT.	*/
+
+
+
+/***********************************************************************
+ *		MSG_VIS_POSITION_BRANCH for HTGenTextClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    Manually position the object.
+ * PARAMETERS:	    
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	edwin	10/24/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method HTGenTextClass, MSG_VIS_POSITION_BRANCH
+{
+  XYValueAsDWord xy = @call @genParent::MSG_VIS_GET_POSITION();
+
+  xOrigin = DWORD_X(xy) + pself->HTGT_xPos;
+  yOrigin = DWORD_Y(xy) + 
+    GetItsPotentialHeight(oself, pself->HTGT_pageRow);
+  @callsuper();
+  return;
+}	/* End of MSG_VIS_POSITION_BRANCH.	*/
+
+
+
+/***********************************************************************
+ *		MSG_META_UIG_CALC_POSITION for HTGenTextClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    Manually calculate the position of the object.
+ * PARAMETERS:	    
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	edwin	10/28/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method HTGenTextClass, MSG_META_UIG_CALC_POSITION
+{
+  int row;
+  SizeAsDWord size = @call self::MSG_VIS_GET_SIZE();
+
+  pself->HTGT_xPos = UpdateItsPotentialPosition(oself, size, &row);
+  pself->HTGT_pageRow = row;
+  return;
+}	/* End of MSG_META_UIG_CALC_POSITION.	*/
+
+
+
+/***********************************************************************
+ *		MSG_VIS_TEXT_SHOW_SELECTION for HTGenTextClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    Don't scroll the view.
+ * PARAMETERS:      (VisTextShowSelectionFlags flags,
+ *                  MakeRectVisibleFlags yFlags,
+ *                  MakeRectVisibleMargin yMargin,
+ *                  MakeRectVisibleFlags xFlags,
+ *                  MakeRectVisibleMargin xMargin,
+ *                  sdword bottom, sdword right,
+ *                  sdword top, sdword left);
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY: 
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	edwin	11/11/96   	Initial Revision
+ *
+
+@method HTGenTextClass, MSG_VIS_TEXT_SHOW_SELECTION
+{
+  return;
+}
+ ***********************************************************************/
+	/* End of MSG_VIS_TEXT_SHOW_SELECTION.	*/
+
+
+
+/***********************************************************************
+ *		MSG_VIS_DRAW for HTGenTextClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    In the print process, make the text backgroud white
+ *                  so that the text on the print out won't have light
+ *                  grey background.
+ * PARAMETERS:	    (DrawFlags drawFlags, GStateHandle gstate);
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	edwin	12/10/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method HTGenTextClass, MSG_VIS_DRAW
+{
+  VisTextWashColorModeRed modeRed;
+  VisTextWashColorBlueGreen blueGreen;
+  VisTextGetWashColor retVal;
+  VisTextInstance  * vself;
+  VisTextIntFlags flag;
+
+  if (drawFlags & DF_PRINT) {
+    @call self::MSG_VIS_TEXT_GET_WASH_COLOR(&retVal);
+    modeRed.VTWCMR_redOrIndex = C_WHITE;
+    modeRed.VTWCMR_mapMode = CF_INDEX;
+    blueGreen.VTWCBG_green = blueGreen.VTWCBG_blue = 0;
+    vself = ObjDerefVis(oself);
+    flag = vself->VTI_intFlags;
+    vself->VTI_intFlags |= VTIF_SUSPENDED;
+    @call self::MSG_VIS_TEXT_SET_WASH_COLOR(modeRed, blueGreen);
+    vself->VTI_intFlags = flag;
+  }
+  @callsuper();
+  if (drawFlags & DF_PRINT) {
+    @call self::MSG_VIS_TEXT_SET_WASH_COLOR(retVal.VTGWC_modeRed,
+					    retVal.VTGWC_blueGreen);
+  }
+  if (pself->HTGT_focalAnchor != -1) {
+    /*
+     *  Redraw the focus outlink if it currently has focus.
+     */
+    GrSaveState(gstate);
+    GrSetLineMaskSys(gstate, SDM_50 );
+    GrSetLineColor(gstate, CF_INDEX, C_LIGHT_GREY, 0, 0);
+    GrSetMixMode(gstate, MM_XOR);
+  if (pself->HTGT_focalBox.R_left != pself->HTGT_focalBox.R_right) {
+	  GrDrawLine(gstate, pself->HTGT_focalBound.RD_left, 
+		     pself->HTGT_focalBound.RD_top, 
+		     pself->HTGT_focalBox.R_right, 
+		     pself->HTGT_focalBound.RD_top);
+	  GrDrawLine(gstate, pself->HTGT_focalBox.R_right, 
+		     pself->HTGT_focalBound.RD_top,
+		     pself->HTGT_focalBox.R_right, 
+		     pself->HTGT_focalBox.R_bottom);
+	  GrDrawLine(gstate, pself->HTGT_focalBox.R_right, 
+		     pself->HTGT_focalBox.R_bottom,
+		     pself->HTGT_focalBound.RD_right, 
+		     pself->HTGT_focalBox.R_bottom);
+	  GrDrawLine(gstate, pself->HTGT_focalBound.RD_right, 
+		     pself->HTGT_focalBox.R_bottom,
+		     pself->HTGT_focalBound.RD_right, 
+		     pself->HTGT_focalBound.RD_bottom);
+	  GrDrawLine(gstate, pself->HTGT_focalBound.RD_right, 
+		     pself->HTGT_focalBound.RD_bottom,
+		     pself->HTGT_focalBox.R_left, 
+		     pself->HTGT_focalBound.RD_bottom);
+	  GrDrawLine(gstate, pself->HTGT_focalBox.R_left, 
+		     pself->HTGT_focalBound.RD_bottom,
+		     pself->HTGT_focalBox.R_left, 
+		     pself->HTGT_focalBox.R_top);
+	  GrDrawLine(gstate, pself->HTGT_focalBox.R_left, 
+		     pself->HTGT_focalBox.R_top,
+		     pself->HTGT_focalBound.RD_left, 
+		     pself->HTGT_focalBox.R_top);
+	  GrDrawLine(gstate, pself->HTGT_focalBound.RD_left, 
+		     pself->HTGT_focalBox.R_top,
+		     pself->HTGT_focalBound.RD_left, 
+		     pself->HTGT_focalBound.RD_top);
+  }
+  else
+      GrDrawRect(gstate, 
+		 pself->HTGT_focalBound.RD_left, 
+		 pself->HTGT_focalBound.RD_top, 
+		 pself->HTGT_focalBound.RD_right, 
+		 pself->HTGT_focalBound.RD_bottom);
+    GrRestoreState(gstate);
+  }
+  return;
+}	/* End of MSG_VIS_DRAW.	*/
+
+
+
+/***********************************************************************
+ *		MSG_SEARCH for HTGenTextClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    Reset a global variable.
+ * PARAMETERS:	    
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	edwin	12/23/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method HTGenTextClass, MSG_SEARCH
+{
+  searchWrapObj = NULL;
+  @callsuper();
+  return;
+}	/* End of MSG_SEARCH.	*/
+
+
+
+/***********************************************************************
+ *		MSG_META_GET_OBJECT_FOR_SEARCH_SPELL for HTGenTextClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    Record the search status in global variables.
+ * PARAMETERS:	    option
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	edwin	12/20/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method HTGenTextClass, MSG_META_GET_OBJECT_FOR_SEARCH_SPELL
+{
+
+  if(option == GSSOT_FIRST_OBJECT || option == GSSOT_LAST_OBJECT) {
+    @call self::MSG_VIS_TEXT_GET_SELECTION_RANGE(&searchWrapRange);
+    searchWrapObj = oself;
+  }
+  else
+    searchWrapObj = NULL;
+  return @callsuper();
+}	/* End of MSG_META_GET_OBJECT_FOR_SEARCH_SPELL.	*/
+
+
+
+/***********************************************************************
+ *		MSG_VIS_TEXT_SELECT_RANGE for HTGenTextClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    To make the selected text in the document
+ *                  stay selected when there is no more matched string
+ *                  during the search process.
+ * PARAMETERS:	    (@stack dword end, dword start)
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	edwin	12/22/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method HTGenTextClass, MSG_VIS_TEXT_SELECT_RANGE
+{
+  if (searchWrapObj == oself) {
+    start = searchWrapRange.VTR_start;
+    end = searchWrapRange.VTR_end;
+  }
+  @callsuper();
+  return;
+}	/* End of MSG_VIS_TEXT_SELECT_RANGE.	*/
+
+

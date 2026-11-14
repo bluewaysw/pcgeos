@@ -1,0 +1,1949 @@
+/***********************************************************************
+ *
+ *	Copyright (c) Geoworks 1998.  All rights reserved.
+ *	GEOWORKS CONFIDENTIAL
+ *
+ * PROJECT:	  Geos-SC WWW Library
+ * MODULE:	  HTML Glyph
+ * FILE:	  htglyph.h
+ *
+ * AUTHOR:  	  Kok Kin Kee: Mar 14, 1998
+ *
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	kkee    	3/14/98		Initial version
+ *
+ * DESCRIPTION:
+ *
+ *	HTGlyph defines an abstract class for all objects that can
+ *      appear in a HTML document structure. Its subclasses define
+ *      both visible elements (such as characters and images) and
+ *      structural elements (such as rows and columns).
+ *      : //depot/liberty/project/ellery/980805/library/www/html/htglyph.h#1
+ *
+ * 	$Id: htglyph.goh,v 1.3 98/08/26 15:08:08 edwin Exp $
+ *
+ ***********************************************************************/
+@ifndef _HTGLYPH_H_
+@define _HTGLYPH_H_
+/*
+#include <basedef.h>   // USE_IT()
+#include <www/wwcore/wwlist.h>
+#include <www/conv/htmldtd.h>
+*/
+
+@include "WWW2/WW2Core/ww2list.goh"
+@include "WWW2/Conv/htmldtd.goh"
+
+/*
+class MouseEvent;  // #include <toolkit/evtmouse.h>
+class HTFrame;
+class MinMaxAccumulator;  // in this same file
+
+#ifdef ERROR_CHECK
+#include <fs/file.h>      // ECPrintSelf()
+#endif
+*/
+
+@importMessage MetaApplicationMessages, HTMLToken GetIdentity();
+@importMessage MetaApplicationMessages, Boolean Format(optr formatter);
+@importMessage MetaApplicationMessages, Boolean ParseAttrs(const SGMLEntity entity[]);
+
+    //////////
+    //
+    // Rectangle of an area, where (x0, y0) represents the uppper left
+    // corner and (x1, y1) represents the lower right corner coordinates.
+    //
+    //      (x0,y0) --------------
+    //             |             |
+    //             |             |
+    //             |             |
+    //             |             |
+    //             --------------- (x1,y1)
+    //
+typedef struct 
+{
+    sword  x0;
+    sdword y0;
+    sword  x1;
+    sdword y1;
+} HTCoord;
+
+    //////////
+    //
+    // A point on an area, where (x,y) represents the point.
+    //
+typedef struct 
+{
+    sword  x;
+    sdword y;
+} HTPoint;
+
+    //////////
+    //
+    // A rectangle area size.
+    //
+typedef struct htSize
+{
+    sword  width;
+    sdword height;
+} HTSize;
+
+    //////////
+    //
+    // Offset, could have negative values.
+    //
+typedef struct htOffset
+{
+    sword  x;
+    sdword y;
+} HTOffset;
+
+    //////////
+    //
+    // Offset and size.
+    //
+typedef struct htOffsetAndSize
+{
+    HTOffset offset;
+    HTSize   size;
+} HTOffsetAndSize;
+
+    //////////
+    //
+    // Intersection and overlapping of bounds states.
+    //
+    // [] HTGLYPH_ABOVE_BOUNDS  The whole glyph is above the bounds.
+    // [] HTGLYPH_IN_BOUNDS     The glyph overlaps/intersects the bounds.
+    // [] HTGLYPH_BELOW_BOUNDS  The whole glyph is below the bounds.
+    // [] HTGLYPH_OUT_BOUNDS    Not inbound but can't determine
+    //                          whether is above or below bounds.
+    //
+typedef enum {
+    HTGLYPH_ABOVE_BOUNDS = 0,
+    HTGLYPH_IN_BOUNDS,
+    HTGLYPH_BELOW_BOUNDS,
+    HTGLYPH_OUT_BOUNDS
+} HTGlyphBoundsCheck;
+
+    //////////
+    //
+    // HTML glyph alignment.
+    //
+    // [] HTALIGN_TOP      Top of the glyph aligns with the tallest
+    //                     glyph on the line containing the image.
+    // [] HTALIGN_MIDDLE   Center of the glyph aligns with the
+    //                     baseline of the line containing the glyph.
+    // [] HTALIGN_BOTTOM   Bottom of the glypg aligns with the baseline
+    //                     of the line containing the glyph.
+    // [] HTALIGN_LEFT     Float the glyph to the left margin, subsequent
+    //                     text flows along the glyph's right side.
+    // [] HTALIGN_RIGHT    Float the glyph to the right margin, subsequent
+    //                     text flows along the glyph's left side.
+    // [] HTALIGN_CENTER   Center all following rows.
+    //
+typedef enum {
+    HTALIGN_TOP,
+    HTALIGN_MIDDLE,
+    HTALIGN_BOTTOM,
+    HTALIGN_LEFT,
+    HTALIGN_RIGHT,
+    HTALIGN_CENTER
+} HTAlignment;
+
+
+    // Various flags to save memory
+    //
+    // [] pointToParent         This is 1 if the _sibling pointer
+    //                          points to parent.
+    // [] geometryValid         This is 1 if the geometry is valid. Geometry
+    //                          is with respect to the position, not size.
+    //                          For size, we use sizeValid flag.
+    // [] sizeValid             1 if glyph size is not valid.
+    // [] unused                Align the structure to 8-bit boundary.
+    //
+typedef struct glyphFlags
+{
+    unsigned  pointToParent : 1;    
+    unsigned  geometryValid : 1;
+    unsigned  sizeValid     : 1;
+    unsigned  unused        : 5;
+} GlyphFlags;
+
+
+/*
+//
+// Forward declaration.
+//
+class FlexPanel;           // #include <toolkit/panel.h>
+class HTGlyphContext;      // in this same file
+class HTBoundedGlyph;      // in this same file
+class HTComposite;         // in this same file
+class HTLeaf;              // in this same file
+class HTAnchoredLeaf;      // in this same file
+class HTToken;             // in this same file
+class HTTextState;         // #include "httext.h"
+class HTFormat;            // #include "htformat.h"
+class HTMLAnchorItem;      // #include "anchor.h"
+*/
+
+
+/***************************************************************************
+CLASS
+    HTGlyph
+
+    The abstract class for all objects that can appear in a HTML
+    document. These objects are divided into two categories; visible
+    elements (such as characters and images) and structural elements
+    (such as table, rows, and columns).
+
+    The glyph methods are divided into three responsibilities.
+
+    Responsibilities       Operations
+    ----------------       ----------
+       appearance          virtual void Draw(...)
+                           virtual void SetBounds(...)
+
+       hit detection       virtual HTGlyphBoundsCheck Intersects(...)
+                           virtual HTGlyphBoundsCheck Overlap(...)
+
+       structure           virtual Boolean Append(...)
+                           virtual void Get(...)
+                           virtual void Remove(...)
+                           virtual HTGlyph* GetParent(...)
+
+     Memory usage
+     ------------
+     * _sibling  = 4 bytes.
+     * _flags    = 2 bytes
+     Total       = 6 bytes.
+
+KEYWORDS
+
+
+CLASS TREE
+<pre>
+    HTGlyph
+</pre>
+****************************************************************************/
+@class HTGlyphClass, MetaClass;
+
+/* public: */
+    //////////
+    //
+    // Destructor. Virtual for inheritance.
+    //
+    // Status_ Functional
+    //
+
+    // virtual ~HTGlyph() {};
+
+    //////////
+    //
+    // Ask the glyph to draw itself to a window.
+    //
+    // Parameters_
+    //
+    // [out] panel      Physical window to draw the glyph. Window
+    //                  coordinates is assumed to go from
+    //                  (0,0) to window size.
+    // [in]  exposed    Offset and size of the virtual window exposed.
+    //                  exposed->offset is the offset from the drawing
+    //                  window upper-left corner. A glyph must add
+    //                  this offset to its _coord. The new coordinates
+    //                  must fall into the rectangle
+    //                     (0,0) to
+    //                     (exposed->size.width, exposed->size.height)
+    //                  in order for a glyph to draw.
+    // [in]  context    The glyph context that maintains extrinsic
+    //                  attributes of the glyph.  If NULL, no
+    //                  extrinsic states.
+    //
+    // See_also_ RequestDraw()
+    //
+    // Status_ Functional
+    //
+    @message /* virtual */ void Draw(optr /* FlexPanel* */ panel,
+                      HTOffsetAndSize exposed,
+                      optr /* HTGlyphContext* */ context /* = NULL */ ); /* = 0; */
+
+    //////////
+    //
+    // For a glyph to request to be drawn. 
+    // If the glyph is in the drawing bounds, it will be called to 
+    // draw sometime in the future. 
+    //
+    // Warning: There could be synchronization problem if the 
+    //          glyph is being formatted while it makes a request to
+    //          draw itself. To avoid this problem, the glyph should
+    //          inherit HTGlyph::Format() such that it locks a semaphore
+    //          before calling the formatter. The glyph should also
+    //          lock the semaphore before calling RequestDraw() on
+    //          itself.
+    //
+    // Parameters_
+    //
+    // [in]     child   NULL if the child is the glyph itself.
+    //                  If not NULL, it must be the child of this
+    //                  glyph.
+    // [in]     coord   The absolute coords of child. NULL if child is
+    //                  NULL to indicate the glyph itself.
+    //
+    // See_also_ Draw(), Format(), RequestDrawFromChild()
+    //
+    // Status_ Functional
+    //
+    @message /* virtual */ void RequestDraw(); /*  {}; */
+
+    //////////
+    //
+    // Accept a request draw from child.
+    //
+    // Parameters_
+    //
+    // [in]     child   Must be a child of this composite.
+    // [in]     coord   Absolute coords of the child.
+    //
+    // See_also_ Draw(), RequestDraw()
+    //
+    // Status_ Functional
+    //
+    @message /* virtual */ void RequestDrawFromChild
+                                     (optr /* HTGlyph * */ child, 
+                                      HTCoord coord); 
+//    {
+//    }
+
+    //////////
+    //
+    // Accept a request to resize.
+    // This is an up-call to the uitree to cause it to reformat, 
+    // whereas SetSize() is a down-call. THis call also set size
+    // invalid via SetSizeValid(FALSE).
+    //
+    // See_also_ SetSize()
+    //
+    // Status_ Functional
+    //
+    @message /* virtual */ void RequestSize();
+
+    //////////
+    //
+    // Ask the glyph to handle the mouse event. If the event is
+    // handled, the event will not be passed to other glyphs.
+    //
+    // Parameters_
+    //
+    // [in]  event      Mouse event.
+    // [in]  point      Where the mouse pointer is.
+    // [in]  frame      The top HTFrame object of the glyph.
+    //
+    // Return_value_ TRUE if the event is handled, else FALSE.
+    //
+    // Status_ Functional
+    //
+/*
+    @message * virtual * Boolean HandleMouseEvent(MouseEvent& event,
+                                     HTPoint point,
+                                     HTFrame * frame); */
+
+    //////////
+    //
+    // Format the glyph. 
+    //
+    // Warning: See the warning in RequestDraw().
+    //
+    // Parameters_
+    //
+    // [in]  formatter   This is the formatter that is used to
+    //                   format this glyph.
+    //
+    // Return_value_     TRUE if ok, FALSE if out of memory.
+    //
+    // See_also_ RequestDraw()
+    //
+    // Status_ Functional
+    //
+//    @message virtual Boolean Format(HTFormat * formatter); // = 0;
+
+    //////////
+    //
+    // Get composite identity. The identity of a composite is
+    // the HTML token that generated the composite.
+    //
+    // Return_value_ HTMLToken
+    //
+    // Status_ Functional
+    //
+//    @message virtual HTMLToken GetIdentity(); // = 0;
+
+    //////////
+    //
+    // Set the geometry of a glyph. A glyph with invalid geometry will
+    // not be drawn.  A glyph with invalid geometry will be formatted.
+    //
+    // Parameters_
+    //
+    // [in]  flag   TRUE to set it valid, FALSE to set it invalid.
+    //
+    // Return_value_ Nothing
+    //
+    // Status_ Functional
+    //
+    @message void SetGeometryValid(Boolean flag);
+
+    //////////
+    //
+    // Get the geometry state. Returns TRUE if geometry valid,
+    // FALSE otherwise. Geometry is used to decide the position
+    // of the glyph on screen.
+    //
+    // Return_value_ TRUE if geometry valid, FALSE otherwise.
+    //
+    // See_also_ SetGeometryValid()
+    //
+    // Status_ Functional
+    //
+    @message Boolean IsGeometryValid();
+
+    //////////
+    //
+    // Get the resize state. Returns TRUE if a glyph has been
+    // resize. Its geometry may still be valid.
+    //
+    // Return_value_ TRUE if glyph is resized and needs to 
+    //               reformatted.
+    //
+    // See_also_ IsGeometryValid()
+    //
+    // Status_ Functional
+    //
+    @message Boolean IsSizeValid(); // const;
+
+    // SetSize() also automatically calls SetSizeValid(TRUE).
+    @message void SetSizeValid(Boolean flag);
+
+    //////////
+    //
+    // Set the anchor of this glyph. A glyph does not necessarily
+    // have an anchor. Only those that falls under <A> .. </A> do.
+    //
+    // Parameters_
+    //
+    // [in]  anchor
+    //
+    // Status_ Functional
+    //
+    @message /* virtual */ void SetAnchor(optr /* HTMLAnchorItem * */anchor);
+
+    //////////
+    //
+    // Get the anchor of this glyph.
+    //
+    // Return_value_ anchor or NULL
+    //
+    // Status_ Functional
+    //
+    @message optr /* virtual HTMLAnchorItem* */ GetAnchor(); // const;
+
+    //////////
+    //
+    // Get the natural minimum and maximum widths of the glyph.
+    //
+    // Parameters_
+    //
+    // [in] minmax  The min max accumulator
+    //
+    // Return_value_ TRUE if ok, FALSE otherwise.
+    //
+    // Status_ Functional
+    //
+    @message /* virtual */ Boolean GetMinMaxWidth(optr /* MinMaxAccumulator * */minmax); //  = 0;
+
+    //////////
+    //
+    // Ask the glyph for its boundary.
+    //
+    // Parameters_
+    //
+    // [out] bounds  The bounds of the glyph, which contains
+    //               coordinates relative to the parent.
+    //
+    // See_also_ SetBounds()
+    //
+    // Status_ Functional
+    //
+    @message /* virtual */ void GlyphGetBounds(HTCoord *bounds); // const = 0;
+
+    //////////
+    //
+    // Ask the glyph for its absolute boundary, i.e. its
+    // document coordinate
+    //
+    // Parameters_
+    //
+    // [out] bounds  The bounds of the glyph, which contains
+    //               coordinates in document.
+    //
+    // Status_ Functional
+    //
+    @message /* virtual */ void GetAbsoluteBounds(HTCoord* rect); // = 0;
+
+    //////////
+    //
+    // Set the bounds of a glyph.
+    //
+    // Parameters_
+    //
+    // [in]  bounds  The bounds of the glyph, which contains
+    //               coordinates relative to the parent.
+    //
+    // See_also_ GetBounds()
+    //
+    // Status_ Functional
+    //
+    @message /* virtual */ void SetBounds(const HTCoord *bounds); // = 0;
+
+    //////////
+    //
+    // Get the size of the glyph.
+    //
+    // Parameters_
+    //
+    // [out]   Size as the width and height of the bounds.
+    //
+    // Status_ Functional
+    //
+    @message /* virtual */ void GetSize(HTSize *size); // const = 0;
+    @message /* virtual */ sword GetWidth(); // const = 0;
+    @message /* virtual */ sdword GetHeight(); // const = 0;
+    @message /* virtual */ Boolean HasSize(); // const = 0;
+
+    //////////
+    //
+    // Set the size of the glyph by changing the bounds
+    // from (0,0) to (width, height). This will also invalidate the
+    // glyph's geometry causing it to be reformatted. So before you
+    // set the size values, make sure they are different to avoid 
+    // unnecessary reformat. This also calls SetSizeValid(TRUE).
+    //
+    // Parameters_
+    //
+    // [in] width  >= 0  Pixels
+    // [in] heigth >= 0  Pixels
+    //
+    // See_also_ RequestSize()
+    //
+    // Status_ Functional
+    //
+    @message /* virtual */ void SetSize(sword width, sword height); // = 0;
+
+    //////////
+    //
+    // Check to see if the glyph intersects a point.
+    //
+    // Parameters_
+    //
+    // [in]  point    Virtual document point to check for intersection.
+    //
+    // Return_value_ HTGLYPH_ABOVE_BOUNDS Glyph is above point.
+    //               HTGLYPH_IN_BOUNDS    Glyph overlaps with point.
+    //               HTGLYPH_BELOW_BOUNDS Glyph is below point.
+    //               HTGLYPH_OUT_BOUNDS   None of the above.
+    //
+    // See_also_ Overlap()
+    //
+    // Status_ Funcional
+    //
+    @message /* virtual */ HTGlyphBoundsCheck Intersects(const HTPoint *point); // = 0;
+
+    //////////
+    //
+    // Check to see a window overlaps the glyph.
+    //
+    // Parameters_
+    //
+    // [in]  exposed  The exposed region.
+    //
+    // Return_value_ HTGLYPH_ABOVE_BOUNDS Glyph is above exposed.
+    //               HTGLYPH_IN_BOUNDS    Glyph overlaps with exposed.
+    //               HTGLYPH_BELOW_BOUNDS Glyph is below exposed.
+    //               HTGLYPH_OUT_BOUNDS   Not inbound but can't determine
+    //                                    whether is above or below bounds.
+    //
+    // See_also_  Intersects()
+    //
+    // Status_ Functional
+    //
+    @message /* virtual */ HTGlyphBoundsCheck Overlap
+                        (const HTOffsetAndSize *exposed); // = 0;
+
+    //////////
+    //
+    // Get the glyph alignment.
+    //
+    // Return_value_ HTALIGN_BOTTOM, the default alignment of any glpyh.
+    //
+    // Status_ Functional
+    //
+    @message /* virtual */ HTAlignment GetAlignment(); // const 
+/*    {
+        return HTALIGN_BOTTOM;
+    };
+*/
+    //////////
+    //
+    // Get the parent of the current glyph. If current glyph has no
+    // parent, this method returns NULL.
+    //
+    // Return_value_ Parent glyph.
+    //
+    // See_also_ Get()
+    //
+    // Status_ Functional
+    //
+    @message optr /* HTGlyph* */ GetParent(); // const;
+
+    //////////
+    //
+    // Append a child glyph.
+    //
+    // Parameters_
+    //
+    // [in]  glyph   A child glyph to Append.
+    //
+    // Return_value_ TRUE ok, FALSE if out of memory.
+    //
+    // See_also_ Get(), Remove()
+    //
+    // Status_ Functional
+    //
+    @message /* virtual */ Boolean Append(optr /* HTGlyph * */ glyph); // = 0;
+
+    //////////
+    //
+    // Remove the first child in the child list.
+    //
+    // Parameters_
+    //
+    // Return_value_ glyph or NULL if no child to remove
+    //
+    // See_also_ GetParent(), Remove()
+    //
+    // Status_ Functional
+    //
+    @message optr /* virtual HTGlyph* */ GlyphGet(); // = 0;
+
+    //////////
+    //
+    // Remove a child glyph.
+    //
+    // Parameters_
+    //
+    // [in] glyph   The child glyph to remove
+    //
+    // Return_value_ The removed glyph, NULL if the glyph
+    //               is not a child of this composite.
+    //
+    // See_also_ Get()
+    //
+    // Status_ Functional
+    //
+    @message optr /* virtual HTGlyph* */ GlyphRemove(optr /* HTGlyph * */glyph); // = 0;
+
+    //////////
+    //
+    // Insert a sibling. Note that a sibling is not a child.
+    // This method append a sibling which is at the same
+    // level as this glyph having the same parent.
+    //
+    // Parameters_
+    //
+    // [in]  sibling  The glyph to insert.
+    // [in]  glyph    The new sibling will be inserted
+    //                after this glyph and so both will
+    //                have the same parent. If this is NULL,
+    //                it will inserted to callee glyph.
+    //
+    // See_also_ Append(), GetSibling()
+    //
+    // Status_ Functional
+    //
+    @message void InsertSibling(optr /* HTGlyph * */ sibling, 
+                                optr /* HTGlyph * */ glyph /* =NULL */);
+
+    //////////
+    //
+    // Get the sibling pointer. This should be used with care as we
+    // return the sibling pointer.
+    //
+    // Parameters_
+    //
+    // Return_value_ Sibling pointer, NULL if no sibling.
+    //
+    // See_also_ InsertSibling()
+    //
+    // Status_ Functional
+    //
+    @message optr /* HTGlyph* */ GetSibling(); // const;
+
+    //////////
+    //
+    // Check if a glyph is a direct or indirect child of this glyph.
+    //
+    // Parameters_
+    //
+    // [in]  glyph
+    //
+    // Return_value_ TRUE/FALSE
+    //
+    // Status_ Functional
+    //
+    @message /* virtual */ Boolean IsChild(optr /* HTGlyph * */ glyph);
+
+    @message Boolean DoesPointToParent();
+    @message void SetPointToParent(unsigned state);
+    @message void SetSiblingGlyph(optr glyph);
+    @message optr GetSiblingGlyph();
+
+#if ERROR_CHECK
+    //////////
+    //
+    // This is a debugging tool for a glyph to print itself to a
+    // file. The normal format for print self is as follows:
+    //
+    // [ MyIdentity MyInfo ] newline
+    //
+    // For example:
+    //
+    // [
+    //   Bounds=(x0,y0),(x1,y1)
+    //   Indentity=HTMLGLYPH_TEXT
+    //   _textH="This is the string"
+    //   _origLength=20
+    //   _length=10
+    // ]
+    //
+    // Parameters_
+    //
+    // [in] fp    File pointer to write stuff to.
+    // [in] level Each glyph must print this preamble which
+    //            identities the depth of the tree at each
+    //            glyph. It has the format ".1.2.1.3" meaning
+    //            Column 1, row 2, column 1, and row 3.
+    //
+    // Return_value_ Nothing
+    //
+    // Status_ Functional
+    //
+//    @message  virtual  void ECPrintSelf(File *fp, char *preamble); // = 0;
+
+    // Print glyph bounds.
+//    @message  virtual  void ECPrintBounds(File *fp); // = 0;
+#endif
+
+//===========================================================================
+//
+//                       W A R N I N G
+//
+// THE LIBERTY EXTERNAL API IS FOUND ABOVE THIS BARRIER. ANYTHING BELOW
+// THIS NOTICE IS IMPLEMENTATION DEPENDENT AND SUBJECT TO CHANGE.
+//
+//
+//===========================================================================
+/* protected:
+    friend class HTBoundedGlyph;
+    friend class HTLeaf;
+    friend class HTAnchoredLeaf;
+    friend class HTComposite;
+    friend class HTToken;
+*/
+
+    // Prevents direct instantiation of an abstract class.
+    @message void HTGlyph(optr /* HTGlyph * */ parent /* = NULL */);
+
+    //
+    // Don't let users call copy the object in any way.  These methods
+    // aren't actually defined since they should never be called, but
+    // declaring them private should catch anyone who tries to call
+    // them.
+    //
+//    HTGlyph(const HTGlyph&);
+//    const HTGlyph& operator=(const HTGlyph&);
+
+    // Various flags
+    @instance GlyphFlags __flags;
+
+    // Points to parent or self if no parent.
+    // See note for _sibling why this is commented.
+    // HTGlyph *_parent;
+
+    // Points to the right sibling of the same parent.
+    // All siblings of the same parent are linked together as a singly
+    // link list using this pointer.
+    //
+    // Note: We make the last sibling point to the parent to save on
+    //       _parent pointer using the _flags.
+    //
+    //       _sibling points to a parent _flags.pointToParent is 1.
+    //
+    @instance optr /* HTGlyph * */ __sibling;
+
+@endc;
+
+
+
+/***************************************************************************
+CLASS
+    HTBoundedGlyph
+
+    Glyph with a bound.
+
+    Memory usage
+    ------------
+    * HTGlyph  = 6  bytes
+    * _coord   = 12 bytes
+    Total      = 18 bytes
+
+KEYWORDS
+    
+
+CLASS TREE
+<pre>
+    HTGlyph
+       |
+       +---HTBoundedGlyph
+</pre>
+****************************************************************************/
+@class HTBoundedGlyphClass, HTGlyphClass;
+
+/* public: */
+    /* virtual ~HTBoundedGlyph() {}; */
+
+    //////////
+    //
+    // For a glyph to request to be drawn. 
+    // If the glyph is in the drawing bounds, it will be called to 
+    // draw sometime in the future. 
+    //
+    // Warning: There could be synchronization problem if the 
+    //          glyph is being formatted while it makes a request to
+    //          draw itself. To avoid this problem, the glyph should
+    //          inherit HTGlyph::Format() such that it locks a semaphore
+    //          before calling the formatter. The glyph should also
+    //          lock the semaphore before calling RequestDraw() on
+    //          itself.
+    //
+    // Parameters_
+    //
+    // [in]     child   NULL if the child is the glyph itself.
+    //                  If not NULL, it must be the child of this
+    //                  glyph.
+    // [in]     coord   The absolute coords of child. NULL if child is
+    //                  NULL to indicate the glyph itself.
+    //
+    // See_also_ Draw(), Format(), RequestDrawFromChild()
+    //
+    // Overrides_ HTGlyph::RequestDraw()
+    //
+    // Status_ Functional
+    //
+    // @message  virtual void RequestDraw();
+
+    //////////
+    //
+    // Accept a request draw from child.
+    //
+    // Parameters_
+    //
+    // [in]     child   Must be a child of this composite.
+    // [in]     coord   Absolute coords of the child.
+    //
+    // See_also_ Draw(), RequestDraw()
+    //
+    // Overrides_ HTGlyph::RequestDrawFromChild()
+    //
+    // Status_ Functional
+    //
+    // @message virtual void RequestDrawFromChild
+    //			(HTGlyph * child, HTCoord absCoord);
+
+    //////////
+    //
+    // Ask the glyph for its boundary.
+    //
+    // Parameters_
+    //
+    // [out] bounds  The bounds of the glyph, which contains
+    //               coordinates relative to the parent.
+    //
+    // Return_value_
+    //
+    // See_also_ SetBounds()
+    //
+    // Overrides_ HTGlyph::SetBounds()
+    //
+    // Status_ Functional
+    //
+    // @message virtual void GlyphGetBounds(HTCoord *bounds); /* const; */
+
+    //////////
+    //
+    // Ask the glyph for its absolute boundary, i.e. its
+    // document coordinate
+    //
+    // Parameters_
+    //
+    // [out] bounds  The bounds of the glyph, which contains
+    //               coordinates in document.
+    //
+    // Return_value_
+    //
+    // See_also_
+    //
+    // Overrides_ HTGlyph::GetAbsoluteBounds()
+    //
+    // Status_ Functional
+    //
+    // @message virtual void GetAbsoluteBounds(HTCoord* rect);
+
+    //////////
+    //
+    // Set the bounds of a glyph.
+    //
+    // Parameters_
+    //
+    // [in]  bounds  The bounds of the glyph, which contains
+    //               coordinates relative to the parent.
+    //
+    // Return_value_
+    //
+    // See_also_ GetBounds()
+    //
+    // Overrides_ HTGlyph::SetBounds()
+    //
+    // Status_ Functional
+    //
+    // @message virtual void SetBounds(const HTCoord *bounds);
+
+    //////////
+    //
+    // Get the size of the glyph.
+    //
+    // Parameters_
+    //
+    // [out]   Size as the width and height of the bounds.
+    //
+    // Return_value_
+    //
+    // See_also_
+    //
+    // Overrides_ HTGlyph::GetSize()
+    //
+    // Status_ Functional
+    //
+    // @message virtual void GetSize(HTSize *size) const;
+    // @message virtual sword GetWidth() const;
+    // @message virtual sdword GetHeight() const;
+    // @message virtual Boolean HasSize() const;
+
+    //////////
+    //
+    // Set the size of the glyph by changing the bounds
+    // from (0,0) to (width, height). Also invalidates	
+    // the geometry of the glyph by SetGeometryValid(FALSE).
+    // But set size valid using SetSizeValid(TRUE);
+    //
+    // Parameters_
+    //
+    // [in] width  In pixels
+    // [in] heigth In pixles
+    //
+    // Return_value_
+    //
+    // See_also_ GetSize(), SetGeometryValid()
+    //
+    // Overrides_ HTGlyph::SetSize()
+    //
+    // Status_ Functional
+    //
+    // @message virtual void SetSize(sword width, sword height);
+
+    //////////
+    //
+    // Check to see if the glyph intersects a point.
+    //
+    // Parameters_
+    //
+    // [in]  point    Virtual document point to check for intersection.
+    //
+    // Return_value_ HTGLYPH_ABOVE_BOUNDS Glyph is above point.
+    //               HTGLYPH_IN_BOUNDS    Glyph overlaps with point.
+    //               HTGLYPH_BELOW_BOUNDS Glyph is below point.
+    //               HTGLYPH_OUT_BOUNDS   None of the above.
+    //
+    // See_also_
+    //
+    // Overrides_ HTGlyph::Intersects()
+    //
+    // Status_ Funcional
+    //
+    // @message virtual HTGlyphBoundsCheck Intersects(const HTPoint *point);
+
+    //////////
+    //
+    // Check to see a window overlaps the glyph.
+    //
+    // Parameters_
+    //
+    // [in]  exposed  The exposed region.
+    //
+    // Return_value_ HTGLYPH_ABOVE_BOUNDS Glyph is above exposed.
+    //               HTGLYPH_IN_BOUNDS    Glyph overlaps with exposed.
+    //               HTGLYPH_BELOW_BOUNDS Glyph is below exposed.
+    //               HTGLYPH_OUT_BOUNDS   Not inbound but can't determine
+    //
+    // See_also_
+    //
+    // Overrides_ HTGlyph::Overlap()
+    //
+    // Status_ Functional
+    //
+    // @message virtual HTGlyphBoundsCheck Overlap(const HTOffsetAndSize *exposed);
+
+#if ERROR_CHECK
+    // Print glyph bounds.
+    // @message virtual void ECPrintBounds(File *fp);
+#endif
+
+//===========================================================================
+//
+//                       W A R N I N G
+//
+// THE LIBERTY EXTERNAL API IS FOUND ABOVE THIS BARRIER. ANYTHING BELOW
+// THIS NOTICE IS IMPLEMENTATION DEPENDENT AND SUBJECT TO CHANGE.
+//
+//
+//===========================================================================
+/* protected:
+    friend class HTLeaf;
+    friend class HTComposite;
+*/    
+    // Prevents direct instantiation
+    @message void HTBoundedGlyph();
+    
+    //
+    // Don't let users call copy the object in any way.  These methods
+    // aren't actually defined since they should never be called, but
+    // declaring them private should catch anyone who tries to call
+    // them.
+    //
+/*
+    HTBoundedGlyph(const HTBoundedGlyph&);
+    const HTBoundedGlyph& operator=(const HTBoundedGlyph&);
+*/
+    //
+    // Bounds of the glyph in the virtual window relative to the parent.
+    //
+    @instance HTCoord __coord;
+
+@endc;
+
+
+
+/***************************************************************************
+CLASS
+    HTLeaf
+
+    Leaf glyphs do not contain children, so we save on the child
+    pointer. HTLeaf provides default handlers for most of the 
+    methods from HTGlyph.
+
+    Memory usage
+    ------------
+    * HTBoundedGlyph  = 18 bytes
+    Total             = 18 bytes
+
+KEYWORDS
+
+
+CLASS TREE
+<pre>
+    HTGlyph
+       |
+       +---HTBoundedGlyph
+              |
+              +---HTLeaf
+</pre>
+****************************************************************************/
+@class HTLeafClass, HTBoundedGlyphClass;
+
+// public:
+//    virtual ~HTLeaf() {};
+
+    //////////
+    //
+    // Append a child glyph.
+    // This method is not allowed for Leaf and will EC crash if called.
+    //
+    // Parameters_
+    //
+    // [in]  glyph   A child glyph to Append.
+    //
+    // Return_value_ TRUE ok, FALSE if out of memory.
+    //
+    // See_also_
+    //
+    // Overrides_ HTGlyph::Append()
+    //
+    // Status_ Functional
+    //
+    // virtual Boolean Append(HTGlyph *glyph);
+
+    //////////
+    //
+    // Remove the first child in the child list.
+    // This method is not allowed for Leaf and will EC crash if called.
+    //
+    // Parameters_
+    //
+    // Return_value_ glyph or NULL if no child to remove
+    //
+    // See_also_
+    //
+    // Overrides_ HTGlyph::Get()
+    //
+    // Status_ Functional
+    //
+    // virtual HTGlyph* Get();
+
+    //////////
+    //
+    // Remove a child glyph.
+    // This method is not allowed for Leaf and will EC crash if called.
+    //
+    // Parameters_
+    //
+    // [in] glyph   The child glyph to remove
+    //
+    // Return_value_ The removed glyph, NULL if the glyph
+    //               is not a child of this composite.
+    //
+    // See_also_
+    //
+    // Overrides_ HTGlyph::Remove()
+    //
+    // Status_ Functional
+    //
+    // virtual HTGlyph* Remove(HTGlyph *glyph);
+
+//===========================================================================
+//
+//                       W A R N I N G
+//
+// THE LIBERTY EXTERNAL API IS FOUND ABOVE THIS BARRIER. ANYTHING BELOW
+// THIS NOTICE IS IMPLEMENTATION DEPENDENT AND SUBJECT TO CHANGE.
+//
+//
+//===========================================================================
+// protected:
+    // Prevents direct instantiation of abstract class.
+    @message void HTLeaf();
+
+    //
+    // Don't let users call copy the object in any way.  These methods
+    // aren't actually defined since they should never be called, but
+    // declaring them private should catch anyone who tries to call
+    // them.
+    //
+//    HTLeaf(const HTLeaf&);
+//    const HTLeaf& operator=(const HTLeaf&);
+
+@endc;
+
+
+/***************************************************************************
+CLASS
+    HTAnchoredLeaf
+
+    Leaf with anchor pointer.
+
+    Memory Usage
+    ------------
+    * HTLeaf  = 18 bytes
+    * _anchor = 4 bytes
+    Total     = 22 bytes 
+
+KEYWORDS
+    
+
+CLASS TREE
+<pre>
+    HTGlyph
+       |
+       +---HTBoundedGlyph
+              |
+              +---HTLeaf
+                     |
+                     +---HTAnchoredLeaf
+</pre>
+****************************************************************************/
+@class HTAnchoredLeafClass, HTLeafClass;
+
+// public:
+//    virtual ~HTAnchoredLeaf(){};
+    
+    //////////
+    //
+    // Set the anchor of this glyph. A glyph does not necessarily
+    // have an anchor. Only those that falls under <A> .. </A> do.
+    //
+    // Parameters_
+    //
+    // [in]  anchor
+    //
+    // Return_value_
+    //
+    // See_also_
+    //
+    // Overrides_
+    //
+    // Status_ Functional
+    //
+    // virtual void SetAnchor(HTMLAnchorItem* anchor);
+
+    //////////
+    //
+    // Get the anchor of this glyph.
+    //
+    // Parameters_
+    //
+    // Return_value_ anchor or NULL
+    //
+    // See_also_ 
+    //
+    // Overrides_
+    //
+    // Status_ Functional
+    //
+    // virtual HTMLAnchorItem* GetAnchor() const;
+
+    //////////
+    //
+    // Handle anchor hit.
+    //
+    // Parameters_
+    //
+    // [in]  event      Mouse event.
+    // [in]  point      Where the mouse pointer is.
+    // [in]  frame      The top HTFrame object of the glyph.
+    //
+    // Return_value_ TRUE if the event is handled, else FALSE.
+    //
+    // See_also_
+    //
+    // Overrides_ HTGlyph::HandleMouseEvent()
+    //
+    // Status_ Functional
+    //
+//    virtual Boolean HandleMouseEvent(MouseEvent& event,
+//                                     HTPoint point,
+//                                     HTFrame *frame);
+
+//===========================================================================
+//
+//                       W A R N I N G
+//
+// THE LIBERTY EXTERNAL API IS FOUND ABOVE THIS BARRIER. ANYTHING BELOW
+// THIS NOTICE IS IMPLEMENTATION DEPENDENT AND SUBJECT TO CHANGE.
+//
+//
+//===========================================================================
+// protected:
+    // Prevent direct instantiation
+    @message void HTAnchoredLeaf(); //  : _anchor(NULL) {};
+
+    //
+    // Don't let users call copy the object in any way.  These methods
+    // aren't actually defined since they should never be called, but
+    // declaring them private should catch anyone who tries to call
+    // them.
+    //
+//    HTAnchoredLeaf(const HTAnchoredLeaf&);
+//    const HTAnchoredLeaf& operator=(const HTAnchoredLeaf&);
+
+    //
+    // The anchor
+    //
+    @instance optr /* HTMLAnchorItem * */ __anchor;
+
+@endc;
+
+
+
+/***************************************************************************
+CLASS
+    HTComposite
+
+    Composite glyphs contain children, so we need two child pointers;
+    firstChild and lastChild.
+
+    Memory Usage
+    ------------
+    * HTBoundedGlyph = 18 bytes
+    * _firstChild    = 4 bytes
+    * _lastChild     = 4 bytes
+    Total            = 26 bytes
+
+KEYWORDS
+
+
+CLASS TREE
+<pre>
+    HTGlyph
+       |
+       +---HTBoundedGlyph
+              |
+              +---HTComposite
+</pre>
+****************************************************************************/
+@class HTCompositeClass, HTBoundedGlyphClass;
+
+// public:
+//    virtual ~HTComposite();
+
+    //////////
+    //
+    // Draw a composite. Normally, you would not intercept Draw(), 
+    // you should intercept DrawSelf().
+    //
+    // Parameters_
+    //
+    // [out] panel      Physical window to draw the glyph. Window
+    //                  coordinates is assumed to go from
+    //                  (0,0) to window size.
+    // [in]  exposed    Offset and size of the virtual window exposed.
+    //                  exposed->offset is the offset from the drawing
+    //                  window upper-left corner. A glyph must add
+    //                  this offset to its _coord. The new coordinates
+    //                  must fall into the rectangle
+    //                     (0,0) to
+    //                     (exposed->size.width, exposed->size.height)
+    //                  in order for a glyph to draw.
+    // [in]  context    The glyph context that maintains extrinsic
+    //                  attributes of the glyph.  If NULL, no
+    //                  extrinsic states.
+    //
+    // Return_value_
+    //
+    // See_also_
+    //
+    // Overrides_ HTGlyph::Draw()
+    //
+    // Status_ Functional
+    //
+    // virtual void Draw
+    //		(FlexPanel *panel, HTOffsetAndSize exposed,
+    //           HTGlyphContext *context = NULL);
+
+    //////////
+    //
+    // Append a child glyph to a composite.
+    //
+    // Parameters_
+    //
+    // [in]  glyph   A child glyph to Append.
+    //
+    // Return_value_ TRUE ok, FALSE if out of memory.
+    //
+    // See_also_
+    //
+    // Overrides_ HTGlyph::Append()
+    //
+    // Status_ Functional
+    //
+    // virtual Boolean Append(HTGlyph *glyph);
+
+    //////////
+    //
+    // Remove the first child in the child list of a composite.
+    //
+    // Parameters_
+    //
+    // Return_value_ glyph or NULL if no child to remove
+    //
+    // See_also_
+    //
+    // Overrides_ HTGlyph::Get()
+    //
+    // Status_ Functional
+    //
+    // virtual HTGlyph* GlyphGet();
+
+    //////////
+    //
+    // Remove a child glyph from a composite.
+    //
+    // Parameters_
+    //
+    // [in] glyph   The child glyph to remove
+    //
+    // Return_value_ The removed glyph, NULL if the glyph
+    //               is not a child of this composite.
+    //
+    // See_also_
+    //
+    // Overrides_ HTGlyph::Remove()
+    //
+    // Status_ Functional
+    //
+    // virtual HTGlyph* GlyphRemove(HTGlyph *glyph);
+
+    //////////
+    //
+    // Get the natural minimum and maximum widths of a composite by
+    // getting the minmax of all its children glyphs.
+    //
+    // Parameters_
+    //
+    // [in] minmax  The min max accumulator
+    //
+    // Return_value_ TRUE if ok, FALSE otherwise.
+    //
+    // See_also_
+    //
+    // Overrides_ HTGlyph::GetMinMaxWidth()
+    //
+    // Status_ Functional
+    //
+    // virtual Boolean GetMinMaxWidth(MinMaxAccumulator *minmax);
+
+    //////////
+    //
+    // Get the first child. Should be used with HTIterators so that
+    // you don't access the pointer directly.
+    //
+    // Parameters_
+    //
+    // Return_value_ Point to the first child.
+    //
+    // See_also_
+    //
+    // Overrides_
+    //
+    // Status_ Functional
+    //
+    @message optr /* HTGlyph* */ FirstChild(); // const;
+
+    //////////
+    //
+    // Get the last child. Should be used with care so that
+    // you don't modify the pointer directly.
+    //
+    // Parameters_
+    //
+    // Return_value_ Point to the last child
+    //
+    // See_also_
+    //
+    // Overrides_
+    //
+    // Status_ Functional
+    //
+    @message optr /* HTGlyph* */ LastChild(); // const;
+
+    //////////
+    //
+    // Pass the mouse event down to the children glyphs.
+    //
+    // Parameters_
+    //
+    // [in]  event      Mouse event.
+    // [in]  point      Where the mouse pointer is.
+    // [in]  frame      The top HTFrame object of the glyph.
+    //
+    // Return_value_ TRUE if the event is handled, else FALSE.
+    //
+    // See_also_
+    //
+    // Overrides_
+    //
+    // Status_ Functional
+    //
+//    virtual Boolean HandleMouseEvent(MouseEvent& event, HTPoint point,
+//                                     HTFrame *frame);
+
+    //////////
+    //
+    // Check if a glyph is a direct or indirect child of this composite.
+    //
+    // Parameters_
+    //
+    // [in]  glyph
+    //
+    // Return_value_ TRUE/FALSE
+    //
+    // Status_ Functional
+    //
+    // virtual Boolean IsChild(HTGlyph *glyph);
+
+#ifdef ERROR_CHECK
+    //////////
+    //
+    // ECCheck self. Make sure that the composite object is
+    // of the right type.
+    //
+    // Parameters_
+    //
+    // [in]  HTMLToken token
+    //
+    // Return_value_
+    //
+    // See_also_
+    //
+    // Overrides_
+    //
+    // Status_ Functional
+    //
+    @message /* virtual */ void ECCheckSelf(HTMLToken token) ;
+//    {
+//    };
+#endif
+
+//===========================================================================
+//
+//                       W A R N I N G
+//
+// THE LIBERTY EXTERNAL API IS FOUND ABOVE THIS BARRIER. ANYTHING BELOW
+// THIS NOTICE IS IMPLEMENTATION DEPENDENT AND SUBJECT TO CHANGE.
+//
+//
+//===========================================================================
+// protected:
+    // Prevents direct instantiation of abstract class.
+    @message void HTComposite();
+
+    //
+    // For composite to draw itself, arguments same as Draw().
+    //
+    @message /* virtual */ void DrawSelf
+		(optr /* FlexPanel * */ panel, 
+		 HTOffsetAndSize exposed,
+        	 optr /* HTGlyphContext * */ context /* = NULL*/) ;
+//    {
+//    };
+
+    //
+    // Don't let users call copy the object in any way.  These methods
+    // aren't actually defined since they should never be called, but
+    // declaring them private should catch anyone who tries to call
+    // them.
+    //
+//    HTComposite(const HTComposite&);
+//    const HTComposite& operator=(const HTComposite&);
+
+    // The child pointer. Children are linked together via their
+    // _sibling pointer defined in HTGlyph. The last _sibling pointer
+    // points to the parent.
+    @instance optr /* HTGlyph * */ __firstChild;
+    @instance optr /* HTGlyph * */ __lastChild;
+
+@endc;
+
+
+
+/***************************************************************************
+CLASS
+    HTToken
+
+    Its a glyph which has no bounds and very few methods. These are
+    the glyphs that are used to maintain certain HTML tokens in the
+    UI tree for ease of reformat. For example, BR, CENTER, P, etc.
+
+    Memory Usage
+    ------------
+    * HTGlyph = 6 bytes
+    Total     = 6 bytes
+
+KEYWORDS
+    
+
+CLASS TREE
+<pre>
+    HTGlyph
+       |
+       +---HTToken
+</pre>
+****************************************************************************/
+@class HTTokenClass, HTGlyphClass;
+
+// public:
+
+    //////////
+    //
+    // Destructor. Virtual for inheritance.
+    //
+    // Parameters_
+    //
+    // Return_value_
+    //
+    // See_also_
+    //
+    // Overrides_
+    //
+    // Status_ Functional
+    //
+    // virtual ~HTToken() {};
+
+    //////////
+    //
+    // Token should not draw. EC crash if called.
+    //
+    // Parameters_
+    //
+    // [out] panel      Physical window to draw the glyph. Window
+    //                  coordinates is assumed to go from
+    //                  (0,0) to window size.
+    // [in]  exposed    Offset and size of the virtual window exposed.
+    //                  exposed->offset is the offset from the drawing
+    //                  window upper-left corner. A glyph must add
+    //                  this offset to its _coord. The new coordinates
+    //                  must fall into the rectangle
+    //                     (0,0) to
+    //                     (exposed->size.width, exposed->size.height)
+    //                  in order for a glyph to draw.
+    // [in]  context    The glyph context that maintains extrinsic
+    //                  attributes of the glyph.  If NULL, no
+    //                  extrinsic states.
+    //
+    // Return_value_
+    //
+    // See_also_
+    //
+    // Overrides_ HTGlyph::Draw()
+    //
+    // Status_ Functional
+    //
+//    virtual void Draw(FlexPanel* panel,
+//                      HTOffsetAndSize exposed,
+//                      HTGlyphContext* context = NULL) ;
+//    {
+//        EC_FAIL("HTToken::Draw() not allowed");
+//    };
+    
+    //////////
+    //
+    // Token has not size.
+    //
+    // Parameters_
+    //
+    // [in] minmax  The min max accumulator
+    //
+    // Return_value_ TRUE if ok, FALSE otherwise.
+    //
+    // See_also_
+    //
+    // Overrides_ HTGlyph::GetMinMaxWidth()
+    //
+    // Status_ Functional
+    //
+//    virtual Boolean GetMinMaxWidth(MinMaxAccumulator * minmax) 
+//    {
+//        return TRUE;
+//    };
+
+    //////////
+    //
+    // Token has no bounds.
+    //
+    // Parameters_
+    //
+    // [out] bounds  The bounds of the glyph, which contains
+    //               coordinates relative to the parent.
+    //
+    // Return_value_
+    //
+    // See_also_ SetBounds()
+    //
+    // Overrides_ HTGlyph::GetBounds()
+    //
+    // Status_ Functional
+    //
+    // virtual void GlyphGetBounds(HTCoord *bounds) const;
+
+    //////////
+    //
+    // Token has no absolute bounds.
+    //
+    // Parameters_
+    //
+    // [out] bounds  The bounds of the glyph, which contains
+    //               coordinates in document.
+    //
+    // Return_value_
+    //
+    // See_also_
+    //
+    // Overrides_ HTGlyph::GetAbsoluteBounds()
+    //
+    // Status_ Functional
+    //
+    // virtual void GetAbsoluteBounds(HTCoord* rect);
+
+    //////////
+    //
+    // Token has no bounds.
+    //
+    // Parameters_
+    //
+    // [in]  bounds  The bounds of the glyph, which contains
+    //               coordinates relative to the parent.
+    //
+    // Return_value_
+    //
+    // See_also_ GetBounds()
+    //
+    // Overrides_ HTGlyph::SetBounds()
+    //
+    // Status_ Functional
+    //
+//    virtual void SetBounds(const HTCoord * bounds) 
+//    {
+//    };
+
+    //////////
+    //
+    // Token has no size.
+    //
+    // Parameters_
+    //
+    // [out]   Size as the width and height of the bounds.
+    //
+    // Return_value_
+    //
+    // See_also_
+    //
+    // Overrides_ HTGlyph::GetSize()
+    //
+    // Status_ Functional
+    //
+    // virtual void GetSize(HTSize *size) const;
+    // virtual sword GetWidth() const;
+    // virtual sdword GetHeight() const;
+    // virtual Boolean HasSize() const;
+
+    //////////
+    //
+    // Token has no size.
+    //
+    // Parameters_
+    //
+    // [in]
+    //
+    // Return_value_
+    //
+    // See_also_
+    //
+    // Overrides_ HTGlyph::SetSize()
+    //
+    // Status_ Functional
+    //
+//    virtual void SetSize(sword width, sword height) 
+//    {
+//        PARAM_ASSERT(width==0);
+//        PARAM_ASSERT(height==0);
+//        USE_IT(width);
+//        USE_IT(height);
+//    };
+
+    //////////
+    //
+    // Token has no bounds, so does not intersect any bounds.
+    //
+    // Parameters_
+    //
+    // [in]  point    Virtual document point to check for intersection.
+    //
+    // Return_value_ HTGLYPH_ABOVE_BOUNDS Glyph is above point.
+    //               HTGLYPH_IN_BOUNDS    Glyph overlaps with point.
+    //               HTGLYPH_BELOW_BOUNDS Glyph is below point.
+    //               HTGLYPH_OUT_BOUNDS   None of the above.
+    //
+    // See_also_
+    //
+    // Overrides_ HTGlyph::Intersects()
+    //
+    // Status_ Funcional
+    //
+//    virtual HTGlyphBoundsCheck Intersects(const HTPoint * point)
+//    {
+//        return HTGLYPH_OUT_BOUNDS;
+//    };
+
+    //////////
+    //
+    // Token has no bounds, so does not overlap any window.
+    //
+    // Parameters_
+    //
+    // [in]  exposed  The exposed region.
+    //
+    // Return_value_ HTGLYPH_OUT_BOUNDS.
+    //
+    // See_also_
+    //
+    // Overrides_ HTGlyph::Overlap()
+    //
+    // Status_ Functional
+    //
+//    virtual HTGlyphBoundsCheck Overlap(const HTOffsetAndSize * exposed)
+//    {
+//        return HTGLYPH_OUT_BOUNDS;
+//    };
+
+    //////////
+    //
+    // Not allowed to append child to a token.
+    //
+    // Parameters_
+    //
+    // [in]  glyph   A child glyph to Append.
+    //
+    // Return_value_ TRUE ok, FALSE if out of memory.
+    //
+    // See_also_
+    //
+    // Overrides_ HTGlyph::Append()
+    //
+    // Status_ Functional
+    //
+//    virtual Boolean Append(HTGlyph * glyph) 
+//    {
+//        EC_FAIL("HTToken::Append() not allowed");
+//        return FALSE;
+//    };
+
+    //////////
+    //
+    // No child to remove for token.
+    //
+    // Parameters_
+    //
+    // Return_value_ glyph or NULL if no child to remove
+    //
+    // See_also_
+    //
+    // Overrides_ HTGlyph::Get()
+    //
+    // Status_ Functional
+    //
+//    virtual HTGlyph* GlyphGet() 
+//    {
+//        EC_FAIL("HTToken::Get() not allowed");
+//        return NULL;
+//    };
+
+    //////////
+    //
+    // No child to remove for token.
+    //
+    // Parameters_
+    //
+    // [in] glyph   The child glyph to remove
+    //
+    // Return_value_ The removed glyph, NULL if the glyph
+    //               is not a child of this composite.
+    //
+    // See_also_
+    //
+    // Overrides_ HTGlyph::Remove()
+    //
+    // Status_ Functional
+    //
+//    virtual HTGlyph* GlyphRemove(HTGlyph * glyph)
+//    {
+//        EC_FAIL("HTToken::Remove() not allowed");
+//        return NULL;
+//    };
+
+    // Print glyph bounds.
+    // virtual void ECPrintBounds(File *fp);
+
+//===========================================================================
+//
+//                       W A R N I N G
+//
+// THE LIBERTY EXTERNAL API IS FOUND ABOVE THIS BARRIER. ANYTHING BELOW
+// THIS NOTICE IS IMPLEMENTATION DEPENDENT AND SUBJECT TO CHANGE.
+//
+//
+//===========================================================================
+// protected:
+    // Prevents direct instantiation.
+    @message void HTToken();
+
+    //
+    // Don't let users call copy the object in any way.  These methods
+    // aren't actually defined since they should never be called, but
+    // declaring them private should catch anyone who tries to call
+    // them.
+    //
+//    HTToken(const HTToken&);
+//    const HTToken& operator=(const HTToken&);
+
+@endc;
+
+
+
+/***************************************************************************
+CLASS
+    MinMaxAccumulator
+
+    Used to accumulate the minimum and maximum widths of glyphs.
+
+KEYWORDS
+    
+
+CLASS TREE
+<pre>
+    MinMaxAccumulator
+</pre>
+****************************************************************************/
+@class MinMaxAccumulatorClass, MetaClass; 
+
+// public:
+    @message void MinMaxAccumulator();
+//    virtual ~MinMaxAccumulator() {};
+
+    // For a glyph to tell it needs to be on row by itself.
+    @message void NewRow();
+
+    // For a glyph to provide its min and max values.
+    @message void AcceptMyMin(sword width);
+    @message void AcceptMyMax(sword width);
+
+    // Obtain the final computed min anx max values.
+    @message sword GetMin();
+    @message sword GetMax();
+
+    // Add and subtract indent levels
+    @message void IncrementIndent();
+    @message void DecrementIndent();
+    
+// protected:
+    // The final min and max values.
+    @instance sword __min;
+    @instance sword __max;
+
+    // The running min and max values being computed.
+    @instance sword __runningMin;
+    @instance sword __runningMax;
+
+    // Indent levels
+    @instance word __indentLevel;
+
+@endc;
+
+
+@endif /* _HTGLYPH_H_ */

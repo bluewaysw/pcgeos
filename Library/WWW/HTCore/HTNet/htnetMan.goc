@@ -1,0 +1,120 @@
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Geoworks 1996 -- All Rights Reserved
+
+PROJECT:	Geos WWW Library
+MODULE:		Net Manager (internal)
+FILE:		htnetMan.goc
+
+AUTHOR:		Kok Kin Kee, May 29, 1996
+
+ROUTINES:
+	Name			Description
+	----			-----------
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	kkee	5/29/96   	Initial version.
+
+DESCRIPTION:
+	The private Net Manager.
+
+	$Id: htnetMan.goc,v 1.4.9.1 97/09/05 10:47:59 jeremyb Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+@include "HTNet/htnetMan.goh"
+
+/* --------------------------------------------------------------------------
+ * 		INTERNAL LIBRARY ROUTINE
+ * --------------------------------------------------------------------------*/
+
+
+
+/***********************************************************************
+ *		HTNetExecuteIntermediateCallback
+ ***********************************************************************
+ * SYNOPSIS:	Execute a request callback. A request callback is 
+ *              expected to NOT modify or delete the request.
+ * CALLED BY:	Library.
+ * RETURN:	Return code from callback routine.
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	kkee	8/23/96   	Initial Revision
+ *
+ ***********************************************************************/
+/* 
+ * int _far _pascal
+ * HTNetExecuteIntermediateCallback (HTListHandle callbackList,
+ * 				  HTRequestHandle request, int status)
+ * {
+ *    return HTNetExecuteCallback(callbackList, request, status);
+ *    
+ * }
+ */
+
+
+
+/***********************************************************************
+ *		HTNetExecuteCallback
+ ***********************************************************************
+ * SYNOPSIS:	Call all the callback functions registeredin the list.
+ * CALLED BY:	HTNetNewClient
+ * PASS:        callbackList = list of callback functions.
+ *              request = the request object.
+ *              status = only callback functions registered to be called
+ *                       based on status will be called.
+ * RETURN:	The return value of the last callback.
+ * SIDE EFFECTS:The request object, request->requestHandle, is passed to 
+ *              the user callback functions. These functions are free
+ *              to delete or resubmit the request to the Library. Hence,
+ *              the request object (and all its pointers keep by the 
+ *              Library) is no longer valid after passing requestHandle
+ *              to the callbacks.
+ *	
+ * STRATEGY:   The callback functions are called in the order in which
+ *             they were registered. 
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	kkee	6/ 4/96   	Initial Revision
+ *
+ ***********************************************************************/
+int _far _pascal
+HTNetExecuteCallback (HTListHandle callbackList, HTRequestHandle request, 
+	int status)
+{
+    HTNetCall netCall;
+    word i, count, size;
+    int ret = HT_OK;
+
+    count = HTListGetCount(callbackList);
+    size = sizeof(HTNetCall);
+
+    for (i=0; i<count; i++) {
+	HTListGetItem(callbackList, i, &netCall, size);
+
+	if (netCall.HTNC_status == status || netCall.HTNC_status == HT_ALL) 
+
+	    if ((ret = ProcCallFixedOrMovable_pascal(request, status,
+			  netCall.HTNC_cbf)) != HT_OK) 
+		break;
+    }
+
+    return ret;
+}	/* End of HTNetExecuteCallback.	*/
+
+
+
+
+
+
+
+

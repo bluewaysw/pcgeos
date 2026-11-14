@@ -1,0 +1,104 @@
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Geoworks 1997.  All rights reserved.
+	GEOWORKS CONFIDENTIAL
+
+PROJECT:	
+MODULE:		
+FILE:		outbound.goh
+
+AUTHOR:		Kok Kin Kee, Mar 12, 1997
+
+ROUTINES:
+	Name			Description
+	----			-----------
+
+REVISION HISTORY:
+	Name		Date		Description
+	----		----		-----------
+	kkee    	3/12/97   	Initial version.
+
+DESCRIPTION:
+
+	
+
+	$Id: outbound.goh,v 1.1 97/04/04 15:56:18 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+/***********************************************************************
+ *
+ *      Copyright (c) STNC Enterprises Ltd. 1996 -- All Rights Reserved
+ *
+ * PROJECT:    Tungsten
+ * MODULE:     Out Bound Header
+ * FILE:			outbound.goh
+ *
+ * AUTHOR:  Bill Godfrey, <bgodfrey@stnc.com>
+ *
+ ***********************************************************************/
+
+#ifndef INCLUDED_OUTBOUND_GOH
+#define INCLUDED_OUTBOUND_GOH
+
+@include <mtools/smtp.goh>
+@include <mtools/mterror.goh>
+@include <mtools/memutils.goh>
+
+#define OUTBOX ht_MemHandle	/* To an OutboxStruct structure. */
+#define MailoutError short int		/* Error code. */
+
+#define MAX_LINE_LENGTH 2048
+
+	/* SMTP_StageType - Records the stage of an outbound process. */
+typedef enum {
+	SST_NORMAL,									/* All is well. */
+	SST_SEND_MAIL_WAITING_RESP_MAIL, 	/* waiting for the response to the MAIL command. */
+	SST_SEND_MAIL_WAITING_RESP_RCPT, 	/* Waitfor for response to a specific RCPT command. */
+	SST_SEND_MAIL_WAITING_RESP_DATA,		/* Waiting for response to a DATA command. */
+	SST_SEND_MAIL_WAITING_RESP_DOT,		/* Waiting for response to the ending dot of a message. */
+
+	SST_OPENING									/* Undergoing the SMTP_Open routine */
+} SMTP_StageType;
+
+
+	/* OutboxStruct - All required information on an outbound session. */
+typedef struct {
+	SMTP_StageType stage;	/* Current stage of response. */
+
+	Socket i;
+	long int maxMsg;		/* Maximum message size. 0 = No limit. */
+	Boolean esmtp;		/* Size notification availble? */
+
+	short int numRcpts;	/* Number of recipients in array. */
+	short int rcptWait;	/* rcpt command response being waited for. */
+
+	Boolean anyRcptsFailed; /* Any bad recipients? */
+	Boolean anyRcptsWorked; /* Any good recipients? */
+
+	MailoutError Mail_Error;	/* Error code. */
+} OutboxStruct;
+
+	/* Mailout_Open - Opens an outbound session.
+			host - Name of server.
+			protocol - OUTB_PROTOCOL_SMTP for SMTP or OUTB_PROTOCOL_ESMTP for ESMTP.
+			localhost - Name of localhost.
+			box - Pointer to OUTBOX type. Must be zero the first time it is called.
+		Returns error code.
+	*/
+MailoutError Mailout_Open(char *host, byte protocol, char *localhost, OUTBOX *box) ;
+
+	/* Mailout_Close - Ends an outbound session.
+			box - Mailbox to close.
+		Return error code.
+	*/
+MailoutError Mailout_Close(OUTBOX box);
+
+	/* Mailout_SendMail - Sends a message.
+			box - Mailbox handle.
+			msg - Pointer to message structure to send.
+		Returns error code.
+	*/
+MailoutError Mailout_SendMail(OUTBOX box, MailMessage *msg) ;
+
+#endif
+

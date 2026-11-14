@@ -1,0 +1,1121 @@
+/*---------------------------------------------------------------------------
+//
+//  Geoworks (R) application software and GEOS (R) operating system
+//  software copyright (C) 1990-1997 Geoworks.  All rights reserved.
+//  United States Patents 5327529, 5237651, and 5438662. U.K. Patents
+//  0375703 and 0631677.  German Patents P3854269.2-08 and
+//  69307728.1-08.  French Patents 0375703 and 0631677.  Other
+//  international patents pending.
+//
+//  This software is the confidential and proprietary information of
+//  Geoworks ("Confidential Information").  You shall not disclose
+//  such Confidential Information and shall use it only in accordance
+//  with the terms of the license agreement you entered into with
+//  Geoworks.
+//
+// PROJECT:     HTMLViewer
+// MODULE:      request
+// FILE:        req.cpp
+//
+// AUTHOR:      Kok Kin Kee: Jan 13, 1998
+//
+// REVISION HISTORY:
+//      Name            Date            Description
+//      ----            ----            -----------
+//      kkee          1/13/98           Initial version
+//
+//
+// DESCRIPTION:
+//      Request
+//      //depot/liberty/project/ellery/main/library/www/html/req.cpp#29
+//
+//      $Id: req.goc,v 1.3 98/09/03 03:50:16 allen Exp $
+//
+//-------------------------------------------------------------------------*/
+
+/*
+
+extern "C" {
+#include <string.h>       // strlen, strcpy, memcpy
+#include <stdio.h>        // sprintf
+}
+
+#include <system.h>
+#include <www/wwcore/wwuri.h>
+#include <www/scheme/wwfile.h>          // File protocol
+#include <www/scheme/http.h>            // HTTP protocol
+#include <fs/fsmgr.h>                   // theFileStoreManager.Delete()
+#include <www/conv/html.h>
+#include <www/fcache.h>
+#include "req.h"
+#include "resp.h"
+#include "../wwcore/suffix.h"
+#include "../wwcore/tee.h"
+#include "../aauth/htaa.h"
+#include "../cookie/cookie.h"
+
+#include <kernel/log.h>  // for theLog and _LOG
+
+*/
+
+@include <Ansi/stdlib.h>
+@include <Ansi/string.h>
+@include <file.h>
+@include "WWW2/WW2Core/ww2strm.goh"
+@include "WWW2/Scheme/wwfile.goh"
+@include "WWW2/WW2Core/ww2string.goh"
+@include "WWW2/Conv/req.goh"
+@include "WWW2/wwMacro.h"
+#include "WWW2/WW2Core/ww2suffx.h"
+
+#define NO_FILE_CACHE_YET 0
+#define NO_HTTP_PROTOCOL_YET 0
+#define NO_REQ_MGR 0
+
+#define _meta       (pself->__meta)
+#define _reqManager (pself->__reqManager)
+#define _target     (pself->__target)
+#define _status     (pself->__status)
+#define _reqType    (pself->__reqType)
+#define _loadMode   (pself->__loadMode)
+#define _url        (pself->__url)
+#define _proxyName  (pself->__proxyName)
+#define _proxyPort  (pself->__proxyPort)
+#define _postBuffer (pself->__postBuffer)
+#define _postLen    (pself->__postLen)
+#define _postFile   (pself->__postFile)
+#define _stream     (pself->__stream)
+#define _preemptStream  (pself->__preemptStream)
+#define _waitForExecute (pself->__waitForExecute)
+#define _lastModified   (pself->__lastModified)
+
+
+static const char CRLF[] = "\x0D\x0A";
+static const char userAgent[] = "User-Agent: Mozilla/4.01";
+static const char formURLEncoded[] = 
+    "Content-Type: application/x-www-form-urlencoded";
+
+
+/*---------------------------------------------------------------------------
+//		HTRequest::HTRequest()
+//---------------------------------------------------------------------------
+// 
+// SYNOPSIS: 	Constructor.
+// SCOPE:	Public
+// RETURN:	Nothing
+// STRATEGY:	
+// 
+// REVISION HISTORY: 
+//	Name		Date		Description 
+//	----		----		----------- 
+//	kkee    	1/29/98 	Initial version 
+//	
+//-------------------------------------------------------------------------*/
+void HTRequestHTRequest 
+       (HTRequest *pself,
+	optr /* HTRequestManager * */ reqManager, 
+        optr /* RequestResponse * */ target,
+	optr /* WWStatus * */ status)
+{
+    _meta.Destructor = (void (*)(Command *)) &HTRequestDestructor;
+    _meta.Execute = (void (*)(Command *)) &HTRequestExecute;
+    _meta.Preempt = (void (*)(Command *)) &HTRequestPreempt;
+    _meta.Done = (void (*)(Command *)) &HTRequestDone;
+    _reqManager = reqManager;
+    _target = target;
+    _status = status;
+    _reqType = REQUEST_UNKNOWN;
+    _loadMode = LOAD_FROM_NETWORK;
+    _url = NULL;
+    _proxyName = 0;
+    _proxyPort = 0;
+    _postBuffer = NULL;
+    _postLen = 0;
+    _postFile = FALSE;
+    _stream = NULL;
+    _lastModified = NULL;
+
+    _preemptStream = ThreadAllocSem(1);
+    _waitForExecute = ThreadAllocSem(0);
+
+/*    _authReq = reqManager->GetAppBase(); */
+
+EC (ECCheckLMemObject(reqManager != NULL));
+}	/* End of HTRequest::HTRequest() */
+
+
+/*---------------------------------------------------------------------------
+//		HTRequest::~HTRequest()
+//---------------------------------------------------------------------------
+// 
+// SYNOPSIS: 	Destructor.
+// SCOPE:	Public
+// RETURN:	Nothing
+// STRATEGY:	
+// 
+// REVISION HISTORY: 
+//	Name		Date		Description 
+//	----		----		----------- 
+//	kkee    	1/29/98 	Initial version 
+//	
+//-------------------------------------------------------------------------*/
+void HTRequestDestructor
+    (HTRequest *pself)
+{
+    free(_url);
+    if (_postFile) {
+        /* Delete the temporary file */
+        EC_FAIL("Its wrong to cast char to TCHAR, use strcpy(TCHAR*,char*)");
+        FileDelete((const char *)_postBuffer);
+    }
+    free(_postBuffer);
+    free(_lastModified);
+    free(_proxyName);
+    @call _stream::MSG_META_OBJ_FREE();
+
+    ThreadFreeSem(_preemptStream);
+    ThreadFreeSem(_waitForExecute);
+    _preemptStream = NULL;
+    _waitForExecute = NULL;
+
+}	/* End of HTRequest::~HTRequest() */
+
+
+
+/*---------------------------------------------------------------------------
+//		HTRequest::InitializeGet()
+//---------------------------------------------------------------------------
+// 
+// SYNOPSIS: 	Initialize request for Get method.
+// SCOPE:	Public
+// RETURN:	REQUEST_OK
+//              REQUEST_OUT_OF_MEMORY
+// STRATEGY:	Make a copy of url as this is a nonblocking call.
+// 
+// REVISION HISTORY: 
+//	Name		Date		Description 
+//	----		----		----------- 
+//	kkee    	1/29/98 	Initial version 
+//	
+//-------------------------------------------------------------------------*/
+RequestResultCode
+HTRequestInitializeGet
+       (HTRequest *pself, const char *url, const char *proxyName,
+        dword proxyPort, LoadMode loadMode)
+{
+    EC_BOUNDS(url);
+    ASSERTS(_reqType == REQUEST_UNKNOWN,
+            "HTRequest::InitializeGet() request has been initialized");
+
+    _reqType = REQUEST_GET;
+    _loadMode = loadMode;
+    
+    /* If necessary, default scheme to http://   */
+    _url = HTRequestDuplicateURL(pself, url);
+    if (!_url) {
+        return REQUEST_OUT_OF_MEMORY;
+    }
+
+    if (proxyName) {
+        _proxyName = (char *)malloc(sizeof(char)*(strlen(proxyName)+1));
+        if (!_proxyName) {
+            return REQUEST_OUT_OF_MEMORY;
+        }
+        strcpy(_proxyName, proxyName);
+    }
+    _proxyPort = proxyPort;
+    
+    return REQUEST_OK;
+}	/* End of HTRequest::InitializeGet() */
+
+
+
+/*---------------------------------------------------------------------------
+//		HTRequest::InitializePost()
+//---------------------------------------------------------------------------
+// 
+// SYNOPSIS: 	Initialize a request for Post method.
+// SCOPE:	Public
+// RETURN:	REQUEST_OK or REQUEST_OUT_OF_MEMORY
+//              
+// STRATEGY:	Make a copy of the URL and data as this is a
+//              nonblocking call.
+// 
+// REVISION HISTORY: 
+//	Name		Date		Description 
+//	----		----		----------- 
+//	kkee    	1/29/98 	Initial version 
+//	
+//-------------------------------------------------------------------------*/
+RequestResultCode
+HTRequestInitializePost (HTRequest *pself,
+			       const char *url,
+			       const byte *buffer,
+			       const dword len,
+			       Boolean file,
+			       const char *proxyName,
+			       dword proxyPort)
+{
+    EC_BOUNDS(url);
+    EC_BOUNDS(buffer);
+    ASSERTS(_reqType == REQUEST_UNKNOWN,
+            "HTRequest::InitializePost() request has been initialized");
+    ASSERTS(file == FALSE,
+            "HTRequest::InitializePost() post from file not implemented");
+    NEC(USE_IT(file));
+
+    _reqType = REQUEST_POST;
+    /* Always load from network when posting. */
+    _loadMode = LOAD_FROM_NETWORK;
+
+    /* If necesary, default scheme to http: */
+    _url = HTRequestDuplicateURL(pself, url);
+    if (!_url) {
+        return REQUEST_OUT_OF_MEMORY;
+    }
+
+    _postLen = len;
+    _postBuffer = (byte *)malloc(sizeof(byte)*(len));
+    if (!_postBuffer) {
+        return REQUEST_OUT_OF_MEMORY;
+    }
+    memcpy(_postBuffer, buffer, len);
+
+    if (proxyName) {
+        _proxyName = (char *)malloc(sizeof(char)*(strlen(proxyName)+1));
+        if (!_proxyName) {
+            return REQUEST_OUT_OF_MEMORY;
+        }
+        strcpy(_proxyName, proxyName);
+    }
+    _proxyPort = proxyPort;
+
+    return REQUEST_OK;
+}	/* End of HTRequest::InitializePost() */
+
+
+
+optr /* RequestResponse* */ 
+HTRequestGetTarget(HTRequest *pself) /* const */
+{
+    return _target;
+}
+
+
+const char *
+HTRequestGetStrURL(HTRequest *pself) /* const  */
+{
+    return _url;
+}
+
+
+
+/*---------------------------------------------------------------------------
+//		HTRequest::Execute()
+//---------------------------------------------------------------------------
+// 
+// SYNOPSIS: 	Execute a request.
+// SCOPE:	Private
+// RETURN:	Nothing
+// STRATEGY:	Run the request to completion or until it is preempted
+//              by Preempt(). Before we return, we MUST raise the
+//              _preempt semaphore regardless of whether we've been
+//              preempted by Preempt().
+//
+//              Implement protocol policy mapping here.
+//
+// REVISION HISTORY: 
+//	Name		Date		Description 
+//	----		----		----------- 
+//	kkee    	1/22/98 	Initial version 
+//	
+//-------------------------------------------------------------------------*/
+void
+HTRequestExecute(HTRequest *pself)
+{
+    /*
+    // Instantiate the appropriate protocol to use.
+    */
+    optr /* WWStream * */ s = HTRequestGetProtocol(pself);
+
+    if (!s) {
+	ThreadVSem(_waitForExecute);
+        return;
+    }
+#if NO_REQ_MGR
+    @call _reqManager::AcceptStream(s, oself /* this */);
+#endif
+    ThreadVSem(_waitForExecute);
+}	/* End of HTRequest::Execute() */
+
+
+/*---------------------------------------------------------------------------
+//		HTRequest::Preempt()
+//---------------------------------------------------------------------------
+// 
+// SYNOPSIS: 	Preempts Execute() from another thread.
+// SCOPE:	Public
+// RETURN:	Nothing
+// STRATEGY:	
+// 
+// REVISION HISTORY: 
+//	Name		Date		Description 
+//	----		----		----------- 
+//	kkee    	1/22/98 	Initial version 
+//	
+//-------------------------------------------------------------------------*/
+void
+HTRequestPreempt(HTRequest *pself)
+{
+    do {
+        /* Wait to preempt _stream */
+        ThreadPSem(_preemptStream);
+        if (_stream) {
+            @call _stream::Abort();
+        }
+        ThreadVSem(_preemptStream);
+
+        /* Block until HTRequest::Run() V the semaphore */
+    } while (ThreadPTimedSem(_waitForExecute, 1000) == SE_TIMEOUT);
+}	/* End of HTRequest::Preempt() */
+
+
+
+/*---------------------------------------------------------------------------
+//		HTRequest::Done()
+//---------------------------------------------------------------------------
+// 
+// SYNOPSIS: 	Indicates that the request object is about to be deleted.
+// SCOPE:	Public
+// RETURN:	Nothing
+// STRATEGY:	
+// 
+// REVISION HISTORY: 
+//	Name		Date		Description 
+//	----		----		----------- 
+//	kkee    	2/10/98 	Initial version 
+//	
+//-------------------------------------------------------------------------*/
+void
+HTRequestDone(HTRequest *pself)
+{
+    /*
+    // Indicate that the request is done.
+    */
+#if NO_REQ_MGR
+    @call _reqManager::AcceptDone(oself /* this */);
+#endif
+}	/* End of HTRequest::Done() */
+
+
+
+/*---------------------------------------------------------------------------
+//		HTRequest::GetProtocol()
+//---------------------------------------------------------------------------
+// 
+// SYNOPSIS: 	Create a protocol stream based on URL. Uses instance
+//              data _url and _stream.
+// SCOPE:	Private
+// RETURN:	Nothing
+// STRATEGY:	If the protocol is allowed to be preempted, we set 
+//              _stream to the protocol.
+// 
+// REVISION HISTORY: 
+//	Name		Date		Description 
+//	----		----		----------- 
+//	kkee    	2/19/98 	Initial version 
+//	
+//-------------------------------------------------------------------------*/
+optr /* WWStream*  */
+HTRequestGetProtocol(HTRequest *pself)
+{
+    if (!WWStrNCaseCmp(_url, "http", 4)) {
+        /* Check cache copy first. */
+        if (_loadMode == LOAD_ANY_VERSION) {
+            optr /* WWStream * */ ret = HTRequestGetCache(pself);
+            if (ret) {
+                return ret;
+            }
+        }
+        /* Load from network, but if we have a cache copy, try checking with */
+        /* server if it has expired. */
+        ASSERT(_lastModified == NULL);
+        _lastModified = HTRequestGetLastModifiedDate(pself);
+        return HTRequestGetHTTP(pself);
+
+    } else if (!WWStrNCaseCmp(_url, "file", 4)) {
+        return HTRequestGetFile(pself);
+
+    } else if (!WWStrNCaseCmp(_url, "mailto", 6)) {
+        return HTRequestLaunchEmail(pself);
+
+    } else {
+        EC_WARN("HTRequest::GetProtocol() protocol not supported");
+    }
+
+    return NULL;
+}	/* End of HTRequest::GetProtocol() */
+
+
+/*---------------------------------------------------------------------------
+//		HTRequest::GetLastModifiedDate()
+//---------------------------------------------------------------------------
+// 
+// SYNOPSIS: 	Get a date we could use to verify with server.
+// SCOPE:	Private
+// RETURN:	non-NULL, GMT time. Must be freed by caller via delete []...
+// STRATEGY:	If no expires date, use last modified date.
+// 
+// REVISION HISTORY: 
+//	Name		Date		Description 
+//	----		----		----------- 
+//	kkee    	6/11/98 	Initial version 
+//	
+//-------------------------------------------------------------------------*/
+char*
+HTRequestGetLastModifiedDate(HTRequest *pself)
+{
+#if NO_FILE_CACHE_YET
+    char *ret = GetHTFileCacheManager().GetField(_url, 
+                        HTFileCacheManager::FT_EXPIRES);
+    if (!ret) {
+        ret = GetHTFileCacheManager().GetField(_url,
+                        HTFileCacheManager::FT_LAST_MODIFIED);
+    }
+    return ret;
+#else
+    return NULL;
+#endif
+}	/* End of HTRequest::GetLastModifiedDate() */
+
+
+/*---------------------------------------------------------------------------
+//		HTRequest::GetHTTP()
+//---------------------------------------------------------------------------
+// 
+// SYNOPSIS: 	Get a HTTP protocol.
+// SCOPE:	Private
+// RETURN:	stream to http, else NULL.
+// STRATEGY:	If the protocol is allowed to be preempted, we set 
+//              _stream to the protocol.
+// 
+// REVISION HISTORY: 
+//	Name		Date		Description 
+//	----		----		----------- 
+//	kkee    	2/23/98 	Initial version 
+//	
+//-------------------------------------------------------------------------*/
+optr /* WWStream * */
+HTRequestGetHTTP(HTRequest *pself)
+{
+#if NO_HTTP_PROTOCOL_YET
+    HTTP *http = new HTTP();
+
+    if (!http || http->Initialize(_status) != WWSTREAM_OK) {
+        delete http;
+        _reqManager->AcceptError(this,
+            WWSTATUS_CANNOT_CREATE_HTTP_PROTOCOL);
+        return NULL;
+    }
+        
+    /* HTTP can be preempted from now on. _stream is deleted by  */
+    /* destructor. */
+    SetStreamPreemptable(http);
+        
+    HTResponse resp(this);
+    int numRetries = 0;
+    while (1) {
+        if (_reqType == REQUEST_GET) {
+            if (http->Get(_url, TRUE, _proxyName, _proxyPort) 
+                != HTTP_OK) {
+                return NULL;
+            } 
+            if (GenHTTPHeaders(http, TRUE) != REQUEST_INT_OK) {
+                return NULL;
+            }
+            
+        } else {
+            if (http->Post(_url, _proxyName, _proxyPort) != HTTP_OK) {
+                return NULL;
+            }
+            if (GenHTTPHeaders(http, FALSE) != REQUEST_INT_OK) {
+                return NULL;
+            }
+            if (GenHTTPPostData(http) != REQUEST_INT_OK) {
+                return NULL;
+            }
+        }
+
+        /* Parse HTTP response headers. The headers will tell us */
+        /* whether to retry or accept the data.                  */
+        RequestInternalCode rc = ParseHTTPResponse(http, &resp);
+
+        /* If necessary, allow at most 10 retries                */
+        /* At the end of the 10-th retry, we just take whatever  */
+        /* is there to read from the last HTTP response.         */
+        if (numRetries++ == 10) {
+            break;
+        }
+
+        if (rc == REQUEST_INT_NOT_MODIFIED) {
+            /* Use cache copy  */
+            DeleteStream();
+            HTFileCacheReader *r = 
+                GetHTFileCacheManager().CreateReader(_url, _reqManager->GetViewer());
+            if (r) {
+                SetStreamPreemptable(r);
+                break;
+            } 
+            /* Retry with new HTTP instance */
+            http = new HTTP();
+            if (!http || http->Initialize(_status) != WWSTREAM_OK) {
+                delete http;
+                break;
+            }
+            SetStreamPreemptable(http);
+        } else if (rc == REQUEST_INT_RETRY) {
+            DeleteStream();
+            http = new HTTP();
+            if (!http || http->Initialize(_status) != WWSTREAM_OK) {
+                delete http;
+                break;
+            }
+            SetStreamPreemptable(http);
+        } else if (rc == REQUEST_INT_OK) {
+            /* See if we want to cache the data from HTTP */
+            WWStream *cacheStream = CacheHTTP(http, &resp);
+            if (cacheStream) {
+#if ERROR_CHECK
+                ASSERT(http == RemoveStream());
+#endif
+                SetStreamPreemptable(cacheStream);
+            }
+            break;
+        } else {
+            /* Accept whatever data from HTTP */
+            break;
+        }
+    }
+#endif
+
+    return _stream;
+}	/* End of HTRequest::GetHTTP() */
+
+
+
+/*---------------------------------------------------------------------------
+//		HTRequest::GetFile()
+//---------------------------------------------------------------------------
+// 
+// SYNOPSIS: 	Get a file protocol
+// SCOPE:	Private
+// RETURN:	file protocol or NULL.
+// STRATEGY:	If the protocol is allowed to be preempted, we set 
+//              _stream to the protocol.
+// 
+// REVISION HISTORY: 
+//	Name		Date		Description 
+//	----		----		----------- 
+//	kkee    	2/23/98 	Initial version 
+//	
+//-------------------------------------------------------------------------*/
+optr /* WWStream * */
+HTRequestGetFile(HTRequest *pself)
+{
+    optr /* WWFile * */ wwfile = ObjInstantiateForThread(0,
+						&WWFileClass);
+
+    if (!wwfile) {
+#if NO_REQ_MGR
+        @call _reqManager::AcceptError(oself /* this */, 
+            WWSTATUS_CANNOT_CREATE_FILE_PROTOCOL);
+#endif
+        return NULL;
+    }   
+
+    /* File can be preempted from now on. _stream is deleted by  */
+    /* by destructor.                                            */
+    HTRequestSetStreamPreemptable(pself, wwfile);
+
+    if ((@call wwfile::Initialize(_status, 
+				  DEFAULT_WWSTREAM_SIZE, 
+				  DEFAULT_WWSTREAM_UNGET_SIZE) != WWSTREAM_OK)) {
+#if NO_REQ_MGR
+        @call _reqManager::AcceptError(oself /* this */, 
+            WWSTATUS_FILE_PROTOCOL_OUT_OF_MEMORY);
+#endif
+        return NULL;
+    }
+ 
+    if (@call wwfile::FileGet(_url) != WWFILE_OK) {
+#if NO_REQ_MGR
+        @call _reqManager::AcceptError(oself /* this */, 
+            WWSTATUS_FILE_PROTOCOL_CANNOT_OPEN_FILE);
+#endif
+        return NULL;
+    }
+        
+    /*
+    // Set the MIME content-type of the file stream. We will the
+    // file size as the default content-length, which is set by
+    // the file protocol.
+    */
+    char *suffix = strrchr(_url, '.');
+    if (suffix) {
+        const char *mimeType = SuffixMimeType(++suffix);
+        if (mimeType) {
+            @call wwfile::SetMimeType(mimeType);
+        }
+    }
+
+    return wwfile;
+}	/* End of HTRequest::GetFile() */
+
+
+/*---------------------------------------------------------------------------
+//		HTRequest::GenHTTPHeaders()
+//---------------------------------------------------------------------------
+// 
+// SYNOPSIS: 	Generate extra HTTP headers that we want to send to server.
+// SCOPE:	Private
+// RETURN:	REQUEST_INT_OK
+//              REQUEST_INT_ABORT
+// STRATEGY:	The following headers are generated:
+//                  * User-Agent:
+//                  * Authorization:
+//                  * If-Modified-Since:  (caching and reload)
+//                  * Pragma: no cache
+//                  * Proxy-Authorization: Basic SP basic-auth
+//                  * Accept: image/gif, image/jpeg
+//                  * Accept-Charset: iso-8859-1
+//                  * Accept-Language: en
+//                  * Cookie:
+//
+//              Write headers to HTTP stream.
+//              Each header is terminated by CRLF.
+//              Headers are ended by CRLF on a line by itself.
+// 
+// REVISION HISTORY: 
+//	Name		Date		Description 
+//	----		----		----------- 
+//	kkee    	3/07/98 	Initial version 
+//	
+//-------------------------------------------------------------------------*/
+RequestInternalCode
+HTRequestGenHTTPHeaders(HTRequest *pself, optr /* HTTP * */ http,
+			Boolean endHeader)
+{
+EC (ECCheckLMemObject(http));
+
+#if NO_HTTP_PROTOCOL_YET
+    
+    uint16 numBytesWritten;
+
+    /* User-Agent: ... */
+    http->Write((uint8*)userAgent, strlen(userAgent), &numBytesWritten);
+    if (http->Write((uint8*)CRLF, 2, &numBytesWritten) != 
+        WWSTREAM_OK || numBytesWritten != 2) {
+        return REQUEST_INT_ABORT;
+    }
+
+    /* Authorization: ...  */
+    char *auth = theHTAccessAuth.Compose(_url);
+    if (auth) {
+        http->Write((uint8*)"Authorization: Basic ", 21, &numBytesWritten);
+        http->Write((uint8*)auth, strlen(auth), &numBytesWritten);
+        delete [] auth;
+        if (http->Write((uint8*)CRLF, 2, &numBytesWritten) != 
+            WWSTREAM_OK || numBytesWritten != 2) {
+            return REQUEST_INT_ABORT;
+        }
+    }
+
+    /* Cookie:              */
+    char *cookie = GetCookieManager().FindCookies(_url);
+    if (cookie) {
+        http->Write((uint8*)"Cookie: ", 8, &numBytesWritten);
+        http->Write((uint8*)cookie, strlen(cookie), &numBytesWritten);
+        delete [] cookie;
+        if (http->Write((uint8*)CRLF, 2, &numBytesWritten) != 
+            WWSTREAM_OK || numBytesWritten != 2) {
+            return REQUEST_INT_ABORT;
+        }
+    }
+    
+    /* If there is a cache copy, verify it with server  */
+    if (_lastModified) {
+        http->Write((uint8*)"If-Modified-Since: ", 19, &numBytesWritten);
+        http->Write((uint8*)_lastModified, strlen(_lastModified), 
+                    &numBytesWritten);
+        delete [] _lastModified;
+        _lastModified = NULL;
+        if (http->Write((uint8*)CRLF, 2, &numBytesWritten) != 
+            WWSTREAM_OK || numBytesWritten != 2) {
+            return REQUEST_INT_ABORT;
+        }
+    }
+
+    /* ....More headers here... */
+
+    if (endHeader) {
+        if (http->Write((uint8*)CRLF, 2, &numBytesWritten, TRUE) != 
+            WWSTREAM_OK || numBytesWritten != 2) {
+            return REQUEST_INT_ABORT;
+        }
+    }
+#endif
+    return REQUEST_INT_OK;
+}	/* End of HTRequest::GenHTTPHeaders() */
+
+
+/*---------------------------------------------------------------------------
+//		HTRequest::GenHTTPPostData()
+//---------------------------------------------------------------------------
+// 
+// SYNOPSIS: 	Generate HTTP Post data.
+// SCOPE:	Private
+// RETURN:	REQUEST_INT_OK
+//              REQUEST_INT_ABORT
+// STRATEGY:	Send the following data.
+//
+//              Content-Type: application/x-www-form-urlencoded <CRLF>
+//              Content-Length: xyz <CRLF>
+//              <CRLF>
+//              Post data here of length xyz.
+// 
+// REVISION HISTORY: 
+//	Name		Date		Description 
+//	----		----		----------- 
+//	kkee    	4/21/98 	Initial version 
+//	
+//-------------------------------------------------------------------------*/
+RequestInternalCode
+HTRequestGenHTTPPostData(HTRequest *pself, optr /* HTTP * */ http)
+{
+EC (ECCheckLMemObject(http));
+    word numBytesWritten;
+
+#if NO_HTTP_PROTOCOL_YET
+
+    /* Content-type: application/x-www-form-urlencoded <CRLF> */
+    http->Write((uint8*)formURLEncoded, strlen(formURLEncoded),
+                &numBytesWritten);
+    http->Write((uint8*)CRLF, 2, &numBytesWritten);
+
+    /* Content-Length: xyz <CRLF>  */
+    char str[12];
+    sprintf(str, "%d", _postLen);
+    http->Write((uint8*)"Content-Length: ", 16, &numBytesWritten);
+    http->Write((uint8*)str, strlen(str), &numBytesWritten);
+    http->Write((uint8*)CRLF, 2, &numBytesWritten);
+
+    /* <CRLF> to end headers and separate headers from data. */
+    http->Write((uint8*)CRLF, 2, &numBytesWritten);
+
+    /* Post data */
+    if (http->Write((uint8*)_postBuffer, _postLen, &numBytesWritten, TRUE) != 
+        WWSTREAM_OK || numBytesWritten != _postLen) {
+        return REQUEST_INT_ABORT;
+    }
+    
+    /* Clean up here to save space instead for waiting for destructor. */
+    delete [] _postBuffer;
+    _postBuffer = NULL;   /* To prevent destructor from deleting it. */
+
+#endif
+    return REQUEST_INT_OK;
+}	/* End of HTRequest::GenHTTPPostData() */
+
+
+
+/*---------------------------------------------------------------------------
+//		HTRequest::ParseHTTPResponse()
+//---------------------------------------------------------------------------
+// 
+// SYNOPSIS: 	Parse HTTP response headers decide if the data is acceptable.
+// SCOPE:	Private
+// RETURN:	REQUEST_INT_OK           http data is acceptable.
+//              REQUEST_INT_NOT_MODIFIED cache copy still valid, http data is 
+//                                   rejected.
+//              REQUEST_INT_RETRY        http data is rejected, should retry.
+//              REQUEST_INT_ABORT        error in http.
+// STRATEGY:	
+// 
+// REVISION HISTORY: 
+//	Name		Date		Description 
+//	----		----		----------- 
+//	kkee    	3/04/98 	Initial version 
+//	
+//-------------------------------------------------------------------------*/
+RequestInternalCode
+HTRequestParseHTTPResponse(HTRequest *pself, optr /* HTTP * */ http,
+			   optr /* HTResponse * */ resp)
+{
+EC (ECCheckLMemObject(http));
+EC (ECCheckLMemObject(resp));
+    
+#if NO_HTTP_PROTOCOL_YET
+
+    HTMime *mime = new HTMime();
+    if (!mime) {
+        EC_WARN("HTRequest::ParseHTTPResponse() out of memory");
+        return(REQUEST_INT_ABORT);
+    }
+
+    if (mime->Parse(http, resp) != HTMIME_OK) {
+        EC_WARN("HTRequest::ParseHTTPResponse() parse mime failed");
+        delete mime;
+        return(REQUEST_INT_ABORT);
+    }
+
+    delete mime; /* No use for it anymore */
+
+    /* Set the content type and content length */
+    http->SetMimeType(resp->GetContentType());
+    http->SetMimeLength(resp->GetContentLength());
+
+    /*
+    // Before we accept the HTTP data, we check all the possible
+    // situations that would cause us to retry.
+    */
+    HTTPStatusCode statusCode = http->StatusCode();
+
+    /* If cache copy not expired, use it */
+    if (statusCode == HTTP_304_NOT_MODIFIED) {
+        return REQUEST_INT_NOT_MODIFIED;
+    }
+
+    /* If redirected, we need to retry */
+    const char *redirectedURL = resp->GetNewURL();
+    if ((statusCode == HTTP_301_MOVED_PERM ||
+         statusCode == HTTP_302_MOVED_TEMP) &&
+        redirectedURL) {
+        char *newURL = WWParseURI(redirectedURL, _url,
+                                  WWURI_PARSE_ALL);
+        if (newURL) {
+            delete [] _url;
+            _url = newURL;   /* Retry with new URL */
+            if (_reqType == REQUEST_POST) {
+                /* Not safe to repost, must change to Get */
+                _reqType = REQUEST_GET;
+            }
+            return(REQUEST_INT_RETRY);
+        } else {
+            return(REQUEST_INT_ABORT);
+        }
+    }
+
+    /* If www-authentication challenged, we need to prompt         */
+    /* user for username and password, and then retry.             */
+    const char *auth = resp->GetAuth();
+    if (statusCode == HTTP_401_UNAUTH && auth) {
+        if (theHTAccessAuth.Parse(_url, auth, &_authReq)) {
+            return(REQUEST_INT_RETRY);
+        }
+        /* Unknown authentication challenge or challenge rejected, */
+        /* take whatever data http provides by returning           */
+        /* REQUEST_INT_OK                                          */
+    }
+
+#endif
+
+    return(REQUEST_INT_OK);
+}	/* End of HTRequest::ParseHTTPResponse() */
+
+
+/*---------------------------------------------------------------------------
+//		HTRequest::CacheHTTP()
+//---------------------------------------------------------------------------
+// 
+// SYNOPSIS: 	Attempt to cache a HTTP response data. Return Tee
+//              stream if cacheable. 
+// SCOPE:	Private
+// RETURN:	Tee stream that tees read data from http to cache.
+// STRATEGY:	
+// 
+// REVISION HISTORY: 
+//	Name		Date		Description 
+//	----		----		----------- 
+//	kkee    	3/06/98 	Initial version 
+//	
+//-------------------------------------------------------------------------*/
+optr /* WWStream* */
+HTRequestCacheHTTP(HTRequest *pself, optr /* HTTP * */ http,
+		   optr /* HTResponse * */ resp)
+{
+EC (ECCheckLMemObject(http));
+EC (ECCheckLMemObject(resp));
+    
+    optr /* WWStream * */ ret = NULL;
+#if NO_FILE_CACHE_YET
+    /* Only cache GET and HTTP/1.0 or higher response only. Post response */
+    /* is cached in memory, not as a file cache. To cache to file, we use */
+    /* a Tee stream to fork the HTTP data to cache writer and client.     */
+    if (GetHTFileCacheManager().GetEnabled() &&
+        (_reqType == REQUEST_GET) && 
+        (http->ResponseVersion() != HTTPV_0_9) && 
+        resp->IsCacheable()) {
+
+        HTFileCacheWriter *fcwriter = 
+            GetHTFileCacheManager().CreateWriter(_url, resp->GetContentType(),
+                                                resp->GetContentLength(),
+                                                resp->GetExpires(),
+                                                resp->GetLastModified(),
+                                                FALSE,
+                                                _reqManager->GetViewer());
+        if (fcwriter) {
+            /* Tee will delete http and fcwriter in its destructor. */
+            WWTee *tee = new WWTee(http, fcwriter);
+			if (tee && (tee->Initialize() == WWSTREAM_OK)) {
+				ret = tee;
+            } else {
+                delete tee;
+                delete fcwriter;
+            }
+        } else {
+            delete fcwriter;
+        }
+    }
+#endif
+    return ret;
+}	/* End of HTRequest::CacheHTTP() */
+
+
+/*---------------------------------------------------------------------------
+//		HTRequest::GetCache()
+//---------------------------------------------------------------------------
+// 
+// SYNOPSIS: 	Get cache copy pointed to by the URL if it exist.
+//              If no cache copy, may optionally provide _lastModified.
+//              Caller has to delete _lastModified if not NULL.
+// SCOPE:	Private
+// RETURN:	WWStream if there is cache copy. Stream for read only,
+//              not write.
+//              NULL if there is no cache copy.
+// STRATEGY:	
+// 
+// REVISION HISTORY: 
+//	Name		Date		Description 
+//	----		----		----------- 
+//	kkee    	3/05/98 	Initial version 
+//  edwin       4/25/98     change algorithm
+//	
+//-------------------------------------------------------------------------*/
+optr /* WWStream* */
+HTRequestGetCache(HTRequest *pself)
+{
+#if NO_FILE_CACHE_YET
+    if (!GetHTFileCacheManager().GetEnabled()) {
+        return NULL;
+    }
+
+    HTFileCacheReader *fcreader = 
+        GetHTFileCacheManager().CreateReader(_url, _reqManager->GetViewer());
+    
+    /* File cache reader can be preempted from now on. _stream is  */
+    /* deleted by destructor.                                      */
+    if (fcreader) {
+        SetStreamPreemptable(fcreader);
+    }
+        
+    return fcreader;
+#else
+    return NULL;
+#endif
+}	/* End of HTRequest::GetCache() */
+
+
+
+/*---------------------------------------------------------------------------
+//		HTRequest::LaunchEmail()
+//---------------------------------------------------------------------------
+// 
+// SYNOPSIS: 	Launch email appl passing it all the relevant params.
+// SCOPE:	Protected
+// RETURN:	NULL as email appl does not return us data.
+// STRATEGY:	We should look up the appropriate email appl to launch
+//              using Geos registry. But for now, you can hardcode the
+//              appl to launch.
+// 
+// REVISION HISTORY: 
+//	Name		Date		Description 
+//	----		----		----------- 
+//	kkee    	5/12/98 	Initial version 
+//	
+//-------------------------------------------------------------------------*/
+optr /* WWStream* */
+HTRequestLaunchEmail(HTRequest *pself)
+{
+    /* xxx launch email passing url data
+    // _url in the form of "mailto:kkee@geoworks.com?subject=hi there"
+    // SetContext(_url); */
+    return NULL;
+}	/* End of HTRequest::LaunchEmail() */
+
+
+
+/*---------------------------------------------------------------------------
+//		HTRequest::DuplicateURL()
+//---------------------------------------------------------------------------
+// 
+// SYNOPSIS: 	Duplicate URL, if there is no scheme, default to http://
+// SCOPE:	Private
+// RETURN:	char*, must be deleted by caller via delete [] .
+// STRATEGY:	
+// 
+// REVISION HISTORY: 
+//	Name		Date		Description 
+//	----		----		----------- 
+//	kkee    	6/15/98 	Initial version 
+//	
+//-------------------------------------------------------------------------*/
+char*
+HTRequestDuplicateURL(HTRequest *pself, const char *url)
+{
+    EC_BOUNDS(url);
+    if (!strchr(url, ':')) {
+        /* Default to http://, which requires 7 spaces */
+        char *ret = (char *)malloc(sizeof(char)*(strlen(url) + 8));
+        if (!ret) {
+            return NULL;
+        }
+        strcpy(ret, "http://");
+        return strcat(ret, url);
+    } else {
+        return stralloccopy(url);
+    }
+}	/* End of HTRequest::DuplicateURL() */
+
+
+void HTRequestSetStreamPreemptable(HTRequest *pself,
+				   optr /* WWStream * */ stream)
+{
+EC (ECCheckLMemObject(stream));
+    ASSERT(_stream == NULL);
+    ThreadPSem(_preemptStream);
+    _stream = stream;
+    ThreadVSem(_preemptStream);
+}
+
+
+void HTRequestDeleteStream(HTRequest *pself)
+{
+    ThreadPSem(_preemptStream);
+    @call _stream::MSG_META_OBJ_FREE();
+    _stream = NULL;
+    ThreadVSem(_preemptStream);
+}
+
+
+
+#if ERROR_CHECK
+/* Remove stream without deleting it   */
+optr /* WWStream* */ HTRequestRemoveStream(HTRequest *pself)
+{
+    ThreadPSem(_preemptStream);
+    optr /* WWStream * */ ret = _stream;
+    _stream = NULL;
+    ThreadVSem(_preemptStream);
+    return ret;
+}
+#endif

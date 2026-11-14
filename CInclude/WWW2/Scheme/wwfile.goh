@@ -1,0 +1,298 @@
+/*---------------------------------------------------------------------------
+//
+//  Geoworks (R) application software and GEOS (R) operating system
+//  software copyright (C) 1990-1997 Geoworks.  All rights reserved.
+//  United States Patents 5327529, 5237651, and 5438662. U.K. Patents
+//  0375703 and 0631677.  German Patents P3854269.2-08 and
+//  69307728.1-08.  French Patents 0375703 and 0631677.  Other
+//  international patents pending.
+//
+//  This software is the confidential and proprietary information of
+//  Geoworks ("Confidential Information").  You shall not disclose
+//  such Confidential Information and shall use it only in accordance
+//  with the terms of the license agreement you entered into with
+//  Geoworks.
+//
+// FILE:        file.h
+//
+// DESCRIPTION: Header file for www file scheme.
+//
+//      $Id: wwfile.goh,v 1.3 98/08/17 16:16:19 edwin Exp $
+//
+//-------------------------------------------------------------------------*/
+
+@ifndef _WWW_SCHEMES_FILE_H_
+@define _WWW_SCHEMES_FILE_H_
+
+/*
+#include <fs/file.h>
+*/
+@include "WWW2/WW2Core/ww2strm.goh"
+
+@if 0
+class WWStatus;             // #include <www/wwcore/wwstatus.h>
+
+    //////////
+    //
+    // File protocol error codes.
+    //
+    // [] WWFILE_OK             Success.
+    // [] WWFILE_CANNOT_OPEN    Cannot open file, either sharing
+    //                          violation or file does not exist.
+    //
+enum WWFileResultCode {
+     WWFILE_OK
+    ,WWFILE_CANNOT_OPEN
+};
+@endif
+
+typedef enum {
+     WWFILE_OK
+    ,WWFILE_CANNOT_OPEN
+} WWFileResultCode ;
+
+
+/***************************************************************************
+CLASS
+    WWFile
+
+    WWFile is a www protocol for loading local files. The size of the
+    file stream (set using SetMimeLegth()) is defaulted to the file size.
+
+OVERVIEW 
+    
+    WWFile is inherited from WWStream. It adds method Get() to request a
+    local file by its url. File urls begin with "file://". 
+ 
+    All WWStream methods, except for Write() and WriteByte(), are 
+    usable in this class.
+
+KEYWORDS
+    
+    WWW
+
+CLASS TREE
+<pre>
+    WWStream
+          |
+          +--- WWFile
+</pre>
+****************************************************************************/
+@class WWFileClass, WWStreamClass;
+
+/* public: */
+
+    /*////////
+    //
+    // Default contructor. 
+    //
+    // Parameters_
+    //
+    // Return_value_ 
+    //
+    // See_also_ WWStream
+    //
+    // Overrides_
+    //
+    // Status_ Functional
+    */
+    @message void WWFile();
+
+    /*////////
+    //
+    // Destructor.
+    //
+    // Parameters_
+    //
+    // Return_value_ 
+    //
+    // See_also_ 
+    //
+    // Overrides_
+    //
+    // Status_ Functional
+    //
+
+    virtual ~WWFile();
+
+    */
+
+    /*////////
+    //
+    // Create storage buffer. It is illegal to call Initialize twice without
+    // without calling Abort() in between. This behavior is guaranteed by 
+    // EC code.
+    //
+    // Parameters_
+    //
+    // [in]  status          Status reporting manager. Allows 
+    //                       the file protocol to report its status.
+    // [in]  bufSize         FIFO buffer size. Must not be zero.
+    // [in]  ungetBufferSize Buffer size for ungetting data. If this 
+    //                       is smaller than the number of unget bytes,
+    //                       it will EC crash and subsequent bytes to 
+    //                       unget will be ignored in non-EC.
+    //
+    // Return_value_ WWSTREAM_OK
+    //               WWSTREAM_OUT_OF_MEMORY   Not enough memory or passed
+    //                                        bufSize is 0.
+    //
+    // See_also_ 
+    //
+    // Overrides_
+    //
+    // Status_ Functional
+    */
+    @message WWStreamResultCode Initialize(optr /* WWStatus * */status /* =NULL */,
+					  word bufferSize /* =
+                                          DEFAULT_WWSTREAM_SIZE */,
+                                          word ungetBufferSize /* = 
+                                          DEFAULT_WWSTREAM_UNGET_SIZE */);
+    /*////////
+    //
+    // Get buffer size.
+    //
+    // Parameters_
+    //
+    // Return_value_ 
+    //
+    // See_also_ 
+    //
+    // Overrides_
+    //
+    // Status_ Functional
+    //
+
+    virtual word GetBufferSize();
+
+    */
+
+    /*////////
+    //
+    // Load a file URL. Get() also sets the content-length via
+    // SetMimeLength() using the filesize as the length. You can
+    // override this by calling SetMimeLength() after this method.
+    // After this call, use and/or
+    // Read() and ReadByte() to obtain data.
+    //
+    // Parameters_
+    //
+    // [in]  url     File url in the form of RFC1738. For example:
+    //               "file:///int/html/index.htm". Must be NULL
+    //               terminated.
+    //               Anything after "file://" is Liberty fullpath.
+    //               For example, file:///int/html/index.htm in mapped
+    //               to ntstore/html/index.htm, where "int" is
+    //               internal storage. We could also have
+    //               file:///ext/... where "ext" would stand for
+    //               external storage. Both "int" and "ext" are called
+    //               storage media. They are defined by
+    //               theFileStoreManager in <fs/fsmgr.h>.
+    //
+    // Return_value_ WWFILE_OK           File opened for reading.
+    //               WWFILE_CANNOT_OPEN  Cannot open for reading.
+    //
+    // See_also_     
+    //
+    // Overrides_
+    //
+    // Status_ Functional
+    */
+    @message WWFileResultCode FileGet(const char *url);
+
+
+    /*////////
+    //
+    // Read data from file protocol stream. 
+    //
+    // Parameters_
+    //
+    // [out] buffer         Buffer containing data.
+    // [out] numBytesRead   Number of bytes read in buffer.
+    // [in]  numBytes       Buffer size.
+    // [in]  blocking       TRUE for blocking and FALSE for non-blocking.
+    //                      If blocking, may optionally provide a timeout.
+    // [in]  timeout        Time in milliseconds to block for data.
+    //
+    // Return_value_ WWSTREAM_OK             Success. numBytesRead returns
+    //                                       <= numBytes and >= 1.
+    //               WWSTREAM_EOF            All the requested data has been
+    //                                       read. numBytesRead returns 0.
+    //               WWSTREAM_ABORTED        Abort() was called. No data was
+    //                                       read. numBytesRead returns 0.
+    //               WWSTREAM_WOULD_BLOCK    If blocking == FALSE and no 
+    //                                       data was read. numBytesRead 
+    //                                       returns 0.
+    //               WWSTREAM_TIMEOUT        If blocking == TRUE and timeout
+    //                                       expired before any data was 
+    //                                       read. numBytesRead returns 0.
+    //               WWSTREAM_SPECIFIC_ERROR File access error.
+    //                                       numBytesRead returns 0.
+    //
+    // See_also_ ReadByte()
+    //
+    // Overrides_ WWStream::Read()
+    //
+    // Status_ Functional
+    //
+
+    virtual WWStreamResultCode Read(byte *buffer, 
+                                    word numBytes,
+                                    word *numBytesRead,
+                                    Boolean blocking = FALSE,
+                                    Timeout timeout = TIMEOUT_FOREVER);
+
+    */
+        
+/*===========================================================================
+//
+//                       W A R N I N G 
+// 
+// THE LIBERTY EXTERNAL API IS FOUND ABOVE THIS BARRIER. ANYTHING BELOW
+// THIS NOTICE IS IMPLEMENTATION DEPENDENT AND SUBJECT TO CHANGE.
+//
+//
+//=========================================================================*/
+
+/* protected: */
+    /*
+    // Don't let users call copy the object in any way.  These methods
+    // aren't actually defined since they should never be called, but
+    // declaring them private should catch anyone who tries to call
+    // them.
+    */
+/*
+    WWFile(const WWFile&);
+    const WWFile& operator=(const WWFile&);
+*/
+
+    /* Does not allow writing. */
+    /*
+    virtual WWStreamResultCode Write(const byte *buffer,
+                             word numBytes,
+                             word *numBytesWritten,
+                             Boolean endOfData = FALSE,
+                             Boolean blocking = FALSE,
+                             Timeout timeout = TIMEOUT_FOREVER);
+    */
+    /*
+    virtual WWStreamResultCode WriteByte(byte writeByte,
+                                 Boolean endOfData = FALSE,
+                                 Boolean blocking = FALSE,
+                                 Timeout timeout = TIMEOUT_FOREVER);
+    */
+
+/* private: */
+    @instance optr /* WWStatus   * */__status;            /* Status reporting manager */
+
+    @instance FileHandle /* File * */__file;              /* File to read */
+    @instance MemHandle __buffer;
+    @instance word __bufferSize;
+    @instance word __readIndex;    /* 0 <= _readIndex < _bufferSize */
+    @instance word __bytesFilled;/* Bytes available in _buffer for reading */
+                                   /* 0 <= _bytesFilled <= _bufferSize       */
+@endc;
+
+
+
+@endif // #ifndef _WWW_SCHEMES_FILE_H_

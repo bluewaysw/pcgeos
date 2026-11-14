@@ -1,0 +1,1145 @@
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Geoworks 1996.  All rights reserved.
+	GEOWORKS CONFIDENTIAL
+
+PROJECT:	Geos WWW Library.
+MODULE:		htstring
+FILE:		htstring.goc
+
+AUTHOR:		Kok Kin Kee, Sep 11, 1996
+
+ROUTINES:
+	Name			Description
+	----			-----------
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	kkee	9/11/96   	Initial version.
+
+DESCRIPTION:
+
+	HTString are used to store and access strings.
+
+	$Id: htstring.goc,v 1.15.5.8 97/11/07 14:37:52 kkee Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+
+@include <WWW/HTCore/htstring.goh>
+@include <WWW/HTCore/htlist.goh>
+@include <WWW/HTCore/htutils.goh>
+#include <WWW/htmem.h>
+@include <Ansi/string.h>
+@include "htfatals.goh"
+
+#ifdef __HIGHC__
+#pragma Code ("HTSTRCODE");
+#endif
+#ifdef __BORLANDC__
+#pragma codeseg HTSTRCODE
+#endif
+
+/* --------------------------------------------------------------------------
+ * 		PRIVATE DATA
+ * --------------------------------------------------------------------------*/
+
+#define HTSTRING_HASH_TABLE_SIZE  51   /* Tunable */
+
+/*
+ * HTStringData is used to store HTStrings.
+ */
+@start HTStringData, data;
+
+/*
+ * HTStringResource is used in MemLock etc routines since we can't do 
+ * MemLock(HTStringData), instead we have to use 
+ * MemLock(OptrToHandle(@HTStringResource)). This is lame!
+ */
+@chunk char HTStringResource[] = "WWW HTString Library";
+
+@chunk HTListHandle htStringHashTable[HTSTRING_HASH_TABLE_SIZE] = {0};
+
+@end   HTStringData;
+
+
+/* --------------------------------------------------------------------------
+ * 		PRIVATE FUNCTIONS
+ * --------------------------------------------------------------------------*/
+
+
+/***********************************************************************
+ *		HTStringDeleteAll
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Delete all elements in the hash table.
+ * CALLED BY:	HTStringLibraryEntry
+ * RETURN:	Nothing
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	kkee	9/11/96   	Initial Revision
+ *
+ ***********************************************************************/
+static void _pascal
+HTStringDeleteAll (void)
+{
+    HTListHandle *tptr;
+    HTStringHandle stringHandle;
+    word count, i, j, size = sizeof(HTStringHandle);
+    MemHandle mh = OptrToHandle(@HTStringResource);
+
+    MemLockExcl(mh);
+
+    tptr = (HTListHandle *) LMemDeref(@htStringHashTable);
+
+    for (i=0; i<HTSTRING_HASH_TABLE_SIZE; i++)
+	if (tptr[i]) {
+	    count = HTListGetCount(tptr[i]);
+
+	    for (j=0; j<count; j++) {
+		HTListRemoveItem(tptr[i], 0, &stringHandle, size);
+		LMemFree(ConstructOptr(mh, stringHandle));
+	    }
+
+	    HTListDelete(tptr[i]);
+	    tptr[i] = NULL;
+	}
+
+    MemUnlockExcl(mh);
+}	/* End of HTStringDeleteAll.	*/
+
+
+
+/* --------------------------------------------------------------------------
+ * 		PUBLIC FUNCTIONS
+ * --------------------------------------------------------------------------*/
+
+
+/***********************************************************************
+ *		HTStringLibraryEntry
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Initialize and cleanup HTString.
+ * CALLED BY:	HTCoreLibraryEntry
+ * RETURN:	0 required by Kernel
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	kkee	9/11/96   	Initial Revision
+ *
+ ***********************************************************************/
+int _far _pascal
+HTStringLibraryEntry (LibraryCallType ty, GeodeHandle client)
+{
+    if (ty == LCT_ATTACH) {
+	/* 
+	 * No need to clear the htStringHashTable as 
+	 * all the buckets are zeros to begin with 
+	 */
+
+    } else if (ty == LCT_DETACH)
+	HTStringDeleteAll();
+    
+    return 0;
+}	/* End of HTStringLibraryEntry.	*/
+
+
+
+/***********************************************************************
+ *		ECCHECKHTSTRING
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Make sure a HTString is valid.
+ * CALLED BY:	Client.
+ * RETURN:	Nothing.
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	kkee	9/26/96   	Initial Revision
+ *
+ ***********************************************************************/
+void _far _pascal
+ECCHECKHTSTRING (HTStringHandle string)
+{
+#if ERROR_CHECK
+    MemHandle mh = OptrToHandle(@HTStringResource);
+
+    if (!string) return;
+
+    MemLockShared(mh);
+    ECLMemExists(ConstructOptr(mh, string));
+    MemUnlockShared(mh);
+#endif
+}	/* End of ECCHECKHTSTRING.	*/
+
+
+
+
+/***********************************************************************
+ *		HTSTRINGFOR
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Convert a NULL terminated string to a HTString.
+ * CALLED BY:	Client.
+ * RETURN:	HTStringHandle, or NULL if the string is empty.
+ * SIDE EFFECTS:Locks the HTString exclusively using MemLockExcl,
+ *
+ *              You will deadlock if, while using HTSTRINGLOCK and
+ *              before calling HTSTRINGUNLOCK, you call HTSTRINGFOR.
+ *	
+ * STRATEGY:    Allocate if it does not exist, else reuse an existing
+ *              HTString. Uses a hash table to store and reuse HTStrings.
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	kkee	9/11/96   	Initial Revision
+ *
+ ***********************************************************************/
+HTStringHandle _far _pascal
+HTSTRINGFOR (const char *string)
+{
+    const char* b;
+    char *cptr;
+    HTListHandle *tptr, list;
+    HTStringHandle stringHandle;
+    word hash, i, count, size = sizeof(HTStringHandle);
+    MemHandle mh = OptrToHandle(@HTStringResource);
+    Boolean found = FALSE;
+
+#if ERROR_CHECK
+    if (!strlen((char *)string)) EC_WARNING(HTSTRING_LENGTH_ZERO);   
+
+    /* Lock count is in the upper byte */
+    /* 
+     * if (MemGetInfo(mh, MGIT_FLAGS_AND_LOCK_COUNT) & 0xff00)
+     *    EC_ERROR(HTSTRING_RESOURCE_STILL_LOCKED);
+     */
+#endif
+
+    /* Empty string? */
+    if (*string == '\0') return NULL;
+
+    /* Generate hash function */
+    for(b=string, hash=0; *b; b++) 
+	hash =  (hash * 3 + (*(unsigned char *) b)) % 
+	    HTSTRING_HASH_TABLE_SIZE;
+
+    /* Search for the string in the hash table */
+    MemLockExcl(mh);
+
+    tptr = (HTListHandle *) LMemDeref(@htStringHashTable);
+
+    list = tptr[hash];
+    if (list) {
+	count = HTListGetCount(list);
+
+	for (i=0; i<count; i++) {
+	    HTListGetItem(list, i, &stringHandle, size);
+	    b = (char *)LMemDeref(ConstructOptr(mh, stringHandle));
+
+	    if (!strcmp(b, string)) {
+		found = TRUE;
+		break;  /* Found! */
+	    }
+	}
+
+    } else {
+	/* Generate a new entry */
+	list = HTListNew();
+	tptr[hash] = list;
+    }
+
+    /* Create a new HTString */
+    if (!found) {
+
+	stringHandle = LMemAlloc(mh, strlen((char *)string)+1);
+
+	if (stringHandle) {
+	    cptr = (char *)LMemDeref(ConstructOptr(mh, stringHandle));
+	    strcpy(cptr, string);
+	    HTListAppend(list, &stringHandle, size);
+	}
+    }
+
+    MemUnlockExcl(mh);
+	 
+    return stringHandle;
+}	/* End of HTSTRINGFOR.	*/
+
+
+
+/***********************************************************************
+ *		HTSTRINGFORCASE
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Same as HTStringFor, but case insensitive.
+ * CALLED BY:	CLient
+ * RETURN:	HTStringHandle.
+ *	
+ * STRATEGY:	
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	kkee    	5/23/97   	Initial Revision
+ *	
+ ***********************************************************************/
+HTStringHandle _far _pascal
+HTSTRINGFORCASE (const char *string)
+{
+    if (!string || !(*string)) return 0;
+    else {
+	HTStringHandle ret;
+	HTMemHandle tmp = HTStrAllocCopy(string);
+	char *c = HTMemLock(tmp);
+	char *p = c;
+
+	while (*p) {
+	    *p = TOLOWER(*p);
+	    p++;
+	}
+	ret =  HTStringFor(c);
+	HTMemUnlockAndFree(tmp);
+	return ret;
+    }
+}	/* End of HTSTRINGFORCASE.	*/
+
+
+
+
+
+/***********************************************************************
+ *		HTSTRINGLOCK
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Lock and dereference a HTString. You can read the string 
+ *              using the return value. You *cannot* lock two HTStrings
+ *              at the same time as that would a deadlock. If you need
+ *              to read two HTStrings, lock one, read it, unlock it,
+ *              and do it for the second HTString etc.
+ * CALLED BY:	Client.
+ * RETURN:	char pointer to string.
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	kkee	9/11/96   	Initial Revision
+ *
+ ***********************************************************************/
+const char* _far _pascal
+HTSTRINGLOCK (HTStringHandle stringHandle)
+{
+    MemHandle mh = OptrToHandle(@HTStringResource);
+
+EC( ECCheckHTString(stringHandle);                                       )
+
+    if (!stringHandle) return NULL;
+    MemLockShared(mh);
+    return (char *) LMemDeref(ConstructOptr(mh, stringHandle));
+}	/* End of HTSTRINGLOCK.	*/
+
+
+
+
+/***********************************************************************
+ *		HTSTRINGUNLOCK
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Unlock a HTString.
+ * CALLED BY:	Client.
+ * RETURN:	Nothing
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	kkee	9/11/96   	Initial Revision
+ *
+ ***********************************************************************/
+void _far _pascal
+HTSTRINGUNLOCK (HTStringHandle stringHandle)
+{
+
+EC( ECCheckHTString(stringHandle);                                       )
+
+    if (!stringHandle) return;
+    MemUnlockShared(OptrToHandle(@HTStringResource));
+}	/* End of HTSTRINGUNLOCK.	*/
+
+
+
+/***********************************************************************
+ *		HTSTRINGLEN
+ ***********************************************************************
+ *
+ * SYNOPSIS:	strlen for a HTStringHandle.
+ * CALLED BY:	Client
+ * RETURN:	int
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	kkee	1/21/97   	Initial Revision
+ *
+ ***********************************************************************/
+int _far _pascal
+HTSTRINGLEN (HTStringHandle stringHandle)
+{
+    const char *s;
+    int ret;
+
+EC( ECCheckHTString(stringHandle);                                       )
+
+    s = HTStringLock(stringHandle);
+    ret = strlen(s);
+
+    HTStringUnlock(stringHandle);
+    
+    return ret;
+}	/* End of HTSTRINGLEN.	*/
+
+
+
+
+/***********************************************************************
+ *		STRCASECMP
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Same as AnsiC strcmp, but case insensitive.
+ * CALLED BY:	Client.
+ * RETURN:	<0 if a<b
+ *              0 if a==b
+ *              >0 if a>b
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:    Copied from W3C HTString.c
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	kkee	9/25/96   	Initial Revision
+ *
+ ***********************************************************************/
+int _far _pascal
+STRCASECMP (const char *a, const char *b)
+{
+    int diff;
+
+    for( ; *a && *b; a++, b++) {
+	diff = TOLOWER(*a) - TOLOWER(*b);
+	if (diff)
+	    return diff;
+    }
+
+    if (*a) return 1;			/* a was longer than b */
+    if (*b) return -1;			/* a was shorter than b */
+    return 0;				/* Exact match */
+}	/* End of STRCASECMP.	*/
+
+
+
+/***********************************************************************
+ *		STRCASECMPHTMEMHANDLE
+ ***********************************************************************
+ *
+ * SYNOPSIS:    Same as strcasecmp, except that the first argument is a
+ *              HTMemHandle.
+ * CALLED BY:	Client
+ * RETURN:	Same as strcasecmp
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	kkee	1/16/97   	Initial Revision
+ *
+ ***********************************************************************/
+int _far _pascal
+STRCASECMPHTMEMHANDLE (const HTMemHandle a, const char *b)
+{
+    char *s = (char *) HTMemLock(a);
+    int ret;
+
+    ret = strcasecmp(s, b);
+    
+    HTMemUnlock(a);
+
+    return ret;
+}	/* End of STRCASECMPHTMEMHANDLE.	*/
+
+
+
+/***********************************************************************
+ *		STRNCASECMPHTMEMHANDLE
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Same as strncasecmp, except that the first argument is a
+ *              HTMemHandle.
+ * CALLED BY:	Client
+ * RETURN:	Same as strncasecmp
+ *	
+ * STRATEGY:	
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	kkee    	4/ 8/97   	Initial Revision
+ *	
+ ***********************************************************************/
+int _far _pascal
+STRNCASECMPHTMEMHANDLE (const HTMemHandle a, const char *b, int n)
+{
+    char *s = (char *) HTMemLock(a);
+    int ret;
+
+    ret = strncasecmp(s, b, n);
+
+    HTMemUnlock(a);
+
+    return ret;
+}	/* End of STRNCASECMPHTMEMHANDLE.	*/
+
+
+
+
+/***********************************************************************
+ *		STRNCASECMP
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Same as strncmp, with case insensitive.
+ * CALLED BY:	Client.
+ * RETURN:	<0 if a<b
+ *              0 if a==b
+ *              >0 if a>b
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:    Copied from W3C HTString.c
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	kkee	10/ 1/96   	Initial Revision
+ *
+ ***********************************************************************/
+int _far _pascal
+STRNCASECMP (const char *a, const char *b, int n)
+{
+    const char *p, *q;
+	
+    for(p=a, q=b;; p++, q++) {
+	int diff;
+	if (p == a+n) return 0;	/*   Match up to n characters */
+	if (!(*p && *q)) return *p - *q;
+	diff = TOLOWER(*p) - TOLOWER(*q);
+	if (diff) return diff;
+    }
+
+    /* We never get here, no need to return ? */
+}	/* End of STRNCASECMP.	*/
+
+
+
+
+/***********************************************************************
+ *		STRCASESTR
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Like strstr(s1, s2), but case-insensitive.
+ * CALLED BY:	Client.
+ * RETURN:	pointer to first occurrence of string s2 in s1, or NULL
+ *              if not present.
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:    Copied from W3C HTString.c
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	kkee	10/ 2/96   	Initial Revision
+ *
+ ***********************************************************************/
+char * _far _pascal
+STRCASESTR (const char *s1, const char *s2)
+{
+    const char * ptr = s1;
+
+    if (!s1 || !s2 || !*s2) return (char *) s1;
+
+    while (*ptr) {
+	if (TOUPPER(*ptr) == TOUPPER(*s2)) {
+	    const char * cur1 = ptr + 1;
+	    const char * cur2 = s2 + 1;
+	    while (*cur1 && *cur2 && TOUPPER(*cur1) == TOUPPER(*cur2)) {
+		cur1++;
+		cur2++;
+	    }
+	    if (!*cur2)	return (char *) ptr;
+	}
+	ptr++;
+    }
+    return NULL;
+}	/* End of STRCASESTR.	*/
+
+
+
+
+/***********************************************************************
+ *		STRTOLOWER
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Convert a string to all lower cases.
+ * CALLED BY:	Client.
+ * RETURN:	passed in string pointer.
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	kkee	9/26/96   	Initial Revision
+ *
+ ***********************************************************************/
+char * _far _pascal
+STRTOLOWER (char *a)
+{
+    char *ret = a;
+
+    for ( ; *a; a++)
+	*a = TOLOWER(*a);
+
+    return ret;
+}	/* End of STRTOLOWER.	*/
+
+
+
+/***********************************************************************
+ *		STRTOUPPER
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Convert a string to all upper cases.
+ * CALLED BY:	Client.
+ * RETURN:	passed in string pointer.
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	kkee	9/26/96   	Initial Revision
+ *
+ ***********************************************************************/
+char * _far _pascal
+STRTOUPPER (char *a)
+{
+    char *ret = a;
+    for ( ; *a; a++)
+	*a = TOUPPER(*a);
+
+    return ret;
+}	/* End of STRTOUPPER.	*/
+
+
+/***********************************************************************
+ *		STRLENHTMEM
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Same as Ansi strlen, but it takes a HTMemHandle.
+ * CALLED BY:	Client.
+ * RETURN:	string length.
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	kkee	12/ 6/96   	Initial Revision
+ *
+ ***********************************************************************/
+int _far _pascal
+STRLENHTMEM (const HTMemHandle str)
+{
+    char *p;
+    int ret;
+    
+    if (!str) return 0;
+    p = (char *) HTMemLock(str);
+    ret = strlen(p);
+    HTMemUnlock(str);
+    return ret;
+}	/* End of STRLENHTMEM.	*/
+
+
+
+/***********************************************************************
+ *		STRCPYHTMEM
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Same as Ansi strcpy, but here we take two HTMemHandles.
+ * CALLED BY:	Client.
+ * RETURN:	Nothing
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	kkee	12/ 6/96   	Initial Revision
+ *
+ ***********************************************************************/
+void _far _pascal
+STRCPYHTMEM (const HTMemHandle s, const HTMemHandle t)
+{
+    char *p, *q;
+
+    if (!s || !t) return;
+
+    p = (char *) HTMemLock(s);
+    q = (char *) HTMemLock(t);
+    strcpy(p, q);
+
+    HTMemUnlock(s);
+    HTMemUnlock(t);
+}	/* End of STRCPYHTMEM.	*/
+
+
+
+/***********************************************************************
+ *		STRCATHTMEM
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Same as Ansi strcat, but takes two HTMemHandles.
+ * CALLED BY:	Client.
+ * RETURN:	Nothing
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	kkee	12/ 6/96   	Initial Revision
+ *
+ ***********************************************************************/
+void _far _pascal
+STRCATHTMEM (const HTMemHandle s, const HTMemHandle ct)
+{
+    char *p, *q;
+
+    if (!s || !ct) return;
+
+    p = (char *) HTMemLock(s);
+    q = (char *) HTMemLock(ct);
+    strcat(p, q);
+    HTMemUnlock(s);
+    HTMemUnlock(ct);
+}	/* End of STRCATHTMEM.	*/
+
+
+
+
+/***********************************************************************
+ *		HTSTRALLOCCOPY
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Allocate and copy a null-terminated string.
+ *
+ * CALLED BY:	Client.
+ * RETURN:	HTMemHandle or NULL if cannot allocate.
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	kkee	11/29/96   	Initial Revision
+ *
+ ***********************************************************************/
+HTMemHandle _far _pascal
+HTSTRALLOCCOPY (const char *str)
+{
+    HTMemHandle ret;
+    char *p;
+    
+    if (!str) return NULL;
+
+    p = (char *) HTMemAllocAndLock(&ret, strlen(str)+1);
+
+    if (!ret) return NULL;
+    
+    strcpy(p, str);
+
+    HTMemUnlock(ret);
+
+    return ret;
+}	/* End of HTSTRALLOCCOPY.	*/
+
+
+/***********************************************************************
+ *		HTSTRALLOCCOPYWID
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Same as HTStrAllocCopy, but allocs for an ID. The
+ *              allocated string can be deleted using HTMemFree
+ *              or HTMemFreeAllWID. 
+ * CALLED BY:	Client
+ * RETURN:	HTMemHandle or NULL.
+ *	
+ * STRATEGY:	
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	kkee    	9/15/97   	Initial Revision
+ *	
+ ***********************************************************************/
+HTMemHandle _far _pascal
+HTSTRALLOCCOPYWID (word id, const char *str)
+{
+    HTMemHandle ret;
+    char *p;
+    
+    if (!str) return NULL;
+
+    p = (char *) HTMemAllocAndLockWID(id, &ret, strlen(str)+1);
+
+    if (!ret) return NULL;
+    
+    strcpy(p, str);
+
+    HTMemUnlock(ret);
+
+    return ret;
+}	/* End of HTSTRALLOCCOPYWID.	*/
+
+
+
+
+/***********************************************************************
+ *		HTSTRNALLOCCOPY
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Same as strncat, but takes a HTMemHandle.
+ * CALLED BY:	Client
+ * RETURN:	HTMemHandle.
+ *	
+ * STRATEGY:	
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	kkee    	6/ 5/97   	Initial Revision
+ *	
+ ***********************************************************************/
+HTMemHandle _far _pascal
+HTSTRNALLOCCOPY (const char *str, int n)
+{
+    HTMemHandle ret;
+    char *p;
+    
+    if (!str || !n) return NULL;
+
+    p = (char *) HTMemAllocAndLock(&ret, n+1);
+
+    if (!ret) return NULL;
+    
+    strncpy(p, str, n);
+
+    HTMemUnlock(ret);
+
+    return ret;
+}	/* End of HTSTRNALLOCCOPY.	*/
+
+
+
+/***********************************************************************
+ *		HTSTRNALLOCCOPYWID
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Same as HTStrnAllocCopy, but allocs for an ID. The
+ *              allocated string can be deleted using HTMemFree
+ *              or HTMemFreeAllWID. 
+ * CALLED BY:	Client
+ * RETURN:	HTMemHandle or NULL.
+ *	
+ * STRATEGY:	
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	kkee    	9/15/97   	Initial Revision
+ *	
+ ***********************************************************************/
+HTMemHandle _far _pascal
+HTSTRNALLOCCOPYWID (word id, const char *str, int n)
+{
+    HTMemHandle ret;
+    char *p;
+    
+    if (!str || !n) return NULL;
+
+    p = (char *) HTMemAllocAndLockWID(id, &ret, n+1);
+
+    if (!ret) return NULL;
+    
+    strncpy(p, str, n);
+
+    HTMemUnlock(ret);
+
+    return ret;
+}	/* End of HTSTRNALLOCCOPYWID.	*/
+
+
+
+
+/***********************************************************************
+ *		HTSTRALLOCCAT
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Same as Ansi strcat, but take a HTMemHandle.
+ * CALLED BY:	Client
+ * RETURN:	HTMemHandle, containing s + t. If cannot allocate,
+ *              return NULL.
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	kkee	12/10/96   	Initial Revision
+ *
+ ***********************************************************************/
+HTMemHandle _far _pascal
+HTSTRALLOCCAT (HTMemHandle s, const char *t)
+{
+    char *p;
+
+    if (!s) return NULL;
+
+    s = HTMemReAlloc(s, strlenHTMem(s) + strlen(t) + 1);
+    if (!s) return NULL;
+    p = (char *) HTMemLock(s);
+    strcat(p, t);
+    HTMemUnlock(s);
+    return s;
+}	/* End of HTSTRALLOCCAT.	*/
+
+
+/***********************************************************************
+ *		HTSTRALLOCCATWID
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Same as HTStrAllocCat, but allocs for an ID. The
+ *              allocated string can be deleted using HTMemFree
+ *              or HTMemFreeAllWID. 
+ * CALLED BY:	Client
+ * RETURN:	HTMemHandle or NULL.
+ *	
+ * STRATEGY:	
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	kkee    	9/15/97   	Initial Revision
+ *	
+ ***********************************************************************/
+HTMemHandle _far _pascal
+HTSTRALLOCCATWID (word id, HTMemHandle s, const char *t)
+{
+    char *p;
+
+    if (!s || !t) return NULL;
+
+    s = HTMemReAllocWID(id, s, strlenHTMem(s) + strlen(t) + 1);
+    if (!s) return NULL;
+    p = (char *) HTMemLock(s);
+    strcat(p, t);
+    HTMemUnlock(s);
+    return s;
+}	/* End of HTSTRALLOCCATWID.	*/
+
+
+
+
+/***********************************************************************
+ *		HTSTRNALLOCCAT
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Same as strncat, but the first paramater is a HTMemHandle.
+ * CALLED BY:	Client
+ * RETURN:	HTMemHandle, which may not be the same as the passed in 
+ *              HTMemHandle.
+ *	
+ * STRATEGY:	
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	kkee    	6/ 4/97   	Initial Revision
+ *	
+ ***********************************************************************/
+HTMemHandle _far _pascal
+HTSTRNALLOCCAT (HTMemHandle s, const char *t, int n)
+{
+    char *p;
+
+    if (!t || !n) return s;
+
+    s = HTMemReAlloc(s, strlenHTMem(s) + n + 1);
+    if (!s) return NULL;
+    p = (char *) HTMemLock(s);
+    strncat(p, t, n);
+    HTMemUnlock(s);
+    return s;
+}	/* End of HTSTRNALLOCCAT.	*/
+
+
+
+/***********************************************************************
+ *		HTSTRNALLOCCATWID
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Same as HTStrnAllocCat, but allocs for an ID. The
+ *              allocated string can be deleted using HTMemFree
+ *              or HTMemFreeAllWID. 
+ * CALLED BY:	Client
+ * RETURN:	HTMemHandle or NULL.
+ *	
+ * STRATEGY:	
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	kkee    	9/15/97   	Initial Revision
+ *	
+ ***********************************************************************/
+HTMemHandle _far _pascal
+HTSTRNALLOCCATWID (word id, HTMemHandle s, const char *t, int n)
+{
+    char *p;
+
+    if (!t || !n) return s;
+
+    s = HTMemReAllocWID(id, s, strlenHTMem(s) + n + 1);
+    if (!s) return NULL;
+    p = (char *) HTMemLock(s);
+    strncat(p, t, n);
+    HTMemUnlock(s);
+    return s;
+}	/* End of HTSTRNALLOCCATWID.	*/
+
+
+
+
+/***********************************************************************
+ *		HTSTRHTMEMALLOCCOPY
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Same as HTStrAllocCopy except we take a HTMemHandle here.
+ * CALLED BY:	Client
+ * RETURN:	HTMemHandle, else NULL if cannot allocate.
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	kkee	11/29/96   	Initial Revision
+ *
+ ***********************************************************************/
+HTMemHandle _far _pascal
+HTSTRHTMEMALLOCCOPY (const HTMemHandle str)
+{
+    HTMemHandle ret;
+    char *p, *q;
+
+    if (!str) return NULL;
+    q = (char *) HTMemLock(str);
+    p = (char *) HTMemAllocAndLock(&ret, strlen(q)+1);
+
+    if (!ret) {
+	HTMemUnlock(str);
+	return NULL;
+    }
+
+    strcpy(p, q);
+
+    HTMemUnlock(str);
+    HTMemUnlock(ret);
+
+    return ret;
+}	/* End of HTSTRHTMEMALLOCCOPY.	*/
+
+
+
+/***********************************************************************
+ *		HTSTRHTMEMALLOCCOPYWID
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Same as HTStrHTMemAllocCopy, but allocs for an ID. The
+ *              allocated string can be deleted using HTMemFree
+ *              or HTMemFreeAllWID. 
+ * CALLED BY:	Client
+ * RETURN:	HTMemHandle or NULL.
+ *	
+ * STRATEGY:	
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	kkee    	9/15/97   	Initial Revision
+ *	
+ ***********************************************************************/
+HTMemHandle _far _pascal
+HTSTRHTMEMALLOCCOPYWID (word id, const HTMemHandle str)
+{
+    HTMemHandle ret;
+    char *p, *q;
+
+    if (!str) return NULL;
+    q = (char *) HTMemLock(str);
+    p = (char *) HTMemAllocAndLockWID(id, &ret, strlen(q)+1);
+
+    if (!ret) {
+	HTMemUnlock(str);
+	return NULL;
+    }
+
+    strcpy(p, q);
+
+    HTMemUnlock(str);
+    HTMemUnlock(ret);
+
+    return ret;
+}	/* End of HTSTRHTMEMALLOCCOPYWID.	*/

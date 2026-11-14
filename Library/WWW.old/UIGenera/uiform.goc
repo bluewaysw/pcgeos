@@ -1,0 +1,3737 @@
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Geoworks 1996 -- All Rights Reserved
+
+PROJECT:	Penelope
+MODULE:		ui form module
+FILE:		uiform.goc
+
+AUTHOR:		Edwin Yu, June 20, 1996
+
+ROUTINES:
+	Name			Description
+	----			-----------
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	EY	6/20/96   	Initial version.
+
+DESCRIPTION:
+	This file defines message handlers to create form objects.
+
+	$Id: uiform.goc,v 1.1 97/04/07 11:49:28 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+@include <WWW/uigenera.goh>
+@include <WWW/pmanager.goh>
+@include "uifatals.goh"
+#include <Ansi/string.h>
+#include <Ansi/stdlib.h>        /* atoi defined */
+
+@classdecl	HTGenFormClass;
+@classdecl      HTGenOuterSelectClass;
+@classdecl	HTGenSelectClass;
+@classdecl	HTGenMultiLineSelectClass;
+@classdecl	HTGenInputClass;
+@classdecl	HTOtherOptionClass;
+@classdecl	HTGenOptionClass;
+@classdecl	HTGenFormTextClass;
+/*@classdecl	HTTextAreaClass; */
+@classdecl	HTGenFormHiddenClass;
+@classdecl	HTGenFormTriggerClass;
+
+@extern method HTGenOptionClass, MSG_META_UIG_SELECT_ALL;
+@extern method HTGenOptionClass, MSG_META_UIG_SELECT_NONE;
+
+void AddInputToForm(optr form, optr inputObj);
+void FormGeneratorNameValuePairs (optr object, HTListHandle query);
+
+
+/***********************************************************************
+ *		MSG_UI_GENERATOR_START_FORM for UIGeneratorClass
+ ***********************************************************************
+ * SYNOPSIS:	Create a ui object representing a fill-out form.
+ *		Information about the form fields are expected to 
+ *		be known as more incoming HTML elements are processed.
+ *		    
+ * PARAMETERS:	    (MemHandle block, SGMLEntity *entity)
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *	Supported Attr:	ACTION, METHOD
+ *
+ * INPUT, SELECT and TEXTAREA are only allowed within FORM elements.
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	EY	4/18/96   	Initial Revision
+ *
+ ***********************************************************************/
+@extern method UIGeneratorClass, MSG_UI_GENERATOR_START_FORM
+{
+  /* 
+   *  If there is some object in UIG_target, insert it to the ui tree.
+   */
+  if ((pself->UIG_target.class == (ClassStruct *)&HTGenTableClass) ||
+      (pself->UIG_target.class == (ClassStruct *)&HTGenTCellClass) ) {
+    @call pself->UIG_pmObj::MSG_PM_TAKE_UNFINISHED_UI_OBJ
+	(pself->UIG_target.obj);
+  }
+  else if (pself->UIG_target.obj) {
+    @call pself->UIG_pmObj::MSG_PM_TAKE_FINISHED_UI_OBJ
+	(pself->UIG_target.obj);
+#if 1
+    @call self::MSG_UI_GENERATOR_BROADCAST_RESIZE_POSITION
+       (pself->UIG_target.obj);
+#endif
+  }
+  /*
+   * Now create a form object and store it in target.obj.  Next, process
+   * the passed attribute list.
+   */
+  pself->UIG_target.obj = @call pself->UIG_pmObj::\
+	MSG_PM_OBJECT_INSTANTIATE((ClassStruct *)&HTGenFormClass);
+  pself->UIG_target.class = (ClassStruct *)&HTGenFormClass;
+  /*
+   *  Process attributes
+   */
+  @call pself->UIG_target.obj::MSG_GEN_FORM_PROCESS_ATTRIBUTE
+     (block, entity);
+
+  return UI_GEN_NO_ERROR;
+}	/* End of MSG_UI_GENERATOR_START_FORM.	*/
+
+
+/***********************************************************************
+ *		MSG_UI_GENERATOR_END_FORM for UIGeneratorClass
+ ***********************************************************************
+ * SYNOPSIS:	    Tell the presentation manager that the form object
+ *		    is ready to be displayed.
+ * PARAMETERS:	    none
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	EY	4/18/96   	Initial Revision
+ *
+ ***********************************************************************/
+@extern method UIGeneratorClass, MSG_UI_GENERATOR_END_FORM
+{
+  /* 
+   * If there is some object in target.obj, we can assume the object 
+   * is done.  Thus, give the object to the presentation manager for
+   * rendering.
+   */
+  if (pself->UIG_target.obj)
+	@call pself->UIG_pmObj::MSG_PM_TAKE_UNFINISHED_UI_OBJ \
+				(pself->UIG_target.obj);
+
+  if (pself->UIG_target.class != (ClassStruct *)&HTGenFormClass) {
+    while (1) {
+      @call pself->UIG_pmObj::MSG_PM_MARK_RECV_OBJECT_DONE
+		(&(pself->UIG_target.obj), &(pself->UIG_target.class));
+      EC_ERROR_IF(pself->UIG_target.class == NULL || 
+		pself->UIG_target.obj == NULL,
+		UIG_INVALID_OPERATION_ON_UI_TREE);
+      if (pself->UIG_target.class == (ClassStruct *)&HTGenSelectClass)
+	@call pself->UIG_target.obj::
+		MSG_GEN_SELECT_COMPLETE_SELECT_CONSTRUCT();
+      else if (pself->UIG_target.class == 
+				(ClassStruct *)&HTGenMultiLineSelectClass)
+	@call pself->UIG_target.obj::
+		MSG_HTGMLS_COMPLETE_SELECT_CONSTRUCT();
+      
+      if (pself->UIG_target.class == (ClassStruct *)&HTGenFormClass)
+	  break;
+    }
+  }
+
+  /*
+   * Tell the receiving object(which must be a HTGenForm object) in 
+   * the ui tree that there are no more children for it.  So the 
+   * presentation manager can mark it usable and display it.
+   */
+  @call pself->UIG_pmObj::MSG_PM_MARK_RECV_OBJECT_DONE
+	(&(pself->UIG_target.obj), &(pself->UIG_target.class));
+#if 1
+  @call self::MSG_UI_GENERATOR_BROADCAST_RESIZE_POSITION
+     (pself->UIG_target.obj);
+#endif
+  return UI_GEN_NO_ERROR;
+}	/* End of MSG_UI_GENERATOR_END_FORM.	*/
+
+
+/***********************************************************************
+ *	MSG_UI_GENERATOR_START_SELECT for UIGeneratorClass
+ ***********************************************************************
+ * SYNOPSIS:	    Create a HTGenSelect object and process the 
+ *		    attribute list.
+ * PARAMETERS:	    (MemHandle block, SGMLEntity *entity)
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	EY	4/18/96   	Initial Revision
+ *
+ ***********************************************************************/
+@extern method UIGeneratorClass, MSG_UI_GENERATOR_START_SELECT
+{
+  char *value;
+  int	index, size = 0;
+  Boolean multiLine = FALSE;
+
+  /*
+   *  Finish and append whatever ui object in the target to the ui tree.
+   *  Return the form object that contains that ui object.
+   */
+  FinishCurrentObjectInForm(pself->UIG_pmObj, &(pself->UIG_target));
+
+  /* 
+   * Go to get the attributes first. Use the size to determine which 
+   * kind selection object to create, either HTGenSelectClass or
+   * HTGenMultiLineSelectClass.
+   */
+
+  for(index = 0; entity[index].SGMLE_token; index++) {
+    if (!entity[index].SGMLE_value)
+      continue;
+    value = (char *)LMemDerefHandles(block, entity[index].SGMLE_value);
+    if(entity[index].SGMLE_token == HTML_ATTR_SIZE) {
+      size = atoi(value);
+      if (size > 1) multiLine = TRUE;
+      break;
+    }
+  }
+
+  /*
+   *  Now create a select object and store it in target.obj.
+   *  Then, process the passed attribute list.
+   */
+  if(!multiLine) {
+      /*
+       *  Create a dummy container for the HTGenSelectClass.  This container
+       *  is used to get the size of the GenItemGroup customized in the
+       *  penelope SPUI.
+       */
+      pself->UIG_target.obj = @call pself->UIG_pmObj::\
+	  MSG_PM_OBJECT_INSTANTIATE((ClassStruct *)&HTGenOuterSelectClass);
+      @call pself->UIG_pmObj::MSG_PM_TAKE_UNFINISHED_UI_OBJ
+	 (pself->UIG_target.obj);
+      pself->UIG_target.obj = @call pself->UIG_pmObj::\
+	  MSG_PM_OBJECT_INSTANTIATE((ClassStruct *)&HTGenSelectClass);
+      pself->UIG_target.class = (ClassStruct *)&HTGenSelectClass;
+      @call pself->UIG_target.obj::MSG_GEN_SELECT_PROCESS_ATTRIBUTE
+          (block, entity);
+
+      @call pself->UIG_target.obj::MSG_META_ADD_VAR_DATA
+	  (HINT_ORIENT_CHILDREN_HORIZONTALLY, 0, NULL);
+      @call pself->UIG_target.obj::MSG_GEN_ITEM_GROUP_SET_NONE_SELECTED
+	  (FALSE);
+  } else {
+      pself->UIG_target.obj = @call pself->UIG_pmObj::\
+	  MSG_PM_OBJECT_INSTANTIATE((ClassStruct *)&HTGenMultiLineSelectClass);
+      pself->UIG_target.class = (ClassStruct *)&HTGenMultiLineSelectClass;
+      @call pself->UIG_target.obj::MSG_HTGMLS_PROCESS_ATTRIBUTE
+          (block, entity);
+  }
+
+  return UI_GEN_NO_ERROR;
+}	/* End of MSG_UI_GENERATOR_START_SELECT.	*/
+
+
+/***********************************************************************
+ *		MSG_UI_GENERATOR_END_SELECT for UIGeneratorClass
+ ***********************************************************************
+ * SYNOPSIS:	    Tell the presentation manager that the HTGenSelect
+ *		    object is done.
+ * PARAMETERS:	    none
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	EY	4/18/96   	Initial Revision
+ *
+ ***********************************************************************/
+@extern method UIGeneratorClass, MSG_UI_GENERATOR_END_SELECT
+{
+  optr select;
+  ClassStruct *class;
+  /* 
+   * If there is some object in target.obj (likely, it can be a 
+   * HTGenOption object), we can assume the object is done.  Thus, give
+   * the object to the presentation manager for rendering.
+   */
+  if (pself->UIG_target.obj &&
+      pself->UIG_target.class == (ClassStruct *)&HTGenOptionClass) {
+	@call pself->UIG_pmObj::MSG_PM_TAKE_FINISHED_UI_OBJ \
+				(pself->UIG_target.obj);
+  } else if(pself->UIG_target.obj && (
+     pself->UIG_target.class==(ClassStruct*)&HTGenMultiLineSelectClass ||
+     pself->UIG_target.class==(ClassStruct*)&HTGenSelectClass)) {
+	@call pself->UIG_pmObj::MSG_PM_TAKE_UNFINISHED_UI_OBJ \
+				(pself->UIG_target.obj);
+  }
+
+  @call pself->UIG_pmObj::MSG_PM_GET_RECV_OBJ_OPTR_AND_CLASS
+	(&select, &class);
+  EC_ERROR_IF(class != (ClassStruct *)&HTGenSelectClass &&
+	class != (ClassStruct *)&HTGenMultiLineSelectClass,
+	UIG_UI_TREE_OPERATION_FAILS);
+  /*
+   * Finalize the select object, like setting it exclusive or 
+   * non-exclusive.
+   */
+  if(class == (ClassStruct *)&HTGenSelectClass) {
+      @send select::MSG_GEN_SELECT_COMPLETE_SELECT_CONSTRUCT();
+      @call pself->UIG_pmObj::MSG_PM_MARK_RECV_OBJECT_DONE
+	 (&(pself->UIG_target.obj), &(pself->UIG_target.class));
+  }
+  else 
+      @send select::MSG_HTGMLS_COMPLETE_SELECT_CONSTRUCT();
+  /*
+   * Tell the receiving object(which must be a HTGenSelect object) in 
+   * the ui tree that there are no more children for it.  So the 
+   * presentation manager can mark it usable and display it.
+   */
+  @call pself->UIG_pmObj::MSG_PM_MARK_RECV_OBJECT_DONE
+	(&(pself->UIG_target.obj), &(pself->UIG_target.class));
+
+  return UI_GEN_NO_ERROR;
+}	/* End of MSG_UI_GENERATOR_END_SELECT.	*/
+
+
+/***********************************************************************
+ *	MSG_UI_GENERATOR_CREATE_OPTION for UIGeneratorClass
+ ***********************************************************************
+ * SYNOPSIS:	    Create HTGenOption object and process the attribute
+ *		    list.
+ * PARAMETERS:	    (MemHandle block, SGMLEntity *entity)
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	EY	4/18/96   	Initial Revision
+ *
+ ***********************************************************************/
+@extern method UIGeneratorClass, MSG_UI_GENERATOR_CREATE_OPTION
+{
+  optr select;
+  ClassStruct *class;
+  int id;
+  char *value;
+  int	index = 0;
+  Boolean selected = FALSE;
+
+  if (pself->UIG_target.obj && 
+      pself->UIG_target.class == (ClassStruct *)&HTGenMultiLineSelectClass){
+
+      for(index = 0; entity[index].SGMLE_token; index++) {
+          switch(entity[index].SGMLE_token) {
+          case HTML_ATTR_VALUE:
+              if (entity[index].SGMLE_value) 
+                  value = (char *)LMemDerefHandles(block, 
+				entity[index].SGMLE_value);
+              break;
+          case HTML_ATTR_SELECTED:
+              selected = TRUE;
+              break;
+          }
+      }
+
+      @call (pself->UIG_target.obj)::MSG_HTGMLS_ADD_OPTION_VALUE(
+			value, selected);
+
+      return UI_GEN_NO_ERROR;
+  }
+
+  /*
+   * add any existing ui object in target.obj to the ui tree.
+   */
+  if (pself->UIG_target.obj && 
+      pself->UIG_target.class == (ClassStruct *)&HTGenOptionClass)
+	@call pself->UIG_pmObj::MSG_PM_TAKE_FINISHED_UI_OBJ
+				(pself->UIG_target.obj);
+  else if (pself->UIG_target.obj) 
+	@call pself->UIG_pmObj::MSG_PM_TAKE_UNFINISHED_UI_OBJ \
+				(pself->UIG_target.obj);
+
+  @call pself->UIG_pmObj::MSG_PM_GET_RECV_OBJ_OPTR_AND_CLASS \
+	(&select, &class);
+  EC_ERROR_IF(class != (ClassStruct *)&HTGenSelectClass,
+	UIG_UI_TREE_OPERATION_FAILS);
+
+  /*
+   * Now create a option object and store it in target.obj.  Then
+   * process the passed attribute list.
+   */
+  pself->UIG_target.obj = @call pself->UIG_pmObj::\
+	MSG_PM_OBJECT_INSTANTIATE((ClassStruct *)&HTGenOptionClass);
+  pself->UIG_target.class = (ClassStruct *)&HTGenOptionClass;
+
+  /*
+   * Assign a unique id to the option object.
+   */
+  id = @call select::MSG_GEN_SELECT_GET_AND_INCREMENT_OPTION_ID();
+  @call pself->UIG_target.obj::MSG_GEN_ITEM_SET_IDENTIFIER(id);
+  /*
+   * Process attributes
+   */
+  @call pself->UIG_target.obj::MSG_GEN_OPTION_PROCESS_ATTRIBUTE
+	(block, entity, select);
+
+  @call pself->UIG_target.obj::MSG_META_ADD_VAR_DATA
+	(HINT_EXPAND_WIDTH_TO_FIT_PARENT, 0, NULL);
+
+  return UI_GEN_NO_ERROR;
+}	/* End of MSG_UI_GENERATOR_CREATE_OPTION.	*/
+
+
+/***********************************************************************
+ *		MSG_UI_GENERATOR_CREATE_INPUT for UIGeneratorClass
+ ***********************************************************************
+ * SYNOPSIS:	    Define user input field as part of the contents
+ *		    in a FORM element.
+ * PARAMETERS:	    (MemHandle block, SGMLEntity *entity)
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:	Supported Attr: TYPE = TEXT | PASSWORD | CHECKBOX | 
+ *				       RADIO | SUBMIT | RESET | HIDDEN |
+ *				       IMAGE.
+ *				NAME, VALUE, SRC, CHECKED, SIZE, 
+ *				MAXLENGTH.
+ *
+ * INPUT elements are not containers and so the end tag is forbidden. 
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	EY	4/18/96   	Initial Revision
+ *
+ ***********************************************************************/
+@extern method UIGeneratorClass, MSG_UI_GENERATOR_CREATE_INPUT
+{
+  char *value, *cptr = NULL;
+  int index, maxLen = 0, size = 13;	/* default SIZE attribute value */
+  Boolean checked = FALSE;
+  InputType Itype = INPUT_TEXT;		/* default input type */
+  CompSizeHintArgs sizeArgs;
+  optr container, dummy;
+  ChunkHandle tmpChunk;
+  HTMemHandle tmpOptr=NULL, nameOptr=NULL, valueOptr=NULL, srcOptr=NULL;
+  WWFixed number;
+  VisMonikerWithText *moniker;
+  ClassStruct *class;
+
+  if (pself->UIG_target.obj == NULL) {
+    EC_WARNING(UIG_WRONG_ASSUMPTION);
+    return UI_GEN_NO_ERROR;
+  }
+  /*
+   *  Finish whatever ui object in the target and append it to the ui tree.
+   *  Travel up the ui tree and return the first container object(which
+   *  can be a form object, or a HTGenTCell object) that is encountered.
+   */
+  container=FinishCurrentObjectInForm(pself->UIG_pmObj,&(pself->UIG_target));
+
+  /*
+   *  This FOR loop processes the attribute list, collecting attribute
+   *  values that will be needed later on.
+   */
+  for(index = 0; entity[index].SGMLE_token; index++) {
+    if (!entity[index].SGMLE_value) {
+      if (entity[index].SGMLE_token == HTML_ATTR_CHECKED)
+	checked = TRUE;
+      continue;
+    }
+    value = (char *)LMemDerefHandles(block, entity[index].SGMLE_value);
+    switch(entity[index].SGMLE_token) {
+    case HTML_ATTR_NAME:
+    case HTML_ATTR_VALUE:
+    case HTML_ATTR_SRC:
+      /* 
+       *  Allocate a chunk to store the NAME, VALUE or SRC data.
+       */
+      tmpOptr = HTMemAlloc(sizeof(char) * (strlen(value)+1));
+      cptr = (char *)HTMemLock(tmpOptr);
+      strcpy(cptr,value);
+      HTMemUnlock(tmpOptr);
+      /*
+       * Decide which type(NAME/VALUE/SRC) of chunk we're creating.
+       */
+      if (entity[index].SGMLE_token == HTML_ATTR_NAME)	/* type = NAME */
+	nameOptr  = tmpOptr;
+      else if (entity[index].SGMLE_token==HTML_ATTR_VALUE)/* type = VALUE */
+	valueOptr = tmpOptr;
+      else				                /* type = SRC */
+	srcOptr = tmpOptr;
+      break;
+    case HTML_ATTR_CHECKED:
+      checked = TRUE;
+      break;
+    case HTML_ATTR_SIZE:
+      size = atoi(value);
+      if (size > 70)
+	  size = 70;
+      else if (size <= 0)
+	  size = 13;     /* get back to default */
+      break;
+    case HTML_ATTR_MAXLENGTH:
+      maxLen = atoi(value);
+      break;
+    case HTML_ATTR_TYPE:
+      if (strcasecmp("text", value) == 0)
+	Itype = INPUT_TEXT;
+      else if (strcasecmp("password", value) == 0)
+	Itype = INPUT_PASSWORD;
+      else if (strcasecmp("checkbox", value) == 0)
+	Itype = INPUT_CHECKBOX;
+      else if (strcasecmp("radio", value) == 0)
+	Itype = INPUT_RADIO;
+      else if (strcasecmp("submit", value) == 0)
+	Itype = INPUT_SUBMIT;
+      else if (strcasecmp("reset", value) == 0)
+	Itype = INPUT_RESET;
+      else if (strcasecmp("hidden", value) == 0)
+	Itype = INPUT_HIDDEN;
+      else if (strcasecmp("image", value) == 0)
+	Itype = INPUT_IMAGE;
+      else if (strcasecmp("button", value) == 0) {
+	pself->UIG_target.obj = container;
+	pself->UIG_target.class=@call container::MSG_META_GET_CLASS();
+	EC_WARNING(UIG_BUTTON_NOT_SUPPORTED);
+	return UI_GEN_ERROR;
+      }
+EC(   else if (strcasecmp("file", value) == 0)
+	/*	Itype = INPUT_FILE;				*/
+	EC_WARNING(UIG_FILE_NOT_SUPPORTED); )
+      break;
+    }
+  }
+
+  switch (Itype) {
+    case INPUT_TEXT:
+    case INPUT_PASSWORD:
+	/*
+	 * Create a text input feild(text object) for user input.
+	 */
+	dummy = @call pself->UIG_pmObj::MSG_PM_OBJECT_INSTANTIATE
+		((ClassStruct *)&HTGenFormTextClass);
+	/*
+	 * Store the attributes data.
+	 */
+	if (valueOptr != NULL) {
+	  /*
+	   *  The default VALUE for TYPE=TEXT is displayed right away.
+	   */
+	  cptr = (char *)HTMemLock(valueOptr);
+	  @call dummy::MSG_VIS_TEXT_APPEND_PTR(cptr, 0);
+	  HTMemUnlock(valueOptr);
+	}
+	@call dummy::MSG_GEN_FORM_TEXT_INITIALIZE(nameOptr, valueOptr);
+	/*
+	 * Set single-text attribute, and width of the object.
+	 */
+	@send dummy::MSG_GEN_TEXT_SET_ATTRS(GTA_SINGLE_LINE_TEXT, 0);
+	sizeArgs.CSHA_width = SST_AVG_CHAR_WIDTHS | size;
+	sizeArgs.CSHA_height = 0;
+	sizeArgs.CSHA_count = 1;
+	EC_ERROR_IF(sizeArgs.CSHA_width < 0, UIG_ERROR_NEGATIVE_WIDTH);
+	@call dummy::MSG_META_ADD_VAR_DATA
+		(HINT_FIXED_SIZE, sizeof(sizeArgs), &sizeArgs);
+	/*
+	 *  Set MAXLENGTH if it is specified.
+	 */
+	if (maxLen > 0 && maxLen < 1000)	/* 1000 is a protection */
+	  @call dummy::MSG_VIS_TEXT_SET_MAX_LENGTH(maxLen);
+	/*
+	 *  If it's a password type, set the BISON font size 13 so that
+	 *  '*' is displayed for every char input.
+	 */
+	if (Itype == INPUT_PASSWORD) {
+	  @send dummy::MSG_VIS_TEXT_SET_FONT_ID(
+				FID_BISON,
+				TEXT_ADDRESS_PAST_END,
+				TEXT_ADDRESS_PAST_END);	
+	  number.WWF_int = 13;
+	  number.WWF_frac = 0;
+	  @call dummy::MSG_VIS_TEXT_SET_POINT_SIZE
+		(number,TEXT_ADDRESS_PAST_END,TEXT_ADDRESS_PAST_END);
+	}
+	break;
+    case INPUT_HIDDEN:
+	/*
+	 *  Create a text object for user input.
+	 */
+	dummy = @call pself->UIG_pmObj::MSG_PM_OBJECT_INSTANTIATE
+		((ClassStruct *)&HTGenFormHiddenClass);
+	/*
+	 *  Store NAME and VALUE attributes.
+	 */
+	@call dummy::MSG_GEN_FORM_HIDDEN_INITIALIZE(nameOptr, valueOptr);
+	break;
+    case INPUT_CHECKBOX:
+    case INPUT_RADIO:
+      /*
+       *  Create a Input object(GenItemGroup).
+       */
+      dummy = @call pself->UIG_pmObj::MSG_PM_OBJECT_INSTANTIATE
+	((ClassStruct *)&HTGenInputClass);
+      @call pself->UIG_pmObj::MSG_PM_TAKE_UNFINISHED_UI_OBJ(dummy);
+      /*
+       *  Initialize the Input object.
+       */
+      @call dummy::MSG_GEN_ITEM_GROUP_SET_NONE_SELECTED(FALSE);
+      @call dummy::MSG_GEN_INPUT_STORE_DATA(nameOptr, valueOptr, 
+					    Itype, checked);
+      /* 
+       *  Add the INPUT object to the linked list under the FORM object.
+       */
+      AddInputToForm(container, dummy);
+      /*
+       * Insert the Input(ItemGroup) to the ui tree.
+       */
+      @call pself->UIG_pmObj::MSG_PM_TAKE_UNFINISHED_UI_OBJ(dummy);
+      /*
+       * Create a genItem object 
+       */
+      dummy = @call pself->UIG_pmObj::MSG_PM_OBJECT_INSTANTIATE
+	((ClassStruct *)&GenItemClass);
+      @call dummy::MSG_GEN_ITEM_SET_IDENTIFIER(0);
+
+      @call pself->UIG_pmObj::MSG_PM_TAKE_FINISHED_UI_OBJ(dummy);
+      @call pself->UIG_pmObj::MSG_PM_MARK_RECV_OBJECT_DONE(&dummy, &class);
+      pself->UIG_target.obj = dummy;
+      pself->UIG_target.class = class;
+      break;
+    case INPUT_RESET:
+    case INPUT_SUBMIT:
+	/*
+	 * Create a text object for user input.
+	 */
+	dummy = @call pself->UIG_pmObj::MSG_PM_OBJECT_INSTANTIATE
+		((ClassStruct *)&HTGenFormTriggerClass);
+	@call dummy::MSG_GEN_FORM_TRIGGER_INITIALIZE(nameOptr, Itype);
+	/*
+	 *  Set up the the vis Moniker on the trigger.
+	 */
+	if (valueOptr) {
+	  /*
+	   *  Create a visMoniker, and copy the text moniker.
+	   */
+	  ObjLockObjBlock(HandleOf(dummy));
+	  cptr = (char *)HTMemLock(valueOptr);
+	  tmpChunk = LMemAlloc(HandleOf(dummy), 
+			strlen(cptr) + 1 + sizeof(VisMonikerWithText));
+	  moniker = LMemDerefHandles(HandleOf(dummy), tmpChunk);
+	  moniker->VMWT_common.VM_type = 0;
+	  moniker->VMWT_common.VM_width= 0;
+	  moniker->VMWT_mnemonicOffset = -1;
+	  strcpy((char *)moniker + VMWT_text, cptr);
+	  MemUnlock(HandleOf(dummy));
+	  HTMemUnlock(valueOptr);
+	  HTMemFree(valueOptr);
+
+	  @call dummy::MSG_GEN_REPLACE_VIS_MONIKER_OPTR
+		(ConstructOptr(HandleOf(dummy),tmpChunk), VUM_NOW);
+	}
+	else if (Itype == INPUT_SUBMIT)
+	  @call dummy::MSG_GEN_REPLACE_VIS_MONIKER_TEXT
+		("Submit", VUM_DELAYED_VIA_UI_QUEUE);
+	else
+	  @call dummy::MSG_GEN_REPLACE_VIS_MONIKER_TEXT
+		("Reset", VUM_DELAYED_VIA_APP_QUEUE);
+	/*
+	 *  Set the RESET action message and destination
+	 */
+	if (Itype == INPUT_RESET) {
+	  @call dummy::MSG_GEN_TRIGGER_SET_ACTION_MSG(MSG_GEN_FORM_RESET);
+	  while(!@call container::MSG_META_IS_OBJECT_IN_CLASS
+	        (&HTGenFormClass)) {
+	    container = @call container::MSG_GEN_FIND_PARENT();
+	  }
+	  @call dummy::MSG_GEN_TRIGGER_SET_DESTINATION(container);
+	}
+	else
+	  @call dummy::MSG_META_SET_OBJ_BLOCK_OUTPUT(pself->UIG_pmObj);
+        break;
+    case INPUT_IMAGE:
+        EC_WARNING(UIG_NOT_SUPPORTED);
+	dummy = @call pself->UIG_pmObj::\
+		MSG_PM_OBJECT_INSTANTIATE((ClassStruct *)&HTGenImageClass);
+	@call dummy::MSG_GEN_IMAGE_REQUEST(srcOptr);
+	break;
+  }
+  if (Itype != INPUT_CHECKBOX && Itype != INPUT_RADIO) {
+    /*
+     *  Done with the new object.  CHECKBOX and RADIO will get its
+     *  visMoniker later.
+     */
+    @call pself->UIG_pmObj::MSG_PM_TAKE_FINISHED_UI_OBJ(dummy);
+    @call pself->UIG_pmObj::MSG_PM_GET_RECV_OBJ_OPTR_AND_CLASS \
+		(&(pself->UIG_target.obj), &(pself->UIG_target.class));
+  }
+    
+  return UI_GEN_NO_ERROR;
+}	/* End of MSG_UI_GENERATOR_CREATE_INPUT.	*/
+
+
+/***********************************************************************
+ *	MSG_UI_GENERATOR_START_TEXTAREA for UIGeneratorClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    Creates a multiple-line text entry control in
+ *		    which the user can enter and edit text. 
+ * PARAMETERS:	    (MemHandle block, SGMLEntity *entity)
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:	Supported Attr: COLS, NAME, ROWS
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	edwin	8/28/96   	Initial Revision
+ *
+ ***********************************************************************/
+@extern method UIGeneratorClass, MSG_UI_GENERATOR_START_TEXTAREA
+{
+  /*
+   *  Finish and append whatever ui object in the target to the ui tree.
+   *  Travel up the tree and return the first container object(which
+   *  can be a form object, or a HTGenTCell object) encountered.
+   */
+  FinishCurrentObjectInForm(pself->UIG_pmObj,&(pself->UIG_target));
+
+  /*
+   * Now create a select object and store it in target.obj.  
+   * Then process the passed attribute list.
+   */
+  pself->UIG_target.obj = @call pself->UIG_pmObj::\
+	MSG_PM_OBJECT_INSTANTIATE((ClassStruct *)&HTGenFormTextClass);
+  pself->UIG_target.class = (ClassStruct *)&HTGenFormTextClass; 
+  @call pself->UIG_target.obj::MSG_GEN_FORM_TEXT_PROCESS_ATTRIBUTE
+	(block, entity); 
+/*****
+  pself->UIG_target.obj = @call pself->UIG_pmObj::\
+	MSG_PM_OBJECT_INSTANTIATE((ClassStruct *)&HTTextAreaClass);
+  pself->UIG_target.class = (ClassStruct *)&HTTextAreaClass; 
+  @call pself->UIG_target.obj::MSG_HTTA_PROCESS_ATTRIBUTE
+	(block, entity); 
+*****/
+
+  return UI_GEN_NO_ERROR;
+}	/* End of MSG_UI_GENERATOR_START_TEXTAREA.	*/
+
+
+/***********************************************************************
+ *	MSG_UI_GENERATOR_END_TEXTAREA for UIGeneratorClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    Finish up the <TEXTAREA> object.
+ * PARAMETERS:	    none
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	edwin	8/28/96   	Initial Revision
+ *
+ ***********************************************************************/
+@extern method UIGeneratorClass, MSG_UI_GENERATOR_END_TEXTAREA
+{
+  HTMemHandle tmpOptr;
+  int	len;
+  char	*cptr;
+  /* 
+   *  If there is some object in target.obj (It must be a GenFormText
+   *  object), now we can mark it done.  Thus, pass the object to the 
+   *  presentation manager for rendering.
+   */
+  if (pself->UIG_target.obj) {
+    EC_ERROR_IF(pself->UIG_target.class != 
+	(ClassStruct *)&HTGenFormTextClass, UIG_UI_TREE_OPERATION_FAILS);
+/*	(ClassStruct *)&HTTextAreaClass, UIG_UI_TREE_OPERATION_FAILS);	*/
+    @call pself->UIG_pmObj::MSG_PM_TAKE_FINISHED_UI_OBJ
+				(pself->UIG_target.obj);
+#if 1
+    @call self::MSG_UI_GENERATOR_BROADCAST_RESIZE_POSITION
+       (pself->UIG_target.obj);
+#endif
+    /*
+     *  If there is some text between <TEXTAREA> and </TEXTAREA>, 
+     *  store a copy of the text in the HTGFT_value.  This copy is used
+     *  to restore the TEXTAREA back to its initial state when the RESET
+     *  trigger is pressed.
+     */
+    if((len = @call pself->UIG_target.obj::MSG_VIS_TEXT_GET_TEXT_SIZE())>0){
+      tmpOptr = HTMemAlloc(sizeof(char)* (len + 1));
+      cptr = (char *)HTMemLock(tmpOptr);
+      len = @call pself->UIG_target.obj::MSG_VIS_TEXT_GET_ALL_PTR(cptr);
+      @call pself->UIG_target.obj::MSG_GEN_FORM_TEXT_INITIALIZE(0,tmpOptr);
+      HTMemUnlock(tmpOptr);
+    }
+/*
+    @call pself->UIG_target.obj::MSG_HTTA_COMPLETE_TEXTAREA_CONSTRUCT();
+*/
+    @call pself->UIG_pmObj::MSG_PM_GET_RECV_OBJ_OPTR_AND_CLASS
+	(&pself->UIG_target.obj, &pself->UIG_target.class);
+    EC_ERROR_IF(pself->UIG_target.class != 
+	(ClassStruct *)&HTGenFormClass, UIG_UI_TREE_OPERATION_FAILS);
+    return UI_GEN_NO_ERROR;
+  }
+  else
+    return UI_GEN_ERROR;
+}	/* End of MSG_UI_GENERATOR_END_TEXTAREA.	*/
+
+
+
+/***********************************************************************
+ *		MSG_GEN_FORM_PROCESS_ATTRIBUTE for HTGenFormClass
+ ***********************************************************************
+ * SYNOPSIS:	    Process the attribute list of the the FORM element
+ * PARAMETERS:	    (MemHandle block, SGMLEntity *entity)
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:	Supported Attr: action, method
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	EY	4/18/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method HTGenFormClass, MSG_GEN_FORM_PROCESS_ATTRIBUTE
+{
+  char *value, *cptr;
+  int	index = 0;
+
+  for(index = 0; entity[index].SGMLE_token; index++) {
+    if (!entity[index].SGMLE_value)
+      continue;
+    value = (char *)LMemDerefHandles(block, entity[index].SGMLE_value);
+    switch (entity[index].SGMLE_token) {
+    case HTML_ATTR_ACTION:
+      /* allocate a chunk to store the ACTION URL */
+      @self->HTGF_action = HTMemAlloc(sizeof(char) * (strlen(value)+1));
+      cptr = (char *)HTMemLock(@self->HTGF_action);
+      strcpy(cptr,value);
+      HTMemUnlock(@self->HTGF_action);
+      break;
+    case HTML_ATTR_METHOD:
+      if (strcasecmp(value, "post") == 0)
+	@self->HTGF_method = HTM_POST;	/* FORM_GET by default */
+      else
+	@self->HTGF_method = HTM_GET;	/* FORM_GET by default */
+      break;
+    }
+  }
+  return;
+}	/* End of MSG_GEN_FORM_PROCESS_ATTRIBUTE.	*/
+
+
+
+/***********************************************************************
+ *		MSG_GEN_FORM_RESET for HTGenFormClass
+ ***********************************************************************
+ * SYNOPSIS:	    Reset all the input field, trigers, buttons back to
+ *		    their default values.
+ * PARAMETERS:	    
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	EY	8/28/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method HTGenFormClass, MSG_GEN_FORM_RESET
+{
+  @send @genChildren::MSG_GEN_RESET();
+  return;
+}	/* End of MSG_GEN_FORM_RESET.	*/
+
+
+
+/***********************************************************************
+ *		MSG_GEN_FORM_SUBMIT for HTGenFormClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    Tell the items under the form to generate the
+ *                  name=value pairs for the form submission.  The
+ *                  information will be stored in a HTList like:
+ *                     index 0  - URL of server specified in ACTION
+ *                           1  - Either FORM_GET or FORM_POST
+ *                           2  - Name of item  1
+ *                           3  - Value of item 1
+ *                           4  - Name of item  2
+ *                           5  - Value of item 2
+ *                           .....
+ * PARAMETERS:	    none
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	edwin	10/19/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method HTGenFormClass, MSG_GEN_FORM_SUBMIT
+{
+  optr pmanager;
+  HTListHandle query;
+  HTMemHandle base, temp;
+
+  if (@call self::MSG_GEN_COUNT_CHILDREN() == 0)
+    return;
+  pmanager = @call self::MSG_META_GET_OBJ_BLOCK_OUTPUT();
+  /*
+   *  Assemble a query string to be sent to the server specified in 
+   *  ACTION attribute.
+   */
+  query = HTListNew();
+  /*
+   *  Append the Action URL.  If there is no HTGF_action, use the base 
+   *  URL of the document.
+   */
+  if (pself->HTGF_action) {
+    temp = HTStrHTMemAllocCopy(pself->HTGF_action);
+    HTListAppend(query, &temp, sizeof(HTMemHandle));
+  }
+  else {
+    if((base = @call pmanager::MSG_PM_GET_BASE_OPTR()) == NULL)
+	return;
+    temp = HTStrHTMemAllocCopy(base);
+    HTListAppend(query, &temp, sizeof(HTMemHandle));
+  }
+  /*
+   *  Append the Method type.
+   */
+  HTListAppend(query, &pself->HTGF_method, sizeof(HTMethod));
+  /*
+   *  Assemble the pairs of "name=value" for each objects in the form.
+   */
+  FormGeneratorNameValuePairs(oself, query);
+
+  @call pmanager::MSG_PM_SET_FORM_QUERY(query);
+  return;
+}	/* End of MSG_GEN_FORM_SUBMIT.	*/
+
+
+
+/***********************************************************************
+ *		MSG_GEN_FORM_ADD_INPUT for HTGenFormClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    Add an input object to the linked list under this 
+ *                  form object.
+ * PARAMETERS:	    (optr inputObj);
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	edwin	1/ 9/97   	Initial Revision
+ *
+ ***********************************************************************/
+@method HTGenFormClass, MSG_GEN_FORM_ADD_INPUT
+{
+  EC_ERROR_IF(!@call inputObj::MSG_META_IS_OBJECT_IN_CLASS(&HTGenInputClass),
+              UIG_UI_TREE_OPERATION_FAILS);
+  if (pself->HTGF_first == NULL) {
+    pself->HTGF_first = pself->HTGF_last = inputObj;
+  }
+  else {
+    @call pself->HTGF_last::MSG_GEN_INPUT_ADD_SIBLING(inputObj);
+    pself->HTGF_last = inputObj;
+  }
+  return;
+}	/* End of MSG_GEN_FORM_ADD_INPUT.	*/
+
+
+
+/***********************************************************************
+ *	MSG_GEN_FORM_SET_EXCLUSIVE_SELECTION for HTGenFormClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    
+ * PARAMETERS:	    (HTMemeHandle name, optr selectedObj)
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	edwin	1/ 9/97   	Initial Revision
+ *
+ ***********************************************************************/
+@method HTGenFormClass, MSG_GEN_FORM_SET_EXCLUSIVE_SELECTION
+{
+  EC_ERROR_IF(!pself->HTGF_first, UIG_INVALID_OPERATION_ON_UI_TREE);
+
+  @call pself->HTGF_first::MSG_GEN_INPUT_CLEAR_SELECTIONS(name, selectedObj);
+  
+  return;
+}	/* End of MSG_GEN_FORM_SET_EXCLUSIVE_SELECTION.	*/
+
+
+
+/***********************************************************************
+ *		MSG_META_UIG_CALC_POSITION for HTGenFormClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    Find its row number and X position.
+ * PARAMETERS:	    none
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	edwin	10/31/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method HTGenFormClass, MSG_META_UIG_CALC_POSITION
+{
+  int row;
+  SizeAsDWord size = @call self::MSG_VIS_GET_SIZE();
+  /*
+   *  Get an estimate position of the object
+   */
+  pself->HTGF_xPos = UpdateItsPotentialPosition(oself, size, &row);
+  pself->HTGF_pageRow = row;
+  return;
+}	/* End of MSG_META_UIG_CALC_POSITION.	*/
+
+
+
+/***********************************************************************
+ *		MSG_VIS_POSITION_BRANCH for HTGenFormClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    Set its new X and Y position
+ * PARAMETERS:	    (int xOrigin = cx, int yOrigin)
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	edwin	11/ 1/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method HTGenFormClass, MSG_VIS_POSITION_BRANCH
+{
+#if 0
+  /*
+  @send @genChildren::MSG_VIS_POSITION_BRANCH(0,0);
+  @send self::MSG_VIS_MARK_INVALID
+     (VOF_IMAGE_INVALID, VUM_DELAYED_VIA_UI_QUEUE);
+     */
+#endif
+  XYValueAsDWord xy = @call @genParent::MSG_VIS_GET_POSITION();
+    
+  xOrigin = DWORD_X(xy) + pself->HTGF_xPos;
+  yOrigin = DWORD_Y(xy) + GetItsPotentialHeight(oself, pself->HTGF_pageRow);
+
+  @callsuper();
+
+  return;
+}	/* End of MSG_VIS_POSITION_BRANCH.	*/
+
+
+
+/***********************************************************************
+ *		MSG_VIS_RECALC_SIZE for HTGenFormClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    
+ * PARAMETERS:	    
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	edwin	9/24/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method HTGenFormClass, MSG_VIS_RECALC_SIZE
+{
+  SizeAsDWord size;
+  CompSizeHintArgs sizeArgs;
+  int value;
+
+  sizeArgs.CSHA_width = 0;
+  @call self::MSG_META_GET_VAR_DATA
+	(HINT_FIXED_SIZE, sizeof(sizeArgs), &sizeArgs);
+  if (sizeArgs.CSHA_width == 0) {
+    @call @genParent::MSG_META_GET_VAR_DATA
+	(HINT_FIXED_SIZE, sizeof(sizeArgs), &sizeArgs);
+    width = sizeArgs.CSHA_width;	/* assume it's SST_PIXELS */
+    if (width > NESTED_MARGIN)
+      sizeArgs.CSHA_width = width - NESTED_MARGIN;
+    else
+      sizeArgs.CSHA_width = width;
+    sizeArgs.CSHA_count = 0;
+    sizeArgs.CSHA_height = 0;
+    EC_ERROR_IF(sizeArgs.CSHA_width < 0, UIG_ERROR_NEGATIVE_WIDTH);
+    @call self::MSG_META_ADD_VAR_DATA
+	(HINT_FIXED_SIZE, sizeof(sizeArgs), &sizeArgs);
+  }
+  else
+    width = sizeArgs.CSHA_width;	/* assume it's SST_PIXELS */
+
+  size = @callsuper();
+  /*
+   *  Clear all the row information.  Tell its children to calculate
+   *  their own position and store that information in a heigtArray.
+   */
+  @call self::MSG_GEN_HTML_CONTENT_RESET_ROW_COUNTER();
+  @send @genChildren::MSG_META_UIG_CALC_POSITION();
+  /*
+   *  Sum up the heights of rows in this form.
+   */
+  height = @call self::MSG_GEN_HTML_CONTENT_SUM_ROW_HEIGHTS();
+  
+  size = MAKE_SIZE_DWORD(width, height);
+  /*
+   *  Finish the last row.
+   */
+  @call self::MSG_GEN_HTML_CONTENT_START_NEW_ROW(0, &value);
+
+  return size;
+}	/* End of MSG_VIS_RECALC_SIZE.	*/
+
+
+
+/***********************************************************************
+ *		MSG_GEN_DESTROY for HTGenFormClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    Free the allocated instance data.
+ * PARAMETERS:	    (VisUpdateMode updateMode, CompChildFlags flags)
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:	    
+ *
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	edwin   	2/26/97   	Initial Revision
+ *	
+ ***********************************************************************/
+@method HTGenFormClass, MSG_GEN_DESTROY
+{
+  @callsuper();
+  if (pself->HTGF_action)
+    HTMemFree(pself->HTGF_action);
+  return;
+}	/* End of MSG_GEN_DESTROY.	*/
+
+
+
+/***********************************************************************
+ *		MSG_GEN_SELECT_PROCESS_ATTRIBUTE for HTGenSelectClass
+ ***********************************************************************
+ * SYNOPSIS:	    Process attributes in <SELECT>
+ * PARAMETERS:	    (MemHandle block, SGMLEntity *entity)
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:  Attributes processed:
+ *		NAME: symbolic name of the field returned to the server
+ *		      on submission.
+ *		SIZE: determines the number of OPTIONS physically
+ *		      visible when the browser display the FORM.
+ *		MULTIPLE: if present, allow mutiple selections, and
+ *		      cause no OPTION to be the default.
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	EY	4/19/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method HTGenSelectClass, MSG_GEN_SELECT_PROCESS_ATTRIBUTE
+{
+  char *value, *cptr;
+  int	index = 0;
+
+  for(index = 0; entity[index].SGMLE_token; index++) {
+    if (!entity[index].SGMLE_value)
+      continue;
+    value = (char *)LMemDerefHandles(block, entity[index].SGMLE_value);
+    switch(entity[index].SGMLE_token) {
+    case HTML_ATTR_NAME:
+      /* allocate a chunk to store the NAME data */
+      @self->HTGS_name = HTMemAlloc(sizeof(char) * (strlen(value)+1));
+      cptr = (char *)HTMemLock(@self->HTGS_name);
+      strcpy(cptr,value);
+      HTMemUnlock(@self->HTGS_name);
+      break;
+    case HTML_ATTR_SIZE:
+      pself->HTGS_size = atoi(value);
+      /* the size must be one! */
+      EC_ERROR_IF(pself->HTGS_size > 1, UIG_UI_TREE_OPERATION_FAILS);
+      break;
+    case HTML_ATTR_MULTIPLE:
+      @self->GIGI_behaviorType = GIGBT_NON_EXCLUSIVE;
+      break;
+    }
+  }
+  return;
+}	/* End of MSG_GEN_SELECT_PROCESS_ATTRIBUTE.	*/
+
+
+/***********************************************************************
+ *	MSG_GEN_SELECT_GET_AND_INCREMENT_OPTION_ID for HTGenSelectClass
+ ***********************************************************************
+ * SYNOPSIS:	    Return next available id, used to assign an OPTION
+ *		    object(GenItem object).
+ * PARAMETERS:	    int ();
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	EY	6/21/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method HTGenSelectClass, MSG_GEN_SELECT_GET_AND_INCREMENT_OPTION_ID
+{
+  int id = pself->HTGS_idCounter;
+  pself->HTGS_idCounter++;
+  return id;
+}	/* End of MSG_GEN_SELECT_GET_AND_INCREMENT_OPTION_ID.	*/
+
+
+/***********************************************************************
+ *	MSG_GEN_SELECT_COMPLETE_SELECT_CONSTRUCT for HTGenSelectClass
+ ***********************************************************************
+ * SYNOPSIS:	    Finalize the visual form of the select object.
+ * PARAMETERS:	    none
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	EY	6/24/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method HTGenSelectClass, MSG_GEN_SELECT_COMPLETE_SELECT_CONSTRUCT
+{
+  CompSizeHintArgs sizeArgs;
+  /*
+   * Is it a exclusive selection?
+   */
+  if (pself->GIGI_behaviorType == GIGBT_NON_EXCLUSIVE) {
+    /*
+     * Set non-exclusive selection, and hilite all the selected 
+     * OPTIONs.
+     */
+    @call self::MSG_GEN_SELECT_SET_MULTIPLE_SELECTION();
+  }
+  else
+    @send self::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION
+	(pself->HTGS_select,0);
+
+  if (pself->HTGS_size <= 1 && pself->HTGS_type == INPUT_NONE &&
+	pself->GIGI_behaviorType == GIGBT_EXCLUSIVE) {
+    /*
+     *  SIZE is 0 or 1, set the display to be the pull-down menu style.
+     */
+    @call self::MSG_META_ADD_VAR_DATA(HINT_ITEM_GROUP_MINIMIZE_SIZE,0,NULL);
+    @call self::MSG_META_ADD_VAR_DATA
+		(HINT_ITEM_GROUP_DISPLAY_CURRENT_SELECTION,0,NULL);
+    /*
+     *  Minimize size of the pull-down trigger.
+     */
+    sizeArgs.CSHA_width = 0;
+    sizeArgs.CSHA_height = SST_LINES_OF_TEXT | 1;
+    sizeArgs.CSHA_count = 0;
+    EC_ERROR_IF(sizeArgs.CSHA_width < 0, UIG_ERROR_NEGATIVE_WIDTH);
+    @call self::MSG_META_ADD_VAR_DATA
+	(HINT_FIXED_SIZE,sizeof(sizeArgs), &sizeArgs);
+  }
+  else if (pself->HTGS_type == INPUT_NONE)
+    /*
+     *  Set the display to be a tool box like.
+     */
+    @call self::MSG_META_ADD_VAR_DATA
+	(HINT_ITEM_GROUP_TOOLBOX_STYLE, 0, NULL);
+
+  return;
+}	/* End of MSG_GEN_SELECT_COMPLETE_SELECT_CONSTRUCT.	*/
+
+
+/***********************************************************************
+ *		MSG_GEN_SELECT_SET_SELECT_ID for HTGenSelectClass
+ ***********************************************************************
+ * SYNOPSIS:	    Store the identifier of the selected OPTION.
+ *		    Note, this function is called for the exlusive
+ *		    selection.
+ * PARAMETERS:	    (int id)
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	EY	6/24/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method HTGenSelectClass, MSG_GEN_SELECT_SET_SELECT_ID
+{
+  pself->HTGS_select = id;
+  return;
+}	/* End of MSG_GEN_SELECT_SET_SELECT_ID.	*/
+
+
+
+/***********************************************************************
+ *		MSG_GEN_RESET for HTGenSelectClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    Reset the GenItem group back to its default
+ *		    selection(s)
+ * PARAMETERS:	    
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	edwin	8/28/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method HTGenSelectClass, MSG_GEN_RESET
+{
+  /*
+   *  Reset back to its default selections in the list of checkboxes.
+   */
+  @call self::MSG_GEN_SELECT_SET_MULTIPLE_SELECTION();
+
+  return;
+}	/* End of MSG_GEN_RESET.	*/
+
+
+/***********************************************************************
+ *	MSG_GEN_SELECT_SET_MULTIPLE_SELECTION for HTGenSelectClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    According to its children(OPTION objects), set the
+ *		    selection list of the GenItemGroup to reflect the
+ *		    selections.
+ * PARAMETERS:	    none
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:	NOTE, this object must be non-exclusive selection.
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	edwin	8/28/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method HTGenSelectClass, MSG_GEN_SELECT_SET_MULTIPLE_SELECTION
+{
+  word num, i, j, *buffer;
+  ChunkHandle chunk;
+  optr child;
+
+  num = @call self::MSG_GEN_COUNT_CHILDREN();
+  chunk = LMemAlloc(OptrToHandle(oself), (num+1) * sizeof(word));
+  buffer = LMemDerefHandles(OptrToHandle(oself), chunk);
+  for (i = 0, j = 0; i < num; i++) {
+	child = @call self::MSG_GEN_FIND_CHILD_AT_POSITION(i);
+	if ((@call child::MSG_GEN_OPTION_IS_SELECTED()) == TRUE)
+	  buffer[j++] = i;
+  }
+  @send self::MSG_GEN_ITEM_GROUP_SET_MULTIPLE_SELECTIONS(buffer,j);
+  LMemFreeHandles(OptrToHandle(oself), chunk);
+  return;
+}	/* End of MSG_GEN_SELECT_SET_MULTIPLE_SELECTION.	*/
+
+
+
+/***********************************************************************
+ *		MSG_GEN_SELECT_SUBMIT for HTGenSelectClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    Generate a name=value pair for the form submission.
+ * PARAMETERS:	    (HTListHandle query)
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	edwin	10/20/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method HTGenSelectClass, MSG_GEN_SELECT_SUBMIT
+{
+  word num, i;
+  optr child;
+
+  num = @call self::MSG_GEN_COUNT_CHILDREN();
+  for (i = 0 ; i < num ; i++) {
+    if (@call self::MSG_GEN_ITEM_GROUP_IS_ITEM_SELECTED(i)) {
+      child = @call self::MSG_GEN_ITEM_GROUP_GET_ITEM_OPTR(i);
+      @call child::MSG_GEN_OPTION_SUBMIT(pself->HTGS_name, query);
+    }
+  }
+  return;
+}	/* End of MSG_GEN_SELECT_SUBMIT.	*/
+
+
+/***********************************************************************
+ *		MSG_GEN_DESTROY for HTGenSelectClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    Free the allocated instance data.
+ * PARAMETERS:	    (VisUpdateMode updateMode, CompChildFlags flags)
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:	    
+ *
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	edwin   	2/ 7/97   	Initial Revision
+ *	
+ ***********************************************************************/
+@method HTGenSelectClass, MSG_GEN_DESTROY
+{
+  @callsuper();
+  if (pself->HTGS_name)
+    HTMemFree(pself->HTGS_name);
+
+  return;
+}	/* End of MSG_GEN_DESTROY.	*/
+
+
+
+/***********************************************************************
+ *		MSG_META_UIG_CALC_POSITION for HTGenOuterSelectClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    Find its row position and X coordinate in that row.
+ * PARAMETERS:	    none
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:        THIS IS AN EXCEPTION!
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	edwin	11/ 3/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method HTGenOuterSelectClass, MSG_META_UIG_CALC_POSITION
+{
+  int row;
+  SizeAsDWord size = @call self::MSG_VIS_GET_SIZE();
+  /*
+   *  Get an estimate position of the object
+   */
+  pself->HTGOS_xPos = UpdateItsPotentialPosition(oself, size, &row);
+  pself->HTGOS_pageRow = row;
+  return;
+}
+
+	/* End of MSG_META_UIG_CALC_POSITION.	*/
+
+
+
+/***********************************************************************
+ *		MSG_VIS_POSITION_BRANCH for HTGenOuterSelectClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    
+ * PARAMETERS:	    
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	edwin	11/ 3/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method HTGenOuterSelectClass, MSG_VIS_POSITION_BRANCH
+{
+
+  XYValueAsDWord xy = @call @genParent::MSG_VIS_GET_POSITION();
+
+  xOrigin = DWORD_X(xy) + pself->HTGOS_xPos;
+  yOrigin = DWORD_Y(xy) + GetItsPotentialHeight(oself, pself->HTGOS_pageRow);
+
+  @callsuper();
+
+  return;
+}	/* End of MSG_VIS_POSITION_BRANCH.	*/
+
+
+
+/***********************************************************************
+ *		MSG_GEN_INPUT_STORE_DATA for HTGenInputClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    Store the identity of the INPUT object.  Some of
+ *                  data will be submitted to a remote server.
+ * PARAMETERS:	    (HTMemHandle name,
+ *                   HTMemHandle value, Boolean checked, InputType type)
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	edwin	1/ 8/97   	Initial Revision
+ *
+ ***********************************************************************/
+@method HTGenInputClass, MSG_GEN_INPUT_STORE_DATA
+{
+  pself->HTGI_name  = name;
+  pself->HTGI_value = value;
+
+  if (type == INPUT_CHECKBOX)
+    pself->GIGI_behaviorType = GIGBT_NON_EXCLUSIVE;
+
+  if (checked == TRUE) {
+    @call oself::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(0, FALSE);
+    pself->HTGI_select = TRUE;
+  }
+
+  return;
+}	/* End of MSG_GEN_INPUT_STORE_DATA.	*/
+
+
+/***********************************************************************
+ *		MSG_GEN_DESTROY for HTGenInputClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    Free the allocated instance data.
+ * PARAMETERS:	    (VisUpdateMode updateMode, CompChildFlags flags)
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:	    
+ *
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	edwin   	2/ 7/97   	Initial Revision
+ *	
+ ***********************************************************************/
+@method HTGenInputClass, MSG_GEN_DESTROY
+{
+  @callsuper();
+  if (pself->HTGI_name)
+    HTMemFree(pself->HTGI_name);
+  if (pself->HTGI_value)
+    HTMemFree(pself->HTGI_value);
+
+  return;
+}	/* End of MSG_GEN_DESTROY.	*/
+
+
+
+
+/***********************************************************************
+ *		MSG_GEN_INPUT_ADD_SIBLING for HTGenInputClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    Store the next sibling INPUT object.
+ * PARAMETERS:	    (optr inputObj);
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	edwin	1/ 9/97   	Initial Revision
+ *
+ ***********************************************************************/
+@method HTGenInputClass, MSG_GEN_INPUT_ADD_SIBLING
+{
+  pself->HTGI_next = inputObj;
+  return;
+}	/* End of MSG_GEN_INPUT_ADD_SIBLING.	*/
+
+
+
+/***********************************************************************
+ *		MSG_GEN_INPUT_CLEAR_SELECTIONS for HTGenInputClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    Unselect the INPUT objects if it has the same NAME
+ *                  but not the selectedObj.  Check the next INPUT object
+ *                  in the linked list.
+ * PARAMETERS:	    (HTMemHandle name, optr selectedObj)
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	edwin	1/ 9/97   	Initial Revision
+ *
+ ***********************************************************************/
+@method HTGenInputClass, MSG_GEN_INPUT_CLEAR_SELECTIONS
+{
+  char *sptr, *tptr;
+
+  if (pself->GIGI_behaviorType == GIGBT_EXCLUSIVE && oself != selectedObj){
+    /*  It's a exclusive selection */
+    /*  Compare the strings. */
+    sptr = (char *)HTMemLock(name);
+    tptr = (char *)HTMemLock(pself->HTGI_name);
+    if (strcasecmp(tptr, sptr) == 0)
+      /* This INPUT is under the same selection group.  Unselect it */
+      @call self::MSG_GEN_ITEM_GROUP_SET_NONE_SELECTED(FALSE);
+
+    HTMemUnlock(pself->HTGI_name);
+    HTMemUnlock(name);
+  }
+  /*
+   *  Check the next input object in the linked list.
+   */
+  if (pself->HTGI_next)
+    @call pself->HTGI_next::MSG_GEN_INPUT_CLEAR_SELECTIONS(name, selectedObj);
+
+  return;
+}	/* End of MSG_GEN_INPUT_CLEAR_SELECTIONS.	*/
+
+
+
+/***********************************************************************
+ *		MSG_GEN_INPUT_SUBMIT for HTGenInputClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    Generate a name=value pair for the form submission.
+ * PARAMETERS:	    (HTListHandle query)
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	edwin	1/ 9/97   	Initial Revision
+ *
+ ***********************************************************************/
+@method HTGenInputClass, MSG_GEN_INPUT_SUBMIT
+{
+  HTMemHandle temp;
+  word selection = @call self::MSG_GEN_ITEM_GROUP_GET_SELECTION();
+
+  if (selection != GIGS_NONE && pself->HTGI_name) {
+    /*
+     *  Append the "name".
+     */
+    temp = HTStrHTMemAllocCopy(pself->HTGI_name);
+    HTListAppend(query, &temp, sizeof(HTMemHandle));
+    /*
+     *  Append the "value".
+     */
+    if (!pself->HTGI_value) {
+      temp = HTStrAllocCopy("on");
+    }
+    else {
+      temp = HTStrHTMemAllocCopy(pself->HTGI_value);
+    }
+    HTListAppend(query, &temp, sizeof(HTMemHandle));
+  }
+  return;
+}	/* End of MSG_GEN_INPUT_SUBMIT.	*/
+
+
+
+/***********************************************************************
+ *		MSG_GEN_RESET for HTGenInputClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    Reset the GenItem group back to its default
+ *		    selection(s)
+ * PARAMETERS:	    
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	edwin	1/ 9/97   	Initial Revision
+ *
+ ***********************************************************************/
+@method HTGenInputClass, MSG_GEN_RESET
+{
+  if (pself->HTGI_select)
+    @send self::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(0, FALSE);
+  else
+    @call self::MSG_GEN_ITEM_GROUP_SET_NONE_SELECTED(FALSE);
+
+  return;
+}	/* End of MSG_GEN_RESET.	*/
+
+
+
+/***********************************************************************
+ *		MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION for HTGenInputClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    
+ * PARAMETERS:	    (word identifier, Boolean indeterminate);
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	edwin	1/ 9/97   	Initial Revision
+ *
+ ***********************************************************************/
+@method HTGenInputClass, MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION
+{
+  optr form;
+
+  form = @call self::MSG_GEN_ITEM_GROUP_GET_DESTINATION();
+  @call form::MSG_GEN_FORM_SET_EXCLUSIVE_SELECTION(pself->HTGI_name,oself);
+  @callsuper();
+  return;
+}	/* End of MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION.	*/
+
+
+
+/***********************************************************************
+ *		MSG_META_UIG_CALC_POSITION for HTGenInputClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    Find its row position and X coordinate in that row.
+ * PARAMETERS:	    none
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:        THIS IS AN EXCEPTION!
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	edwin	11/ 3/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method HTGenInputClass, MSG_META_UIG_CALC_POSITION
+{
+  int row;
+  SizeAsDWord size = @call self::MSG_VIS_GET_SIZE();
+  /*
+   *  Get an estimate position of the object
+   */
+  pself->HTGI_xPos = UpdateItsPotentialPosition(oself, size, &row);
+  pself->HTGI_pageRow = row;
+  return;
+}	/* End of MSG_META_UIG_CALC_POSITION.	*/
+
+
+
+/***********************************************************************
+ *		MSG_VIS_POSITION_BRANCH for HTGenInputClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    Manually position its position.
+ * PARAMETERS:	    
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	edwin	11/ 3/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method HTGenInputClass, MSG_VIS_POSITION_BRANCH
+{
+  XYValueAsDWord xy = @call @genParent::MSG_VIS_GET_POSITION();
+
+  xOrigin = DWORD_X(xy) + pself->HTGI_xPos;
+  yOrigin = DWORD_Y(xy) + GetItsPotentialHeight(oself, pself->HTGI_pageRow);
+
+  @callsuper();
+
+  return;
+}	/* End of MSG_VIS_POSITION_BRANCH.	*/
+
+
+
+/***********************************************************************
+ *		MSG_GEN_OPTION_PROCESS_ATTRIBUTE for HTGenOptionClass
+ ***********************************************************************
+ * SYNOPSIS:	    Process OPTION attribute list
+ * PARAMETERS:	    (MemHandle block, SGMLEntity *entity, optr select)
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	EY	4/19/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method HTGenOptionClass, MSG_GEN_OPTION_PROCESS_ATTRIBUTE
+{
+  char *value, *cptr;
+  int	index = 0;
+
+  for(index = 0; entity[index].SGMLE_token; index++) {
+    if (!entity[index].SGMLE_value) {
+      if (entity[index].SGMLE_value == HTML_ATTR_SELECTED) {
+	@self->HTGO_selected = TRUE;
+	@send select::MSG_GEN_SELECT_SET_SELECT_ID(@self->GII_identifier);
+      }
+      continue;
+    }
+    value = (char *)LMemDerefHandles(block, entity[index].SGMLE_value);
+    switch(entity[index].SGMLE_token) {
+    case HTML_ATTR_VALUE:
+      /* allocate a chunk to store the ACTION URL */
+      @self->HTGO_value = HTMemAlloc(sizeof(char) * (strlen(value)+1));
+      cptr = (char *)HTMemLock(@self->HTGO_value);
+      strcpy(cptr, value);
+      HTMemUnlock(@self->HTGO_value);
+      break;
+    case HTML_ATTR_SELECTED:
+      @self->HTGO_selected = TRUE;
+      @send select::MSG_GEN_SELECT_SET_SELECT_ID(@self->GII_identifier);
+      break;
+    }
+  }
+  return;
+}	/* End of MSG_GEN_OPTION_PROCESS_ATTRIBUTE.	*/
+
+
+/***********************************************************************
+ *		MSG_GEN_OPTION_SET_SELECTED for HTGenOptionClass
+ ***********************************************************************
+ * SYNOPSIS:	    Mark the OPTION object selected.
+ * PARAMETERS:	    none
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	EY	6/29/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method HTGenOptionClass, MSG_GEN_OPTION_SET_SELECTED
+{
+  pself->HTGO_selected = TRUE;
+  return;
+}	/* End of MSG_GEN_OPTION_SET_SELECTED.	*/
+
+
+
+/***********************************************************************
+ *		MSG_GEN_OPTION_IS_SELECTED for HTGenOptionClass
+ ***********************************************************************
+ * SYNOPSIS:	    Return the status of the OPTION object
+ * PARAMETERS:	    Boolean ()
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	EY	6/24/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method HTGenOptionClass, MSG_GEN_OPTION_IS_SELECTED
+{
+ return pself->HTGO_selected;
+}	/* End of MSG_GEN_OPTION_IS_SELECTED.	*/
+
+
+
+/***********************************************************************
+ *		MSG_GEN_OPTION_SUBMIT for HTGenOptionClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    Generate a name=value pair for the form submission.
+ *                  and store it in the passed query list.
+ * PARAMETERS:	    (HTMemHandle chunk, HTListHandle query)
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:     Handles <INPUT TYPE=CHECKBOX value=? name=?> 
+ *                       Or
+ *                       <SELECT name=?>
+ *                         <OPTION value=?>
+ *                       </SELECT>
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	edwin	10/21/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method HTGenOptionClass, MSG_GEN_OPTION_SUBMIT
+{
+  HTMemHandle temp;
+
+  if (chunk && pself->HTGO_value) {
+    /*
+     *  Append the "name".
+     */
+    temp = HTStrHTMemAllocCopy(chunk);
+    HTListAppend(query, &temp, sizeof(HTMemHandle));
+    /*
+     *  Append the "value".
+     */
+    temp = HTStrHTMemAllocCopy(pself->HTGO_value);
+    HTListAppend(query, &temp, sizeof(HTMemHandle));
+  }
+  return;
+}	/* End of MSG_GEN_OPTION_SUBMIT.	*/
+
+
+/***********************************************************************
+ *		MSG_GEN_DESTROY for HTGenOptionClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    Free the allocated instance data.
+ * PARAMETERS:	    (VisUpdateMode updateMode, CompChildFlags flags)
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:	    
+ *
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	edwin   	2/ 7/97   	Initial Revision
+ *	
+ ***********************************************************************/
+@method HTGenOptionClass, MSG_GEN_DESTROY
+{
+  @callsuper();
+  if (pself->HTGO_value)
+    HTMemFree(pself->HTGO_value);
+
+  return;
+}	/* End of MSG_GEN_DESTROY.	*/
+
+
+
+/***********************************************************************
+ *	MSG_GEN_FORM_TEXT_PROCESS_ATTRIBUTE for HTGenFormTextClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    Process the <TEXTAREA> attribute list.
+ * PARAMETERS:	    (MemHandle block, SGMLEntity *entity)
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:	Attributes processed:  NAME, COLS, ROWS.
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	edwin	8/28/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method HTGenFormTextClass, MSG_GEN_FORM_TEXT_PROCESS_ATTRIBUTE
+{
+  char *value, *cptr;
+  int	index, cols = 12, rows = 1;
+  HTMemHandle nameOptr;
+  CompSizeHintArgs sizeArgs;
+
+  for(index = 0; entity[index].SGMLE_token; index++) {
+    if (!entity[index].SGMLE_value)
+      continue;
+    value = (char *)LMemDerefHandles(block, entity[index].SGMLE_value);
+    switch(entity[index].SGMLE_token) {
+    case HTML_ATTR_NAME:
+      nameOptr = HTMemAlloc(sizeof(char) * (strlen(value)+1));
+      cptr = (char *)HTMemLock(nameOptr);
+      strcpy(cptr,value);
+      HTMemUnlock(nameOptr);
+      pself->HTGFT_name = nameOptr;
+      break;
+    case HTML_ATTR_COLS:
+      cols = atoi(value);
+      if (cols > 75)
+	  cols = 75;
+      else if (cols <= 0)
+	  cols = 12;     /* get back to default */
+      break;
+    case HTML_ATTR_ROWS:
+      rows = atoi(value);
+      if (rows > 50)
+	  rows = 50;
+      else if (rows <= 0)
+	  rows = 1;     /* get back to default */
+      break;
+    }
+  }
+  sizeArgs.CSHA_width = SST_AVG_CHAR_WIDTHS | cols;
+  sizeArgs.CSHA_height = SST_LINES_OF_TEXT | rows;
+  sizeArgs.CSHA_count = 0;
+  EC_ERROR_IF(cols < 0, UIG_ERROR_NEGATIVE_WIDTH);
+  @call self::MSG_META_ADD_VAR_DATA
+		(HINT_FIXED_SIZE, sizeof(sizeArgs), &sizeArgs);
+  return;
+}	/* End of MSG_GEN_FORM_TEXT_PROCESS_ATTRIBUTE.	*/
+
+
+/***********************************************************************
+ *		MSG_GEN_FORM_TEXT_INITIALIZE for HTGenFormTextClass
+ ***********************************************************************
+ * SYNOPSIS:	    Store the NAME attribute for the user-input field
+ *		    under the FORM.
+ * PARAMETERS:	    (HTMemHandle name, HTMemHandle value)
+ *			name - a chunk handle storing the symbolic 
+ *			       name used to return to server on 
+ *			       submision.
+ *			value - a chunk storing the default text string.
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	EY	8/23/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method HTGenFormTextClass, MSG_GEN_FORM_TEXT_INITIALIZE
+{
+  pself->HTGFT_name = name;
+  pself->HTGFT_value= value;
+
+  return;
+}	/* End of MSG_GEN_FORM_TEXT_INITIALIZE.	*/
+
+
+
+/***********************************************************************
+ *		MSG_GEN_DESTROY for HTGenFormTextClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    Free the allocated instance data.
+ * PARAMETERS:	    (VisUpdateMode updateMode, CompChildFlags flags)
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:	    
+ *
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	edwin   	2/ 7/97   	Initial Revision
+ *	
+ ***********************************************************************/
+@method HTGenFormTextClass, MSG_GEN_DESTROY
+{
+  @callsuper();
+  if (pself->HTGFT_name)
+    HTMemFree(pself->HTGFT_name);
+  if (pself->HTGFT_value)
+    HTMemFree(pself->HTGFT_value);
+
+  return;
+}	/* End of MSG_GEN_DESTROY.	*/
+
+
+
+/***********************************************************************
+ *		MSG_GEN_FORM_TEXT_SUBMIT for HTGenFormTextClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    Generate the name=value pair and store in the query
+ *                  list.
+ * PARAMETERS:	    (HTListHandle query)
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:        Handle <INPUT type=TEXT | PASSWORD name=? value=?>
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	edwin	10/20/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method HTGenFormTextClass, MSG_GEN_FORM_TEXT_SUBMIT
+{
+  char *value;
+  int len;
+  HTMemHandle temp;
+
+  if (pself->HTGFT_name) {
+    /*
+     *  If there is no entered text nor any default text, 
+     *  Don't generate a pair.
+     */
+    len = @call self::MSG_VIS_TEXT_GET_TEXT_SIZE();
+    if (len <= 0) return;
+    /*
+     *  Append the "name".
+     */
+    temp = HTStrHTMemAllocCopy(pself->HTGFT_name);
+    HTListAppend(query, &temp, sizeof(HTMemHandle));
+    /*
+     *  Append the value
+     */
+    value = (char *) HTMemAllocAndLock(&temp, sizeof(char) * (len+1));
+    @call self::MSG_VIS_TEXT_GET_ALL_PTR(value);
+    HTMemUnlock(temp);
+    HTListAppend(query, &temp, sizeof(HTMemHandle));
+  }
+  return;
+}	/* End of MSG_GEN_FORM_TEXT_SUBMIT.	*/
+
+
+
+/***********************************************************************
+ *		MSG_GEN_RESET for HTGenFormTextClass
+ ***********************************************************************
+ * SYNOPSIS:	    Reset the text object back to its default value, if
+ *		    there was any.
+ * PARAMETERS:	    
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	EY	8/28/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method HTGenFormTextClass, MSG_GEN_RESET
+{
+  char *cptr;
+
+  if (pself->HTGFT_value) {
+    /*
+     *  Ok, there were some default text string.
+     */
+    cptr = HTMemLock(pself->HTGFT_value);
+    @call self::MSG_VIS_TEXT_REPLACE_ALL_PTR(cptr, 0);
+    HTMemUnlock(pself->HTGFT_value);
+    @call self::MSG_VIS_TEXT_SCREEN_UPDATE();
+  }
+  else
+    /*
+     *  Cear any text in the input field.
+     */
+    @call self::MSG_VIS_TEXT_DELETE_ALL();
+
+  return;
+}	/* End of MSG_GEN_RESET.	*/
+
+
+
+/***********************************************************************
+ *		MSG_VIS_RECALC_SIZE for HTGenFormTextClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    Tell the Geometry Manager to sent 
+ *                  MSG_VIS_POSITION_BRANCH instead of calling a routine.
+ * PARAMETERS:	    SizeAsDWord (RecalcSizeArgs width, 
+ *				 RecalcSizeArgs height)
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	edwin	10/24/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method HTGenFormTextClass, MSG_VIS_RECALC_SIZE
+{
+  VisTextInstance  * vself;
+  SizeAsDWord size;
+
+  size = @callsuper();
+  /*
+   *  Tell the Geometry Manager to send a messaeg instead of caling a
+   *  a routine.
+   */
+  vself = ObjDerefVis(oself);
+  vself->VI_geoAttrs &= ~VGA_USE_VIS_SET_POSITION;
+
+  return size;
+}	/* End of MSG_VIS_RECALC_SIZE.	*/
+
+
+
+/***********************************************************************
+ *		MSG_VIS_POSITION_BRANCH for HTGenFormTextClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    Set its new X and Y position.
+ * PARAMETERS:	    (int xOrigin, int yOrigin)
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	edwin	10/24/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method HTGenFormTextClass, MSG_VIS_POSITION_BRANCH
+{
+  XYValueAsDWord xy = @call @genParent::MSG_VIS_GET_POSITION();
+
+  xOrigin = DWORD_X(xy) + pself->HTGFT_xPos;
+  yOrigin = DWORD_Y(xy) + 
+    GetItsPotentialHeight(oself, pself->HTGFT_pageRow) - 1;
+
+  @callsuper();
+  return;
+}	/* End of MSG_VIS_POSITION_BRANCH.	*/
+
+
+
+/***********************************************************************
+ *		MSG_VIS_TEXT_SHOW_SELECTION for HTGenFormTextClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    Don't cause the view object to scroll to show this
+ *                  object.
+ * PARAMETERS:	    
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	edwin	11/12/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method HTGenFormTextClass, MSG_VIS_TEXT_SHOW_SELECTION
+{
+  return;
+}	/* End of MSG_VIS_TEXT_SHOW_SELECTION.	*/
+
+
+
+/***********************************************************************
+ *		MSG_META_UIG_CALC_POSITION for HTGenFormTextClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    Find its row number and X position.
+ * PARAMETERS:	    none
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	edwin	10/28/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method HTGenFormTextClass, MSG_META_UIG_CALC_POSITION
+{
+  int row;
+  SizeAsDWord size = @call self::MSG_VIS_GET_SIZE();
+  /*
+   *  Get an estimated position of the object
+   */
+  pself->HTGFT_xPos = UpdateItsPotentialPosition(oself, size, &row);
+  pself->HTGFT_pageRow = row;
+  return;
+}	/* End of MSG_META_UIG_CALC_POSITION.	*/
+
+
+
+/***********************************************************************
+ *		MSG_GEN_FORM_HIDDEN_INITIALIZE for HTGenFormHiddenClass
+ ***********************************************************************
+ * SYNOPSIS:	    Store the NAME and VALUE attributes for the hidden
+ *		    information under the FORM.
+ * PARAMETERS:	    (HTMemHandle name, HTMemHandle value)
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	EY	8/27/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method HTGenFormHiddenClass, MSG_GEN_FORM_HIDDEN_INITIALIZE
+{
+  pself->HTGFH_name  = name;
+  pself->HTGFH_value = value;
+
+  return;
+}	/* End of MSG_GEN_FORM_HIDDEN_INITIALIZE.	*/
+
+
+
+/***********************************************************************
+ *		MSG_GEN_DESTROY for HTGenFormHiddenClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    Free the allocated instance data.
+ * PARAMETERS:	    (VisUpdateMode updateMode, CompChildFlags flags)
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:	    
+ *
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	edwin   	2/ 7/97   	Initial Revision
+ *	
+ ***********************************************************************/
+@method HTGenFormHiddenClass, MSG_GEN_DESTROY
+{
+  @callsuper();
+  if (pself->HTGFH_name)
+    HTMemFree(pself->HTGFH_name);
+  if (pself->HTGFH_value)
+    HTMemFree(pself->HTGFH_value);
+
+  return;
+}	/* End of MSG_GEN_DESTROY.	*/
+
+
+
+
+/***********************************************************************
+ *		MSG_GEN_FORM_HIDDEN_SUBMIT for HTGenFormHiddlenClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    Generate name=value pair and store it in the query.
+ * PARAMETERS:	    (HTListHandle query)
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:        Handle <INPUT TYPE=HIDDEN name=? value=?>
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	edwin	10/20/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method HTGenFormHiddenClass, MSG_GEN_FORM_HIDDEN_SUBMIT
+{
+  HTMemHandle temp;
+
+  if (pself->HTGFH_name && pself->HTGFH_value) {
+    /*
+     *  Append the "name".
+     */
+    temp = HTStrHTMemAllocCopy(pself->HTGFH_name);
+    HTListAppend(query, &temp, sizeof(HTMemHandle));
+    /*
+     *  Append the "value".
+     */
+    temp = HTStrHTMemAllocCopy(pself->HTGFH_value);
+    HTListAppend(query, &temp, sizeof(HTMemHandle));
+  }
+  return;
+}	/* End of MSG_GEN_FORM_HIDDEN_SUBMIT.	*/
+
+
+
+/***********************************************************************
+ *		MSG_GEN_RESET for HTGenFormHiddenClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    Reset the password field back to the default.
+ * PARAMETERS:	    
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:	    
+ *
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	edwin   	2/26/97   	Initial Revision
+ *	
+ ***********************************************************************/
+@method HTGenFormHiddenClass, MSG_GEN_RESET
+{
+  char *cptr;
+
+  if (pself->HTGFH_value) {
+    /*
+     *  Ok, there were some default text string.
+     */
+    cptr = HTMemLock(pself->HTGFH_value);
+    @call self::MSG_VIS_TEXT_REPLACE_ALL_PTR(cptr, 0);
+    HTMemUnlock(pself->HTGFH_value);
+    @call self::MSG_VIS_TEXT_SCREEN_UPDATE();
+  }
+  else
+    /*
+     *  Cear any text in the input field.
+     */
+    @call self::MSG_VIS_TEXT_DELETE_ALL();
+
+  return;
+}	/* End of MSG_GEN_RESET.	*/
+
+
+
+/***********************************************************************
+ *	MSG_GEN_FORM_TRIGGER_INITIALIZE for HTGenFormTriggerClass
+ ***********************************************************************
+ * SYNOPSIS:	    Store the NAME attribute for the triggers under the
+ *		    FORM.
+ * PARAMETERS:	    (HTMemHandle name, InputType type)
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	EY	8/27/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method HTGenFormTriggerClass, MSG_GEN_FORM_TRIGGER_INITIALIZE
+{
+  pself->HTGFT_name = name;
+  pself->HTGFT_type = type;
+  return;
+}	/* End of MSG_GEN_FORM_TRIGGER_INITIALIZE.	*/
+
+
+/***********************************************************************
+ *		MSG_GEN_DESTROY for HTGenFormTriggerClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    Free the allocated instance data.
+ * PARAMETERS:	    (VisUpdateMode updateMode, CompChildFlags flags)
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:	    
+ *
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	edwin   	2/ 7/97   	Initial Revision
+ *	
+ ***********************************************************************/
+@method HTGenFormTriggerClass, MSG_GEN_DESTROY
+{
+  @callsuper();
+  if (pself->HTGFT_name)
+    HTMemFree(pself->HTGFT_name);
+
+  return;
+}	/* End of MSG_GEN_DESTROY.	*/
+
+
+
+
+/***********************************************************************
+ *		MSG_GEN_FORM_TRIGGER_SUBMIT for HTGenFormTriggerClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    Generate the name=value pair and store in the query.
+ * PARAMETERS:	    (HTListHandle query)
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:        Handle <INPUT TYPE = SUBMIT NAME=? VALUE=?>
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	edwin	10/20/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method HTGenFormTriggerClass, MSG_GEN_FORM_TRIGGER_SUBMIT
+{
+  char *cptr;
+  ChunkHandle moniker;
+  HTMemHandle temp;
+
+  if (pself->HTGFT_name && pself->HTGFT_type == INPUT_SUBMIT) {
+    /*
+     *  Append the "name".
+     */
+    temp = HTStrHTMemAllocCopy(pself->HTGFT_name);
+    HTListAppend(query, &temp, sizeof(HTMemHandle));
+    /*
+     *  Append the "value".
+     */
+    moniker = @call oself::MSG_GEN_GET_VIS_MONIKER();
+    cptr = (char *)LMemDerefHandles(OptrToHandle(oself), moniker) 
+      + sizeof(VisMonikerWithText);
+    temp = HTStrAllocCopy(cptr);
+    HTListAppend(query, &temp, sizeof(HTMemHandle));
+  }
+  return;
+}	/* End of MSG_GEN_FORM_TRIGGER_SUBMIT.	*/
+
+
+
+
+/***********************************************************************
+ *		MSG_META_START_SELECT for HTGenFormTriggerClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    Assemble a query URL of the form:
+ *                  action?name=value&name=value&name=value
+ *                  ("action" here is the URL specified by the ACTION 
+ *                  attribute to the FORM tag, or the current document
+ *                  URL if no ACTION attribute was specified.)
+ * PARAMETERS:	    
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	edwin	10/18/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method HTGenFormTriggerClass, MSG_META_START_SELECT
+{
+  optr parent;
+
+  @callsuper();
+  if (pself->HTGFT_type == TRIGGER_SUBMIT) {
+    parent = oself;
+    while(1) {
+      parent = @call parent::MSG_GEN_FIND_PARENT();
+      if (@call parent::MSG_META_IS_OBJECT_IN_CLASS(&HTGenFormClass)) {
+	@call parent::MSG_GEN_FORM_SUBMIT();
+	break;
+      }
+    }
+  }
+  return;
+}	/* End of MSG_META_START_SELECT.	*/
+
+
+
+/***********************************************************************
+ *		MSG_VIS_RECALC_SIZE for HTGenFormTriggerClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    Tell the Geometry Manager to sent 
+ *                  MSG_VIS_POSITION_BRANCH instead of calling a routine.
+ * PARAMETERS:	    SizeAsDWord (RecalcSizeArgs width, 
+ *				RecalcSizeArgs height)
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	edwin	10/24/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method HTGenFormTriggerClass, MSG_VIS_RECALC_SIZE
+{
+  VisTextInstance  * vself;
+  SizeAsDWord size;
+
+  size = @callsuper();
+  /*
+   *  Tell the Geometry Manager to send a messaeg instead of caling a
+   *  a routine.
+   */
+  vself = ObjDerefVis(oself);
+  vself->VI_geoAttrs &= ~VGA_USE_VIS_SET_POSITION;
+
+  return size;
+}	/* End of MSG_VIS_RECALC_SIZE.	*/
+
+
+
+/***********************************************************************
+ *		MSG_VIS_POSITION_BRANCH for HTGenFormTriggerClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    Set its new X and Y positions.
+ * PARAMETERS:	    (int xOrigin, int yOrigin)
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	edwin	10/24/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method HTGenFormTriggerClass, MSG_VIS_POSITION_BRANCH
+{
+  XYValueAsDWord xy = @call @genParent::MSG_VIS_GET_POSITION();
+
+  xOrigin = DWORD_X(xy) + pself->HTGFT_xPos;
+  yOrigin = DWORD_Y(xy) + GetItsPotentialHeight(oself, pself->HTGFT_pageRow);
+  @callsuper();
+  return;
+}	/* End of MSG_VIS_POSITION_BRANCH.	*/
+
+
+
+/***********************************************************************
+ *		MSG_META_UIG_CALC_POSITION for HTGenFormTriggerClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    Find its row number and X position.
+ * PARAMETERS:	    none
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	edwin	10/28/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method HTGenFormTriggerClass, MSG_META_UIG_CALC_POSITION
+{
+  int row;
+  SizeAsDWord size = @call self::MSG_VIS_GET_SIZE();
+  /*
+   *  Get an estimate position of the object
+   */
+  pself->HTGFT_xPos = UpdateItsPotentialPosition(oself, size, &row);
+  pself->HTGFT_pageRow = row;
+  return;
+}	/* End of MSG_META_UIG_CALC_POSITION.	*/
+
+
+
+/***********************************************************************
+ *		FinishCurrentObjectInForm
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Finish the object in target and append it to the ui
+ *		tree.  Return the parent object of the subtree(either
+ *              a form or table cell).  This parent object is the typen
+ *              of a GenInteractin subclass.
+ * CALLED BY:	(optr pmObj, ObjInfo *target);
+ * RETURN:	
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	edwin	8/28/96   	Initial Revision
+ *
+ ***********************************************************************/
+optr
+FinishCurrentObjectInForm (optr pmObj, ObjInfo *target)
+{
+  ClassStruct *class;
+  optr	container;
+
+  /*
+   * Add whatever object in UIG_target to the leaf of the ui-tree, and
+   * travel up the tree branch to find the first FORM or HTGenTCell
+   * object that can take more children objects.
+   */
+  @call pmObj::MSG_PM_TAKE_UNFINISHED_UI_OBJ(target->obj);
+  if (target->class != (ClassStruct *)&HTGenFormClass &&
+      target->class != (ClassStruct *)&HTGenTCellClass) {
+    while (1) {
+	@call pmObj::MSG_PM_MARK_RECV_OBJECT_DONE(&container, &class);
+	EC_ERROR_IF(class == NULL || container == NULL ||
+	  class == (ClassStruct *)&HTGenTextClass,
+	  UIG_INVALID_OPERATION_ON_UI_TREE);
+	if (class == (ClassStruct *)&HTGenFormClass ||
+	    class == (ClassStruct *)&HTGenTCellClass)
+	  break;
+	else if (class == (ClassStruct *)&HTGenSelectClass)
+	  @call container::MSG_GEN_SELECT_COMPLETE_SELECT_CONSTRUCT();
+/*	else if (class == (ClassStruct *)&HTGenMultiLineSelectClass)
+	  @call container::MSG_HTGMLS_COMPLETE_SELECT_CONSTRUCT();
+	  */  /* edwin's observation */
+    }
+  }
+  else 
+    container = target->obj;
+
+  /*
+   *  Note, container may contain a FORM object or a HTGenTCell object.
+   */
+  return container;
+}	/* End of FinishCurrentObjectInForm.	*/
+
+
+/* The code for HTTextAreaClass (<TEXTAREA>). */
+
+/***********************************************************************
+ *		MSG_HTTA_PROCESS_ATTRIBUTE for HTTextAreaClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    
+ * PARAMETERS:	    ChunkHandle block, SGMLEntity *entity
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	mzhu	10/27/96   	Initial Revision
+ *
+ ***********************************************************************/
+/***********
+@method HTTextAreaClass, MSG_HTTA_PROCESS_ATTRIBUTE
+{
+  char *value, *cptr;
+  int	index;
+  ChunkHandle nameChunk;
+  CompSizeHintArgs sizeArgs;
+
+  @self->HTTA_cols = 12;
+  @self->HTTA_rows = 4;
+
+  for(index = 0; entity[index].SGMLE_token; index++) {
+    if (!entity[index].SGMLE_value)
+      continue;
+    value = (char *)LMemDerefHandles(block, entity[index].SGMLE_value);
+    switch(entity[index].SGMLE_token) {
+    case HTML_ATTR_NAME:
+      nameChunk = LMemAlloc(HandleOf(oself), strlen(value)+1);
+      cptr = (char *)LMemDerefHandles(HandleOf(oself), nameChunk);
+      strcpy(cptr,value);
+      pself = ObjDerefGen(oself);
+      pself->HTGFT_name = nameChunk;
+      break;
+    case HTML_ATTR_COLS:
+      @self->HTTA_cols = atoi(value);
+      break;
+    case HTML_ATTR_ROWS:
+      @self->HTTA_rows = atoi(value);
+      break;
+    }
+  }
+  sizeArgs.CSHA_width = SST_AVG_CHAR_WIDTHS | cols;
+  sizeArgs.CSHA_height = SST_LINES_OF_TEXT | rows;
+  sizeArgs.CSHA_count = 0;
+  EC_ERROR_IF(sizeArgs.CSHA_width < 0, UIG_ERROR_NEGATIVE_WIDTH);
+  @call self::MSG_META_ADD_VAR_DATA
+		(HINT_FIXED_SIZE, sizeof(sizeArgs), &sizeArgs);
+  return;
+}	******/ /* End of MSG_HTTA_PROCESS_ATTRIBUTE.	*/
+
+
+
+/***********************************************************************
+ *		MSG_HTTA_SET_TEXT_PTR for HTTextAreaClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    
+ * PARAMETERS:	    char *text, word len
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	mzhu	10/27/96   	Initial Revision
+ *
+ ***********************************************************************/
+/**************
+@method HTTextAreaClass, MSG_HTTA_SET_TEXT_PTR
+{
+    char *default;
+
+    if(!(*text) || len<=0) return;
+
+    if(!@self->HTTA_textHandle) {
+	@self->HTTA_textHandle = MemAllocLMem(LMEM_TYPE_GENERAL,
+					sizeof(LMemBlockHeader));
+    }
+
+    MemLock(@self->HTTA_textHandle);
+   
+    @self->HTTA_defaultText = LMemAlloc(@self->HTTA_textHandle,
+					len);
+
+    default = LMemDeref(@self->HTTA_textHandle, @self->HTTA_defaultText);
+
+    strcpy(default, text, len);
+
+    MemUnlock(@self->HTTA_textHandle);
+} ********/	/* End of MSG_HTTA_SET_TEXT_PTR.	*/
+
+
+
+/***********************************************************************
+ *		MSG_HTTA_COMPLETE_TEXTAREA_CONSTRUCT for HTTextAreaClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    
+ * PARAMETERS:	    
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	mzhu	10/27/96   	Initial Revision
+ *
+ ***********************************************************************/
+/**********
+@method HTTextAreaClass, MSG_HTTA_COMPLETE_TEXTAREA_CONSTRUCT
+{
+    
+} *****/ 	/* End of MSG_HTTA_COMPLETE_TEXTAREA_CONSTRUCT.	*/
+
+
+/* The code for MultiLineSelection. */
+
+/***********************************************************************
+ *		MSG_HTGMLS_PROCESS_ATTRIBUTE for HTGenMultiLineSelectClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    
+ * PARAMETERS:	    
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	mzhu	10/23/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method HTGenMultiLineSelectClass, MSG_HTGMLS_PROCESS_ATTRIBUTE
+{
+  char *value, *cptr;
+  int	index = 0;
+
+  @self->HTGMLS_exclusive = TRUE;
+
+  for(index = 0; entity[index].SGMLE_token; index++) {
+    if(entity[index].SGMLE_token == HTML_ATTR_MULTIPLE) {
+      	@self->HTGMLS_exclusive = FALSE;
+	continue;
+    }
+
+    if (!entity[index].SGMLE_value)
+	continue;
+
+    value = (char *)LMemDerefHandles(block, entity[index].SGMLE_value);
+
+    switch(entity[index].SGMLE_token) {
+    case HTML_ATTR_NAME:
+      /* allocate a chunk to store the NAME data */
+      @self->HTGMLS_name = LMemAlloc(HandleOf(oself), strlen(value)+1);
+      cptr = (char *)LMemDerefHandles(HandleOf(oself), @self->HTGMLS_name);
+      strcpy(cptr,value);
+      break;
+    case HTML_ATTR_SIZE:
+      pself->HTGMLS_size = atoi(value);
+      /* the size must be greater than one! */
+      EC_ERROR_IF(pself->HTGMLS_size <= 1, UIG_UI_TREE_OPERATION_FAILS);
+      break;
+    }
+  }
+  return;
+}	/* End of MSG_HTGMLS_PROCESS_ATTRIBUTE.	*/
+
+
+
+/***********************************************************************
+ *		MSG_HTGMLS_ADD_ONE_OPTION_VALUE for HTGenMultiLineSelectClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    
+ * PARAMETERS:	 char *value, Boolean selected
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	mzhu	10/23/96   	Initial Revision
+ *
+ ***********************************************************************/
+typedef struct {
+    Boolean OS_selected;
+    Boolean OS_default;
+    byte    OS_valueOffset;
+    byte    OS_textOffset;
+} OptionStruct;
+
+@method HTGenMultiLineSelectClass, MSG_HTGMLS_ADD_OPTION_VALUE
+{
+    OptionStruct *option;
+
+    /*
+     * Check if there is a valid chunkarray. 
+     */
+    if(!@self->HTGMLS_optionsHandle) {
+	/* Create one memory block for it. */
+	@self->HTGMLS_optionsHandle = MemAllocLMem(LMEM_TYPE_GENERAL,
+					sizeof(LMemBlockHeader));
+	MemLock(@self->HTGMLS_optionsHandle);
+
+    	/* Create a chunkarray for it. */
+	@self->HTGMLS_optionsChunk = ChunkArrayCreate(
+				@self->HTGMLS_optionsHandle,
+				0, sizeof(ChunkArrayHeader), 0);
+	MemUnlock(@self->HTGMLS_optionsHandle);
+    }
+
+    MemLock(@self->HTGMLS_optionsHandle);
+
+    option = ChunkArrayAppendHandles(@self->HTGMLS_optionsHandle,
+			@self->HTGMLS_optionsChunk,
+			sizeof(OptionStruct) + strlen(value) + 1);
+    option->OS_selected = selected;
+    option->OS_default = selected;
+    option->OS_valueOffset = sizeof(OptionStruct);
+    option->OS_textOffset = sizeof(OptionStruct) + strlen(value) + 1;
+    strcpy((char *)((char *)option + option->OS_valueOffset), value);
+
+    MemUnlock(@self->HTGMLS_optionsHandle);
+  
+    return;
+}	/* End of MSG_HTGMLS_ADD_OPTION_VALUE.	*/
+
+
+
+/***********************************************************************
+ *		MSG_HTGMLS_ADD_OPTION_TEXT for HTGenMultiLineSelectClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    
+ * PARAMETERS:	    char *text
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	mzhu	10/23/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method HTGenMultiLineSelectClass, MSG_HTGMLS_ADD_OPTION_TEXT
+{
+    OptionStruct *option;
+    int	last;
+    word size;
+    GStateHandle gstate;
+
+    gstate = GrCreateState(0);
+
+    /*
+     * Check if there is a valid chunkarray. 
+     */
+    if(!@self->HTGMLS_optionsHandle) {
+	/* Create one memory block for it. */
+	@self->HTGMLS_optionsHandle = MemAllocLMem(LMEM_TYPE_GENERAL,
+					sizeof(LMemBlockHeader));
+	MemLock(@self->HTGMLS_optionsHandle);
+
+    	/* Create a chunkarray for it. */
+	@self->HTGMLS_optionsChunk = ChunkArrayCreate(
+				@self->HTGMLS_optionsHandle,
+				0, sizeof(ChunkArrayHeader), 0);
+
+     	option = ChunkArrayAppendHandles(@self->HTGMLS_optionsHandle,
+			@self->HTGMLS_optionsChunk,
+			sizeof(OptionStruct) + strlen(text) + 1);
+    	option->OS_selected = FALSE;
+  	option->OS_valueOffset = sizeof(OptionStruct);
+  	option->OS_textOffset = sizeof(OptionStruct);
+    	strcpy((char *)((char *)option + option->OS_textOffset), text);
+
+	MemUnlock(@self->HTGMLS_optionsHandle);
+
+   	return;
+    }
+
+    MemLock(@self->HTGMLS_optionsHandle);
+
+    last = ChunkArrayGetCountHandles(@self->HTGMLS_optionsHandle,
+				@self->HTGMLS_optionsChunk) - 1;
+
+    if(last < 0) return;
+
+    option = ChunkArrayElementToPtrHandles(@self->HTGMLS_optionsHandle,
+				@self->HTGMLS_optionsChunk, last, &size);
+
+    ChunkArrayElementResizeHandles(
+			@self->HTGMLS_optionsHandle,
+			@self->HTGMLS_optionsChunk, 
+			last,
+			size + strlen(text) + 1);
+
+    option = ChunkArrayElementToPtrHandles(@self->HTGMLS_optionsHandle,
+				@self->HTGMLS_optionsChunk, last, &size);
+
+    strcpy((char *)((char *)option + option->OS_textOffset), text);
+
+    MemUnlock(@self->HTGMLS_optionsHandle);
+
+    /* 
+     * Find the longest text string. 
+     */ 
+    size = GrTextWidth(gstate, text, strlen(text));
+    if(size > @self->HTGMLS_len) @self->HTGMLS_len = size;
+  
+    return;
+}	/* End of MSG_HTGMLS_ADD_OPTION_TEXT.	*/
+
+
+
+/***********************************************************************
+ *		MSG_HTGMLS_COMPLETE_SELECT_CONSTRUCT for HTGenMultiLineSelectClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    
+ * PARAMETERS:	    
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	mzhu	10/23/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method HTGenMultiLineSelectClass, MSG_HTGMLS_COMPLETE_SELECT_CONSTRUCT
+{
+    optr list, scroll, item, *tmp;
+    int i;
+    SpecSizeSpec sizeSpec;
+    CompSizeHintArgs sizeArgs;
+  
+    sizeSpec = SST_PIXELS | 0;
+   
+    sizeArgs.CSHA_width = SST_PIXELS | @self->HTGMLS_len;
+    sizeArgs.CSHA_height = SST_LINES_OF_TEXT | 1;
+    sizeArgs.CSHA_count = 1;
+
+    EC_ERROR_IF(sizeArgs.CSHA_width < 0, UIG_ERROR_NEGATIVE_WIDTH);
+    @call self::MSG_META_ADD_VAR_DATA
+		(HINT_FIXED_SIZE, sizeof(sizeArgs), &sizeArgs);
+
+    MemLock(@self->HTGMLS_optionsHandle);
+
+    @call self::MSG_META_ADD_VAR_DATA(HINT_DRAW_IN_BOX, 0, NULL);
+    @call self::MSG_META_ADD_VAR_DATA(HINT_DRAW_STYLE_3D_LOWERED, 0, NULL);
+    @call self::MSG_META_ADD_VAR_DATA(
+			HINT_ORIENT_CHILDREN_HORIZONTALLY, 0, NULL);
+    @call self::MSG_META_ADD_VAR_DATA(
+			HINT_NO_TALLER_THAN_CHILDREN_REQUIRE, 0, NULL);
+    @call self::MSG_META_ADD_VAR_DATA(
+			HINT_NO_WIDER_THAN_CHILDREN_REQUIRE, 0, NULL);
+    @call self::MSG_META_ADD_VAR_DATA
+		(HINT_CUSTOM_CHILD_SPACING, sizeof(SpecSizeSpec), 
+		 &sizeSpec); 
+
+    if( ChunkArrayGetCountHandles(@self->HTGMLS_optionsHandle,
+		@self->HTGMLS_optionsChunk) > @self->HTGMLS_size){
+
+    	scroll = ObjInstantiateForThread(0, (ClassStruct *)&GenInteractionClass);
+    	@call scroll::MSG_META_ADD_VAR_DATA(
+			HINT_ORIENT_CHILDREN_VERTICALLY, 0, NULL);
+    	@call scroll::MSG_META_ADD_VAR_DATA(
+			HINT_FULL_JUSTIFY_CHILDREN_VERTICALLY, 0, NULL);
+    	@call scroll::MSG_META_ADD_VAR_DATA(
+			HINT_EXPAND_HEIGHT_TO_FIT_PARENT, 0, NULL);
+
+    	@call self::MSG_GEN_ADD_CHILD(scroll, CCF_MARK_DIRTY);
+	@call scroll::MSG_GEN_SET_USABLE(VUM_DELAYED_VIA_APP_QUEUE);
+
+    	item = ObjInstantiateForThread(0, (ClassStruct *)&GenTriggerClass);
+	@call item::MSG_GEN_REPLACE_VIS_MONIKER_TEXT(
+			"UP", VUM_DELAYED_VIA_APP_QUEUE);
+	@call item::MSG_GEN_TRIGGER_SET_ACTION_MSG(MSG_HTGMLS_SCROLL_UP);
+	@call item::MSG_GEN_TRIGGER_SET_DESTINATION(oself);	
+	@call item::MSG_META_ADD_VAR_DATA(
+			HINT_DRAW_STYLE_FLAT, 0, NULL);
+	@call item::MSG_META_ADD_VAR_DATA(
+			HINT_NO_BORDERS_ON_MONIKERS, 0, NULL);
+	@call item::MSG_META_ADD_VAR_DATA(
+		HINT_ALIGN_TOP_EDGE_WITH_OBJECT, sizeof(optr), &scroll);
+
+    	@call scroll::MSG_GEN_ADD_CHILD(item, CCF_MARK_DIRTY);
+	@self->HTGMLS_up = item;
+
+    	item = ObjInstantiateForThread(0, (ClassStruct *)&GenTriggerClass);
+	@call item::MSG_GEN_REPLACE_VIS_MONIKER_TEXT(
+			"DN", VUM_DELAYED_VIA_APP_QUEUE);
+	@call item::MSG_GEN_TRIGGER_SET_ACTION_MSG(MSG_HTGMLS_SCROLL_DOWN);
+	@call item::MSG_GEN_TRIGGER_SET_DESTINATION(oself);	
+	@call item::MSG_META_ADD_VAR_DATA(
+			HINT_DRAW_STYLE_FLAT, 0, NULL);
+	@call item::MSG_META_ADD_VAR_DATA(
+			HINT_NO_BORDERS_ON_MONIKERS, 0, NULL);
+	@call item::MSG_META_ADD_VAR_DATA(
+		HINT_ALIGN_BOTTOM_EDGE_WITH_OBJECT, sizeof(optr), &scroll);
+
+    	@call scroll::MSG_GEN_ADD_CHILD(item, CCF_MARK_DIRTY);
+	@call item::MSG_GEN_SET_USABLE(VUM_DELAYED_VIA_APP_QUEUE);
+	@self->HTGMLS_down = item;
+    }
+
+    list = ObjInstantiateForThread(0, (ClassStruct *)&GenInteractionClass);
+
+    @call list::MSG_META_ADD_VAR_DATA(
+			HINT_ORIENT_CHILDREN_VERTICALLY, 0, NULL);
+    @call list::MSG_META_ADD_VAR_DATA
+		(HINT_CUSTOM_CHILD_SPACING, sizeof(SpecSizeSpec), 
+		 &sizeSpec); 
+
+    @call self::MSG_GEN_ADD_CHILD(list, CCF_MARK_DIRTY);
+    @call list::MSG_GEN_SET_USABLE(VUM_DELAYED_VIA_APP_QUEUE);
+
+    /* Create a chunkarray to hold the children. */
+    @self->HTGMLS_itemChunk = ChunkArrayCreate(
+				@self->HTGMLS_optionsHandle,
+				sizeof(optr), sizeof(ChunkArrayHeader), 0);
+
+    for(i=0; i<@self->HTGMLS_size; i++) {
+	item = ObjInstantiateForThread(0, (ClassStruct *)&HTOtherOptionClass);
+	@call item::MSG_META_ADD_VAR_DATA(
+			HINT_EXPAND_WIDTH_TO_FIT_PARENT, 0, NULL);
+	@call item::MSG_META_ADD_VAR_DATA(
+			HINT_EXPAND_HEIGHT_TO_FIT_PARENT, 0, NULL);
+	@call item::MSG_META_ADD_VAR_DATA(
+			HINT_DRAW_STYLE_FLAT, 0, NULL);
+	@call item::MSG_META_ADD_VAR_DATA(
+			HINT_NO_BORDERS_ON_MONIKERS, 0, NULL);
+	EC_ERROR_IF(sizeArgs.CSHA_width < 0, UIG_ERROR_NEGATIVE_WIDTH);
+    	@call item::MSG_META_ADD_VAR_DATA
+		(HINT_FIXED_SIZE, sizeof(sizeArgs), &sizeArgs);
+
+	@call list::MSG_GEN_ADD_CHILD(item, CCF_MARK_DIRTY);
+    	tmp = ChunkArrayAppendHandles(@self->HTGMLS_optionsHandle,
+			@self->HTGMLS_itemChunk, 0);
+	*tmp = item;
+
+	@call item::MSG_GEN_SET_USABLE(VUM_DELAYED_VIA_APP_QUEUE);
+	@call item::MSG_HTOO_SET_ML(oself);
+    }
+/*
+    sizeArgs.CSHA_height = SST_LINES_OF_TEXT | @self->HTGMLS_size;
+    EC_ERROR_IF(sizeArgs.CSHA_width < 0, UIG_ERROR_NEGATIVE_WIDTH);
+    @call list::MSG_META_ADD_VAR_DATA
+		(HINT_FIXED_SIZE, sizeof(sizeArgs), &sizeArgs);
+*/
+
+    MemUnlock(@self->HTGMLS_optionsHandle);
+
+    @call self::MSG_HTGMLS_SET_ALL_MONIKER();
+
+}	/* End of MSG_HTGMLS_COMPLETE_SELECT_CONSTRUCT.	*/
+
+
+
+/***********************************************************************
+ *		MSG_HTGMLS_SET_ALL_MONIKER for HTGenMultiLineSelectClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    
+ * PARAMETERS:	    
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	mzhu	10/24/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method HTGenMultiLineSelectClass, MSG_HTGMLS_SET_ALL_MONIKER
+{
+    OptionStruct *option;
+    char  *text;
+    int  i, realItem;
+    word  size;
+    optr *item;
+
+    EC_ERROR_IF(!@self->HTGMLS_optionsHandle, UIG_UI_TREE_OPERATION_FAILS);
+
+    MemLock(@self->HTGMLS_optionsHandle);
+
+    for(i=0; i<@self->HTGMLS_size; i++) {
+    	realItem = i + @self->HTGMLS_currentFirst;
+	item = ChunkArrayElementToPtrHandles(@self->HTGMLS_optionsHandle,
+				@self->HTGMLS_itemChunk, 
+				@self->HTGMLS_size - i - 1, &size);
+
+	option = ChunkArrayElementToPtrHandles(@self->HTGMLS_optionsHandle,
+				@self->HTGMLS_optionsChunk, realItem, &size);
+	text = ((char *)option + option->OS_textOffset);
+
+	@send (*item)::MSG_HTOO_SET_SEL(option->OS_selected);
+
+	@send (*item)::MSG_GEN_REPLACE_VIS_MONIKER_TEXT(
+			(char *)text, VUM_DELAYED_VIA_APP_QUEUE);
+    }
+
+    MemUnlock(@self->HTGMLS_optionsHandle);
+}	/* End of MSG_HTGMLS_SET_ALL_MONIKER.	*/
+
+
+
+/***********************************************************************
+ *		MSG_HTGMLS_SCROLL_UP for HTGenMultiLineSelectClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    
+ * PARAMETERS:	    
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	mzhu	10/24/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method HTGenMultiLineSelectClass, MSG_HTGMLS_SCROLL_UP,
+				   MSG_HTGMLS_SCROLL_DOWN
+{
+    if(message == MSG_HTGMLS_SCROLL_UP) {
+	@self->HTGMLS_currentFirst --;
+    } else {
+	@self->HTGMLS_currentFirst ++;
+    }
+
+    @call self::MSG_HTGMLS_SET_ALL_MONIKER();
+
+    if(@self->HTGMLS_currentFirst) 
+        @send @self->HTGMLS_up::MSG_GEN_SET_USABLE(VUM_DELAYED_VIA_APP_QUEUE);
+    else 
+        @send @self->HTGMLS_up::MSG_GEN_SET_NOT_USABLE(VUM_DELAYED_VIA_APP_QUEUE);
+
+    MemLock(@self->HTGMLS_optionsHandle);
+	
+    if( ChunkArrayGetCountHandles(@self->HTGMLS_optionsHandle,
+		@self->HTGMLS_optionsChunk) - @self->HTGMLS_currentFirst 
+		> @self->HTGMLS_size)
+    	@send @self->HTGMLS_down::MSG_GEN_SET_USABLE(VUM_DELAYED_VIA_APP_QUEUE);
+    else
+    	@send @self->HTGMLS_down::MSG_GEN_SET_NOT_USABLE(VUM_DELAYED_VIA_APP_QUEUE);
+
+}	/* End of MSG_HTGMLS_SCROLL_UP.	*/
+
+
+
+/***********************************************************************
+ *		MSG_HTGMLS_CHANGE_SELECT for HTGenMultiLineSelectClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    
+ * PARAMETERS:	    optr item
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	mzhu	10/25/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method HTGenMultiLineSelectClass, MSG_HTGMLS_CHANGE_SELECT
+{
+    word count, i, size, current;
+    optr *tmp;
+    OptionStruct *option;
+
+    MemLock(@self->HTGMLS_optionsHandle);
+
+    count = ChunkArrayGetCountHandles(@self->HTGMLS_optionsHandle,
+		@self->HTGMLS_optionsChunk);
+
+    if(@self->HTGMLS_exclusive) {
+	for(i=0; i<@self->HTGMLS_size; i++) {
+	    tmp = ChunkArrayElementToPtrHandles(@self->HTGMLS_optionsHandle,
+			@self->HTGMLS_itemChunk, i, &size);
+	    if(*tmp != item) {
+		if (@call (*tmp)::MSG_HTOO_GET_SEL()) {
+		    @call (*tmp)::MSG_HTOO_SET_SEL(FALSE);
+		    @send (*tmp)::MSG_VIS_INVALIDATE();
+	 	}
+	    } else
+		current = i;
+	}
+
+	current = @self->HTGMLS_size - current - 1 
+			+ @self->HTGMLS_currentFirst;
+
+	for(i=0; i<count; i++) {
+	    option = ChunkArrayElementToPtrHandles(
+			@self->HTGMLS_optionsHandle,
+			@self->HTGMLS_optionsChunk, i, &size);
+	    if(i == current) 
+		option->OS_selected = !option->OS_selected;
+	    else if(option->OS_selected) 
+		option->OS_selected = FALSE;
+	}		
+
+    } else {
+
+	for(i=0; i<@self->HTGMLS_size; i++) {
+	    tmp = ChunkArrayElementToPtrHandles(@self->HTGMLS_optionsHandle,
+			@self->HTGMLS_itemChunk, i, &size);
+	    if(*tmp == item) current = i;
+	}
+
+	current = @self->HTGMLS_size - current - 1 
+			+ @self->HTGMLS_currentFirst;
+
+	for(i=0; i<count; i++) {
+	    option = ChunkArrayElementToPtrHandles(
+			@self->HTGMLS_optionsHandle,
+			@self->HTGMLS_optionsChunk, i, &size);
+	    if(i == current) 
+		option->OS_selected = !option->OS_selected;
+	}		
+    }
+
+    MemUnlock(@self->HTGMLS_optionsHandle);
+
+}	/* End of MSG_HTGMLS_CHANGE_SELECT.	*/
+
+
+
+/***********************************************************************
+ *		MSG_HTGMLS_SUBMIT for HTGenMultiLineSelectClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    
+ * PARAMETERS:	    HTListHandle query
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	mzhu	10/25/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method HTGenMultiLineSelectClass, MSG_HTGMLS_SUBMIT
+{
+    char *cptr, *name;
+    word count, i, size;
+    OptionStruct *option;
+    HTMemHandle htmh;
+
+    if(!@self->HTGMLS_name) return;
+
+    name = LMemDerefHandles(OptrToHandle(oself), @self->HTGMLS_name);
+
+    MemLock(@self->HTGMLS_optionsHandle);
+
+    count = ChunkArrayGetCountHandles(@self->HTGMLS_optionsHandle,
+				@self->HTGMLS_optionsChunk);
+	
+    for(i=0; i<count; i++) {
+	option = ChunkArrayElementToPtrHandles(
+			@self->HTGMLS_optionsHandle,
+			@self->HTGMLS_optionsChunk, i, &size);
+ 	if(option->OS_selected) {
+	    cptr = (char *)option + option->OS_valueOffset;
+	    htmh = HTStrAllocCopy(name);
+	    HTListAppend(query, &htmh, sizeof(HTMemHandle));
+	    htmh = HTStrAllocCopy(cptr);
+	    HTListAppend(query, &htmh, sizeof(HTMemHandle));
+	}
+    }
+
+    MemUnlock(@self->HTGMLS_optionsHandle);
+
+  return;
+}	/* End of MSG_HTGMLS_SUBMIT.	*/
+
+
+
+/***********************************************************************
+ *		MSG_GEN_RESET for HTGenMultiLineSelectClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    
+ * PARAMETERS:	    
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	mzhu	10/26/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method HTGenMultiLineSelectClass, MSG_GEN_RESET
+{
+    word count, i, size;
+    OptionStruct *option;
+
+    MemLock(@self->HTGMLS_optionsHandle);
+
+    count = ChunkArrayGetCountHandles(@self->HTGMLS_optionsHandle,
+				@self->HTGMLS_optionsChunk);
+	
+    for(i=0; i<count; i++) {
+	option = ChunkArrayElementToPtrHandles(
+			@self->HTGMLS_optionsHandle,
+			@self->HTGMLS_optionsChunk, i, &size);
+	option->OS_selected = option->OS_default;
+    }
+
+    MemUnlock(@self->HTGMLS_optionsHandle);
+
+    @self->HTGMLS_currentFirst = 0;
+    @send self::MSG_HTGMLS_SET_ALL_MONIKER();
+
+    if(@self->HTGMLS_down && @self->HTGMLS_up) {
+    	@send @self->HTGMLS_up::MSG_GEN_SET_NOT_USABLE(VUM_DELAYED_VIA_APP_QUEUE);
+    	@send @self->HTGMLS_down::MSG_GEN_SET_USABLE(VUM_DELAYED_VIA_APP_QUEUE);
+    }
+
+    return;
+}	/* End of MSG_GEN_RESET.	*/
+
+
+
+/***********************************************************************
+ *		MSG_META_UIG_CALC_POSITION for HTGenMultiLineSelectClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    
+ * PARAMETERS:	    
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	edwin	11/24/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method HTGenMultiLineSelectClass, MSG_META_UIG_CALC_POSITION
+{
+  int row;
+  SizeAsDWord size = @call self::MSG_VIS_GET_SIZE();
+  /*
+   *  Get an estimate position of the object
+   */
+  pself->HTGMLS_xPos = UpdateItsPotentialPosition(oself, size, &row);
+  pself->HTGMLS_pageRow = row;
+}	/* End of MSG_META_UIG_CALC_POSITION.	*/
+
+
+
+/***********************************************************************
+ *		MSG_VIS_POSITION_BRANCH for HTGenMultiLineSelectClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    
+ * PARAMETERS:	    
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	edwin	11/24/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method HTGenMultiLineSelectClass, MSG_VIS_POSITION_BRANCH
+{
+  XYValueAsDWord xy = @call @genParent::MSG_VIS_GET_POSITION();
+
+  xOrigin = DWORD_X(xy) + pself->HTGMLS_xPos;
+  yOrigin = DWORD_Y(xy)+GetItsPotentialHeight(oself, pself->HTGMLS_pageRow);
+
+  @callsuper();
+  return;
+}	/* End of MSG_VIS_POSITION_BRANCH.	*/
+
+
+
+/***********************************************************************
+ *		MSG_META_START_SELECT for HTOtherOptionClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    
+ * PARAMETERS:	    
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	mzhu	10/25/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method HTOtherOptionClass, MSG_META_START_SELECT
+{
+    @send (@self->HTOO_multiLine)::MSG_HTGMLS_CHANGE_SELECT(oself);
+    @self->HTOO_selected = !@self->HTOO_selected;
+
+    @send self::MSG_VIS_INVALIDATE();
+    @callsuper();
+}	/* End of MSG_META_START_SELECT.	*/
+
+
+
+/***********************************************************************
+ *		MSG_HTOO_SET_ML for HTOtherOptionClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    
+ * PARAMETERS:	    optr ml
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	mzhu	10/25/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method HTOtherOptionClass, MSG_HTOO_SET_ML
+{
+    @self->HTOO_multiLine = ml;
+}	/* End of MSG_HTOO_ML.	*/
+
+
+
+/***********************************************************************
+ *		MSG_HTOO_SET_SEL for HTOtherOptionClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    
+ * PARAMETERS:	    Boolean sel
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	mzhu	10/25/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method HTOtherOptionClass, MSG_HTOO_SET_SEL
+{
+    @self->HTOO_selected = sel;
+
+}	/* End of MSG_HTOO_SET_SEL.	*/
+
+@method HTOtherOptionClass, MSG_HTOO_GET_SEL
+{
+    return @self->HTOO_selected;
+
+}	/* End of MSG_HTOO_GET_SEL.	*/
+
+
+/***********************************************************************
+ *		MSG_VIS_DRAW for HTOtherOptionClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    
+ * PARAMETERS:	    
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	mzhu	10/25/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method HTOtherOptionClass, MSG_VIS_DRAW
+{
+    BackgroundColors bkgColors;
+
+/*
+    Rectangle bounds;
+
+    if(@self->HTOO_selected) {
+    	@call self::MSG_VIS_GET_BOUNDS(&bounds);
+	GrSaveState(gstate);
+        GrSetAreaColor(gstate, CF_INDEX, C_DARK_GRAY, 0, 0);  
+	GrSetMixMode(gstate, MM_XOR);
+        GrFillRect(gstate, bounds.R_left, bounds.R_top,
+			bounds.R_right, bounds.R_bottom);
+  	GrRestoreState(gstate);
+    }
+*/
+    if(@self->HTOO_selected) {
+     	bkgColors.BC_unselectedColor1 = C_DARK_GRAY;
+    	bkgColors.BC_unselectedColor2 = C_DARK_GRAY;
+    	bkgColors.BC_selectedColor1 = C_DARK_GRAY;
+    	bkgColors.BC_selectedColor2 = C_DARK_GRAY;
+
+    } else {
+        bkgColors.BC_unselectedColor1 = C_LIGHT_GRAY;
+        bkgColors.BC_unselectedColor2 = C_LIGHT_GRAY;
+    	bkgColors.BC_selectedColor1 = C_LIGHT_GRAY;
+    	bkgColors.BC_selectedColor2 = C_LIGHT_GRAY;
+    }
+
+    @call self::MSG_META_ADD_VAR_DATA
+		(HINT_GADGET_BACKGROUND_COLORS, sizeof(BackgroundColors), 
+		 &bkgColors); 
+
+    @callsuper();
+
+}	/* End of MSG_VIS_DRAW.	*/
+
+
+
+/***********************************************************************
+ *		AddInputToForm
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Add the input object to the linked list under the form.
+ * CALLED BY:	(optr form, optr inputObj)
+ * RETURN:	void 
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	edwin	1/ 9/97   	Initial Revision
+ *
+ ***********************************************************************/
+void
+AddInputToForm (optr form, optr inputObj)
+{
+  while(!@call form::MSG_META_IS_OBJECT_IN_CLASS(&HTGenFormClass)) {
+    form = @call form::MSG_GEN_FIND_PARENT();
+    if (@call form::MSG_META_IS_OBJECT_IN_CLASS(&PresentationManagerClass)){
+      EC_WARNING(UIG_INVALID_OPERATION);
+      return;
+    }
+  }
+  @send inputObj::MSG_GEN_ITEM_GROUP_SET_DESTINATION(form);
+  @call form::MSG_GEN_FORM_ADD_INPUT(inputObj);
+  return;
+}	/* End of AddInputToForm.	*/
+
+/***********************************************************************
+ *		FormGeneratorNameValuePairs
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Generate Name/Value pair for each form items.
+ * CALLED BY:	
+ * RETURN:	none
+ *	
+ * STRATEGY:	
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	edwin   	2/26/97   	Initial Revision
+ *	
+ ***********************************************************************/
+void
+FormGeneratorNameValuePairs (optr object, HTListHandle query)
+{
+  optr child;
+  int i, cnt;
+  ClassStruct *class;
+
+  if ((cnt = @call object::MSG_GEN_COUNT_CHILDREN()) == 0)
+    return;
+
+  for (i = 0; i < cnt; i++) {
+    child = @call object::MSG_GEN_FIND_CHILD_AT_POSITION(i);
+    class = @call child::MSG_META_GET_CLASS();
+    if (class == (ClassStruct *)&HTGenFormTextClass)
+      @call child::MSG_GEN_FORM_TEXT_SUBMIT(query);
+/*    else if (class == (ClassStruct *)&HTTextAreaClass)
+      @call child::MSG_HTTA_SUBMIT(query);
+*/
+    else if (class == (ClassStruct *)&HTGenFormHiddenClass)
+      @call child::MSG_GEN_FORM_HIDDEN_SUBMIT(query);
+    else if (class == (ClassStruct *)&HTGenFormTriggerClass)
+      @call child::MSG_GEN_FORM_TRIGGER_SUBMIT(query);
+    else if (class == (ClassStruct *)&HTGenOuterSelectClass) {
+      /* HTGenSelect is the child of HTGenOuterSelect */
+      child = @call child::MSG_GEN_FIND_CHILD_AT_POSITION(0);
+      @call child::MSG_GEN_SELECT_SUBMIT(query);
+    }
+    else if (class == (ClassStruct *)&HTGenMultiLineSelectClass)
+      @call child::MSG_HTGMLS_SUBMIT(query);
+    else if (class == (ClassStruct *)&HTGenInputClass)
+      @call child::MSG_GEN_INPUT_SUBMIT(query);
+    else if (class == (ClassStruct *)&HTGenTextClass)
+      	;
+    else if (@call child::MSG_GEN_COUNT_CHILDREN() > 0) {
+      FormGeneratorNameValuePairs(child, query);
+    }
+  }
+  return;
+}	/* End of FormGeneratorNameValuePairs.	*/

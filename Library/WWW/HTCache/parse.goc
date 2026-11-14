@@ -1,0 +1,160 @@
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Geoworks 1997.  All rights reserved.
+	GEOWORKS CONFIDENTIAL
+
+PROJECT:	Geos WWW Library
+MODULE:		HTCache
+FILE:		parse.goc
+
+AUTHOR:		Kok Kin Kee, Nov 15, 1997
+
+ROUTINES:
+	Name			Description
+	----			-----------
+
+REVISION HISTORY:
+	Name		Date		Description
+	----		----		-----------
+	kkee    	11/15/97   	Initial version.
+
+DESCRIPTION:
+
+	Parse, scan, and write index files.
+
+	$Id: parse.goc,v 1.1.2.1 97/11/18 22:40:23 kkee Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+@include <stdapp.goh>
+@include <WWW/htcache.goh>
+@include <WWW/HTCore/htutils.goh>
+@include <WWW/HTCore/htstring.goh>
+#include <Ansi/string.h>
+#include <Ansi/stdio.h>
+#include <Ansi/stdlib.h>
+@include "cache.goh"
+
+
+/***********************************************************************
+ *		ScanToken
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Scans for the next token. Modifies pass in p to advance
+ *              pointer to next token.
+ * CALLED BY:	ParseIndex.
+ * RETURN:	Token or NULL if no more tokens.
+ *	
+ * STRATEGY:	Tokens are separated by a whitespace.
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	kkee    	11/16/97   	Initial Revision
+ *	
+ ***********************************************************************/
+static char * _pascal
+ScanToken (char **pp)
+{
+    char *p = *pp, *f = *pp, *ret = 0;
+
+    /* Token is ended by \t or \n */
+    while (*p && (*p != '\t') && (*p != '\n')) {
+	p++;
+    }
+    if (f != p) {
+	*p++ = 0;
+	ret = f;
+    }
+
+    /* Skip trailing white spaces */
+    while (*p && (*p != '\n') && ISWHITE(*p)) {
+	p++;
+    }
+
+    *pp = p;
+    return ret;
+}	/* End of ScanToken.	*/
+
+
+/***********************************************************************
+ *		ParseIndex
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Parse index into htCacheHashTable. Modifies contents of p.
+ * CALLED BY:	HTCacheInit
+ * RETURN:	TRUE if ok, else index corrupted.
+ *	
+ * STRATEGY:	
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	kkee    	11/15/97   	Initial Revision
+ *	
+ ***********************************************************************/
+Boolean _pascal
+ParseIndex (char *p)
+{
+    FileHandle fp;
+    Boolean ret = TRUE;
+    char *t, *r;
+    HTCacheItem cache;
+    dword largest;
+
+    while (*p && ISWHITE(*p)) p++;  /* Skip all initial whitespaces */
+
+    do {
+	HTCacheInitItem(0, &cache, 0, HTCACHE_INTERSESSION);
+
+	/* URL is not optional */
+	t = ScanToken(&p);
+	if (!t) {
+	    break;
+	}
+	cache.HTCI_url = HTStrAllocCopyWID(HTMID_HTCACHE, t);
+
+	/* Filename is not optional */
+	t = ScanToken(&p);
+	if (!t || (strlen(t) > 12)) {
+	    HTCacheDeleteItem(&cache);
+	    ret = FALSE;
+	    break;
+	}
+	strcpy(cache.HTCI_filename, t);
+
+	/* Save the largest filenumber and increment from there */
+	r = strchr(t, '.');
+	if (r) {
+	    *r = 0;  /* Null-terminate */
+	}
+	UtilAsciiToHex32(t, (sdword*)&largest);
+	if ((word)largest > fileNumber) {
+	    fileNumber = (word)largest;
+	}
+
+	/* Expiration is optional */
+	t = ScanToken(&p);
+	if (t) {
+	    cache.HTCI_expires = HTStrAllocCopyWID(HTMID_HTCACHE, t);
+	}
+
+	/* Add the cache file size to totalSize */
+	/* This is lame, I have to open the file to get its size !*/
+	if ((fp = FileOpen(cache.HTCI_filename, 
+			   FILE_DENY_RW | FILE_ACCESS_R)) != NULL) {
+		
+	    cache.HTCI_filesize = FileSize(fp);
+	    totalSize += cache.HTCI_filesize;
+	    FileClose(fp, FALSE);
+
+	    HTCacheAppendItem(&cache);
+
+	} else {
+	    HTCacheDeleteItem(&cache);
+	}
+
+    } while (1);
+
+    return TRUE;
+}	/* End of ParseIndex.	*/

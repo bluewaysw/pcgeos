@@ -1,0 +1,1054 @@
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Geoworks 1996.  All rights reserved.
+	GEOWORKS CONFIDENTIAL
+
+PROJECT:	
+MODULE:		
+FILE:		isApp.goc
+
+AUTHOR:		Mingzhe Zhu, Oct 29, 1996
+
+ROUTINES:
+	Name			Description
+	----			-----------
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	mzhu	10/29/96   	Initial version.
+
+DESCRIPTION:
+
+	The file has the code for InfoServ application object.
+
+	$Id: bApp.goc,v 1.1 97/04/04 17:20:35 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+@include <bConst.goh>
+@include <bUI.goh>
+@include <WWW/htcore.goh>
+#include <initfile.h>
+@include "reqList.goh"
+
+@classdecl	ISAppClass;
+@classdecl      ISPresentationManagerClass;
+extern void 	ISSetWindowMoniker(char *title, char *url);
+extern SReqList sRequestList;
+extern Boolean  IsBusy;
+
+void ECCheckHistoryList(MemHandle mh, ChunkHandle ch);
+
+/***********************************************************************
+ *		MSG_META_ATTACH for ISAppClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    
+ * PARAMETERS:	    
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	mzhu	10/26/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method ISAppClass, MSG_META_ATTACH_OBJECT
+{
+    @self->ISAC_historySize = 0;
+
+    /* Creates a local memory heap to store history list. */
+    @self->ISAC_historyHandle = MemAllocLMem(LMEM_TYPE_GENERAL,
+					sizeof(LMemBlockHeader));
+    MemLock(@self->ISAC_historyHandle);
+
+    /* Creates a chunk array in the block. */
+    @self->ISAC_historyChunk = 
+		ChunkArrayCreate(@self->ISAC_historyHandle,
+		0, sizeof(ChunkArrayHeader), 0);
+
+    MemUnlock(@self->ISAC_historyHandle);
+
+    @callsuper();
+}	/* End of MSG_META_ATTACH.	*/
+
+@method ISAppClass, MSG_META_DETACH
+{
+    if(@self->ISAC_historyHandle) {
+	MemFree(@self->ISAC_historyHandle);
+    	@self->ISAC_historyHandle = NullHandle;
+    	@self->ISAC_historySize = 0;
+    }
+
+    @callsuper();
+}	/* End of MSG_META_ATTACH.	*/
+
+
+
+/***********************************************************************
+ *		MSG_ISA_GET_HISTORY_HANDLE for ISAppClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    
+ * PARAMETERS:	    
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	mzhu	11/ 4/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method ISAppClass, MSG_ISA_GET_HISTORY_HANDLE
+{
+EC( ECCheckHistoryList(@self->ISAC_historyHandle, @self->ISAC_historyChunk);	)
+    return @self->ISAC_historyHandle;
+}	/* End of MSG_ISA_GET_HISTORY_HANDLE.	*/
+
+
+
+/***********************************************************************
+ *		MSG_ISA_ADD_TO_HISTORY for ISAppClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    Everytime to open a url, this routine adds the url to 
+ *			or moves the url in the history list based on if
+ *			this url already exists there. Also this routine
+ *			maintains the history list to keep it no longer
+ *			than 20 (as Spec). 
+ * PARAMETERS:	    MemHandle tit_url
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:	The history list is a chunck array. Every element is a
+ *		chunk with the data of url and title.
+ *
+ *		When a url already exists in the history list, just moves
+ *		it to the top. 
+ *		When the history list is at the maximum size (20), uses
+ *		FIFO to remove the oldest one.
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	mzhu	9/13/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method ISAppClass, MSG_ISA_ADD_TO_HISTORY
+{
+    ISHistoryStruct *history, *tmp_history;
+    char	*title, *url, *tmp_url;
+    word 	i, size;
+
+    if(tit_url == NullHandle) return;
+
+EC( ECCheckHistoryList(@self->ISAC_historyHandle, @self->ISAC_historyChunk);	)
+
+    MemLock(tit_url);
+    title = MemDeref(tit_url);
+    url = title + strlen(title) + 1;
+
+    if(strlen(title) > ITEM_TEXT_LENGTH) 
+	*(title + ITEM_TEXT_LENGTH) = 0;
+
+    /* Locks the history block. */
+    MemLock(@self->ISAC_historyHandle);
+
+EC( ECCheckHistoryList(@self->ISAC_historyHandle, @self->ISAC_historyChunk);	)
+
+
+    /* Checks if this item already exists in the list.*/
+    for(i=0; i<@self->ISAC_historySize; i++) {
+	tmp_history = ChunkArrayElementToPtrHandles(@self->ISAC_historyHandle,
+						@self->ISAC_historyChunk,
+						i, &size);
+
+	tmp_url = (char *)tmp_history + tmp_history->ISHS_urlOffset;
+
+	if(!strcmp(tmp_url, url)) {	
+	    /* The item exists, moves to the latest position */
+    	    history = ChunkArrayAppendHandles(@self->ISAC_historyHandle,
+					@self->ISAC_historyChunk, size);
+	    tmp_history = ChunkArrayElementToPtrHandles
+			(@self->ISAC_historyHandle,
+			@self->ISAC_historyChunk, i, &size);
+     	    memcpy((char *)history, (char *)tmp_history, size);
+	    ChunkArrayDeleteHandle(@self->ISAC_historyChunk, tmp_history);
+    	
+	    /* Sets up the current history to it. */
+	    @self->ISAC_currentHistory = @self->ISAC_historySize;
+	
+	    MemUnlock(@self->ISAC_historyHandle);
+	    MemFree(tit_url);
+	    return;
+	}
+    }
+
+
+EC( ECCheckHistoryList(@self->ISAC_historyHandle, @self->ISAC_historyChunk);	)
+
+    /* 
+     * If the current history is on the top, just go ahead to add it,
+     * else needs to clean all the items from the current to the top.
+     */
+    if(@self->ISAC_currentHistory < @self->ISAC_historySize - 1) {
+	for(i = @self->ISAC_currentHistory + 1; i<@self->ISAC_historySize; i++){
+	    tmp_history = ChunkArrayElementToPtrHandles(
+					@self->ISAC_historyHandle,
+					@self->ISAC_historyChunk,
+					i, &size);
+	    ChunkArrayDeleteHandle(@self->ISAC_historyChunk, tmp_history);
+	}
+    }
+
+
+
+EC( ECCheckHistoryList(@self->ISAC_historyHandle, @self->ISAC_historyChunk);	)
+
+    /* checks if there are too many history items */
+    if(@self->ISAC_historySize >= MAX_HISTORY) {
+	/* Deletes the 0 item, which is the oldest one. */
+	tmp_history = ChunkArrayElementToPtrHandles(@self->ISAC_historyHandle,
+						@self->ISAC_historyChunk,
+						0, &size);
+	ChunkArrayDeleteHandle(@self->ISAC_historyChunk, tmp_history);
+    }
+
+
+EC( ECCheckHistoryList(@self->ISAC_historyHandle, @self->ISAC_historyChunk);	)
+
+    /* Locks the new chunk, and stores the url/title there. */  	
+    history = ChunkArrayAppendHandles(@self->ISAC_historyHandle,
+					@self->ISAC_historyChunk,
+					(sizeof(ISHistoryStruct) +
+					 strlen(title) + strlen(url) + 2));
+    history->ISHS_titleOffset = sizeof(ISHistoryStruct);
+    history->ISHS_urlOffset = sizeof(ISHistoryStruct) + 
+					strlen(title) + 1;
+    strcpy((char *)((char *)history + history->ISHS_titleOffset), title);
+    strcpy((char *)((char *)history + history->ISHS_urlOffset), url);
+ 
+    /* Changes the history size and current history entry. */
+    @self->ISAC_historySize = ChunkArrayGetCountHandles(
+			@self->ISAC_historyHandle,
+			@self->ISAC_historyChunk);
+    @self->ISAC_currentHistory = @self->ISAC_historySize - 1;
+
+
+EC( ECCheckHistoryList(@self->ISAC_historyHandle, @self->ISAC_historyChunk);	)
+
+    MemUnlock(@self->ISAC_historyHandle);
+    MemFree(tit_url);
+}	/* End of MSG_ISA_ADD_TO_HISTORY.	*/
+
+
+
+/***********************************************************************
+ *		MSG_ISA_GET_CURRENT_DOCUMENT for ISAppClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    To get the info of current loaded document.
+ * PARAMETERS:	    
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:		If there was one loaded before,
+ *			returns its position in the history list. 
+ *			Otherwise return GIGS_NONE;
+ *			When title or url is not NULL, fills it 
+ *			with the content.
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	mzhu	9/13/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method ISAppClass, MSG_ISA_GET_CURRENT_DOCUMENT
+{
+    ISHistoryStruct _far *history;
+    word size;
+
+
+EC( ECCheckHistoryList(@self->ISAC_historyHandle, @self->ISAC_historyChunk);	)
+
+    if(!@self->ISAC_historySize) return NULL;
+
+    /* Open the history list to get the current history item. */
+    MemLock(@self->ISAC_historyHandle);
+    history = ChunkArrayElementToPtrHandles(@self->ISAC_historyHandle,
+					@self->ISAC_historyChunk,
+					@self->ISAC_currentHistory, 
+					&size);
+    return history;
+}	/* End of MSG_ISA_GET_CURRENT_DOCUMENT.	*/
+
+
+
+/***********************************************************************
+ *		MSG_ISA_SET_CURRENT_TITLE_AND_DISPLAY for ISAppClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    
+ * PARAMETERS:	    optr titleOptr
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	mzhu	10/21/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method ISAppClass, MSG_ISA_SET_CURRENT_TITLE_AND_DISPLAY
+{
+    ISHistoryStruct *history;
+    char *url, *title;
+    word size;
+    MemHandle urlBlock = NullHandle;
+
+    if(titleOptr == NullOptr) return;
+
+
+EC( ECCheckHistoryList(@self->ISAC_historyHandle, @self->ISAC_historyChunk);	)
+
+    MemLock(OptrToHandle(titleOptr));
+    title = LMemDeref(titleOptr);
+
+    if(title == NULL) { 
+	MemUnlock(OptrToHandle(titleOptr));
+	return;
+    }
+
+    SReqListSetTitle(&sRequestList, title);
+
+    if(strlen(title) > ITEM_TEXT_LENGTH) 
+	*(title + ITEM_TEXT_LENGTH) = 0;
+
+
+EC( ECCheckHistoryList(@self->ISAC_historyHandle, @self->ISAC_historyChunk);	)
+
+    MemLock(@self->ISAC_historyHandle);
+    history = ChunkArrayElementToPtrHandles(@self->ISAC_historyHandle,
+					@self->ISAC_historyChunk,
+					@self->ISAC_currentHistory, 
+					&size);
+
+    if(!strcmp(title, (char *)((char *)history + history->ISHS_titleOffset))){
+    	MemUnlock(@self->ISAC_historyHandle);
+      	MemUnlock(OptrToHandle(titleOptr));
+	return;
+    }
+
+
+EC( ECCheckHistoryList(@self->ISAC_historyHandle, @self->ISAC_historyChunk);	)
+
+    size = strlen((char *)history + history->ISHS_urlOffset);
+    urlBlock = MemAlloc(size + 1, HF_SWAPABLE | HF_SHARABLE,
+				HAF_ZERO_INIT | HAF_LOCK);
+    url = MemDeref(urlBlock);
+    strcpy(url, ((char *)history + history->ISHS_urlOffset));
+    
+    ChunkArrayElementResizeHandles(@self->ISAC_historyHandle,
+					@self->ISAC_historyChunk,
+					@self->ISAC_currentHistory,
+					(sizeof(ISHistoryStruct) +
+					 strlen(url) + strlen(title)
+					 + 2));
+
+    history = ChunkArrayElementToPtrHandles(@self->ISAC_historyHandle,
+					@self->ISAC_historyChunk,
+					@self->ISAC_currentHistory, 
+					&size);
+
+    history->ISHS_titleOffset = sizeof(ISHistoryStruct);
+    history->ISHS_urlOffset = sizeof(ISHistoryStruct) + strlen(title) + 1;
+    strcpy((char *)((char *)history + history->ISHS_titleOffset), title);
+    url = MemDeref(urlBlock);
+    strcpy((char *)((char *)history + history->ISHS_urlOffset), url);
+
+
+EC( ECCheckHistoryList(@self->ISAC_historyHandle, @self->ISAC_historyChunk);	)
+
+    ISSetWindowMoniker(title, url);
+
+    MemUnlock(@self->ISAC_historyHandle);
+    MemUnlock(OptrToHandle(titleOptr));
+    MemFree(urlBlock);
+}	/* End of MSG_ISA_SET_CURRENT_TITLE.	*/
+
+
+
+/***********************************************************************
+ *		MSG_ISA_CAN_BACK for ISAppClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    To check if there is url history to back.
+ * PARAMETERS:	    
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:		
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	mzhu	9/13/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method ISAppClass, MSG_ISA_CAN_BACK
+{
+    if(@self->ISAC_currentHistory > 0) return TRUE;
+
+    return FALSE;
+}	/* End of MSG_ISA_CAN_BACK.	*/
+
+
+
+/***********************************************************************
+ *		MSG_ISA_CAN_FORWARD for ISAppClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    To check if there is url history to forward.
+ * PARAMETERS:	    
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	mzhu	9/13/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method ISAppClass, MSG_ISA_CAN_FORWARD
+{
+    if(@self->ISAC_currentHistory < @self->ISAC_historySize - 1) 
+	return TRUE;
+
+    return FALSE;
+
+}	/* End of MSG_ISA_CAN_FORWARD.	*/
+
+
+@method ISAppClass, MSG_ISA_HAS_DOCUMENT
+{
+    if(@self->ISAC_historySize) return TRUE;
+    return FALSE;
+}
+
+
+
+/***********************************************************************
+ *		MSG_ISA_BACK for ISAppClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    To back to the last time loaded url.
+ * PARAMETERS:	    
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:		When calling this method, there must be a url
+ *			can be back.
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	mzhu	9/15/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method ISAppClass, MSG_ISA_BACK
+{
+    ISHistoryStruct *history;
+    char title[ITEM_TEXT_LENGTH+1];
+    char  *url;
+    MemHandle urlBlock = NullHandle;
+    word size;
+
+
+EC( ECCheckHistoryList(@self->ISAC_historyHandle, @self->ISAC_historyChunk);	)
+
+    /* Just to make sure... */
+    if(@self->ISAC_currentHistory <= 0) {
+	@send ISLIBackButton::MSG_GEN_SET_NOT_ENABLED(VUM_DELAYED_VIA_APP_QUEUE);
+	return;
+    }
+
+    /* Back one the current history entry. */
+    @self->ISAC_currentHistory --;
+
+
+EC( ECCheckHistoryList(@self->ISAC_historyHandle, @self->ISAC_historyChunk);	)
+
+    /* Gets the information of the last time loaded url from its history item. */
+    MemLock(@self->ISAC_historyHandle);
+    history = ChunkArrayElementToPtrHandles(@self->ISAC_historyHandle,
+					@self->ISAC_historyChunk,
+					@self->ISAC_currentHistory, 
+					&size);
+    strcpy(title, (char *)((char *)history + history->ISHS_titleOffset));
+
+    urlBlock = MemAlloc(strlen((char *)history + history->ISHS_urlOffset)+1, 
+			HF_SWAPABLE, HAF_ZERO_INIT | HAF_LOCK);
+    url = MemDeref(urlBlock);
+  
+    history = ChunkArrayElementToPtrHandles(@self->ISAC_historyHandle,
+					@self->ISAC_historyChunk,
+					@self->ISAC_currentHistory, 
+					&size);
+    strcpy(url, (char *)((char *)history + history->ISHS_urlOffset));
+
+    MemUnlock(@self->ISAC_historyHandle);
+
+
+EC( ECCheckHistoryList(@self->ISAC_historyHandle, @self->ISAC_historyChunk);	)
+
+    /* To check if there is more to back. */
+    if(@self->ISAC_currentHistory <= 0) 
+	@send ISLIBackButton::MSG_GEN_SET_NOT_ENABLED(VUM_DELAYED_VIA_APP_QUEUE);
+
+    /* There must be one to forward later. */
+    @send ISLIForwardButton::MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_APP_QUEUE);
+
+    /* Changes the window's title. */
+    ISSetWindowMoniker(title, url);
+    MemUnlock(urlBlock);
+
+    @send process::MSG_ISP_OPEN_URL(urlBlock, NULL);
+    
+}	/* End of MSG_ISA_BACK.	*/
+
+
+
+/***********************************************************************
+ *		MSG_ISA_FORWARD for ISAppClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    To forward to the next loaded url according to the
+ *			history.
+ * PARAMETERS:	    
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	mzhu	9/15/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method ISAppClass, MSG_ISA_FORWARD
+{
+    ISHistoryStruct *history;
+    char title[ITEM_TEXT_LENGTH+1];
+    char  *url;
+    MemHandle urlBlock = NullHandle;
+    word size;
+
+    /* Makes sure no errors here. */
+    if(@self->ISAC_currentHistory >= @self->ISAC_historySize - 1) {
+	@send ISLIForwardButton::MSG_GEN_SET_NOT_ENABLED(VUM_DELAYED_VIA_APP_QUEUE);
+	return;
+    }
+  
+
+EC( ECCheckHistoryList(@self->ISAC_historyHandle, @self->ISAC_historyChunk);	)
+
+    /* Forwards the current history entry. */
+    @self->ISAC_currentHistory ++;
+
+    /* Locks and gets the data.*/
+    MemLock(@self->ISAC_historyHandle);
+    history = ChunkArrayElementToPtrHandles(@self->ISAC_historyHandle,
+					@self->ISAC_historyChunk,
+					@self->ISAC_currentHistory, 
+					&size);
+    strcpy(title, (char *)((char *)history + history->ISHS_titleOffset));
+
+    urlBlock = MemAlloc(strlen((char *)history + history->ISHS_urlOffset)+1, 
+			HF_SWAPABLE, HAF_ZERO_INIT | HAF_LOCK);
+    url = MemDeref(urlBlock);
+  
+    history = ChunkArrayElementToPtrHandles(@self->ISAC_historyHandle,
+					@self->ISAC_historyChunk,
+					@self->ISAC_currentHistory, 
+					&size);
+    strcpy(url, (char *)((char *)history + history->ISHS_urlOffset));
+
+    MemUnlock(@self->ISAC_historyHandle);
+
+
+EC( ECCheckHistoryList(@self->ISAC_historyHandle, @self->ISAC_historyChunk);	)
+
+    /* More to forward or not... */
+    if(@self->ISAC_currentHistory >= @self->ISAC_historySize - 1)
+	@send ISLIForwardButton::MSG_GEN_SET_NOT_ENABLED(VUM_DELAYED_VIA_APP_QUEUE);
+
+    /* Must be one to back. */
+    @send ISLIBackButton::MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_APP_QUEUE);
+
+    ISSetWindowMoniker(title, url);
+    MemUnlock(urlBlock);
+
+    /* open url ... */
+    @send process::MSG_ISP_OPEN_URL(urlBlock, NULL);
+ 
+}	/* End of MSG_ISA_FORWARD.	*/
+
+
+/***********************************************************************
+ *		MSG_ISA_OPEN_LOCATION for ISAppClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    Directly open a url, for Open Location Icon..
+ * PARAMETERS:	    
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	mzhu	9/15/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method ISAppClass, MSG_ISA_OPEN_LOCATION
+{
+    ISHistoryStruct *history;
+    char  *title, *url;
+    MemHandle urlBlock = NullHandle;
+    MemHandle tit_url = NullHandle;
+    word size;
+
+
+EC( ECCheckHistoryList(@self->ISAC_historyHandle, @self->ISAC_historyChunk);	)
+
+    /* Gets the current document's url. */
+    if(@self->ISAC_historySize > 0) {
+
+    	MemLock(@self->ISAC_historyHandle);
+    	history = ChunkArrayElementToPtrHandles(@self->ISAC_historyHandle,
+					@self->ISAC_historyChunk,
+					@self->ISAC_currentHistory, 
+					&size);
+        /* The initial url in the Open Location Dialog uses the current load *
+     	 * url. 								 */
+    	@call LocationField::MSG_VIS_TEXT_REPLACE_ALL_PTR(
+		(char *)((char *)history + history->ISHS_urlOffset), 0);
+
+    	MemUnlock(@self->ISAC_historyHandle);
+    }
+
+    if(UserDoDialog(@ISOpenLocationDialog) != IC_APPLY) return;
+
+    /* Get the new url.*/
+    size = @call LocationField::MSG_VIS_TEXT_GET_TEXT_SIZE();
+
+    urlBlock = MemAlloc(size + 1, HF_SWAPABLE, HAF_ZERO_INIT | HAF_LOCK);
+    url = MemDeref(urlBlock);
+    @call LocationField::MSG_VIS_TEXT_GET_ALL_PTR(url);
+
+    if(*url == 0) {	
+	MemFree(urlBlock);
+	return;
+    }
+
+    size += min(ITEM_TEXT_LENGTH, strlen(url)) + 2;
+
+    tit_url = MemAlloc(size, HF_SWAPABLE, HAF_ZERO_INIT | HAF_LOCK);
+    title = MemDeref(tit_url);
+    url = MemDeref(urlBlock);
+    size = min(ITEM_TEXT_LENGTH, strlen(url));
+    strncpy(title, url, size);
+    strcpy(title+size+1, url);
+    MemUnlock(tit_url);
+
+
+EC( ECCheckHistoryList(@self->ISAC_historyHandle, @self->ISAC_historyChunk);	)
+
+    @call self::MSG_ISA_ADD_TO_HISTORY(tit_url);
+    MemUnlock(urlBlock);
+
+    /* call www libary to load the page and get the title.  */
+    /* If this address doesn't exist or something wrong, ... */
+    @send process::MSG_ISP_OPEN_URL(urlBlock, NULL);
+    @send process::MSG_ISP_DISPLAY_DOCUMENT();
+
+}	/* End of MSG_ISA_OPEN_LOCATION.	*/
+
+
+
+/***********************************************************************
+ *		MSG_ISA_HISTORY for ISAppClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    To open the history list.
+ * PARAMETERS:	    
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	mzhu	9/15/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method ISAppClass, MSG_ISA_HISTORY
+{
+    ISHistoryStruct *history;
+    char title[ITEM_TEXT_LENGTH+1];
+    char  *url;
+    MemHandle urlBlock = NullHandle;
+    word size, select;
+
+    /* Prepares the History Dialog and its dynamic list. */
+    @call HistoryList::MSG_GEN_DYNAMIC_LIST_INITIALIZE
+				(@self->ISAC_historySize);
+    @call HistoryList::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION
+		(@self->ISAC_historySize - @self->ISAC_currentHistory - 1, 0);
+
+    if(UserDoDialog(@ISHistoryDialog) != IC_APPLY) return; 
+
+    /* Gets the selected history list. */
+    select = @call HistoryList::MSG_GEN_ITEM_GROUP_GET_SELECTION();
+
+    if(select == GIGS_NONE) return;
+
+
+EC( ECCheckHistoryList(@self->ISAC_historyHandle, @self->ISAC_historyChunk);	)
+
+    /* Checks if the selected page is the current load page. */
+    if(select == @self->ISAC_historySize - @self->ISAC_currentHistory - 1)
+ 	return;
+
+    @self->ISAC_currentHistory = @self->ISAC_historySize - select -1;
+
+    /* Gets the data about this url. */
+    MemLock(@self->ISAC_historyHandle);
+    history = ChunkArrayElementToPtrHandles(@self->ISAC_historyHandle,
+					@self->ISAC_historyChunk,
+					@self->ISAC_currentHistory, &size);
+    strcpy(title, (char *)((char *)history + history->ISHS_titleOffset));
+
+    urlBlock = MemAlloc(strlen((char *)history + history->ISHS_urlOffset) + 1, 
+		HF_SWAPABLE, HAF_ZERO_INIT | HAF_LOCK);
+    url = MemDeref(urlBlock);
+
+    strcpy(url, (char *)((char *)history + history->ISHS_urlOffset));
+    MemUnlock(urlBlock);
+
+    MemUnlock(@self->ISAC_historyHandle);
+
+
+EC( ECCheckHistoryList(@self->ISAC_historyHandle, @self->ISAC_historyChunk);	)
+
+    /* Tells the process to display document. */
+    @send process::MSG_ISP_OPEN_URL(urlBlock, NULL);
+    @send process::MSG_ISP_DISPLAY_DOCUMENT();
+
+    /* Sets the back/forward icons as need. */
+    if(@self->ISAC_currentHistory > 0) 
+	@send ISLIBackButton::MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_APP_QUEUE);
+    else 
+	@send ISLIBackButton::MSG_GEN_SET_NOT_ENABLED(VUM_DELAYED_VIA_APP_QUEUE);
+
+    if(@self->ISAC_currentHistory < @self->ISAC_historySize - 1)
+	@send ISLIForwardButton::MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_APP_QUEUE);
+    else
+	@send ISLIForwardButton::MSG_GEN_SET_NOT_ENABLED(VUM_DELAYED_VIA_APP_QUEUE);
+}	/* End of MSG_ISA_HISTORY.	*/
+
+
+
+/***********************************************************************
+ *		MSG_ISA_HISTORY_LIST_MONIKER_QUERY for ISAppClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    The moniker query message for the dynamic list in 
+ *			the History Dialog.
+ * PARAMETERS:	    void (optr list, word item)
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:		The list uses the reverse order to display the
+ *			history items. The latest one is on the top.
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	mzhu	9/15/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method ISAppClass, MSG_ISA_HISTORY_LIST_MONIKER_QUERY
+{
+    ISHistoryStruct *history;
+    char *title;
+    word size;
+
+
+EC( ECCheckHistoryList(@self->ISAC_historyHandle, @self->ISAC_historyChunk);	)
+
+    MemLock(@self->ISAC_historyHandle);
+    history = ChunkArrayElementToPtrHandles(@self->ISAC_historyHandle,
+					@self->ISAC_historyChunk,
+					@self->ISAC_historySize - item - 1, 
+					&size);
+    title = (char *)history + history->ISHS_titleOffset;
+
+    @call list::MSG_GEN_DYNAMIC_LIST_REPLACE_ITEM_TEXT(item, title);
+
+    MemUnlock(@self->ISAC_historyHandle);
+}	/* End of MSG_ISA_HISTORY_LIST_MONIKER_QUERY.	*/
+
+
+/***********************************************************************
+ *		MSG_ISA_DOCUMENT_INFORMATION for ISAppClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    To display the load page's data.
+ * PARAMETERS:	    
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:		The data is title, url, and modified date.
+ *			The data should be get from the www library.
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	mzhu	9/16/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method ISAppClass, MSG_ISA_DOCUMENT_INFORMATION
+{
+    ISHistoryStruct *history;
+    char *title, *url;
+    word size;
+
+    if(@self->ISAC_historySize <= 0) return;
+
+    MemLock(@self->ISAC_historyHandle);
+    history = ChunkArrayElementToPtrHandles(@self->ISAC_historyHandle,
+					@self->ISAC_historyChunk,
+					@self->ISAC_currentHistory, 
+					&size);
+
+    title = (char *)history + history->ISHS_titleOffset;
+    url = (char *)history + history->ISHS_urlOffset;
+
+    @call DITitleText::MSG_VIS_TEXT_REPLACE_ALL_PTR(title,0);
+    @call DILocationText::MSG_VIS_TEXT_REPLACE_ALL_PTR(url,0);
+    @call DIModifiedText::MSG_VIS_TEXT_REPLACE_ALL_PTR
+			("Not Available",0);
+ 
+    UserDoDialog(@ISDocuInfoDialog);
+
+    MemUnlock(@self->ISAC_historyHandle);
+
+EC( ECCheckHistoryList(@self->ISAC_historyHandle, @self->ISAC_historyChunk);	)
+
+}	/* End of MSG_ISA_DOCUMENT_INFORMATION.	*/
+
+
+
+/***********************************************************************
+ *		MSG_META_START_SELECT for ISAppClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    
+ * PARAMETERS:	    
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	edwin	10/17/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method ISPresentationManagerClass, MSG_META_START_SELECT
+{
+    char *cptr, *url, *relatedName, *aName;
+    MemHandle urlBlock = NullHandle;
+    MemHandle tit_url = NullHandle;
+    MemHandle dataHandle = NullHandle;
+    ChunkHandle relatedChunk = NullChunk;
+    ChunkHandle aNameChunk = NullChunk;
+    int i, count = 0, size;
+    ISHistoryStruct _far *cur_history;
+    HTMemHandle htmh;
+
+    @callsuper();
+
+    if(IsBusy) return;
+
+    if (pself->PM_linkUnderMouse) {
+
+	dataHandle = MemAllocLMem(LMEM_TYPE_GENERAL, sizeof(LMemBlockHeader));
+	MemLock(dataHandle);
+     	aName = (char *)MemLock(@self->PM_linkUnderMouse);
+
+	htmh = HTParseURI(aName, NULL, HTURI_PARSE_ALL);
+ 	if(htmh) {
+	    HTMemLock(htmh);
+	    cptr = (char *)HTMemDeref(htmh);
+	    aNameChunk = LMemAlloc(dataHandle, strlen(cptr) + 1);
+	    aName = LMemDerefHandles(dataHandle, aNameChunk);
+	    strcpy(aName, cptr);
+ 	    HTMemFree(htmh);
+ 	}
+
+    	if(@self->PM_base != NULL) {
+	    relatedName = LMemDerefHandles(OptrToHandle(oself), @self->PM_base);
+	    htmh = HTParseURI(relatedName, NULL, HTURI_PARSE_ALL);
+ 	    if(htmh) {
+	        HTMemLock(htmh);
+	        cptr = (char *)HTMemDeref(htmh);
+	        relatedChunk = LMemAlloc(dataHandle, strlen(cptr) + 1);
+	    	relatedName = LMemDerefHandles(dataHandle, relatedChunk);
+	        strcpy(relatedName, cptr);
+ 	        HTMemFree(htmh);
+	    }
+	    relatedName = LMemDerefHandles(dataHandle, relatedChunk);
+    	} else {
+	    cur_history = @call application::MSG_ISA_GET_CURRENT_DOCUMENT();
+	    if(cur_history) {
+  	        relatedName = (char *)cur_history + cur_history->ISHS_urlOffset;
+	        htmh = HTParseURI(relatedName, NULL, HTURI_PARSE_ALL);
+ 	        if(htmh) {
+	            HTMemLock(htmh);
+	            cptr = (char *)HTMemDeref(htmh);
+	            relatedChunk = LMemAlloc(dataHandle, strlen(cptr) + 1);
+	    	    relatedName = LMemDerefHandles(dataHandle, relatedChunk);
+	            strcpy(relatedName, cptr);
+ 	            HTMemFree(htmh);
+		}
+    	    	MemUnlock(@call application::MSG_ISA_GET_HISTORY_HANDLE());
+		relatedName = LMemDerefHandles(dataHandle, relatedChunk);
+	    }
+	}
+
+	aName = LMemDerefHandles(dataHandle, aNameChunk);
+	htmh = HTParseURI(aName, relatedName, HTURI_PARSE_ALL);
+	if(htmh) {
+	    HTMemLock(htmh);
+	    cptr = (char *)HTMemDeref(htmh);
+	    urlBlock = MemAlloc(strlen(cptr) + 1, 
+			HF_SWAPABLE | HF_SHARABLE, HAF_ZERO_INIT | HAF_LOCK);
+	    url = MemDeref(urlBlock);
+	    strcpy(url, cptr);
+	    HTMemFree(htmh);
+	}
+
+	MemFree(dataHandle);
+
+        url = HTSimplifyURI(&url);
+
+	tit_url = MemAlloc(strlen(url) + min(strlen(url), ITEM_TEXT_LENGTH) + 2, 
+			HF_SWAPABLE | HF_SHARABLE, HAF_ZERO_INIT | HAF_LOCK);
+	cptr = MemDeref(tit_url);
+	url = MemDeref(urlBlock);
+  	strncpy(cptr, url, min(strlen(url), ITEM_TEXT_LENGTH));
+	strcpy(cptr + strlen(cptr) + 1, url);
+	MemUnlock(urlBlock);
+	MemUnlock(tit_url);
+	
+   	@send process::MSG_ISP_OPEN_URL(urlBlock, NULL);
+	@send application::MSG_ISA_ADD_TO_HISTORY(tit_url);
+    	@send ISLIBackButton::MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_APP_QUEUE);
+
+    	MemUnlock(pself->PM_linkUnderMouse);
+
+    } else if (pself->PM_query) {
+	count = HTListGetCount(@self->PM_query);
+	size = HTListGetItemSize(@self->PM_query, 0);
+	size += 1;
+
+	for(i=2; i<count; i ++) 
+	    size += HTListGetItemSize(@self->PM_query, i) + 1;
+
+	urlBlock = MemAlloc(size + 1, 
+			HF_SWAPABLE | HF_SHARABLE, HAF_ZERO_INIT | HAF_LOCK);
+	url = MemDeref(urlBlock);
+
+	size = HTListGetItemSize(@self->PM_query, 0);
+	HTListGetItem(@self->PM_query, 0, url, size);
+	strcat(url, "?");
+
+	for(i=2; i<count; i += 2) {
+	    size = HTListGetItemSize(@self->PM_query, i);
+	    HTListGetItem(@self->PM_query, i, (url+strlen(url)), size);
+	    strcat(url, "=");
+
+	    size = HTListGetItemSize(@self->PM_query, i+1);
+	    HTListGetItem(@self->PM_query, i+1, (url+strlen(url)), size);
+	    strcat(url, "&");
+	}
+
+	*(url + strlen(url) - 1) = 0;
+	
+	tit_url = MemAlloc(strlen(url) + min(strlen(url), ITEM_TEXT_LENGTH) + 2, 
+			HF_SWAPABLE | HF_SHARABLE, HAF_ZERO_INIT | HAF_LOCK);
+	cptr = MemDeref(tit_url);
+ 	url = MemDeref(urlBlock);
+  	strncpy(cptr, url, min(strlen(url), ITEM_TEXT_LENGTH));
+	strcpy(cptr + strlen(cptr) + 1, url);
+	MemUnlock(tit_url);
+	MemUnlock(urlBlock);
+
+   	@send process::MSG_ISP_OPEN_URL(urlBlock, NULL);
+	@call application::MSG_ISA_ADD_TO_HISTORY(tit_url);
+    	@send ISLIBackButton::MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_APP_QUEUE);
+	
+      	HTListDelete(pself->PM_query);
+      	pself->PM_query=NULL;
+    }
+
+    return;
+}	/* End of MSG_META_START_SELECT.	*/
+
+
+
+/***********************************************************************
+ *		ECCheckHistoryList
+ ***********************************************************************
+ *
+ * SYNOPSIS:	
+ * CALLED BY:	
+ * RETURN:	
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	mzhu	11/ 8/96   	Initial Revision
+ *
+ ***********************************************************************/
+void
+ECCheckHistoryList (MemHandle mh, ChunkHandle ch)
+{
+    ISHistoryStruct *history;
+    word size, i, count;
+    char *title, *url;
+
+    ECCheckMemHandle(mh);
+/*    ECCheckChunkArray(ch); */
+
+    MemLock(mh);
+    count = ChunkArrayGetCountHandles(mh, ch);
+
+    for(i=0; i<count; i++){
+	history = ChunkArrayElementToPtrHandles(mh, ch,	i, &size);
+	title = (char *)history + history->ISHS_titleOffset;
+	url = (char *)history + history->ISHS_urlOffset;
+
+ 	EC_ERROR_IF( size != sizeof(ISHistoryStruct) + 
+				strlen(title) + strlen(url) + 2, 0);
+    }
+
+    MemUnlock(mh);
+}	/* End of ECCheckHistoryList.	*/
+

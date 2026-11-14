@@ -1,0 +1,159 @@
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Geoworks 1997.  All rights reserved.
+	GEOWORKS CONFIDENTIAL
+
+PROJECT:	Geos WWW Library
+MODULE:		mimehdrx
+FILE:		mimehdrx.goc
+
+AUTHOR:		Kok Kin Kee, May 19, 1997
+
+ROUTINES:
+	Name			Description
+	----			-----------
+
+REVISION HISTORY:
+	Name		Date		Description
+	----		----		-----------
+	kkee    	5/19/97   	Initial version.
+
+DESCRIPTION:
+
+	MIME header extension parser.
+
+	$Id: mimehdrx.goc,v 1.1.5.1 97/09/05 10:52:41 jeremyb Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+@include <stdapp.goh>
+
+#include <WWW/htmem.h>
+#include <Ansi/string.h>                 /* strcpy, strlen */
+#include <Ansi/stdio.h>                  /* sprintf */
+@include <WWW/HTCore/htuu.goh>			 /* Base64 */
+@include <WWW/HTCore/htqp.goh>			 /* Quoted-printable */
+@include <WWW/HTCore/htutils.goh>
+
+@include "htfatals.goh"
+
+
+/* ---------------------------------------------------------------------
+ * 		PRIVATE DATA
+ * ---------------------------------------------------------------------*/
+
+
+/***********************************************************************
+ *		DecodeWord
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Decode an encoded-word as per RFC2047. outbuf must be 
+ *              at least be (end-start) in length. Currently, we only
+ *              recognize Q and B encodings as these are the only two
+ *              specified in RFC2047.
+ *              The starting "=?" and ending "?=" have been stripped.
+ * CALLED BY:	DecodeMIMEMsgHdrX
+ * RETURN:	    Number of bytes written to outbuf. Outbuf is not null
+ *              terminated.
+ *	
+ * STRATEGY:    encoded-word = "=?" charset "?" encoding "?=" 
+ *                             encoded-text "?="
+ *
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	kkee    	6/ 3/97   	Initial Revision
+ *	
+ ***********************************************************************/
+static int _pascal
+DecodeWord(char *start, char *end, char *outbuf) {
+	char *c, *e;
+
+	if (end<=start) return 0;
+
+	/* Skip charset */
+	c = strchr(start, '?');	
+	/* Encoding */
+	if (c) e = strchr(c+1, '?');
+	if (!c || !e) {
+		/* Do not null-terminate outbuf */
+		strncpy(outbuf, start, end-start);
+		return end-start;
+	}
+	e--;
+	if (*e=='Q' || *e=='q') {
+		/* Do not null-terminate outbuf */
+		return HTQPDecodePtr((byte*)e+2, end-(e+2), 
+							 (byte*)outbuf);
+	} else if (*e=='B' || *e=='b') {
+		/* Do not null-terminate outbuf */
+		return HTUUDecodePtr((byte*)e+2, end-(e+2), 
+							 (byte*)outbuf, end-start);
+	}
+	/* Other unknown encodings are ignored */
+	strncpy(outbuf, start, end-start);
+	return end-start;
+}
+
+
+/***********************************************************************
+ *		DecodeMIMEMsgHdrX
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Decode a MIME message header extension as per RFC2047.
+ * CALLED BY:	Resp.goc
+ * RETURN:	    HTMemHandle of decoded header.
+ *	
+ * STRATEGY:    Split hdr into encoded-words and decode them.
+ *
+ *				LWS (Linear white space) between encoded words are 
+ *              ignored. Note that LWS includes unfolded CRLF; CRLF
+ *              followed by one or more spaces.
+ *
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	kkee    	6/ 3/97   	Initial Revision
+ *	
+ ***********************************************************************/
+HTMemHandle _pascal
+DecodeMIMEMsgHdrX(HTMemHandle hdr)
+{
+	char *p, *q, *r, *left;
+	int len;
+
+	if (!hdr) return hdr;
+EC( ECCheckHTMemHandle(hdr);                                            )
+
+	/* p points to the end of decoded hdr */
+	p = (char *) HTMemLock(hdr);
+	left = p;
+	while ((q=strstr(left, "=?")) != 0 &&
+		   (r=strstr(q+1, "?=")) != 0) {
+		if (left!=q) { 
+			/* Do NOT copy if q-left is LWS 
+			 * between two encoded words.
+		     */
+			/* Do not null-terminate p here! */	
+			char *t;
+			for (t=left; t<q; t++)
+				if (!ISWHITE(*t)) {
+					strncpy(p, left, q-left);
+					p += (q-left);
+					break;
+				}
+		}
+		len = DecodeWord(q+2, r, p);
+		p += len;
+		left = r+2;  /* Skip the decoded word */
+	}
+	/* Copy whatever leftover non-decodable data */
+	/* Null-terminate p with strcpy as well */
+	if (left && *left) strcpy(p, left); 
+	else 
+		*p = 0;  /* Null terminate the string */
+	HTMemUnlock(hdr);
+
+	return hdr;
+}

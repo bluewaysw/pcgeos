@@ -1,0 +1,1299 @@
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Geoworks 1996.  All rights reserved.
+	GEOWORKS CONFIDENTIAL
+
+PROJECT:	Geos WWW Library
+MODULE:		sgml
+FILE:		sgml.goc
+
+AUTHOR:		Kok Kin Kee, Sep 25, 1996
+
+ROUTINES:
+	Name			Description
+	----			-----------
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	kkee	9/25/96   	Initial version.
+
+DESCRIPTION:
+
+	SGML parser. To parse an SGML file, create this stream which
+	is a parser. The stream get a DTD structure from its target.
+	Hence, in addition to being a HTStructured stream, the target
+	*MUST* add method MSG_HT_STRUCTURED_GET_DTD.
+
+	"text/html"  ---> SGML parser ---> "text/xgw-html"
+
+	$Id: sgml.goc,v 1.1 97/04/07 11:51:17 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+
+@include <stdapp.goh>
+@include <WWW/HTCore/htstream.goh>
+@include <WWW/HTCore/htreq.goh>
+@include <WWW/sgml.goh>
+@include <sem.h>
+#include <Ansi/ctype.h>                 /* isspace() */
+#include <Ansi/string.h>
+#include <Ansi/stdlib.h>                /* atoi() */
+
+@include "sgmlS.goh"
+@include "fatals.goh"
+
+#define SGML_THREAD_STACK_SIZE 1024   /* No ui stuff, 1K is enough. */
+
+#define TAGLIST            sptr->SGMLS_dtd.SGMLD_tagList
+#define NUMOFTAGS          sptr->SGMLS_dtd.SGMLD_numOfTags
+#define ENTITYLIST         sptr->SGMLS_dtd.SGMLD_entityList
+#define CHARACTERLIST      sptr->SGMLS_dtd.SGMLD_characterList
+#define ENTITYTRANSLATE    sptr->SGMLS_dtd.SGMLD_entityTranslate
+#define CHARACTERTRANSLATE sptr->SGMLS_dtd.SGMLD_characterTranslate
+#define NUMOFENTITIES      sptr->SGMLS_dtd.SGMLD_numOfEntities
+#define NUMOFCHARACTERS    sptr->SGMLS_dtd.SGMLD_numOfCharacters
+
+#define PUTBLOCK(target, data, len)  \
+        @call target::MSG_HT_STREAM_PUT_BLOCK(data, len)
+
+
+/***********************************************************************
+		Class Declaration
+***********************************************************************/
+
+@classdecl	SGMLClass;
+
+
+/***********************************************************************
+		Private Functions
+***********************************************************************/
+static void _pascal SGMLHandleStartElement(SGMLScanner *sptr, SGMLTag *tptr);
+static void _pascal SGMLHandleEndElement(SGMLScanner *sptr, SGMLTag *tptr);
+static void _pascal SGMLHandleText(SGMLScanner *sptr);
+static void _pascal SGMLParseLiteral(SGMLScanner *sptr);
+static void _pascal SGMLParseReference(SGMLScanner *sptr);
+static void _pascal SGMLParseOpenBracket(SGMLScanner *sptr);
+static void _pascal SGMLParseComment(SGMLScanner *sptr);
+static void _pascal SGMLParseText(SGMLScanner *sptr);
+static void _pascal SGMLParseStartElement(SGMLScanner *sptr);
+static void _pascal SGMLParseEndElement(SGMLScanner *sptr);
+static void _pascal SGMLParseElementAttrs(SGMLScanner *sptr, 
+					  SGMLTag *tptr);
+#define SGMLIGNOREELEMENT(sptr) \
+    while ((SGMLScanGetChar(sptr) != '>') && (!sptr->SGMLS_endOfFile))
+
+
+
+/***********************************************************************
+ *		SGMLAppendChar
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Append a character to text buffer without reducing
+ *              consecutive whitespaces. Make sure you put this call
+ *              in braces as the macro expands into two statements.
+ * CALLED BY:	SGMLParseText.
+ * RETURN:	Nothing.
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:    Define as a macro for efficiency. Linefeed is not needed
+ *              by the UI Generator.
+ *              Any control characters (between NULL and 0x1f) are
+ *              filtered out.
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	kkee	10/ 8/96   	Initial Revision
+ *
+ ***********************************************************************/
+#define SGMLAppendChar(sptr, chr) \
+    if ((chr != C_LF) && chr > 0x1f) { \
+	sptr->SGMLS_textBuffer[sptr->SGMLS_textLength++] = chr; \
+	if (sptr->SGMLS_textLength == SGML_TEXT_BUFFER_SIZE) \
+	    SGMLHandleText(sptr); \
+    } 
+/* @@@
+static void _pascal SGMLAppendChar(SGMLScanner *sptr, char chr) {
+    if (chr != C_LF && chr > 0x1f) { \
+	sptr->SGMLS_textBuffer[sptr->SGMLS_textLength++] = chr; 
+
+	if (sptr->SGMLS_textLength == SGML_TEXT_BUFFER_SIZE) 
+	    SGMLHandleText(sptr);
+    }
+}
+@@@ */
+
+
+
+/***********************************************************************
+ *		SGMLAppendReduceWhiteChar
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Append a character to text buffer. It reduces 
+ *              consecutive white spaces into one white space. 
+ * CALLED BY:	
+ * RETURN:	
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:    Define as a macro for efficiency. Linefeed is not needed
+ *              by the UI Generator.
+ *              Any control characters (between NULL and 0x1f) are
+ *              filtered out.
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	kkee	10/30/96   	Initial Revision
+ *
+ ***********************************************************************/
+#define SGMLAppendReduceWhiteChar(sptr, chr) \
+    if (chr != C_LF && chr > 0x1f) { \
+	if (!((chr == ' ') &&  \
+	      (sptr->SGMLS_textBuffer[sptr->SGMLS_textLength-1] == ' '))) { \
+	    sptr->SGMLS_textBuffer[sptr->SGMLS_textLength++] = chr; \
+	    if (sptr->SGMLS_textLength == SGML_TEXT_BUFFER_SIZE) \
+		SGMLHandleText(sptr); \
+	} \
+    } \
+/* @@@
+static void _pascal SGMLAppendReduceWhiteChar(SGMLScanner *sptr, char chr) {
+
+    if (chr != C_LF && chr > 0x1f) { \
+	if (!((chr == ' ') && 
+	      (sptr->SGMLS_textBuffer[sptr->SGMLS_textLength-1] == ' '))) {
+	    sptr->SGMLS_textBuffer[sptr->SGMLS_textLength++] = chr; 
+
+	    if (sptr->SGMLS_textLength == SGML_TEXT_BUFFER_SIZE) 
+		SGMLHandleText(sptr); 
+	}
+    }
+}
+@@@ */
+
+
+
+/***********************************************************************
+ *		SGMLHandleStartElement
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Push a token onto our element stack.
+ * CALLED BY:	SGMLParseStartElement.
+ * RETURN:	Nothing.
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	kkee	10/13/96   	Initial Revision
+ *
+ ***********************************************************************/
+static void _pascal
+SGMLHandleStartElement (SGMLScanner *sptr, SGMLTag *tptr)
+{
+    /* See if there is buffered text, push text first */
+    if (sptr->SGMLS_textLength) 
+	SGMLHandleText(sptr);
+
+#if ERROR_CHECK
+	if (sptr->SGMLS_stackPos == SGML_MAX_ELEMENT_NESTING_LEVEL)
+	    EC_WARNING(EXCEED_MAX_ELEMENT_NESTING_LEVEL);
+#else
+	if (sptr->SGMLS_stackPos == SGML_MAX_ELEMENT_NESTING_LEVEL)
+	    return;
+#endif	
+	
+    /* Update our element stack */
+    if (tptr->SGMLT_content != SGMLC_EMPTY) {
+	sptr->SGMLS_elementStack[sptr->SGMLS_stackPos++] =
+	    tptr;
+    }
+
+    /* 
+     * Update the current content. We change from any content to 
+     * another content except for preformatted. Preformatted content
+     * can only be changed when we see the end element.
+     */
+    if (tptr->SGMLT_content == SGMLC_PREFORMATTED)
+	sptr->SGMLS_content = SGMLC_PREFORMATTED;
+
+    /* Now push the element to target */
+    @call sptr->SGMLS_target::
+	MSG_HT_STRUCTURED_PUT_START_ELEMENT(tptr->SGMLT_token,
+					    sptr->SGMLS_block,
+					    sptr->SGMLS_attr);
+
+}	/* End of SGMLHandleStartElement.	*/
+
+
+
+
+/***********************************************************************
+ *		SGMLHandleEndElement
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Pop a tag from the element stack. 
+ * CALLED BY:	SGMLParseEndElement.
+ * RETURN:	Nothing
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:    If we have a start element and end element mismatch,
+ *              we try to recover using Maciej Puzio's approach 
+ *              (puzio@laser.mimuw.edu.pl). See
+ *          http://www.w3c.org/pub/WWW/Library/User/Patch/lib_4.0_1.fix.
+ *              Basically, if end element does not match the last start 
+ *              element, we use the following rules.
+ *              1. If we are on the last level (i.e., only <HTML> is on
+ *                 element stack), we ignore the bad element.
+ *              2. If there are some other start elements, we assume the 
+ *                 corresponding end tags (execpt <HTML>), free those
+ *                 elements from the stack, and then repeat 1 and 2.
+ *                 We stop when we find the matching start element or 
+ *                 we are at the last level.
+ *              3. Puzio's patch basically ignores the ill-nested 
+ *                 end element if it does not have a corresponding
+ *                 start element on the element stack.
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	kkee	10/13/96   	Initial Revision
+ *
+ ***********************************************************************/
+static void _pascal
+SGMLHandleEndElement (SGMLScanner *sptr, SGMLTag *endPtr)
+{
+    int i, index;
+
+    /* 
+     * Before we push the end element, we must flush all buffered
+     * text, if any. 
+     */
+    if (sptr->SGMLS_textLength)
+	SGMLHandleText(sptr);
+
+    if ((endPtr->SGMLT_content == SGMLC_EMPTY) || 
+	!sptr->SGMLS_stackPos) 
+	return;
+
+    /*
+     * If the end element does not have a corresponding start element
+     * on the stack, it is ignored.
+     */
+    index = -1;
+    for (i=sptr->SGMLS_stackPos-1; i>=0; i--) {
+
+	if (sptr->SGMLS_elementStack[i] == endPtr) {
+	    index = i;
+	    break;  /* found */
+	}
+    }
+
+    if (index == -1) return;  /* Ignored! */
+
+    /* 
+     * Start popping all the start elements on the stack until the 
+     * the matching element.
+     */
+    for(i=sptr->SGMLS_stackPos-1; i>=index; i--) {
+	@call sptr->SGMLS_target::
+	    MSG_HT_STRUCTURED_PUT_END_ELEMENT(
+                sptr->SGMLS_elementStack[i]->SGMLT_token);
+
+	/* End preformatted content? */
+	if (sptr->SGMLS_elementStack[i]->SGMLT_content == 
+	    SGMLC_PREFORMATTED)
+	    sptr->SGMLS_content = SGMLC_MIXED;
+    }
+
+    sptr->SGMLS_stackPos = index;
+
+}	/* End of SGMLHandleEndElement.	*/
+
+
+
+
+/***********************************************************************
+ *		SGMLHandleText
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Push text to target.
+ * CALLED BY:	SGMLParse... routines.
+ * RETURN:	Nothing
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:       If we had previously pushed text with a trailing
+ *                 whitespace AND the current text to push has a 
+ *                 leading white space, we ignore the leading 
+ *                 whitespace. Initially 
+ *                 sptr->SGMLS_hasTrailingWhiteSpace is set to TRUE.
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	kkee	10/15/96   	Initial Revision
+ *
+ ***********************************************************************/
+static void _pascal
+SGMLHandleText (SGMLScanner *sptr)
+{
+EC( if (!sptr->SGMLS_textLength)                                        )
+EC(    EC_ERROR(TEXT_BUFFER_IS_EMPTY);                                  )
+
+    if (sptr->SGMLS_content == SGMLC_PREFORMATTED) {
+	PUTBLOCK(sptr->SGMLS_target,
+		 sptr->SGMLS_textBuffer, 
+		 sptr->SGMLS_textLength);
+
+	sptr->SGMLS_textLength = 0;
+	return;
+    }
+	
+
+    /* Check for trailing and leading white spaces */
+    if (sptr->SGMLS_hasTrailingWhiteSpace &&
+	sptr->SGMLS_textBuffer[0] == ' ') {
+	
+	if (sptr->SGMLS_textLength > 1)
+	    PUTBLOCK(sptr->SGMLS_target,
+		     sptr->SGMLS_textBuffer+1, 
+		     sptr->SGMLS_textLength-1);
+
+    } else {
+
+	PUTBLOCK(sptr->SGMLS_target,
+		 sptr->SGMLS_textBuffer, 
+		 sptr->SGMLS_textLength);
+
+    }
+
+    if (sptr->SGMLS_textBuffer[sptr->SGMLS_textLength-1] == ' ')
+	sptr->SGMLS_hasTrailingWhiteSpace = TRUE;
+
+    else
+	sptr->SGMLS_hasTrailingWhiteSpace = FALSE;
+
+    sptr->SGMLS_textLength = 0;
+}	/* End of SGMLHandleText.	*/
+
+
+
+
+
+/***********************************************************************
+ *		SGMLParseReference
+ ***********************************************************************
+ *
+ * SYNOPSIS:	We have seen '&'. Parse character or entity reference.
+ * CALLED BY:	SGMLParserThread.
+ * RETURN:	Nothing.
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:
+ *              Example of a character reference is &#258;
+ *              Example of an entity reference is &gt;
+ *              (The terminating semicolon is optional as whitespace
+ *               can also terminate a char or entity reference)
+ *
+ *              It seems most people write &ltxxx to mean <xxx with no
+ *              space and semicolon. So I allow this.
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	kkee	10/ 8/96   	Initial Revision
+ *
+ ***********************************************************************/
+static void _pascal
+SGMLParseReference (SGMLScanner *sptr)
+{
+    int i, value;
+    char c;
+
+    i = 0;
+
+    /* Character reference */
+    if ((c = SGMLScanGetChar(sptr)) == '#') {
+
+	c = SGMLScanGetChar(sptr);
+	while (ISDIGIT(c) && i < MAX_SGML_NAME_LENGTH) {
+	    sptr->SGMLS_thisWord[i++] = c;
+	    c = SGMLScanGetChar(sptr);
+	}
+
+	sptr->SGMLS_thisWord[i] = '\0';
+
+	if (c != ';')
+	    SGMLScanUngetChar(sptr, c);
+
+	/* Translate the character reference to native representiation */
+	value = atoi(sptr->SGMLS_thisWord);
+	if ((i = SGMLSearchCharacter(CHARACTERLIST,
+				     NUMOFCHARACTERS,
+				     value)) >= 0) {
+
+	    SGMLAppendChar(sptr, CHARACTERTRANSLATE[i][0]);
+
+	} else {
+	    /* Not translated, assume compatible with native character */
+	    SGMLAppendChar(sptr, (char) value);
+	}
+	
+	return;
+	
+    } else if (ISWHITE(c)) {
+
+	SGMLAppendChar(sptr, '&');
+	SGMLAppendChar(sptr, ' ');
+	return;
+
+    } else if (c == '<') {
+
+	SGMLAppendChar(sptr, '&');
+	SGMLScanUngetChar(sptr, c);
+	return;
+    }
+
+    /* Entity reference */
+    do {
+	sptr->SGMLS_thisWord[i++] = c;
+	sptr->SGMLS_thisWord[i] = 0;
+	
+	/* 
+	 * Don't expect to get a space or semicolon that 
+	 * terminates the reference as most people won't bother
+	 * putting it there.
+	 */
+	if ((value = SGMLSearchEntity(ENTITYLIST,
+				      NUMOFENTITIES,
+				      sptr->SGMLS_thisWord)) >= 0) {
+
+	    SGMLAppendChar(sptr, ENTITYTRANSLATE[value][0]);
+
+	    /* If next char is semicolon, we have to swallow it */
+	    if ((c = SGMLScanGetChar(sptr)) != ';')
+		SGMLScanUngetChar(sptr, c);
+
+	    return;
+	}
+	
+	c = SGMLScanGetChar(sptr);
+    } while ((ISALPHA(c) || ISDIGIT(c)) &&  i < MAX_SGML_NAME_LENGTH);
+    
+    /* 
+     * Otherwise we put sptr->SGMLS_thisWord as text.
+     */
+    SGMLAppendChar(sptr, '&');
+
+    for (value=0; value<i; value++) {
+	SGMLAppendChar(sptr, sptr->SGMLS_thisWord[value]);
+    }
+	    
+    SGMLAppendChar(sptr, c);
+}	/* End of SGMLParseReference.	*/
+
+
+
+
+/***********************************************************************
+ *		SGMLParseStartElement
+ ***********************************************************************
+ *
+ * SYNOPSIS:	We have seen "<?". So parse a start element.
+ * CALLED BY:	SGMLParseOpenBracket
+ * RETURN:	Nothing
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:    
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	kkee	10/ 2/96   	Initial Revision
+ *
+ ***********************************************************************/
+static void _pascal
+SGMLParseStartElement (SGMLScanner *sptr)
+{
+    char c;
+    int index = -1;
+    SGMLEntity *alist;
+    word elementToken;
+
+    SGMLScanGobbleSym(sptr);
+
+    if (sptr->SGMLS_thisSym == SGMLT_STRING)
+	index = SGMLSearchTag(TAGLIST,
+			      NUMOFTAGS,
+			      sptr->SGMLS_thisWord);
+
+    if (index > -1) {
+	/* Found the tag in DTD! */
+
+	if (TAGLIST[index].SGMLT_attrList)
+	    SGMLParseElementAttrs(sptr, &TAGLIST[index]);
+
+	else {
+	    /* Element has no attrs, so ignore the rest */
+	    SGMLIGNOREELEMENT(sptr);
+
+	    MemLock(sptr->SGMLS_block);
+
+	    alist = (SGMLEntity *) LMemDerefHandles(sptr->SGMLS_block,
+						    sptr->SGMLS_attr);
+	    alist[0].SGMLE_token = 0;    /* Terminate attr list */
+	    alist[0].SGMLE_value = NULL;  
+
+	    MemUnlock(sptr->SGMLS_block);
+	}    
+
+	SGMLHandleStartElement(sptr, &TAGLIST[index]);
+	
+    } else {
+	/* Tag not found in DTD, ignore! */
+	SGMLIGNOREELEMENT(sptr);
+/* @@@
+EC(	EC_WARNING(UNKNOWN_START_ELEMENT);                            )
+@@@ */
+    }
+
+}	/* End of SGMLParseStartElement.	*/
+
+
+
+
+/***********************************************************************
+ *		SGMLParseElementAttrs
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Parse the attributes of an element. 
+ * CALLED BY:	SGMLParserStartElement.
+ * RETURN:	Nothing.
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:    Attributes in the form of 
+ *              name or
+ *              name = value or 
+ *              name = "value"
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	kkee	10/ 3/96   	Initial Revision
+ *
+ ***********************************************************************/
+static void _pascal
+SGMLParseElementAttrs (SGMLScanner *sptr, SGMLTag *tptr)
+{
+    SGMLAttr *aptr;
+    SGMLEntity *alist;
+    char chr, *cptr;
+    int i, index = 0, attrIndex = -1;
+
+EC( ECCheckLMemOD(tptr->SGMLT_attrList);                                 )
+
+    /* Initialize SGMLEntity list */
+    MemLock(sptr->SGMLS_block);
+    alist = (SGMLEntity *) LMemDerefHandles(sptr->SGMLS_block,
+					    sptr->SGMLS_attr);
+    
+    alist[0].SGMLE_token = 0;      /* init list to null */
+    alist[0].SGMLE_value = NULL;
+
+    aptr = (SGMLAttr *) LMemDeref(tptr->SGMLT_attrList);
+
+    SGMLScanGobbleSym(sptr);
+    do {
+
+	switch(sptr->SGMLS_thisSym) {
+
+	case SGMLT_STRING:
+	    /* We have gobbled an attribute name in sptr->SGMLS_thisWord */
+	    if ((attrIndex = SGMLSearchAttr(aptr, 
+					    tptr->SGMLT_numOfAttrs,
+					    sptr->SGMLS_thisWord))
+		> -1) {
+
+		if (index < MAX_SGML_ATTRIBUTES) {
+
+		    alist[index++].SGMLE_token = 
+			aptr[attrIndex].SGMLA_token;
+		    alist[index].SGMLE_value = NULL;
+
+		    alist[index].SGMLE_token = 0;      /* end of list */
+		    alist[index].SGMLE_value = NULL;   
+		}
+/* @@@
+#if ERROR_CHECK
+		else if (index >= MAX_SGML_ATTRIBUTES)
+		    EC_WARNING(ATTRIBUTE_ARRAY_TOO_SMALL);
+#endif
+@@@ */
+		SGMLScanGobbleSym(sptr);
+
+		if (sptr->SGMLS_thisSym == SGMLT_EQUAL){
+		    /* Attribute has a value */
+
+		    alist[index-1].SGMLE_value =
+			sptr->SGMLS_valueCopy[index-1];
+
+		    cptr = (char *)
+			LMemDerefHandles(sptr->SGMLS_block,
+					 alist[index-1].SGMLE_value);
+
+		    /* Single or double quoted value */
+		    if (((chr = SGMLScanGetNonWhiteChar(sptr)) == '\"') ||
+			(chr == '\''))
+			SGMLScanGobbleQuotedValue(sptr, cptr);
+		    
+		    else {
+			SGMLScanUngetChar(sptr, chr);
+			SGMLScanGobbleValue(sptr, cptr);
+		    }
+
+		    SGMLScanGobbleSym(sptr);  /* go to next token */
+
+		} 
+
+	    } else {
+/* @@@
+EC(		EC_WARNING(UNKNOWN_ATTRIBUTE_NAME);                   )
+@@@ */
+                SGMLScanGobbleSym(sptr);
+
+                if (sptr->SGMLS_thisSym == SGMLT_EQUAL) {
+		    /* Throw away */
+		    SGMLScanGobbleValue(sptr, sptr->SGMLS_thisWord);
+		    SGMLScanGobbleSym(sptr);    /* go to next token */
+		}
+	    }
+
+	    break;
+
+	case SGMLT_CLOSE_BRACKET:
+	case SGMLT_XXX_EOF:
+	    break;  /* done */
+
+	default:
+	    /* Ignoring other SGML tokens */
+	    SGMLScanGobbleSym(sptr);
+	    break;
+	}
+
+    } while ((sptr->SGMLS_thisSym != SGMLT_CLOSE_BRACKET) &&
+	     (sptr->SGMLS_thisSym != SGMLT_XXX_EOF));
+
+    MemUnlock(sptr->SGMLS_block);
+}	/* End of SGMLParseElementAttrs.	*/
+
+
+
+
+/***********************************************************************
+ *		SGMLParseEndElement
+ ***********************************************************************
+ *
+ * SYNOPSIS:	We have seen "</". So parse an end element.
+ * CALLED BY:	SGMLParseOpenBracket
+ * RETURN:	Nothing
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:    Although "</ " (with spaces) is not an end element, we
+ *              treat it so. Both for speed and valid assumption.
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	kkee	10/ 2/96   	Initial Revision
+ *
+ ***********************************************************************/
+static void _pascal
+SGMLParseEndElement (SGMLScanner *sptr)
+{
+    int index = -1;
+
+    /* Now we gobble till '>' */
+    SGMLScanGobbleSym(sptr);
+
+    do {
+
+	switch(sptr->SGMLS_thisSym) {
+
+	case SGMLT_CLOSE_BRACKET:
+	case SGMLT_XXX_EOF:
+	    break;  /* done */
+	    
+	case SGMLT_STRING:
+	    if (index == -1)
+		index = SGMLSearchTag(TAGLIST, 
+				      NUMOFTAGS,
+				      sptr->SGMLS_thisWord);
+
+	    SGMLScanGobbleSym(sptr); /* next token */
+
+	    break;
+
+	default:
+	    /* Not suppose to get these, so ignore */
+	    SGMLScanGobbleSym(sptr);
+	    break;
+	}
+	
+    } while ((sptr->SGMLS_thisSym != SGMLT_CLOSE_BRACKET) &&
+	     (sptr->SGMLS_thisSym != SGMLT_XXX_EOF));
+
+    if (index > -1)
+	SGMLHandleEndElement(sptr, &TAGLIST[index]);
+/* @@@
+#if ERROR_CHECK
+    else 
+	EC_WARNING(UNKNOWN_END_ELEMENT);
+#endif
+@@@ */    
+}	/* End of SGMLParseEndElement.	*/
+
+
+
+
+/***********************************************************************
+ *		SGMLParseOpenBracket
+ ***********************************************************************
+ *
+ * SYNOPSIS:	We have seen an '<', parse the rest.
+ * CALLED BY:	SGMLParserThread.
+ * RETURN:	Nothing
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:    <tag               => a start element
+ *              </tag              => an end element
+ *              < tag              => treated as <tag
+ *              <!--               => begin of comment
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	kkee	10/ 2/96   	Initial Revision
+ *
+ ***********************************************************************/
+static void _pascal
+SGMLParseOpenBracket (SGMLScanner *sptr)
+{
+    char c;
+
+    c = SGMLScanGetChar(sptr);
+
+
+    /* 
+     * Although c may be a whitespace, but we don't care. We need to 
+     * assume its a tag. We do this to improve performance.
+     *
+     * if (ISWHITE(c)) {
+     *	SGMLAppendChar(sptr, c);
+     *	SGMLParseText(sptr);
+     * }
+     */
+
+    if (c == '/')
+	SGMLParseEndElement(sptr);
+
+    else if (c == '!')
+	SGMLParseComment(sptr);
+
+    else { 
+	SGMLScanUngetChar(sptr, c);
+	SGMLParseStartElement(sptr);
+    }
+}	/* End of SGMLParseOpenBracket.	*/
+
+
+
+
+/***********************************************************************
+ *		SGMLParseComment
+ ***********************************************************************
+ *
+ * SYNOPSIS:	We have seen '<!'. Parse the rest of the comment.
+ * CALLED BY:	SGMLParseOpenBracket.
+ * RETURN:	Nothing.
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:    <!-- Comment line 1 --  -- Comment line 2 -->
+ *
+ *              So comment must end with '-->' and we just throw it
+ *              away to improve speed instead of pushing the comment
+ *              to the target.
+ *
+ *              <! ... > This is also a comment.
+ *
+ *              But we can't match <!-- >, argh!! HTML!!
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	kkee	10/ 4/96   	Initial Revision
+ *
+ ***********************************************************************/
+static void _pascal
+SGMLParseComment (SGMLScanner *sptr)
+{
+    char chr;
+
+    /* 
+     * No need to check for sptr->SGMLS_endOfFile until the while 
+     * statement. We do this to improve performance.
+     */
+
+    /* Comment without -- */
+    if (SGMLScanGetChar(sptr) != '-') {
+	while ((SGMLScanGetChar(sptr) != '>') &&
+	       !sptr->SGMLS_endOfFile);
+
+	return;
+    }
+    SGMLScanUngetChar(sptr, '-');
+
+    /* Comment with -- */
+    do {
+	if ((chr = SGMLScanGetChar(sptr)) == '-')
+
+	    if ((chr = SGMLScanGetChar(sptr)) == '-') {
+
+		/* Watch out for consecutive dashes and remain at 
+		 * state where we have seen two dashes.
+		 */
+		while ((chr = SGMLScanGetChar(sptr)) == '-');
+
+		if (chr == '>')
+		    break;  /* Done! */
+
+	    }
+
+    } while(!sptr->SGMLS_endOfFile);
+}	/* End of SGMLParseComment.	*/
+
+
+
+
+
+/***********************************************************************
+ *		SGMLParseText
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Parse text until we see a token.
+ * CALLED BY:	SGMLParserThread.
+ * RETURN:	Nothing.
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:    Stop when we see '<' or '&'.
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	kkee	10/ 2/96   	Initial Revision
+ *
+ ***********************************************************************/
+static void _pascal
+SGMLParseText (SGMLScanner *sptr)
+{
+    char c;
+
+    if (sptr->SGMLS_content == SGMLC_PREFORMATTED)
+	c = SGMLScanGetChar(sptr);
+    else
+	c = SGMLScanGetReduceWhiteChar(sptr);
+
+    while ((c != '<') && (c != '&') && (!sptr->SGMLS_endOfFile)) {
+
+	SGMLAppendChar(sptr, c);
+
+	/* 
+	 * SGMLC_PREFORMATTED content model accepts all whitespaces.
+	 */
+	if (sptr->SGMLS_content == SGMLC_PREFORMATTED)
+
+	    c = SGMLScanGetChar(sptr);
+
+	else
+	    /* SGMLC_MIXED */
+	    c = SGMLScanGetReduceWhiteChar(sptr);
+    }
+
+    /* 
+     * We have read one character ahead.
+     */
+    if (!sptr->SGMLS_endOfFile)
+	SGMLScanUngetChar(sptr, c);
+	
+}	/* End of SGMLParseText.	*/
+
+
+
+
+/***********************************************************************
+ *		SGMLParseLiteral
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Parse literal text until the expected end element
+ *              is encountered. 
+ * CALLED BY:	SGMLParserThread
+ * RETURN:	Nothing
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:  
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	kkee	10/ 8/96   	Initial Revision
+ *
+ ***********************************************************************/
+static void _pascal
+SGMLParseLiteral (SGMLScanner *sptr)
+{
+    word i, length;
+    int index;
+    char chr;
+
+#if ERROR_CHECK
+    if (!sptr->SGMLS_stackPos)
+	EC_ERROR(EXPECTED_START_ELEMENT_MISSING);
+#endif
+
+    /* 
+     * Flush buffer if there is any text in it as we are going to 
+     * use the buffer. 
+     */
+    if (sptr->SGMLS_textLength)
+	SGMLHandleText(sptr);
+
+    /* Ignore leading white spaces */
+    chr = SGMLScanGetNonWhiteChar(sptr);
+
+    do {
+	
+	if (chr == '<') {
+
+	    if ((chr = SGMLScanGetChar(sptr)) == '/') {
+
+		chr = SGMLScanGetChar(sptr);
+		if (!ISWHITE(chr)) {
+
+		    SGMLScanUngetChar(sptr, chr);
+		    SGMLScanGobbleSym(sptr);
+
+		    if (((index = 
+			  SGMLSearchTag(TAGLIST,
+					NUMOFTAGS,
+					sptr->SGMLS_thisWord)) > -1) &&
+			(TAGLIST[index].SGMLT_token == 
+			 sptr->SGMLS_elementStack[sptr->SGMLS_stackPos-1]->SGMLT_token)) {
+
+			/* Throw away the rest of the element */
+			SGMLIGNOREELEMENT(sptr);
+
+			break;  /* done! exit the while loop */
+		    }
+
+		    /* Not an element that can stop processing 
+		     * literal text.
+		     */
+		    SGMLAppendChar(sptr, '<');
+		    SGMLAppendChar(sptr, '/');
+
+		    length = strlen(sptr->SGMLS_thisWord);
+		    for (i=0; i<length; i++) {
+			SGMLAppendChar(sptr, 
+				       sptr->SGMLS_thisWord[i]);
+		    }
+
+		} else { 
+		    SGMLAppendChar(sptr, '<');
+		    SGMLAppendChar(sptr, '/');
+		    SGMLAppendChar(sptr, chr);
+		}
+
+	    } else {
+		SGMLAppendChar(sptr, '<');
+		SGMLAppendChar(sptr, chr);
+	    }
+
+	} else {
+	    SGMLAppendChar(sptr, chr);
+	}
+	    
+	chr = SGMLScanGetChar(sptr);
+
+    } while (!sptr->SGMLS_endOfFile);
+
+    SGMLHandleEndElement(sptr, &TAGLIST[index]);
+
+}	/* End of SGMLParseLiteral.	*/
+
+
+
+
+/***********************************************************************
+ *		SGMLParserThread
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Parse an SGML document.
+ * CALLED BY:	Kernel
+ * RETURN:	0, required by kernel.
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:    We also lock down the whole DTD and we required that the
+ *              whole DTD info must be in the same resource. We do this 
+ *              for performance.
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	kkee	9/18/96   	Initial Revision
+ *
+ ***********************************************************************/
+word _pascal
+SGMLParserThread (SGMLScannerHandle scanner)
+{
+    SGMLScanner *sptr;
+    char chr;
+    int i;
+
+    MemLock(scanner);
+    sptr = (SGMLScanner *) MemDeref(scanner);
+
+    sptr->SGMLS_dtd.SGMLD_block = 
+	OptrToHandle(sptr->SGMLS_clientDTD->SGMLD_tagList);
+
+    MemLock(sptr->SGMLS_dtd.SGMLD_block);
+    
+    /* Now dereference all the DTD information we need for parsing */
+    TAGLIST = (SGMLTag *) LMemDeref(sptr->SGMLS_clientDTD->SGMLD_tagList);
+
+    NUMOFTAGS = sptr->SGMLS_clientDTD->SGMLD_numOfTags;
+
+    ENTITYLIST = (char **) LMemDeref(sptr->SGMLS_clientDTD->SGMLD_entityList);
+
+    CHARACTERLIST = 
+	(char **) LMemDeref(sptr->SGMLS_clientDTD->SGMLD_characterList);
+
+    ENTITYTRANSLATE = 
+	(char **) LMemDeref(sptr->SGMLS_clientDTD->SGMLD_entityTranslate);
+
+    CHARACTERTRANSLATE = 
+	(char **) LMemDeref(sptr->SGMLS_clientDTD->SGMLD_characterTranslate);
+
+    NUMOFENTITIES = sptr->SGMLS_clientDTD->SGMLD_numOfEntities;
+
+    NUMOFCHARACTERS = sptr->SGMLS_clientDTD->SGMLD_numOfCharacters;
+
+    /* Enter main parsing loop ... */
+    do {
+	if (sptr->SGMLS_endOfFile)
+	    break;  /* out of the while loop and exit */
+
+	/*
+	 * Parse according to current content model.
+	 */
+	if (sptr->SGMLS_content == SGMLC_LITERAL)
+	    SGMLParseLiteral(sptr);
+
+	else {
+
+	    if (sptr->SGMLS_content == SGMLC_PREFORMATTED)
+		chr = SGMLScanGetChar(sptr);
+	    else
+		chr = SGMLScanGetReduceWhiteChar(sptr);
+
+	    if (chr == '<')
+		SGMLParseOpenBracket(sptr);
+	
+	    else if (chr == '&')
+		SGMLParseReference(sptr);
+
+	    else {
+		
+		if (sptr->SGMLS_content == SGMLC_PREFORMATTED) {
+		    SGMLAppendChar(sptr, chr); 
+		} else {
+		    SGMLAppendReduceWhiteChar(sptr, chr);
+		}
+
+		SGMLParseText(sptr);
+	    }
+
+	}
+
+    } while (!sptr->SGMLS_endOfFile);
+
+    /* 
+     * If there is buffered data, flush it. We do not buffer elements.
+     */
+    if (sptr->SGMLS_textLength) 
+	SGMLHandleText(sptr);
+
+    /* If there is leftover start elements on element stack, push them
+     * all to the target 
+     */
+    for(i=sptr->SGMLS_stackPos-1; i>=0; i--) {
+	@call sptr->SGMLS_target::
+	    MSG_HT_STRUCTURED_PUT_END_ELEMENT(
+               sptr->SGMLS_elementStack[i]->SGMLT_token);
+    }
+
+    /* Unlock the DTD */
+    MemUnlock(sptr->SGMLS_dtd.SGMLD_block);
+
+    /* Inform SGML content handler that the parser thread is exiting. */
+    ThreadVSem(sptr->SGMLS_parserThreadIsRunning);
+
+    /* 
+     * We should not unlock scanner since the scanner is being deleted
+     * by the parser once we've encountered token SGMLT_XXX_EOF.
+     */
+
+    return 0;
+}	/* End of SGMLParserThread.	*/
+
+
+
+/***********************************************************************
+		Message Handlers
+***********************************************************************/
+
+
+/***********************************************************************
+ *		MSG_HT_STREAM_SET_TARGET for SGMLClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    We need to get a DTD from the target.
+ * PARAMETERS:	    void (HTStreamHandle target)
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	kkee	9/26/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method SGMLClass, MSG_HT_STREAM_SET_TARGET
+{
+    @callsuper();
+
+    @self->SGMLI_dtd = (SGMLDTD *) @call target::
+	MSG_HT_STRUCTURED_GET_DTD();
+}	/* End of MSG_HT_STREAM_SET_TARGET.	*/
+
+
+
+
+/***********************************************************************
+ *		MSG_HT_STREAM_ABORT for SGMLClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    Delete scanner and abort self.
+ * PARAMETERS:	    int (void)
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:        Wait for parser thread to terminate and then we can
+ *                  safe free the scanner.
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	kkee	9/15/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method SGMLClass, MSG_HT_STREAM_ABORT
+{
+    SGMLScanner *sptr;
+
+    /* 
+     * Becareful that we may not have created a scanner when we get 
+     * the abort message. This happens when the stream is aborted
+     * as soon as it gets created (like user stopping before we
+     * load any data).
+     */
+    if (@self->SGMLI_scanner) {
+
+	MemLock(@self->SGMLI_scanner);
+	sptr = (SGMLScanner *) MemDeref(@self->SGMLI_scanner);
+
+	/* Tell scanner there is no more data to scan */
+	sptr->SGMLS_endOfFile = TRUE;
+
+	/* Then we wait for scanner to terminate */
+	ThreadPSem(sptr->SGMLS_parserThreadIsRunning);
+
+	MemUnlock(@self->SGMLI_scanner);
+	SGMLScanDelete(@self->SGMLI_scanner);
+    }
+
+    return @callsuper();
+}	/* End of MSG_HT_STREAM_ABORT.	*/
+
+
+
+
+/***********************************************************************
+ *		MSG_HT_STREAM_PUT_BLOCK for SGMLClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    text/SGML parser.
+ * PARAMETERS:	    int (byte *data, word len)
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:        We append the data to SGML content-handler (which
+ *                  is actually appending to the SGML scanner), force
+ *                  queue a message to ourself and return. We can do
+ *                  this because all content handlers run in the client
+ *                  content thread, while this API MSG_HT_STREAM_PUT_BLOCK
+ *                  is called from the Library HTCore thread.
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	kkee	9/15/96   	Initial Revision
+ *
+ ***********************************************************************/
+static word (*const SGMLParserFunc)(word) = &SGMLParserThread;
+
+@method SGMLClass, MSG_HT_STREAM_PUT_BLOCK
+{
+
+#if ERROR_CHECK
+    if (!@self->SGMLI_dtd)
+	EC_ERROR(SGML_CANNOT_PARSE_WITHOUT_A_DTD);
+#endif
+
+    /* Ignore empty data */
+    if (!data || !len) return HT_OK;
+
+    /* Create a SGML scanner and parser */
+    if (!@self->SGMLI_scanner) {
+	@self->SGMLI_scanner = SGMLScanNew(@self->SGMLI_dtd,
+					   @self->HTSI_target);
+
+	if (!@self->SGMLI_scanner) return HT_OUT_OF_MEMORY;
+
+	/* Start the parsing process */
+	if (!@self->SGMLI_parserThread)
+	    @self->SGMLI_parserThread = 
+		ThreadCreate(PRIORITY_HIGH,
+			     @self->SGMLI_scanner,
+			     SGMLParserFunc,
+			     SGML_THREAD_STACK_SIZE,
+			     GeodeGetCodeProcessHandle());
+    }
+
+    /* Produce data for scanner (data is consumed by SGMLScanGetChar) */
+    SGMLScanAppendData(@self->SGMLI_scanner, (char *)data, len);
+
+    return HT_OK;
+}	/* End of MSG_HT_STREAM_PUT_BLOCK.	*/
+
+
+

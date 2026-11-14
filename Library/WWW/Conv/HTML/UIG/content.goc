@@ -1,0 +1,1994 @@
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Geoworks 1996 -- All Rights Reserved
+
+PROJECT:	Penelope
+MODULE:		HTML Content module
+FILE:		content.goc
+
+AUTHOR:		Edwin Yu, Jun 16, 1996
+
+ROUTINES:
+	Name			Description
+	----			-----------
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	EY	6/16/96   	Initial version.
+
+DESCRIPTION:
+	This file defines a class that keeps track HTML style content.
+	The class also provides interface to access and add/remove
+	contents.
+
+	$Id: content.goc,v 1.32.1.32 98/06/09 14:53:01 jeremyb Exp $
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+@include <stdapp.goh>
+@include <WWW/html.goh>
+@include "htfatals.goh"
+@include "UIG/utility.goh"
+
+@classdecl	HTGenHtmlContentClass;
+
+@extern method HTGenHtmlContentClass, MSG_GEN_PREPARE_FOR_DESTROY;
+
+
+
+/***********************************************************************
+ *  MSG_GEN_HTML_CONTENT_FORMAT_TEXT_OBJECT for HTGenHtmlContentClass
+ ***********************************************************************
+ * SYNOPSIS:	    Format the text object according to the current
+ *		    HTML content.
+ * PARAMETERS:	    (optr text, GStateHandle gstate)
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	EY	6/15/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method HTGenHtmlContentClass, MSG_GEN_HTML_CONTENT_FORMAT_TEXT_OBJECT
+{
+  int 		n;
+  WWFixed 	number;
+  StyleType 	token;
+  FontID	fontId;
+  /*
+   * Set the default tabs.
+   */
+  @send text::MSG_VIS_TEXT_SET_DEFAULT_TABS(TAB_SIZE,
+				TEXT_ADDRESS_PAST_END,
+				TEXT_ADDRESS_PAST_END);
+  /*
+   * Set the font.  STYLE_FW_FONT is handled here.
+   */
+@ifdef PRODUCT_RESPONDER
+    pself = ObjDerefGen(oself);
+@endif
+
+  if (!(@self->HTGHC_cntFWFont)) {
+    fontId = FID_DTC_URW_SANS;
+    @send text::MSG_VIS_TEXT_SET_FONT_ID(fontId,
+					 TEXT_ADDRESS_PAST_END,
+					 TEXT_ADDRESS_PAST_END);
+  }
+  /*
+   * Set the font size.  The size is stored in the font stack.  Thus,
+   * this handles any <FONT SIZE=n> that have been encountered before
+   * the creation of the text object.  I.e. STYLE_FONT is handled here.
+   */
+  number.WWF_int = @call self::MSG_GEN_HTML_CONTENT_GET_FONT_SIZE();
+  number.WWF_frac = 0;
+  @call text::MSG_VIS_TEXT_SET_POINT_SIZE
+		(number, TEXT_ADDRESS_PAST_END,TEXT_ADDRESS_PAST_END);
+  /*
+   * Set the gstate
+   */
+  GrSetFont(gstate, fontId, MakeWWFixed(number.WWF_int));
+  /* 
+   *  Get the last alignment and set to the text object.  I.e
+   *  STYLE_ALIGN is handled here.
+   */
+  @call self::MSG_GEN_HTML_CONTENT_SET_TEXT_ALIGNMENT(text);
+
+@ifdef PRODUCT_RESPONDER
+    pself = ObjDerefGen(oself);
+@endif
+
+  EC_ERROR_IF(@self->HTGHC_formatIndex > 0 &&
+	      @self->HTGHC_formatStack == NULL, 1);
+
+  for (n = 0; n < @self->HTGHC_formatIndex; n++) {
+    HTListGetItem(@self->HTGHC_formatStack, n, &token, sizeof(StyleType));
+    switch (token) {
+	case STYLE_STRIKE:
+	  @call text::MSG_GEN_TEXT_CHANGE_SIMPLE_RENDERING
+				(ELEMENT_START, TS_STRIKE_THRU);
+	  break;
+	case STYLE_ITALIC:
+	  @call text::MSG_GEN_TEXT_CHANGE_SIMPLE_RENDERING
+				(ELEMENT_START, TS_ITALIC);
+	  break;
+	case STYLE_ANCHOR:
+	  if (@self->HTGHC_hrefToken != -1) {
+	    @call text::MSG_GEN_TEXT_CHANGE_SIMPLE_RENDERING
+				(ELEMENT_START, TS_UNDERLINE);
+@ifdef PRODUCT_RESPONDER
+    pself = ObjDerefGen(oself);
+@endif
+	    @call text::MSG_GEN_TEXT_RECORD_HREF       
+                                (ELEMENT_START, @self->HTGHC_hrefToken);
+	  }
+	  break;
+	case STYLE_BOLD:
+	  @call text::MSG_GEN_TEXT_CHANGE_SIMPLE_RENDERING
+				(ELEMENT_START, TS_BOLD);
+	  break;
+	case STYLE_SUPERSCRIPT:
+	  @call text::MSG_GEN_TEXT_CHANGE_SIMPLE_RENDERING
+				(ELEMENT_START, TS_SUPERSCRIPT);
+	  break;
+	case STYLE_SUBSCRIPT:
+	  @call text::MSG_GEN_TEXT_CHANGE_SIMPLE_RENDERING
+				(ELEMENT_START, TS_SUBSCRIPT);
+	  break;
+	case STYLE_BQ:
+	  FormatSetTextBQ (text, oself);
+	  break;
+  	case STYLE_PARAGRAPH:
+	  break;
+	case STYLE_ALIGN:
+	  break;
+	case STYLE_FONT:
+	  number.WWF_int = @call self::MSG_GEN_HTML_CONTENT_GET_FONT_SIZE();
+	  number.WWF_frac= 0;
+	  @call text::MSG_VIS_TEXT_SET_POINT_SIZE
+	     (number,TEXT_ADDRESS_PAST_END,TEXT_ADDRESS_PAST_END);
+	  break;
+	case STYLE_FW_FONT:
+	  EC_WARNING_IF(!@self->HTGHC_cntFWFont, 1);
+	  @send text::MSG_VIS_TEXT_SET_FONT_ID(FID_DTC_URW_MONO,
+					       TEXT_ADDRESS_PAST_END,
+					       TEXT_ADDRESS_PAST_END);
+	  break;
+	case STYLE_PRE:
+	case STYLE_UL:
+	case STYLE_OL:
+	  /* Already handled */
+	case STYLE_HEADER:
+	case STYLE_DL:
+	  /* does nothing */
+	  break;
+    } /* end of switch */
+@ifdef PRODUCT_RESPONDER
+    pself = ObjDerefGen(oself);
+@endif
+  } 
+  return;
+
+}	/* End of MSG_GEN_HTML_CONTENT_FORMAT_TEXT_OBJECT.	*/
+
+
+/***********************************************************************
+ *	MSG_GEN_HTML_CONTENT_SET_CONTENT for HTGenHtmlContentClass
+ ***********************************************************************
+ * SYNOPSIS:	    Add a new content type to the object.
+ * PARAMETERS:	    (StyleType type)
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	EY	6/16/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method HTGenHtmlContentClass, MSG_GEN_HTML_CONTENT_SET_CONTENT
+{
+  word index;
+
+  if (!@self->HTGHC_formatStack)
+    @self->HTGHC_formatStack = HTListNewWID(uiMgr.UIM_currentDoc->HTUI_memID);
+
+  index = HTListAppend(@self->HTGHC_formatStack, &type, sizeof(StyleType));
+
+  EC_ERROR_IF(index != @self->HTGHC_formatIndex, 1);
+  @self->HTGHC_formatIndex++;
+
+  switch (type) {
+    case STYLE_ANCHOR:
+	@self->HTGHC_cntUnderline++;
+	EC_WARNING_IF(@self->HTGHC_cntUnderline > 1,
+		      UIG_NESTED_ANCHORS_IN_CONTENT);
+	break;
+    case STYLE_BOLD:
+	@self->HTGHC_cntBold++;
+	break;
+    case STYLE_ITALIC:
+	@self->HTGHC_cntItalic++;
+	break;
+    case STYLE_STRIKE:
+	@self->HTGHC_cntStrike++;
+	break;
+    case STYLE_SUPERSCRIPT:
+	@self->HTGHC_cntSuperscript++;
+	break;
+    case STYLE_SUBSCRIPT:
+	@self->HTGHC_cntSubscript++;
+	break;
+    case STYLE_FW_FONT:
+	@self->HTGHC_cntFWFont++;
+	break;
+  }
+  return;
+}	/* End of MSG_GEN_HTML_CONTENT_SET_CONTENT.	*/
+
+
+/***********************************************************************
+ *	MSG_GEN_HTML_CONTENT_REMOVE_CONTENT for HTGenHtmlContentClass
+ ***********************************************************************
+ * SYNOPSIS:	    Remove a content type from the object.
+ * PARAMETERS:	    StyleType (int &counter)
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	EY	6/16/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method HTGenHtmlContentClass, MSG_GEN_HTML_CONTENT_REMOVE_CONTENT
+{
+  StyleType type;
+EC(int cnt;	)
+
+  *counter = 0;
+
+  EC_ERROR_IF(@self->HTGHC_formatIndex == 0, UIG_ERROR_IN_CONTENT_STACK);
+  @self->HTGHC_formatIndex--;
+
+  /*
+   *  Clear stack element.
+   */
+  EC_ERROR_IF(@self->HTGHC_formatStack == NULL, 1);
+  HTListRemoveItem(@self->HTGHC_formatStack, @self->HTGHC_formatIndex,
+		   &type, sizeof(StyleType));
+EC(cnt = HTListGetCount(@self->HTGHC_formatStack);
+   EC_ERROR_IF(cnt != @self->HTGHC_formatIndex, 1); )
+
+  switch (type) {
+    case STYLE_ANCHOR:
+	*counter = --@self->HTGHC_cntUnderline;
+	break;
+    case STYLE_BOLD:
+	*counter = --@self->HTGHC_cntBold;
+	break;
+    case STYLE_ITALIC:
+	*counter = --@self->HTGHC_cntItalic;
+	break;
+    case STYLE_STRIKE:
+	*counter = --@self->HTGHC_cntStrike;
+	break;
+    case STYLE_SUPERSCRIPT:
+	*counter = --@self->HTGHC_cntSuperscript;
+	break;
+    case STYLE_SUBSCRIPT:
+	*counter = --@self->HTGHC_cntSubscript;
+	break;
+    case STYLE_FW_FONT:
+	*counter = --@self->HTGHC_cntFWFont;
+	break;
+  }
+  EC_WARNING_IF(*counter < 0, UIG_UNBALANCED_COUNTER);
+  return type;
+}	/* End of MSG_GEN_HTML_CONTENT_REMOVE_CONTENT.	*/
+
+/***********************************************************************
+ *		MSG_GEN_HTML_CONTENT_SET_BR for HTGenHtmlContentClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    Store the state of <NOBR> content.
+ * PARAMETERS:	    status = STYLE_NOBR, <NOBR> starts
+ *                         or
+ *                         = 0, </NOBR>
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:	    
+ *
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	edwin   	7/10/97   	Initial Revision
+ *	
+ ***********************************************************************/
+@method HTGenHtmlContentClass, MSG_GEN_HTML_CONTENT_SET_BR
+{
+    @self->HTGHC_noBr = status;
+    return;
+}	/* End of MSG_GEN_HTML_CONTENT_SET_BR.	*/
+
+
+/***********************************************************************
+ *	MSG_GEN_HTML_CONTENT_GET_CONTENT_TYPE for HTGenHtmlContentClass
+ ***********************************************************************
+ * SYNOPSIS:	    Get the current content type.
+ * PARAMETERS:	    StyleType ()
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	EY	6/18/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method HTGenHtmlContentClass, MSG_GEN_HTML_CONTENT_GET_CONTENT_TYPE
+{
+  StyleType type;
+
+  if (@self->HTGHC_formatIndex == 0)
+      return -1;
+  EC_ERROR_IF(@self->HTGHC_formatStack == NULL, 1);
+  HTListGetItem(@self->HTGHC_formatStack, @self->HTGHC_formatIndex-1,
+		&type, sizeof(StyleType));
+  return type;
+}	/* End of MSG_GEN_HTML_CONTENT_GET_CONTENT_TYPE.	*/
+
+
+/***********************************************************************
+ *	MSG_GEN_HTML_CONTENT_GET_STYLE_COUNT for HTGenHtmlContentClass
+ ***********************************************************************
+ * SYNOPSIS:	    
+ * PARAMETERS:	    (StyleType type)
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	EY	6/18/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method HTGenHtmlContentClass, MSG_GEN_HTML_CONTENT_GET_STYLE_COUNT
+{
+  int count = 0;
+
+  switch (type) {
+    case STYLE_ANCHOR:
+	count = @self->HTGHC_cntUnderline;
+	break;
+    case STYLE_BOLD:
+	count = @self->HTGHC_cntBold;
+	break;
+    case STYLE_ITALIC:
+	count = @self->HTGHC_cntItalic;
+	break;
+    case STYLE_STRIKE:
+	count = @self->HTGHC_cntStrike;
+	break;
+    case STYLE_SUPERSCRIPT:
+	count = @self->HTGHC_cntSuperscript;
+	break;
+    case STYLE_SUBSCRIPT:
+	count = @self->HTGHC_cntSubscript;
+	break;
+    case STYLE_FW_FONT:
+	count = @self->HTGHC_cntFWFont;
+	break;
+  }
+  return count;
+}	/* End of MSG_GEN_HTML_CONTENT_GET_STYLE_COUNT.	*/
+
+
+/***********************************************************************
+ *	MSG_GEN_HTML_CONTENT_GET_FONT_SIZE for HTGenHtmlContentClass
+ ***********************************************************************
+ * SYNOPSIS:	    Return the current font size
+ * PARAMETERS:	    byte ()
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	EY	6/16/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method HTGenHtmlContentClass, MSG_GEN_HTML_CONTENT_GET_FONT_SIZE
+{
+  WWFixed number;
+  FontType byte;
+
+  if(@self->HTGHC_fontIndex == 0) {
+      if (@self->HTGHC_baseFont) {
+	  /*
+	   * Map the attribute size to the actual font point size.
+	   */
+	  MapAttrSizeToPointSize(@self->HTGHC_baseFont, &number);
+	  return number.WWF_int;
+      }
+      else
+	  return DEFAULT_STYLE_FONT;
+  }
+  EC_ERROR_IF(@self->HTGHC_fontStack == NULL, 1);
+  HTListGetItem(@self->HTGHC_fontStack, @self->HTGHC_fontIndex-1, &byte, 
+		sizeof(FontType));
+  return byte;
+}	/* End of MSG_GEN_HTML_CONTENT_GET_FONT_SIZE.	*/
+
+
+/***********************************************************************
+ *	MSG_GEN_HTML_CONTENT_PUSH_FONT_SIZE for HTGenHtmlContentClass
+ ***********************************************************************
+ * SYNOPSIS:	    Push a font size to the font stack.
+ * PARAMETERS:	    (FontType size)
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	EY	6/17/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method HTGenHtmlContentClass, MSG_GEN_HTML_CONTENT_PUSH_FONT_SIZE
+{
+  word index;
+
+  if (!@self->HTGHC_fontStack)
+      @self->HTGHC_fontStack = HTListNewWID(uiMgr.UIM_currentDoc->HTUI_memID);
+
+  index = HTListAppend(@self->HTGHC_fontStack, &size, sizeof(FontType));
+  EC_ERROR_IF(index != @self->HTGHC_fontIndex, 1);
+
+  @self->HTGHC_fontIndex++;
+
+  return;
+}	/* End of MSG_GEN_HTML_CONTENT_PUSH_FONT_SIZE.	*/
+
+
+/***********************************************************************
+ *	MSG_GEN_HTML_CONTENT_POP_FONT_SIZE for HTGenHtmlContentClass
+ ***********************************************************************
+ * SYNOPSIS:	    Pop a font size off the font stack
+ * PARAMETERS:	    int ();
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	EY	6/17/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method HTGenHtmlContentClass, MSG_GEN_HTML_CONTENT_POP_FONT_SIZE
+{
+  FontType size;
+  WWFixed number;
+
+  if (@self->HTGHC_fontIndex > 0) {
+      EC_ERROR_IF(HTListGetCount(@self->HTGHC_fontStack) != 
+		  @self->HTGHC_fontIndex, 1);;
+      @self->HTGHC_fontIndex--;
+      /* delete current font size */
+      size = 0;
+      EC_ERROR_IF(@self->HTGHC_fontStack == NULL, 1);
+      HTListRemoveItem(@self->HTGHC_fontStack, @self->HTGHC_fontIndex,
+		       &size, sizeof(FontType));
+  }
+  /*
+   *  if @self->HTGHC_fontIndex == 0, then
+   *  Sorry kid, we don't handle <FONT COLOR FACE>.  Thus, </font>
+   *  doesn't have any thing for you.
+   */
+
+  if(@self->HTGHC_fontIndex == 0) {
+      if (@self->HTGHC_baseFont) {
+	  /*
+	   * Map the attribute size to the actual font point size.
+	   */
+	  MapAttrSizeToPointSize(@self->HTGHC_baseFont, &number);
+	  return number.WWF_int;
+      }
+      else
+	  return DEFAULT_STYLE_FONT;
+  }
+
+  /* get the previous font size */
+  EC_ERROR_IF(@self->HTGHC_fontStack == NULL, 1);
+  HTListGetItem(@self->HTGHC_fontStack, @self->HTGHC_fontIndex-1, &size, 
+		sizeof(FontType));
+  return size;
+}	/* End of MSG_GEN_HTML_CONTENT_POP_FONT_SIZE.	*/
+
+
+/***********************************************************************
+ *	MSG_GEN_HTML_CONTENT_GET_BASEFONT for HTGenHtmlContentClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    Return the base font.
+ * PARAMETERS:	    int
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:	    
+ *
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	edwin   	5/12/97   	Initial Revision
+ *	
+ ***********************************************************************/
+@method HTGenHtmlContentClass, MSG_GEN_HTML_CONTENT_GET_BASEFONT
+{
+    if (@self->HTGHC_baseFont)
+	return @self->HTGHC_baseFont;
+    else
+	return DEFAULT_BASEFONT;
+}	/* End of MSG_GEN_HTML_CONTENT_GET_BASEFONT.	*/
+
+
+/***********************************************************************
+ *	MSG_GEN_HTML_CONTENT_SET_BASEFONT for HTGenHtmlContentClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    Set the new base font
+ * PARAMETERS:	    (int size)
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:	    
+ *
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	edwin   	5/12/97   	Initial Revision
+ *	
+ ***********************************************************************/
+@method HTGenHtmlContentClass, MSG_GEN_HTML_CONTENT_SET_BASEFONT
+{
+    @self->HTGHC_baseFont = size;
+    return;
+}	/* End of MSG_GEN_HTML_CONTENT_SET_BASEFONT.	*/
+
+
+
+/***********************************************************************
+ *   MSG_GEN_HTML_CONTENT_PUSH_JUSTIFICATION for HTGenHtmlContentClass
+ ***********************************************************************
+ * SYNOPSIS:	    Push a justification type to the align stack.
+ * PARAMETERS:	    (Justfication align)
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	EY	6/17/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method HTGenHtmlContentClass, MSG_GEN_HTML_CONTENT_PUSH_JUSTIFICATION
+{
+  int index;
+  if (!@self->HTGHC_alignStack)
+    @self->HTGHC_alignStack = HTListNewWID(uiMgr.UIM_currentDoc->HTUI_memID);
+
+  index = HTListAppend(@self->HTGHC_alignStack, &align, sizeof(Justification));
+  EC_ERROR_IF(index != @self->HTGHC_alignIndex, 1);
+
+  @self->HTGHC_alignIndex++;
+  EC_ERROR_IF(@self->HTGHC_alignIndex == 0, UIG_ERROR_IN_CONTENT_STACK);
+  return;
+}	/* End of MSG_GEN_HTML_CONTENT_PUSH_JUSTIFICATION.	*/
+
+
+/***********************************************************************
+ *   MSG_GEN_HTML_CONTENT_POP_JUSTIFICATION for HTGenHtmlContentClass
+ ***********************************************************************
+ * SYNOPSIS:	    Pop off one justification token from the align stack
+ * PARAMETERS:	    none
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	EY	6/17/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method HTGenHtmlContentClass, MSG_GEN_HTML_CONTENT_POP_JUSTIFICATION
+{
+  Justification old;
+
+  if(@self->HTGHC_alignIndex <= 0) {
+	EC_WARNING(UIG_INVALID_OPERATION);
+	return DEFAULT_ALIGNMENT;
+  }
+  @self->HTGHC_alignIndex--;
+
+  /* delete current justification */
+  HTListRemoveItem(@self->HTGHC_alignStack, @self->HTGHC_alignIndex,
+		   &old, sizeof(Justification));
+  EC_ERROR_IF(HTListGetCount(@self->HTGHC_alignStack) != 
+	      @self->HTGHC_alignIndex, 1);
+
+  return old;
+}	/* End of MSG_GEN_HTML_CONTENT_POP_JUSTIFICATION.	*/
+
+
+/***********************************************************************
+ *    MSG_GEN_HTML_CONTENT_GET_JUSTIFICATION for HTGenHtmlContentClass
+ ***********************************************************************
+ * SYNOPSIS:	    Get the current text justification
+ * PARAMETERS:	    Justification (word *br)
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	EY	6/17/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method HTGenHtmlContentClass, MSG_GEN_HTML_CONTENT_GET_JUSTIFICATION
+{
+  Justification just;
+
+  *br = @self->HTGHC_noBr;
+
+  if(@self->HTGHC_alignIndex <= 0)
+	return DEFAULT_ALIGNMENT;
+
+  HTListGetItem(@self->HTGHC_alignStack, @self->HTGHC_alignIndex-1,
+		   &just, sizeof(Justification));
+  return just;
+}	/* End of MSG_GEN_HTML_CONTENT_GET_JUSTIFICATION.	*/
+
+
+/***********************************************************************
+ *	MSG_GEN_HTML_CONTENT_PUSH_LIST_GROUP for HTGenHtmlContentClass
+ ***********************************************************************
+ * SYNOPSIS:	    
+ * PARAMETERS:	    (StyleType groupType, int start, char displayType)
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	EY	6/18/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method HTGenHtmlContentClass, MSG_GEN_HTML_CONTENT_PUSH_LIST_GROUP
+{
+  ListGroup group;
+  int index;
+
+  if (!@self->HTGHC_listStack)
+    @self->HTGHC_listStack = HTListNewWID(uiMgr.UIM_currentDoc->HTUI_memID);
+
+  group.LG_groupType = groupType;
+  group.LG_counter = start;
+  group.LG_displayType = displayType;
+
+  index = HTListAppend(@self->HTGHC_listStack, &group, sizeof(ListGroup));
+  EC_ERROR_IF(index != @self->HTGHC_listIndex, 1);
+
+  @self->HTGHC_listIndex++;
+
+  return;
+}	/* End of MSG_GEN_HTML_CONTENT_PUSH_LIST_GROUP.	*/
+
+
+
+/***********************************************************************
+ *	MSG_GEN_HTML_CONTENT_POP_LIST_GROUP for HTGenHtmlContentClass
+ ***********************************************************************
+ * SYNOPSIS:	    
+ * PARAMETERS:	    none
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	EY	6/18/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method HTGenHtmlContentClass, MSG_GEN_HTML_CONTENT_POP_LIST_GROUP
+{
+  ListGroup group;
+
+  if(@self->HTGHC_listIndex <= 0) {	/* It's impossible, but in case */
+	EC_WARNING(UIG_INVALID_OPERATION);
+	return;
+  }
+
+  EC_ERROR_IF(@self->HTGHC_listStack == NULL, 1);
+  EC_ERROR_IF(HTListGetCount(@self->HTGHC_listStack) != 
+	       @self->HTGHC_listIndex, 1);
+
+  /*
+   *  If there was any previous list group, it has POPPED, so erase it.
+   */
+  @self->HTGHC_listIndex--;
+  /* delete current font size */
+  HTListRemoveItem(@self->HTGHC_listStack, @self->HTGHC_listIndex,
+		       &group, sizeof(ListGroup));
+
+  return;
+}	/* End of MSG_GEN_HTML_CONTENT_POP_LIST_GROUP.	*/
+
+
+/***********************************************************************
+ *	MSG_GEN_HTML_CONTENT_GET_LIST_GROUP for HTGenHtmlContentClass
+ ***********************************************************************
+ * SYNOPSIS:	    Get the latest list goup information.
+ * PARAMETERS:	(StyleType *group,int *counter,char *type,int *level)
+ * 		group - <OL> or <UL>, or -1 if no list groups
+ *		start - the next numeric number for the next list item
+ *		type  - display type, A | a | I | i | 1
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	EY	6/18/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method HTGenHtmlContentClass, MSG_GEN_HTML_CONTENT_GET_LIST_GROUP
+{
+  ListGroup item;
+
+  if (@self->HTGHC_listIndex == 0) {
+	*group = -1;
+	*level = -1;
+	return;
+  }
+  EC_ERROR_IF(@self->HTGHC_listStack == NULL, 1);
+  HTListGetItem(@self->HTGHC_listStack, @self->HTGHC_listIndex-1, &item, 
+		sizeof(ListGroup));
+
+  *group = item.LG_groupType;
+  *counter = item.LG_counter;
+  *type  = item.LG_displayType;
+  *level = @self->HTGHC_listIndex - 1;
+  return;
+}	/* End of MSG_GEN_HTML_CONTENT_GET_LIST_GROUP.	*/
+
+
+
+/***********************************************************************
+ *	MSG_GEN_HTML_CONTENT_UPDATE_COUNTER for HTGenHtmlContentClass
+ ***********************************************************************
+ * SYNOPSIS:	    Update the LG_counter in the current OL group
+ * PARAMETERS:	    (int start)
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	EY	6/18/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method HTGenHtmlContentClass, MSG_GEN_HTML_CONTENT_UPDATE_COUNTER
+{
+  ListGroup group;
+
+  EC_WARNING_IF(@self->HTGHC_listIndex == 0, UIG_INVALID_OPERATION);
+
+  HTListGetItem(@self->HTGHC_listStack, @self->HTGHC_listIndex-1, &group, 
+		sizeof(ListGroup));
+  EC_WARNING_IF(group.LG_groupType != STYLE_OL, UIG_INVALID_OPERATION);
+
+  group.LG_counter = start;
+  HTListReplaceItem(@self->HTGHC_listStack, @self->HTGHC_listIndex - 1,
+		    &group, sizeof(ListGroup));
+  return;
+}	/* End of MSG_GEN_HTML_CONTENT_UPDATE_COUNTER.	*/
+
+
+/***********************************************************************
+ *	MSG_GEN_HTML_CONTENT_INCREMENT_COUNTER for HTGenHtmlContentClass
+ ***********************************************************************
+ * SYNOPSIS:	Increment the counter in the last group info.  This new
+ *		counter value will be the number of the next list item.
+ * PARAMETERS:	    none
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	EY	6/19/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method HTGenHtmlContentClass, MSG_GEN_HTML_CONTENT_INCREMENT_COUNTER
+{
+  ListGroup group;
+  EC_WARNING_IF(@self->HTGHC_listIndex == 0, UIG_INVALID_OPERATION);
+
+  HTListGetItem(@self->HTGHC_listStack, @self->HTGHC_listIndex-1, &group, 
+		sizeof(ListGroup));
+  EC_WARNING_IF(group.LG_groupType != STYLE_OL, UIG_INVALID_OPERATION);
+
+  group.LG_counter++;
+  HTListReplaceItem(@self->HTGHC_listStack, @self->HTGHC_listIndex - 1,
+		    &group, sizeof(ListGroup));
+  return;
+}	/* End of MSG_GEN_HTML_CONTENT_INCREMENT_COUNTER.	*/
+
+
+
+/***********************************************************************
+ *   MSG_GEN_HTML_CONTENT_SET_TEXT_ALIGNMENT for HTGenHtmlContentClass
+ ***********************************************************************
+ * SYNOPSIS:	    
+ * PARAMETERS:	    (optr text);
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	EY	6/16/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method HTGenHtmlContentClass, MSG_GEN_HTML_CONTENT_SET_TEXT_ALIGNMENT
+{
+  VisTextParaAttrAttributes new_attr = 0, old_attr = 0;
+  Justification	new_just, old_just = 255;
+  /*
+   * Get the last align token off the stack.
+   */
+  if(@self->HTGHC_alignIndex == 0)
+	new_just = DEFAULT_ALIGNMENT;
+  else
+      HTListGetItem(@self->HTGHC_alignStack, @self->HTGHC_alignIndex-1,
+		   &new_just, sizeof(Justification));
+  if (@self->HTGHC_alignIndex > 1)
+      HTListGetItem(@self->HTGHC_alignStack, @self->HTGHC_alignIndex-2,
+		   &old_just, sizeof(Justification));
+
+  /*
+   * Set the alignment.
+   */
+  new_attr = new_just << VTPAA_JUSTIFICATION_OFFSET;
+  old_attr = old_just << VTPAA_JUSTIFICATION_OFFSET;
+  @call text::MSG_VIS_TEXT_SET_PARA_ATTRIBUTES(
+		old_attr, new_attr, 
+		TEXT_ADDRESS_PAST_END,
+		TEXT_ADDRESS_PAST_END);
+  return;
+}	/* End of MSG_GEN_HTML_CONTENT_SET_TEXT_ALIGNMENT.	*/
+
+
+
+/***********************************************************************
+ *	MSG_GEN_HTML_CONTENT_SET_HREF_TOKEN for HTGenHtmlContentClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    Store the hyperlink token.
+ * PARAMETERS:	    (int token)
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	edwin	10/ 6/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method HTGenHtmlContentClass, MSG_GEN_HTML_CONTENT_SET_HREF_TOKEN
+{
+  @self->HTGHC_hrefToken = token;
+}	/* End of MSG_GEN_HTML_CONTENT_SET_HREF_TOKEN.	*/
+
+
+
+/***********************************************************************
+ *MSG_GEN_HTML_CONTENT_GET_PREV_SIBLING_R_EDGE for HTGenHtmlContentClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    Given the current object, find the current row
+ *                  number and its x position in the row.
+ * PARAMETERS:	    (optr obj, SizeAsDWord size, int *row, 
+ *                   optr *prevObj, word *br);
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	edwin	10/25/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method HTGenHtmlContentClass, MSG_GEN_HTML_CONTENT_GET_PREV_SIBLING_R_EDGE
+{
+  if (@self->HTGHC_currentObj != obj) {
+    Boolean isObjImage = @call obj::MSG_META_IS_OBJECT_IN_CLASS(&HTGenImageClass) ;
+
+
+    /*
+     *  If this is a new object encountered for the first time(i.e.
+     *  the previous object has settled), we update instance data
+     *  to calculate the x position of the new object.
+     */
+    @self->HTGHC_accumulatedPrevWidth += @self->HTGHC_widthCurrentObj;
+    if (!isObjImage) {
+      @self->HTGHC_accumulatedPrevWidth += MARGIN ;
+      @self->HTGHC_accumulatedMargin += MARGIN ;
+    } 
+    if (!@self->HTGHC_maxHeightInRow)
+      @self->HTGHC_maxHeightInRow = DWORD_HEIGHT(size);
+    else if (@self->HTGHC_heightCurrentObj > @self->HTGHC_maxHeightInRow) {
+      @self->HTGHC_maxHeightInRow = @self->HTGHC_heightCurrentObj;
+    }
+    *prevObj = @self->HTGHC_currentObj;
+    @self->HTGHC_currentObj = obj;
+  }
+  else
+    *prevObj = NULL;
+  @self->HTGHC_widthCurrentObj = DWORD_WIDTH(size);
+  @self->HTGHC_heightCurrentObj= DWORD_HEIGHT(size);
+  /*
+   *  The new object is in the row number = array index + 1.
+   *  The height element(array index + 1) doesn't exist in the height 
+   *  array yet because we don't know its height until we will have
+   *  encountered all the objects in the new row.
+   */
+  *row = @self->HTGHC_rowIndex + 1;
+  *br = @self->HTGHC_noBr;
+  *sumMargin = @self->HTGHC_accumulatedMargin;
+  return @self->HTGHC_accumulatedPrevWidth;
+}	/* End of MSG_GEN_HTML_CONTENT_GET_PREV_SIBLING_R_EDGE.	*/
+
+
+
+/***********************************************************************
+ *	MSG_GEN_HTML_CONTENT_RESET_ROW_COUNTER for HTGenHtmlContentClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    Clear the variables and array that keep track of 
+ *                  row information(specifically the row heights).
+ * PARAMETERS:	    none
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	edwin	11/ 1/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method HTGenHtmlContentClass, MSG_GEN_HTML_CONTENT_RESET_ROW_COUNTER
+{
+  @self->HTGHC_rowIndex = -1;
+  @self->HTGHC_currentObj = NULL;
+  @self->HTGHC_maxHeightInRow = @self->HTGHC_heightCurrentObj = 
+  @self->HTGHC_widthCurrentObj = 0;
+  @self->HTGHC_sumOfHeights = MARGIN;    /* top margin */
+  @self->HTGHC_accumulatedPrevWidth = 0; 
+  @self->HTGHC_accumulatedMargin = 0;
+  @self->HTGHC_maxRowWidth = MARGIN;
+  /*
+   *  heightArray stores the heights of each row.
+   */
+  if (@self->HTGHC_heightArray)
+      HTListDeleteAllItems(@self->HTGHC_heightArray);
+  else
+      @self->HTGHC_heightArray = HTListNewWID(uiMgr.UIM_currentDoc->HTUI_memID);
+  /*
+   *  rowArray stores the line with of each row.
+   */
+  if (@self->HTGHC_rowArray)
+      HTListDeleteAllItems(@self->HTGHC_rowArray);
+  else
+      @self->HTGHC_rowArray = HTListNewWID(uiMgr.UIM_currentDoc->HTUI_memID);
+
+  return;
+}	/* End of MSG_GEN_HTML_CONTENT_RESET_ROW_COUNTER.	*/
+
+
+
+/***********************************************************************
+ *	MSG_GEN_HTML_CONTENT_GET_ROW_HEIGHT for HTGenHtmlContentClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    Given the row number, return its absolute y- 
+ *                  document coordinate.
+ * PARAMETERS:	    (int row);
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	edwin	10/25/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method HTGenHtmlContentClass, MSG_GEN_HTML_CONTENT_GET_ROW_HEIGHT
+{
+  int height = 0;
+
+  EC_ERROR_IF(row > @self->HTGHC_rowIndex, 1);
+  HTListGetItem(@self->HTGHC_heightArray, row, &height, sizeof(int));
+  return height;
+}	/* End of MSG_GEN_HTML_CONTENT_GET_ROW_HEIGHT.	*/
+
+
+
+/***********************************************************************
+ *	MSG_GEN_HTML_CONTENT_GET_ROW_WIDTH for HTGenHtmlContentClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    Given the row number, return its absolute y- 
+ *                  document coordinate.
+ * PARAMETERS:	    (int row);
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	edwin	10/25/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method HTGenHtmlContentClass, MSG_GEN_HTML_CONTENT_GET_ROW_WIDTH
+{
+  int width = 0;
+
+  EC_ERROR_IF(row > @self->HTGHC_rowIndex, 1);
+  HTListGetItem(@self->HTGHC_rowArray, row, &width, sizeof(int));
+  return width;
+}	/* End of MSG_GEN_HTML_CONTENT_GET_ROW_HEIGHT.	*/
+
+
+#ifdef __HIGHC__
+#pragma Code("CONTENTSTARTROW");
+#endif
+#ifdef __BORLANDC__
+#pragma codeseg CONTENTSTARTROW
+#endif
+
+
+/***********************************************************************
+ *	MSG_GEN_HTML_CONTENT_START_NEW_ROW for HTGenHtmlContentClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    IF currentObj is not NULL, the current row is filled
+ *                  up with objects.  So, append the current row height
+ *                  to the HTGHC_heightArray.  Initialize all the 
+ *                  instance variables for the next new row.
+ *                  IF the passed currentObj is NULL, that means we
+ *                  finish adding objects to the current row.  Thus, 
+ *                  we need to update the last row information.
+ * PARAMETERS:	    int (SizeAsDWord size, int *row, optr currentObj);
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	edwin	10/27/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method HTGenHtmlContentClass, MSG_GEN_HTML_CONTENT_START_NEW_ROW
+{
+  word chunk, width;
+  optr parent, child, view;
+  int rowNum, count;
+  GStateHandle gstate;
+  RectDWord rect;
+  Rectangle objrect;
+  /*
+   *  Add the current row height(= height of the highest object in the 
+   *  row) to the accmulator (sumOfHeights).
+   */
+  /* Also add the bottom margin */
+  if (@self->HTGHC_maxHeightInRow < MARGIN) {
+    @self->HTGHC_maxHeightInRow += MARGIN ;
+  }
+
+  @self->HTGHC_sumOfHeights += @self->HTGHC_maxHeightInRow;
+
+  /*
+   *  Append the height of the finished row in the heightArray.
+   */
+  chunk = HTListAppend
+    (@self->HTGHC_heightArray, &(@self->HTGHC_sumOfHeights), sizeof(word));
+@ifdef PRODUCT_RESPONDER
+    pself = ObjDerefGen(oself);
+@endif
+  EC_ERROR_IF(@self->HTGHC_rowIndex+1 != chunk, 1);
+  @self->HTGHC_rowIndex = chunk;
+  /*
+   *  The future new object is in the row number = array index + 1.
+   *  The height element(array index + 1) doesn't exist in the height 
+   *  array yet because we don't know its height until we will have
+   *  encountered all the objects in the new row.
+   */
+  *row = @self->HTGHC_rowIndex + 1;
+  /*
+   *  Update the maximum row width.
+   */
+@ifdef PRODUCT_RESPONDER
+    pself = ObjDerefGen(oself);
+@endif
+  @self->HTGHC_accumulatedPrevWidth += MARGIN; /* add right margin */
+  @self->HTGHC_accumulatedMargin += MARGIN;
+  /*
+   *  If the previous row is widest, update the max row width.
+   */
+  if (@self->HTGHC_accumulatedPrevWidth > @self->HTGHC_maxRowWidth)
+    @self->HTGHC_maxRowWidth = @self->HTGHC_accumulatedPrevWidth;
+  /*
+   *  If the currentObj == NULL, that means we're finishing up the last
+   *  row.  
+   */
+  if (!currentObj) {
+      if ((width = (@self->HTGHC_widthCurrentObj + 
+	  @self->HTGHC_accumulatedPrevWidth)) > 
+	  @self->HTGHC_maxRowWidth)
+	@self->HTGHC_maxRowWidth = width;
+      @self->HTGHC_accumulatedPrevWidth = 0;
+      @self->HTGHC_accumulatedMargin = 0;
+  }
+  else {
+    width = @self->HTGHC_accumulatedPrevWidth;
+    /*
+     *  The object doesn't fit in the prevoius row, so it starts
+     *  at a new row with a right margin.
+     */
+    @self->HTGHC_accumulatedPrevWidth = MARGIN; /* left margin */
+    @self->HTGHC_accumulatedMargin = MARGIN;
+  }
+
+  /*
+   *  Store the current row width in the rowArray.
+   */
+  chunk = HTListAppend(@self->HTGHC_rowArray, &width, sizeof(int));
+  EC_ERROR_IF(chunk != @self->HTGHC_rowIndex, 1);
+
+  /*
+   *  Initialize maxHeightInRow to the the height of the first object 
+   *  in the new row.
+   */
+  @self->HTGHC_maxHeightInRow = @self->HTGHC_heightCurrentObj = 
+      DWORD_HEIGHT(size);
+  @self->HTGHC_widthCurrentObj = DWORD_WIDTH(size);
+  @self->HTGHC_currentObj = currentObj;    /* set new current object */
+  /*
+   *  Return if it's a table/form/caption object.  We'll do drawing when the 
+   *  complete table object is set usable.
+   */
+  if (@call oself::MSG_META_IS_OBJECT_IN_CLASS(&HTGenTCellClass) ||
+      @call oself::MSG_META_IS_OBJECT_IN_CLASS(&HTGenCaptionClass))
+      return @self->HTGHC_accumulatedPrevWidth;
+
+  parent = @call self::MSG_GEN_HTML_CONTENT_GET_PM_IF_GLOBAL();
+  if (!parent)
+      parent = oself;
+
+  /***********************************************************************
+   *  THE FOLLOWING CODE IS EXECUTED ONLY FOR THE GLOBAL CONTENT OBJECT  *
+   ***********************************************************************/
+  gstate = @call parent::MSG_VIS_VUP_CREATE_GSTATE();
+  view = @call parent::MSG_VIS_VUP_FIND_OBJECT_OF_CLASS(&GenViewClass);
+  @call view::MSG_GEN_VIEW_GET_VISIBLE_RECT(&rect);
+
+@ifdef PRODUCT_RESPONDER
+	pself = ObjDeref(oself, word_offsetof(GenBase, Gen_offset));
+@endif
+
+  for (count = @call parent::MSG_GEN_COUNT_CHILDREN() - 1; count>=0; count--){
+      child = @call parent::MSG_GEN_FIND_CHILD_AT_POSITION(count);
+      rowNum = @call child::MSG_UI_GET_ROW_POSITION();
+@ifdef PRODUCT_RESPONDER
+	pself = ObjDeref(oself, word_offsetof(GenBase, Gen_offset));
+@endif
+      if (rowNum > @self->HTGHC_rowIndex || rowNum == -1)
+	  continue;
+      else if (rowNum == @self->HTGHC_rowIndex) {
+	  @call child::MSG_VIS_POSITION_BRANCH(0,0);
+	  @call child::MSG_VIS_GET_BOUNDS(&objrect);
+	  if (objrect.R_top<rect.RD_bottom && objrect.R_bottom>rect.RD_top &&
+	      objrect.R_left < rect.RD_right && objrect.R_right > rect.RD_left)
+	      @call child::MSG_VIS_DRAW(DF_EXPOSED, gstate);
+      }
+      else
+	  break;
+  }
+@ifdef PRODUCT_RESPONDER
+	pself = ObjDeref(oself, word_offsetof(GenBase, Gen_offset));
+@endif
+
+  GrDestroyState(gstate);
+  /*
+   *  Extend the size of content if needed.
+   */
+@ifdef PRODUCT_RESPONDER
+	pself = ObjDeref(oself, word_offsetof(GenBase, Gen_offset));
+@endif
+  @call @self->HTGHC_pmObj::MSG_VIS_GET_BOUNDS(&objrect);
+  if (@self->HTGHC_sumOfHeights > objrect.R_bottom + Y_SCREEN_SIZE) {
+      optr parent;
+      SizeAsDWord sz;
+      int width;
+      EC_ERROR_IF(objrect.R_top > 0, 1);
+      parent = @call @self->HTGHC_pmObj::MSG_GEN_FIND_PARENT();
+      width = (@self->HTGHC_maxRowWidth > X_SCREEN_SIZE) ?
+	  @self->HTGHC_maxRowWidth : X_SCREEN_SIZE;
+      sz = MAKE_SIZE_DWORD(width, @self->HTGHC_sumOfHeights);
+      @call parent::MSG_HTML_CONTENT_SET_VIEW_DOC_BOUNDS(sz);
+      @call parent::MSG_VIS_SET_SIZE(width,@self->HTGHC_sumOfHeights);
+      @call @self->HTGHC_pmObj::MSG_VIS_SET_SIZE
+	  (width, @self->HTGHC_sumOfHeights);
+  }
+  return @self->HTGHC_accumulatedPrevWidth;
+}	/* End of MSG_GEN_HTML_CONTENT_START_NEW_ROW.	*/
+
+
+
+/***********************************************************************
+ *	MSG_GEN_HTML_CONTENT_GET_DIMENSION for HTGenHtmlContentClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    Sum up all the row heights in document.
+ * PARAMETERS:	    (word width, word height);
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	edwin	10/27/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method HTGenHtmlContentClass, MSG_GEN_HTML_CONTENT_GET_DIMENSION
+{
+  int currWidth;
+
+  currWidth = MARGIN + 
+      @self->HTGHC_accumulatedPrevWidth + @self->HTGHC_widthCurrentObj;
+
+  *width = (@self->HTGHC_maxRowWidth > currWidth) ?
+      @self->HTGHC_maxRowWidth : (@self->HTGHC_maxRowWidth = currWidth);
+  if (*width <= MARGIN) {
+      *width = 1;
+      *height = 1;
+      return;  /* object is is small to be significant */
+  }
+  /*
+   *  HTGHC_sumOfHeights accumulates the row heights up to n-1 rows.
+   *  HTGHC_maxHeightInRow keeps the row height of the n_th row.
+   */
+  *height = @self->HTGHC_sumOfHeights + @self->HTGHC_maxHeightInRow;
+  return;
+}	/* End of MSG_GEN_HTML_CONTENT_GET_DIMENSION.	*/
+
+
+
+/***********************************************************************
+ *	MSG_GEN_HTML_CONTENT_UPDATE_MAX_HEIGHT for HTGenHtmlContentClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    Update the max height of the object in a row.
+ * PARAMETERS:	    none
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	edwin	11/25/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method HTGenHtmlContentClass, MSG_GEN_HTML_CONTENT_UPDATE_MAX_HEIGHT
+{
+  /*
+   *  HTGHC_heightCurrentObj is the height of the last object in the row.
+   *  If it's greater the the max. height seen previously, update the max.
+   */
+  if (@self->HTGHC_heightCurrentObj > @self->HTGHC_maxHeightInRow)
+       @self->HTGHC_maxHeightInRow = @self->HTGHC_heightCurrentObj;
+  return;
+}	/* End of MSG_GEN_HTML_CONTENT_UPDATE_MAX_HEIGHT.	*/
+
+
+/***********************************************************************
+ *  MSG_GEN_HTML_CONTENT_GET_SUGGESTED_SIZE for HTGenHtmlContentClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    
+ * PARAMETERS:	    
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:	    
+ *
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	edwin   	5/16/97   	Initial Revision
+ *	
+ ***********************************************************************/
+@method HTGenHtmlContentClass, MSG_GEN_HTML_CONTENT_GET_SUGGESTED_SIZE
+{
+  word width; /* , height; */
+
+/*
+  height = @call self::MSG_GEN_HTML_CONTENT_SUM_ROW_HEIGHTS();
+  width = @self->HTGHC_maxRowWidth;
+  if (width < X_SCREEN_SIZE - MARGIN - MARGIN)
+ */
+
+  width = X_SCREEN_SIZE - MARGIN - MARGIN;
+
+  return width;
+}	/* End of MSG_GEN_HTML_CONTENT_GET_SUGGESTED_SIZE.	*/
+
+
+/***********************************************************************
+ *	MSG_GEN_HTML_CONTENT_GET_PM_IF_GLOBAL for HTGenHtmlContentClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    Reture the pm ojbect if this content is the global
+ *                  formating content object.
+ * PARAMETERS:	    
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:	    
+ *
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	edwin   	5/21/97   	Initial Revision
+ *	
+ ***********************************************************************/
+@method HTGenHtmlContentClass, MSG_GEN_HTML_CONTENT_GET_PM_IF_GLOBAL
+{
+    return @self->HTGHC_pmObj;
+}	/* End of MSG_GEN_HTML_CONTENT_GET_PM_IF_GLOBAL.	*/
+
+
+/***********************************************************************
+ *		MSG_GEN_HTML_CONTENT_SET_PM for HTGenHtmlContentClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    Store the PresentationManager object.
+ * PARAMETERS:	    (optr pm);
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:	    
+ *
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	edwin   	5/21/97   	Initial Revision
+ *	
+ ***********************************************************************/
+@method HTGenHtmlContentClass, MSG_GEN_HTML_CONTENT_SET_PM
+{
+    @self->HTGHC_pmObj = pm;
+}	/* End of MSG_GEN_HTML_CONTENT_SET_PM.	*/
+
+
+/***********************************************************************
+ *		UpdateHeightArray
+ ***********************************************************************
+ *
+ * SYNOPSIS:	An object in a row expands the row height, so we need to
+ *              add the difference of the old and height to the 
+ *              following rows.  Note: all heights are in absolute 
+ *              document coordinate.
+ * CALLED BY:	
+ * RETURN:	the sum of the heights of rows in the document.
+ *	
+ * STRATEGY:	
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	edwin   	9/ 4/97   	Initial Revision
+ *	
+ ***********************************************************************/
+word
+UpdateHeightArray 
+(word newHeight, word heightPrevRow, HTListHandle heightArray, int row, 
+ word totalCnt, optr parent, optr firstObj, int firstIndex)
+{
+    optr obj, view;
+    word objRow;
+    int diff, left, top, right, bottom;
+    RectDWord viewBound;
+    Rectangle objBound;
+    /*
+     *  diff can be positive(expanding) or negative(shrinking).
+     */
+    diff = heightPrevRow - newHeight;
+    /*
+     *  Update the row height for the row.
+     */
+    HTListReplaceItem(heightArray, row, 
+		      &heightPrevRow, sizeof(int));
+    /*  if (row+1 < totalCnt)
+     *  Update the rest of row heights: simply add the difference.
+     */
+    for (objRow = row+1; objRow < totalCnt; objRow++) {
+	HTListGetItem(heightArray, objRow,
+		      &heightPrevRow, sizeof(int));
+	heightPrevRow += diff;
+	HTListReplaceItem(heightArray,
+			  objRow, &heightPrevRow, sizeof(int));
+    }
+    /*
+     *  Re-positioning starting from the firstObj, i.e. the first obj
+     *  of the row in which the passed obj changes its size.
+     */
+    view = @call parent::MSG_VIS_VUP_FIND_OBJECT_OF_CLASS(&GenViewClass);
+    @call view::MSG_GEN_VIEW_GET_VISIBLE_RECT(&viewBound);
+    for (obj = firstObj; obj; ){
+	if (!@call obj::MSG_VIS_FIND_PARENT())
+	    break;  /* rest of siblings are not positioned yet */
+	/*
+	 *  invalid the old position.
+	 */
+	@call obj::MSG_VIS_GET_BOUNDS(&objBound);
+	if (objBound.R_left < viewBound.RD_right && 
+	    objBound.R_right > viewBound.RD_left && 
+	    objBound.R_top < viewBound.RD_bottom &&
+	    objBound.R_bottom > viewBound.RD_top) {
+
+	    left = objBound.R_left - viewBound.RD_left;
+	    top = objBound.R_top - viewBound.RD_top;
+	    right = objBound.R_right - viewBound.RD_left;
+	    bottom = objBound.R_bottom - viewBound.RD_top;
+	    if (diff < 0) {
+		bottom -= diff;
+		top += diff;
+	    }
+	    else {
+		bottom += diff;
+		top -= diff;
+	    }
+	    InvalidRegion (parent, left, top, right, bottom);
+	}
+	@call obj::MSG_VIS_POSITION_BRANCH(0,0);
+	obj = @call parent::MSG_GEN_FIND_CHILD_AT_POSITION(++firstIndex);
+    }
+    return heightPrevRow;
+}	/* End of UpdateHeightArray.	*/
+
+
+#ifdef __HIGHC__
+#pragma Code("CONTENTRECALC");
+#endif
+#ifdef __BORLANDC__
+#pragma codeseg CONTENTRECALC
+#endif
+
+
+/***********************************************************************
+ *	MSG_GEN_HTML_CONTENT_RECALC_POSITIONS for HTGenHtmlContentClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    Re-position objects to the right of and below the
+ *                  passed startObj that just changed its size.
+ * PARAMETERS:	    (optr startObj, optr parent)
+ *                  startObj - the object whose size just changed.
+ *                  parent   - can be oself, or can be PManager.
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:	    
+ *
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	edwin   	6/ 3/97   	Initial Revision
+ *	
+ ***********************************************************************/
+@method HTGenHtmlContentClass, MSG_GEN_HTML_CONTENT_RECALC_POSITIONS
+{
+  int startPos, startRow, row, i, firstIndex, objRow, tmp, nextRow;
+  optr obj, firstObj;
+  SizeAsDWord objSize;
+  word pWidth, heightPrevRow, heightCurrRow, accWidthCurrRow = MARGIN,
+       accumulatedMargin = MARGIN,
+       totalCnt = HTListGetCount(@self->HTGHC_heightArray), diff;
+  optr view;
+  RectDWord viewBound;
+  Rectangle objBound;
+  optr stopObj;
+
+  if(@self->HTGHC_rowIndex < 0) {
+      /* This can happen when loading *.gif or .jpg file directly */
+      @call self::MSG_GEN_HTML_CONTENT_START_NEW_ROW(0, &nextRow, startObj);
+      totalCnt = HTListGetCount(@self->HTGHC_heightArray);
+  }
+  /*
+   *  Scan to the first object in the row.
+   *  While scanning backward in this row, find max height of objects seen
+   *  so far in the backward direction, also accumulate the widths.
+   */
+  startPos = @call parent::MSG_GEN_FIND_CHILD(startObj);
+  startRow = @call startObj::MSG_UI_GET_ROW_POSITION();
+  obj = startObj;
+  for (i = startPos - 1, heightCurrRow = 0; i >= 0; i--) {
+    firstObj = obj;
+    obj = @call parent::MSG_GEN_FIND_CHILD_AT_POSITION(i);
+    row = @call obj::MSG_UI_GET_ROW_POSITION();
+    if (row == -1)
+	continue;  /*  it may be a HTGenFormHiddenClass */
+    if (row != startRow)
+	break;  /*  Break if we reach an object in the previous row. */
+    EC_ERROR_IF(row > startRow, 1);
+    /*
+     *  Got one object still in the current row in the backward direction.
+     *  Now update the max height and accumulate the width.
+     */
+    objSize = @call obj::MSG_VIS_GET_SIZE();
+    if (heightCurrRow < DWORD_HEIGHT(objSize))
+      heightCurrRow = DWORD_HEIGHT(objSize);
+    if (!@call obj::MSG_META_IS_OBJECT_IN_CLASS(&HTGenImageClass)) {
+        accWidthCurrRow += (DWORD_WIDTH(objSize) + MARGIN);
+        accumulatedMargin += MARGIN;
+    }
+  }
+  firstIndex = i+1; /* the child index of the first object in the startRow */
+  if (i == -1) {
+    /*
+     *  startObj is already the first object in the row.  In fact,
+     *  the row is the first row of the document.
+     */
+    firstObj = obj;
+  }
+  if (startRow < 1)
+    heightPrevRow = MARGIN;
+  else
+    /*
+     *  startObj is in a row other than the first row.  Thus, let's get the
+     *  absolute height of the previous row.  Later, we'll calculate the
+     *  new absolute height this current row where the startObj changes its
+     *  size.
+     */
+    HTListGetItem(@self->HTGHC_heightArray, startRow-1,
+		  &heightPrevRow, sizeof(int));
+
+  if (parent == uiMgr.UIM_currentDoc->HTUI_pmanager)
+      pWidth = @call uiMgr.UIM_currentDoc->HTUI_pmContent::
+	  MSG_GEN_HTML_CONTENT_GET_SUGGESTED_SIZE();
+  else
+      pWidth = @call parent::MSG_GEN_HTML_CONTENT_GET_SUGGESTED_SIZE();
+  objSize = @call startObj::MSG_VIS_GET_SIZE();
+  if (pWidth < DWORD_WIDTH(objSize))
+      /* 
+       * The startObj will expand its parent size anyway, so the pWidth
+       * should be updated to the size of objSize.
+       */
+      pWidth = DWORD_WIDTH(objSize);
+
+  /*
+   *         (-:        LET'S REPOSITION OBJECTS       :-)
+   *
+   *  startPos - the child index of the passed object whose size 
+   *             just changed.
+   *  startRow - the row in which the passed object changed its size, 0-based.
+   *  heightCurrRow - height of tallest object to the left of 
+   *                  startObj in the same row.
+   *  accWidthCurrRow - the sum of widths of all objects to the left of
+   *                 startObj in the same row.
+   *  heightPrevRow - the Y document position of the previous row.
+   *  accumulatedMargin - accmulate the spaces between objects in 
+   *                      the same row.
+   */
+  for (i = startPos, obj = startObj, row = startRow;
+       obj;
+       i++, obj = @call parent::MSG_GEN_FIND_CHILD_AT_POSITION(i)) {
+
+    Boolean isObjImage = @call obj::
+			MSG_META_IS_OBJECT_IN_CLASS(&HTGenImageClass) ;
+
+    objSize = @call obj::MSG_VIS_GET_SIZE();
+
+    if ((objRow = @call obj::MSG_UI_GET_ROW_POSITION()) > row) {
+      /*
+       *  We've reach an object that is already beyond the current adjusted 
+       *  row.  We can stop repositioning all the following objects.
+       */
+      HTListReplaceItem(@self->HTGHC_rowArray, row, 
+			&accWidthCurrRow, sizeof(int));
+      /*
+       *  Update the max row width.
+       */
+      if (accWidthCurrRow > @self->HTGHC_maxRowWidth) 
+	@self->HTGHC_maxRowWidth = accWidthCurrRow; /* +MARGIN; */
+      /*
+       *  Update the rest of row heights.
+       */
+	heightPrevRow += heightCurrRow + MARGIN;
+/******
+      if (!isObjImage) {
+	heightPrevRow += heightCurrRow + MARGIN;
+      }
+******/
+      HTListGetItem(@self->HTGHC_heightArray, row,
+		    &diff, sizeof(int));
+      if (diff != heightPrevRow) {
+	  heightPrevRow = UpdateHeightArray
+	      (diff, heightPrevRow, @self->HTGHC_heightArray, row, totalCnt, 
+	       parent, firstObj, firstIndex);
+	  @self->HTGHC_sumOfHeights = heightPrevRow;
+      }
+      else {
+	/*
+	 *  Object didn't change size.  No resizing, no repositioning.
+	 *  Simply return the hiehgt of the whole document.
+	 */
+	HTListGetItem(@self->HTGHC_heightArray, totalCnt-1,
+			&heightPrevRow, sizeof(int));
+	stopObj = obj;
+	obj = @call parent::MSG_GEN_FIND_CHILD_AT_POSITION(firstIndex);
+
+	view = @call parent::MSG_VIS_VUP_FIND_OBJECT_OF_CLASS(&GenViewClass);
+	@call view::MSG_GEN_VIEW_GET_VISIBLE_RECT(&viewBound);
+
+	for (; obj && obj != stopObj; ) {
+	    if (!@call obj::MSG_VIS_FIND_PARENT())
+		break; /*  Following sibling objects are not built yet. */
+	    @call obj::MSG_VIS_GET_BOUNDS(&objBound);
+	    InvalidRegion (parent, 
+			   objBound.R_left - viewBound.RD_left,
+			   objBound.R_top - viewBound.RD_top,
+			   objBound.R_right - viewBound.RD_left,
+			   objBound.R_bottom - viewBound.RD_top);
+	    @call obj::MSG_VIS_POSITION_BRANCH(0,0);
+	    @send obj::MSG_VIS_MARK_INVALID(VOF_IMAGE_INVALID,
+					    VUM_DELAYED_VIA_UI_QUEUE);
+	    obj = @call parent::MSG_GEN_FIND_CHILD_AT_POSITION(++firstIndex);
+	}
+      }
+EC(   for (objRow = 0, i=0; objRow < totalCnt; objRow++) {
+        HTListGetItem(@self->HTGHC_heightArray, objRow, 
+		      &heightCurrRow, sizeof(int));
+	EC_ERROR_IF(i >= heightCurrRow, 1);
+	i = heightCurrRow;
+      } )
+      return MAKE_SIZE_DWORD(@self->HTGHC_maxRowWidth, heightPrevRow);
+    }
+    /*
+     *  Can the object fit in the currently adjusted row?
+     */
+    if (accWidthCurrRow <= MARGIN || 
+	accWidthCurrRow + DWORD_WIDTH(objSize) <= 
+	(pWidth + accumulatedMargin)) {
+	/*
+	 *  The object can FIT in the current row.  Row is 0-based.
+	 */
+	@call obj::MSG_UI_SET_NEW_POSITION(accWidthCurrRow, row);
+	accWidthCurrRow += DWORD_WIDTH(objSize);
+	if (!isObjImage) {
+	  accWidthCurrRow += MARGIN;
+	  accumulatedMargin += MARGIN;
+	}
+	if (heightCurrRow < DWORD_HEIGHT(objSize))
+	  heightCurrRow = DWORD_HEIGHT(objSize);
+    }
+    else {
+      /*
+       *  Can't fit in the current line.  Thus, let's wrap up all the 
+       *  information of the current line before reseting variables for
+       *  the next line.
+       */
+      heightPrevRow += heightCurrRow + MARGIN;
+/*****
+      if (!isObjImage) {
+        heightPrevRow += MARGIN;
+      }
+*****/
+      if (row < totalCnt) {
+	  HTListGetItem(@self->HTGHC_heightArray, row,
+			&diff, sizeof(int));
+	  if (diff != heightPrevRow) {
+	      @self->HTGHC_sumOfHeights = UpdateHeightArray
+		  (diff, heightPrevRow, @self->HTGHC_heightArray, row, 
+		   totalCnt, parent, firstObj, firstIndex);
+	  }
+	  HTListReplaceItem(@self->HTGHC_rowArray,
+			    row, &accWidthCurrRow, sizeof(int));
+      }
+      else {
+	  @self->HTGHC_rowIndex++;
+	  totalCnt++;
+	  tmp = HTListAppend(@self->HTGHC_heightArray,
+		       &heightPrevRow, sizeof(int));
+	  EC_ERROR_IF(tmp != @self->HTGHC_rowIndex, 1);
+	  tmp = HTListAppend(@self->HTGHC_rowArray,
+		       &accWidthCurrRow, sizeof(int));
+	  EC_ERROR_IF(tmp != @self->HTGHC_rowIndex, 1);
+	  EC_ERROR_IF(@self->HTGHC_sumOfHeights > heightPrevRow, 1);
+	  @self->HTGHC_sumOfHeights = heightPrevRow;
+      }
+/*      EC_ERROR_IF(!(@self->GI_states & GS_USABLE), 1); */
+      row++;
+      if (!isObjImage) {
+      @call obj::MSG_UI_SET_NEW_POSITION(MARGIN, row);
+      } else {
+	@call obj::MSG_UI_SET_NEW_POSITION(0, row);
+      }
+      if (accWidthCurrRow > @self->HTGHC_maxRowWidth)
+	@self->HTGHC_maxRowWidth = accWidthCurrRow; /* + MARGIN; */
+      accWidthCurrRow = DWORD_WIDTH(objSize) ;
+      if (!isObjImage) {
+        accWidthCurrRow = MARGIN + MARGIN;
+        accumulatedMargin = MARGIN+MARGIN;
+      }
+      heightCurrRow = DWORD_HEIGHT(objSize);
+    }
+  }
+  /*
+   *  We've run out of children object of the parent.  Let's update the
+   *  information of the last row.
+   */
+  /* JB: 6/8/98: Not changing this code: don't have an obj to refer to */
+  heightPrevRow += heightCurrRow + MARGIN;
+  if (row < totalCnt) {
+    HTListGetItem(@self->HTGHC_heightArray, row,
+		  &diff, sizeof(int));
+    if (diff != heightPrevRow) {
+	heightPrevRow = UpdateHeightArray
+	    (diff, heightPrevRow, @self->HTGHC_heightArray, row, 
+	     totalCnt, parent, firstObj, firstIndex);
+	@self->HTGHC_sumOfHeights = heightPrevRow;
+    }
+    HTListReplaceItem(@self->HTGHC_rowArray,
+		      row, &accWidthCurrRow, sizeof(int));
+  }
+/*  else if (row == totalCnt && !(@self->GI_states & GS_USABLE)) {
+      ;   totalCnt is 1-based.
+  } */
+  else {
+    @self->HTGHC_rowIndex++;
+EC( totalCnt++;
+    EC_ERROR_IF(@self->HTGHC_rowIndex != (totalCnt-1), 1);)
+    i = HTListAppend(@self->HTGHC_heightArray,
+		     &heightPrevRow, sizeof(int));
+    EC_ERROR_IF(i != @self->HTGHC_rowIndex, 1);
+    i = HTListAppend(@self->HTGHC_rowArray,
+		 &accWidthCurrRow, sizeof(int));
+    EC_ERROR_IF(i != @self->HTGHC_rowIndex, 1);
+    EC_ERROR_IF(@self->HTGHC_sumOfHeights > heightPrevRow, 1);
+    @self->HTGHC_sumOfHeights = heightPrevRow;
+  }
+  if (accWidthCurrRow > @self->HTGHC_maxRowWidth) 
+      @self->HTGHC_maxRowWidth = accWidthCurrRow; /* +MARGIN; */
+
+EC( obj = @call parent::MSG_GEN_FIND_CHILD_AT_POSITION(firstIndex); )
+EC( EC_ERROR_IF(obj != firstObj, 1); )
+
+  /*
+   *  Start positioning the objects.
+   */
+  view = @call parent::MSG_VIS_VUP_FIND_OBJECT_OF_CLASS(&GenViewClass);
+  @call view::MSG_GEN_VIEW_GET_VISIBLE_RECT(&viewBound);
+  for (obj = firstObj; obj; ){
+    if (!@call obj::MSG_VIS_FIND_PARENT())
+	break;	/*  The next sibling object is not built out yet. */
+    @call obj::MSG_VIS_GET_BOUNDS(&objBound);
+    InvalidRegion (parent, 
+		   objBound.R_left - viewBound.RD_left,
+		   objBound.R_top - viewBound.RD_top,
+		   objBound.R_right - viewBound.RD_left,
+		   objBound.R_bottom - viewBound.RD_top);
+    @call obj::MSG_VIS_POSITION_BRANCH(0,0);
+    @send obj::MSG_VIS_MARK_INVALID(VOF_IMAGE_INVALID,
+				    VUM_DELAYED_VIA_UI_QUEUE);
+    obj = @call parent::MSG_GEN_FIND_CHILD_AT_POSITION(++firstIndex);
+  }
+EC(   for (objRow = 0, i=0; objRow < totalCnt; objRow++) {
+        HTListGetItem(@self->HTGHC_heightArray, objRow, 
+		      &heightCurrRow, sizeof(int));
+	EC_ERROR_IF(i >= heightCurrRow, 1);
+	i = heightCurrRow;
+      } )
+  return MAKE_SIZE_DWORD(@self->HTGHC_maxRowWidth, heightPrevRow);
+}	/* End of MSG_GEN_HTML_CONTENT_RECALC_POSITIONS.	*/
+
+
+/***********************************************************************
+ *MSG_GEN_HTML_CONTENT_GET_ACCUMULATED_HEIGHTS for HTGenHtmlContentClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    Return the accumulated row heights.
+ * PARAMETERS:	    (word *width, word *height);
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:	    
+ *
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	edwin   	9/ 8/97   	Initial Revision
+ *	
+ ***********************************************************************/
+@method HTGenHtmlContentClass, MSG_GEN_HTML_CONTENT_GET_ACCUMULATED_HEIGHTS
+{
+    *width = @self->HTGHC_maxRowWidth;
+    *height = @self->HTGHC_sumOfHeights;
+    return;
+}	/* End of MSG_GEN_HTML_CONTENT_GET_ACCUMULATED_HEIGHTS.	*/
+
+
+/***********************************************************************
+ *	MSG_GEN_HTML_CONTENT_SET_ROW_RESIZE for HTGenHtmlContentClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    Reposition rows after the table which shrinks in
+ *                  height.  The rows are in the global content.
+ * PARAMETERS:	    (optr startObj, int diff);
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:	    
+ *
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	edwin   	12/ 5/97   	Initial Revision
+ *	
+ ***********************************************************************/
+@method HTGenHtmlContentClass, MSG_GEN_HTML_CONTENT_SET_ROW_RESIZE
+{
+  int i, row, totalCnt;
+  word oldHeight;
+  SizeAsDWord sz;
+  optr parent;
+
+  if ((row = @call startObj::MSG_UI_GET_ROW_POSITION()) == -1)
+      /*
+       *  This happend when the document is loaded for the first time.
+       *  If the page is re-built, for example the page has been loaded,
+       *  and user goes backward, and goes forward to the page again.
+       *  In this case all object would have row number already, and
+       *  would fail this test condition.
+       */
+      return;
+  /*
+   *  Assume table can cause this to happen.
+   */
+  EC_ERROR_IF(!@call startObj::MSG_META_IS_OBJECT_IN_CLASS(&HTGenTableClass), 1);
+
+  totalCnt = HTListGetCount(@self->HTGHC_heightArray);
+
+  EC_ERROR_IF(diff < 0, 1);
+
+  for (i = row+1; i < totalCnt; i++) {
+    HTListGetItem(@self->HTGHC_heightArray, i, &oldHeight, sizeof(word));
+    oldHeight -= diff;
+    EC_ERROR_IF(oldHeight < 0, 1);
+    HTListReplaceItem(@self->HTGHC_heightArray,i,&oldHeight,sizeof(word));
+  }
+  EC_ERROR_IF(i != totalCnt, 1);
+  @self->HTGHC_sumOfHeights = oldHeight;
+
+  parent = @call @self->HTGHC_pmObj::MSG_GEN_FIND_PARENT();
+  sz = MAKE_SIZE_DWORD(@self->HTGHC_maxRowWidth, @self->HTGHC_sumOfHeights);
+  @call parent::MSG_HTML_CONTENT_SET_VIEW_DOC_BOUNDS(sz);
+  @call parent::MSG_VIS_SET_SIZE(@self->HTGHC_maxRowWidth,
+				 @self->HTGHC_sumOfHeights);
+  @call @self->HTGHC_pmObj::MSG_VIS_SET_SIZE(@self->HTGHC_maxRowWidth,
+					     @self->HTGHC_sumOfHeights);
+  /*
+   *  Reposition following objects.
+   */
+  i=@call (uiMgr.UIM_currentDoc)->HTUI_pmanager::MSG_GEN_FIND_CHILD(startObj);
+  i++;
+  startObj = @call (uiMgr.UIM_currentDoc)->HTUI_pmanager::
+      MSG_GEN_FIND_CHILD_AT_POSITION(i);
+  for (;i < totalCnt && startObj; i++) {
+      @call startObj::MSG_VIS_POSITION_BRANCH(0,0);
+      startObj = @call (uiMgr.UIM_currentDoc)->HTUI_pmanager::
+	  MSG_GEN_FIND_CHILD_AT_POSITION(i);
+  }
+  return;
+}	/* End of MSG_GEN_HTML_CONTENT_SET_ROW_RESIZE.	*/
+
+
+/***********************************************************************
+ *		MSG_GEN_SET_USABLE for HTGenHtmlContentClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    Delete some instance data that are no longer needed.
+ * PARAMETERS:	    
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:	    
+ *
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	edwin   	11/ 6/97   	Initial Revision
+ *	
+ ***********************************************************************/
+@method HTGenHtmlContentClass, MSG_GEN_SET_USABLE
+{
+    HTListDelete(@self->HTGHC_fontStack);
+    @self->HTGHC_fontStack = 0;
+    HTListDelete(@self->HTGHC_formatStack);
+    @self->HTGHC_formatStack = 0;
+    HTListDelete(@self->HTGHC_listStack);
+    @self->HTGHC_listStack = 0;
+    HTListDelete(@self->HTGHC_alignStack);
+    @self->HTGHC_alignStack = 0;
+
+    @callsuper();
+    return;
+}	/* End of MSG_GEN_SET_USABLE.	*/
+
+
+/***********************************************************************
+ *		MSG_GEN_PREPARE_FOR_DESTROY for HTGenHtmlContentClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    Prepare the object for HTObjDestroyAllWID. All we
+ *                  need to do is delete instance data. This message 
+ *                  replaces MSG_GEN_DESTROY as we won't be sending 
+ *                  MSG_GEN_DESTROY to objects. Instance data allocated
+ *                  using ...WID APIs (like HTListNewWID, HTMemAllocWID)
+ *                  need not freed to save time.
+ * PARAMETERS:	    void (void)
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:	    
+ *
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	kkee    	9/16/97   	Initial Revision
+ *	
+ ***********************************************************************/
+@method HTGenHtmlContentClass, MSG_GEN_PREPARE_FOR_DESTROY
+{
+    /* 
+     * These would be destroyed when we delete the blocks using
+     * HTListDeleteAllWID.
+     *
+     * HTListDelete(@self->HTGHC_heightArray);
+     * HTListDelete(@self->HTGHC_rowArray);
+     * HTListDelete(@self->HTGHC_fontStack);
+     */
+    /* 
+     * If we delete something here, make sure to add to list in 
+     * PresentationManager::MSG_PM_OBJECT_INSTANTIATE.
+     */
+    return;
+}	/* End of MSG_GEN_PREPARE_FOR_DESTROY.	*/

@@ -1,0 +1,486 @@
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Geoworks 1997.  All rights reserved.
+	GEOWORKS CONFIDENTIAL
+
+PROJECT:	Geos WWW Library
+MODULE:		htobj
+FILE:		htobj.goc
+
+AUTHOR:		Kok Kin Kee, Apr  2, 1997
+
+ROUTINES:
+	Name			Description
+	----			-----------
+
+REVISION HISTORY:
+	Name		Date		Description
+	----		----		-----------
+	kkee    	4/ 2/97   	Initial version.
+
+DESCRIPTION:
+
+	Object instantiation (for Geos versions that do not support
+	ObjInstantiateForThread).
+
+	$Id: htobj.goc,v 1.8.7.8 97/10/06 12:45:21 kkee Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+@include <stdapp.goh>
+#include <sem.h>
+@include <WWW/HTCore/htobj.goh>
+@include <WWW/HTCore/htutils.goh>
+@include <WWW/HTCore/htassoc.goh>
+#include <WWW/htmem.h>
+@include "htfatals.goh"
+
+/* ---------------------------------------------------------------------
+ * 		Local Data
+ * ---------------------------------------------------------------------*/
+/*
+ * HTObjInstantiateForThread client list.
+ */
+static HTAssocList clientList = 0;
+/*
+ * HTObjInstantiateForDestroy client list.
+ */
+static HTAssocList widClientList = 0;
+static SemaphoreHandle htClientSem = 0;     /* Synch access to clientList */
+static SemaphoreHandle widClientSem = 0;    /* Synch access to widClientList */
+
+#define HT_OBJBLOCK_DESIRED_SIZE   4096      /* 4K */
+
+
+/***********************************************************************
+ *		HTObjLibraryEntry
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Initialize static vars. 
+ * CALLED BY:	HTCoreLibraryEntry
+ * RETURN:	Must return 0 to indicate all ok to Geos.
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:   
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	kkee    	4/ 2/97   	Initial Revision
+ *	
+ ***********************************************************************/
+int _far _pascal
+HTObjLibraryEntry (LibraryCallType ty, GeodeHandle client)
+{
+    PUSHDS;
+    SET_DS_LIB_DGROUP;
+
+    if (ty == LCT_ATTACH) {
+	clientList = HTAssocListNew();
+	widClientList = HTAssocListNew();
+	htClientSem = ThreadAllocSem(1); 
+	HandleModifyOwner(htClientSem, GeodeGetCodeProcessHandle());
+	widClientSem = ThreadAllocSem(1); 
+	HandleModifyOwner(widClientSem, GeodeGetCodeProcessHandle());
+
+    } else if (ty == LCT_DETACH) {
+	HTAssocDwordListDelete(clientList);
+	HTAssocDwordListDelete(widClientList);
+	clientList = 0;   /* Lazarus protection. */
+	widClientList = 0;
+	ThreadFreeSem(htClientSem);
+	htClientSem = 0;
+	ThreadFreeSem(widClientSem);
+	widClientSem = 0;
+    }
+
+    POPDS;
+
+    return 0; /* Return value required by Geos */
+}	/* End of HTObjLibraryEntry.	*/
+
+
+
+/***********************************************************************
+ *		HTOBJATTACH
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Initialize a thread to use HTObjInstantiateForThread
+ *              and also so that other threads can call 
+ *              HTObjInstantiateForThread on this thread.
+ * CALLED BY:   Client. The passed in thread must be an event thread (so
+ *              that objects can be created for it). Pass 0 for current 
+ *              thread.
+ * RETURN:	TRUE if ok, else FALSE.
+ *	
+ * STRATEGY:	
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	kkee    	4/ 2/97   	Initial Revision
+ *	
+ ***********************************************************************/
+Boolean _far _pascal
+HTOBJATTACH (ThreadHandle thread)
+{
+    HTListHandle list;
+
+EC( if (thread) ECCheckThreadHandle(thread);                            )
+
+    PUSHDS;
+    SET_DS_LIB_DGROUP;
+
+    ThreadPSem(htClientSem);
+
+    if (!thread) thread = ThreadGetInfo(0, TGIT_THREAD_HANDLE);
+
+    /* Create an object list for clientList */
+    list = HTListNew();    /* List of blocks for ObjInstantiate */
+    if (list) {
+	if (!HTAssocDwordListLookup(clientList, (dword)thread, 0))
+	    HTAssocDwordListAdd(clientList, (dword)thread, (dword)list);
+#ifdef ERROR_CHECK
+	else 
+	    EC_ERROR(HTOBJATTACH_HAS_BEEN_CALLED_FOR_THREAD);
+#endif
+    }
+
+    ThreadVSem(htClientSem);
+
+    POPDS;
+    
+    if (!list) return FALSE;
+    return TRUE;
+}	/* End of HTOBJATTACH.	*/
+
+
+
+/***********************************************************************
+ *		HTOBJDETACH
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Cleanup the environment of a thread that had previously
+ *              called HTObjDetach. After this call, there MUST NOT be
+ *              any more calls to HTObjInstantiateForThread. Pass 0 for
+ *              current thread.
+ * CALLED BY:	Client
+ * RETURN:	Nothing
+ *	
+ * STRATEGY:	We lookup the list that contains all the object blocks
+ *              created for HTObjInstantiateForThread and delete the 
+ *              list. We MUST not delete the blocks as could be messages
+ *              for objects in these blocks. When the thread exits, all
+ *              these blocks will be deleted anyways.
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	kkee    	4/ 2/97   	Initial Revision
+ *	
+ ***********************************************************************/
+void _far _pascal
+HTOBJDETACH (ThreadHandle thread)
+{
+    HTListHandle list;
+
+EC( if (thread) ECCheckThreadHandle(thread);                            )
+
+    PUSHDS;
+    SET_DS_LIB_DGROUP;
+
+    ThreadPSem(htClientSem);
+
+    if (!thread) thread = ThreadGetInfo(0, TGIT_THREAD_HANDLE);
+
+    if (HTAssocDwordListRemove(clientList, (dword)thread, (dword *)&list)) {
+	/* 
+	 * No need to free individual object blocks in the list
+	 * as they will be discarded when the owner thread dies.
+	 */
+	HTListDelete(list);
+    }
+#if ERROR_CHECK
+    else 
+	EC_ERROR(HTOBJATTACH_NOT_CALLED_FOR_THREAD);
+#endif
+
+    ThreadVSem(htClientSem);
+
+    POPDS;
+}	/* End of HTOBJDETACH.	*/
+
+
+/***********************************************************************
+ *		HTOBJINSTANTIATEFORTHREAD
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Instantiatiate an object for a thread. The thread must
+ *              have been registered using HTObjAttach. When no more 
+ *              instantiations are to be performed using this API, 
+ *              HTObjDetach should be called.
+ * CALLED BY:	Client
+ * RETURN:	optr or NullOptr.
+ *	
+ * STRATEGY:	
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	kkee    	4/ 2/97   	Initial Revision
+ *	
+ ***********************************************************************/
+optr _far _pascal
+HTOBJINSTANTIATEFORTHREAD (ThreadHandle thread, ClassStruct *class)
+{
+    HTListHandle blockList;
+    optr ret = NullOptr;
+
+EC( if (thread) ECCheckThreadHandle(thread);                           )
+EC( ECCheckClass(class);                                               )
+
+    PUSHDS;
+    SET_DS_LIB_DGROUP;
+
+    if (!thread) thread = ThreadGetInfo(0, TGIT_THREAD_HANDLE);
+
+    ThreadPSem(htClientSem);
+
+    if (HTAssocDwordListLookup(clientList, (dword)thread, 
+				   (dword *)&blockList)) {
+	word i, count;
+	MemHandle block;
+	    
+	count = HTListGetCount(blockList);
+	for (i=0; i<count; i++) {
+	    HTListGetItem(blockList, i, &block, sizeof(MemHandle));
+	    if (MemGetInfo(block, MGIT_SIZE) < HT_OBJBLOCK_DESIRED_SIZE) {
+		ret = ObjInstantiate(block, class);
+		break;
+	    }
+	}
+
+	if (!ret) {
+    	    block = UserAllocObjBlock(thread);
+	    HTListAppend(blockList, (void *)&block, sizeof(MemHandle));
+	    ret = ObjInstantiate(block, class);
+	}
+    }
+#if ERROR_CHECK
+     else
+	 EC_ERROR(HTOBJATTACH_NOT_CALLED_FOR_THREAD);
+#endif
+    ThreadVSem(htClientSem);
+
+    POPDS;
+
+    return ret;
+}	/* End of HTOBJINSTANTIATEFORTHREAD.	*/
+
+
+/***********************************************************************
+ *		HTOBJINSTANTIATEFORTHREADWID
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Like HTObjInstantiateForThread, except that the objects
+ *              can be destroyed by deleting their blocks by calling 
+ *              HTObjDestroy (this option is in addition to the normal
+ *              object destroy). Pass 0 to default to current thread.
+ *              There is no need to call HTObjAttach to use WID APIs.
+ * CALLED BY:	Client
+ * RETURN:	optr
+ *	
+ * STRATEGY:	
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	kkee    	9/10/97   	Initial Revision
+ *	
+ ***********************************************************************/
+optr _far _pascal
+HTOBJINSTANTIATEFORTHREADWID (word id, ThreadHandle thread, 
+			      ClassStruct *class)
+{
+    HTListHandle blockList;
+    word i, count;
+    MemHandle block;
+    optr ret = NullOptr;
+
+#if ERROR_CHECK
+    if ((id == HTMID_BASE) || (id >= HTMID_END))
+	EC_ERROR(INVALID_ID_FOR_HTOBJ);        
+#endif
+
+EC( if (thread) ECCheckThreadHandle(thread);                           )
+EC( ECCheckClass(class);                                               )
+
+    PUSHDS;
+    SET_DS_LIB_DGROUP;
+
+    if (!thread) thread = ThreadGetInfo(0, TGIT_THREAD_HANDLE);
+
+    ThreadPSem(widClientSem);
+
+    if (!HTAssocDwordListLookup(widClientList, (dword)id, 
+				   (dword *)&blockList)) {
+	/* Create a list to hold object blocks */
+	blockList = HTListNew();
+	HTAssocDwordListAdd(widClientList, (dword)id, (dword)blockList);
+    }
+
+    count = HTListGetCount(blockList);
+    for (i=0; i<count; i++) {
+	HTListGetItem(blockList, i, &block, sizeof(MemHandle));
+	if (MemGetInfo(block, MGIT_SIZE) < HT_OBJBLOCK_DESIRED_SIZE) {
+	    ret = ObjInstantiate(block, class);
+	    break;
+	}
+    }
+
+    if (!ret) {
+	block = UserAllocObjBlock(thread);
+	HTListAppend(blockList, (void *)&block, sizeof(MemHandle));
+	ret = ObjInstantiate(block, class);
+    }
+
+    ThreadVSem(widClientSem);
+
+    POPDS;
+
+    return ret;
+}	/* End of HTOBJINSTANTIATEFORTHREADWID.	*/
+
+
+
+
+/***********************************************************************
+ *		HTOBJDESTROYALLWID
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Destroy the blocks associated with objects created 
+ *              using HTObjInstantiateForThreadWID. These objects must
+ *              not be getting anymore messages as the objects are
+ *              destroyed by deleting their blocks, not sending destroy
+ *              messages to them. 
+ *              You must use this API to delete these blocks as HTObjDetach
+ *              won't do it for WID APIs.
+ * CALLED BY:	Client
+ * RETURN:	Nothing
+ *	
+ * STRATEGY:	
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	kkee    	9/10/97   	Initial Revision
+ *	
+ ***********************************************************************/
+void _far _pascal
+HTOBJDESTROYALLWID (word id)
+{
+    HTAssocList blockList;
+    optr ret = NullOptr;
+
+#if ERROR_CHECK
+    if ((id == HTMID_BASE) || (id >= HTMID_END))
+	EC_ERROR(INVALID_ID_FOR_HTOBJ);        
+#endif
+
+    PUSHDS;
+    SET_DS_LIB_DGROUP;
+
+    ThreadPSem(widClientSem);
+
+    if (HTAssocDwordListRemove(widClientList, (dword)id, 
+			       (dword *)&blockList)) {
+	word i, count;
+	MemHandle block;
+	    
+	count = HTListGetCount(blockList);
+	for (i=0; i<count; i++) {
+	    HTListRemoveItem(blockList, 0, &block, sizeof(MemHandle));
+	    MemFree(block);
+	}
+	HTListDelete(blockList);
+    }
+
+    ThreadVSem(widClientSem);
+
+    POPDS;
+}	/* End of HTOBJDESTROYALLWID.	*/
+
+
+
+/***********************************************************************
+ *		HTOBJUSEDSPACEWID
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Memory used for an ID. If id is 0, then we get the memory
+ *              used by non-id object instantiation.
+ * CALLED BY:	Client
+ * RETURN:	dword
+ *	
+ * STRATEGY:	
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	kkee    	10/ 5/97   	Initial Revision
+ *	
+ ***********************************************************************/
+dword _far _pascal
+HTOBJUSEDSPACEWID (word id)
+{
+    HTListHandle blockList;
+    word i, count, listCount;
+    MemHandle block;
+    dword ret = 0;
+
+#if ERROR_CHECK
+    if (id >= HTMID_END)
+	EC_ERROR(INVALID_ID_FOR_HTOBJ);        
+#endif
+
+    PUSHDS;
+    SET_DS_LIB_DGROUP;
+
+
+    /* Without ID */
+    if (!id) {
+	word clientCount, j;
+	
+	ThreadPSem(htClientSem);
+	
+	clientCount = HTListGetCount(clientList);
+	for (j=0; j<clientCount; j++) {
+	    blockList = HTAssocDwordListGetValue(clientList, j);
+	    count = HTListGetCount(blockList);
+	    for (i=0; i<count; i++) {
+		HTListGetItem(blockList, i, &block, sizeof(MemHandle));
+		ret += MemGetInfo(block, MGIT_SIZE);
+	    }
+	}
+
+	ThreadVSem(htClientSem);
+
+    } else {
+	/* With ID */
+	ThreadPSem(widClientSem);
+	
+	if (HTAssocDwordListLookup(widClientList, (dword)id, 
+				   (dword *)&blockList)) {
+	    count = HTListGetCount(blockList);
+	    for (i=0; i<count; i++) {
+		HTListGetItem(blockList, i, &block, sizeof(MemHandle));
+		ret += MemGetInfo(block, MGIT_SIZE);
+	    }
+	}
+
+	ThreadVSem(widClientSem);
+    }
+
+    POPDS;
+
+    return ret;
+}	/* End of HTOBJUSEDSPACEWID.	*/

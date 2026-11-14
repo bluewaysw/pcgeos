@@ -1,0 +1,447 @@
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Geoworks 1996 -- All Rights Reserved
+
+PROJECT:	Geos WWW Library
+MODULE:		The Net Manager.
+FILE:		htnetS.goc
+
+AUTHOR:		Kok Kin Kee, Jun  5, 1996
+
+ROUTINES:
+	Name			Description
+	----			-----------
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	kkee	6/ 5/96   	Initial version.
+
+DESCRIPTION:
+	The Net Scheduler class.
+
+	$Id: htnetS.goc,v 1.1 97/04/07 11:48:32 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+@include <WWW/HTCore/htreqMan.goh>
+@include <WWW/HTCore/hturi.goh>
+@include <WWW/HTCore/htstring.goh>
+@include "HTNet/htnetS.goh"
+@include "htfatals.goh"
+#include <WWW/htmem.h>
+
+/*
+ * Queue of scheduled Net threads. Access to this queue is syunchronized
+ * since it is only accessed from method handlers of HTNetSchedulerClass. 
+ * In essence, this queue is an instance data of HTNetSchedulerClass but
+ * we can't put it in the process as process can't have instance data.
+ */
+static HTListHandle htNetThreadQueue = NULL;
+
+
+/* --------------------------------------------------------------------------
+ *		Class Declarations
+ * --------------------------------------------------------------------------*/
+
+@classdecl      HTNetSchedulerClass, neverSaved;
+
+
+/* --------------------------------------------------------------------------
+ *		Internal functions.
+ * --------------------------------------------------------------------------*/
+
+
+/***********************************************************************
+ *		HTNetKillLow
+ ***********************************************************************
+ * SYNOPSIS:	Kill a request, internal use by the Library.
+ * CALLED BY:	MSG_HTNS_SCHEDULE_ROUND_ROBIN, MSG_HTNS_DEQUEUE_THREAD,
+ *              MSG_HTNS_NEW_CLIENT.
+ * RETURN:	Whatever is returned from client "after" callbacks.
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	kkee	8/21/96   	Initial Revision
+ *
+ ***********************************************************************/
+static int _pascal
+HTNetKillLow (HTRequestHandle request, HTNetThread *netThread, int status)
+{
+    optr scheduler;
+    HTRequest *rptr;
+    HTListHandle afterList;
+
+EC( ECCheckRequest(request);                                           )
+
+    rptr = (HTRequest *) MemThreadGrab(request);
+    afterList = rptr->HTR_afterList;
+
+#if ERROR_CHECK
+    if (rptr->HTR_protocol != netThread->HTNT_protocolHandler)
+	EC_ERROR(INVALID_HTNET_THREAD);
+#endif
+
+    rptr->HTR_protocol = NullOptr; /* Severe netThread from request. */
+    rptr->HTR_sockfd = 0;          /* Severe request from sockfd */
+
+    MemThreadRelease(request);
+
+    /* Now we can get rid of the protocol. */
+    if (netThread->HTNT_protocolHandler) 
+	@call netThread->HTNT_protocolHandler::MSG_HT_STREAM_ABORT();
+
+    /* 
+     * Remember, we can't lock the request during callback as the 
+     * callback might use the request and cause a deadlock. 
+     */
+    return HTNetExecuteCallback(afterList, request, status);
+
+    /* 
+     * We can't use the request after the "after" callbacks as the 
+     * request is no longer valid.
+     */
+}	/* End of HTNetKillLow.	*/
+
+
+/* --------------------------------------------------------------------------
+ *		Message Handlers for HTNetSchedulerClass
+ * --------------------------------------------------------------------------*/
+
+
+
+/***********************************************************************
+ *		MSG_HTNS_NEW_CLIENT for HTNetSchedulerClass
+ ***********************************************************************
+ * SYNOPSIS:	    Add a new protocol client to the scheduler.
+ * PARAMETERS:	    void (HTRequestHandle request)
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	kkee	8/18/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method HTNetSchedulerClass, MSG_HTNS_NEW_CLIENT
+{
+    HTMemHandle physical, access;
+    HTNetThread netThread;
+    HTRequest *rptr;
+    char *cptr;
+
+    rptr = (HTRequest *) MemThreadGrab(request);
+
+    /* Get access scheme using physical address (not the URL) */
+    physical = HTAnchorPhysical(rptr->HTR_anchor);
+    access = HTParseHTMemHandleURI(physical, NULL, HTURI_PARSE_ACCESS);
+    if (physical) HTMemFree(physical);
+
+    if (!access) {
+	HTNetKillLow(request, &netThread, HT_OUT_OF_MEMORY);
+	return;
+    }	
+
+    cptr = (char *) HTMemLock(access);
+
+    /* Find a protocol object for this access scheme */
+    netThread.HTNT_protocolHandler =
+	HTPolicyGetProtocolHandler(request, 
+				   rptr->HTR_protocolList, 
+				   HTStringFor(cptr));
+    netThread.HTNT_status = HT_OK;
+
+    HTMemUnlockAndFree(access);
+
+    /* 
+     * Link the request with the netThread using protocolHandler and
+     * the original owner that issued this request.
+     */
+    rptr->HTR_protocol = netThread.HTNT_protocolHandler;
+    netThread.HTNT_owner = rptr->HTR_clientGeodeHandle;
+    MemThreadRelease(request);
+
+    if (!netThread.HTNT_protocolHandler) 
+	HTNetKillLow(request, &netThread, HT_NO_PROTOCOL);
+
+    else {
+	/* Enter the protocol object in the scheduler queue */
+	@call oself::MSG_HTNS_ENQUEUE_THREAD(netThread); 
+    
+	/* Schedule the protocol object to run */
+	@send,forceQueue, replace, checkDuplicate oself::
+	    MSG_HTNS_SCHEDULE_ROUND_ROBIN();
+    }
+}	/* End of MSG_HTNS_NEW_CLIENT.	*/
+
+
+
+
+/***********************************************************************
+ *		MSG_HTNS_SCHEDULE_ROUND_ROBIN for HTNetSchedulerClass
+ ***********************************************************************
+ * SYNOPSIS:	    Schedule a queue of protocol objects in a round-robin
+ *                  fashion.
+ * PARAMETERS:	    void (void)
+ * SIDE EFFECTS:    Nothing.
+ *
+ * STRATEGY:        Run the first protocol object in the head of the 
+ *                  scheduling queue, then move the object to the end of 
+ *                  the queue.
+ *    
+ *                  Finally sends this message to itself to schedule the
+ *                  next protocol thread.
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	kkee	5/29/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method HTNetSchedulerClass, MSG_HTNS_SCHEDULE_ROUND_ROBIN
+{
+    HTNetThread netThread;
+    word count, size, i;
+    Boolean found = FALSE;
+
+    /* 
+     * Stop the scheduler if there are no threads to schedule or
+     * get the first schedulable Net thread in the head of the queue. 
+     */
+    count = HTListGetCount(htNetThreadQueue);
+    size = sizeof(HTNetThread);
+
+    for (i=0; i<count; i++) {
+	HTListGetItem(htNetThreadQueue, i, &netThread, size);
+
+	if (netThread.HTNT_status != HT_ASYNCH_LOAD) {
+	    HTListRemoveItem(htNetThreadQueue, i, &netThread, size);
+	    found = TRUE;
+	    break;
+	}
+    }
+    
+    if (!found) return;
+
+    /* 
+     * Run the HTNet thread protocol synchronously. 
+     */
+    netThread.HTNT_status = @call netThread.HTNT_protocolHandler::
+	MSG_HT_PROTOCOL_LOAD(HT_OK);
+
+    if (netThread.HTNT_status == HT_OK ||
+	netThread.HTNT_status == HT_ASYNCH_LOAD) 
+	/* 
+	 * Its round robin, so move the thread to the end of queue.
+	 * If HT_ASYNCH_LOAD, we won't schedule this protocol.
+	 */
+	HTListAppend(htNetThreadQueue, &netThread,
+		     sizeof(HTNetThread));    
+    else 
+	HTNetKillLow(@call netThread.HTNT_protocolHandler::
+		     MSG_HT_STREAM_GET_REQUEST(), 
+		     &netThread, netThread.HTNT_status);
+
+    /*
+     * Schedule the next thread 
+     */
+    @send,forceQueue, checkDuplicate, replace oself::
+	MSG_HTNS_SCHEDULE_ROUND_ROBIN();
+
+}	/* End of MSG_HTNS_SCHEDULE_ROUND_ROBIN.	*/
+
+
+
+
+/***********************************************************************
+ *		MSG_HTNS_ENQUEUE_THREAD for HTNetSchedulerClass
+ ***********************************************************************
+ * SYNOPSIS:	    Enter a thread in the round-robin queue.
+ * PARAMETERS:	    void (HTNetThread netThread);
+ * SIDE EFFECTS:    Nothing.
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	kkee	6/ 6/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method HTNetSchedulerClass, MSG_HTNS_ENQUEUE_THREAD
+{
+
+EC( ECCheckStream(netThread.HTNT_protocolHandler);                      )
+
+    /* Do we have a scheduler queue yet? */
+    if (htNetThreadQueue == NULL) 
+	htNetThreadQueue = HTListNew();
+
+    HTListAppend(htNetThreadQueue, &netThread, 
+		 sizeof(HTNetThread));
+}	/* End of MSG_HTNS_ENQUEUE_THREAD.	*/
+
+
+
+
+/***********************************************************************
+ *		MSG_HTNS_DEQUEUE_THREAD for HTNetSchedulerClass
+ ***********************************************************************
+ * SYNOPSIS:	    Remove a protocol thread from the scheduler queue. The 
+ *                  thread is also deleted. The protocol is guaranteed to 
+ *                  to be removed from the scheduler.
+ * PARAMETERS:	    void (HTStreamHandle protocol)
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:	    The only way we can guarantee that a protocol is 
+ *                  removed and not processing any other messages 
+ *                  (like servicing a request in MSG_HT_PROTOCOL_LOAD) 
+ *                  is to use a blocking call.
+ * 
+ *                  Since the client may call HTNetKill (via HTRequestKill)
+ *                  while at the same time a protocol thread is being 
+ *                  dequeued by the Library in MSG_HT_SCHEDULE_ROUND_ROBIN.
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	kkee	6/ 6/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method HTNetSchedulerClass, MSG_HTNS_DEQUEUE_THREAD
+{
+    HTNetThread netThread;
+    word count, i, size;
+
+EC( ECCheckStream(protocol);                                           )
+EC( if (htNetThreadQueue == NULL) EC_ERROR(HTNET_NO_SCHEDULER); )
+
+    /* Do we have a scheduler queue yet? */
+    if (htNetThreadQueue == NULL) return;
+
+    /* Find the HTNet thread that runs the protocol */
+    count = HTListGetCount(htNetThreadQueue);
+    size = sizeof(HTNetThread);
+
+    for (i=0; i<count; i++) {
+	HTListGetItem(htNetThreadQueue, i, &netThread, size);
+
+	if (netThread.HTNT_protocolHandler == protocol) {
+	    /* Found! */
+	    HTListRemoveItem(htNetThreadQueue, i, &netThread, size);
+
+	    /* 
+	     * Must be a blocking call to make sure the protocol is aborted
+	     * before we continue as the caller depends on it. At the same
+	     * time, we also severe the link between a request and the
+	     * protocol bound to it.
+	     */
+	    HTNetKillLow(@call protocol::MSG_HT_STREAM_GET_REQUEST(),
+			 &netThread, status);
+	    break;
+	}
+    }
+
+
+    /* If not found, the protocol has just gotten killed by the Library.
+     * This is not an error.
+     */
+
+}	/* End of MSG_HTNS_DEQUEUE_THREAD.	*/
+
+
+
+/***********************************************************************
+ *		MSG_HTNS_DEQUEUE_THREADS_FOR for HTNetSchedulerClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Remove all Net threads for a particular client. All these
+ *              Net threads are deleted.
+ * PARAMETERS:	void (GeodeHandle client);    
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:	    
+ *
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	kkee    	3/21/97   	Initial Revision
+ *	
+ ***********************************************************************/
+@method HTNetSchedulerClass, MSG_HTNS_DEQUEUE_THREADS_FOR
+{
+    HTNetThread netThread;
+    word count, i, size;
+
+    /* Do we have a scheduler queue yet? */
+    if (htNetThreadQueue == NULL) return;
+
+    count = HTListGetCount(htNetThreadQueue);
+    size = sizeof(HTNetThread);
+
+    /* Find & kill all Net threads that are owned by client */
+    i = 0;
+    while (i<count) {
+	HTListGetItem(htNetThreadQueue, i, &netThread, size);
+
+	if (netThread.HTNT_owner == client) {
+	    HTListRemoveItem(htNetThreadQueue, i, &netThread, size);
+	    HTNetKillLow(@call netThread.HTNT_protocolHandler::
+			 MSG_HT_STREAM_GET_REQUEST(),
+			 &netThread, status);
+	    count--;
+
+	} else 
+	    i++;
+    }
+}	/* End of MSG_HTNS_DEQUEUE_THREADS_FOR.	*/
+
+
+
+
+/***********************************************************************
+ *		MSG_META_OBJ_FREE for HTNetSchedulerClass
+ ***********************************************************************
+ * SYNOPSIS:	    Cleanup data maintained by the scheduler. 
+ * PARAMETERS:	    void (void)
+ * SIDE EFFECTS:    Nothing.
+ *
+ * STRATEGY:	    Abort all scheduled protocol objects using 
+ *		    MSG_HT_STREAM_ABORT.
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	kkee	5/29/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method HTNetSchedulerClass, MSG_META_OBJ_FREE
+{
+    HTStreamHandle protocol;
+    word count, i;
+
+    count = HTListGetCount(htNetThreadQueue);
+    for (i=0; i<count; i++) {
+	HTListGetItem(htNetThreadQueue, i, &protocol, 
+		      sizeof(HTStreamHandle));
+	@call protocol::MSG_HT_STREAM_ABORT();
+    }
+
+    /*
+     * Finally, free the schedule queue itself.
+     */ 
+    HTListDelete(htNetThreadQueue);
+    htNetThreadQueue = NULL;
+
+    @callsuper();
+}	/* End of MSG_META_OBJ_FREE.	*/
+
+
+
+

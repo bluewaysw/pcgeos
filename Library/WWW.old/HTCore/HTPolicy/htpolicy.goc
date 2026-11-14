@@ -1,0 +1,871 @@
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Geoworks 1996 -- All Rights Reserved
+
+PROJECT:	Geos WWW Library.
+MODULE:		Policy Manager.
+FILE:		htpolicy.goc
+
+AUTHOR:		Kok Kin Kee, Apr 21, 1996
+
+ROUTINES:
+	Name			Description
+	----			-----------
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	kkee	4/21/96   	Initial version.
+
+DESCRIPTION:
+	The Policy Manager.
+
+	$Id: htpolicy.goc,v 1.1 97/04/07 11:48:41 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+@include <WWW/HTCore/htpolicy.goh>
+@include <WWW/HTCore/htreq.goh>
+@include <WWW/HTCore/htreqMan.goh>
+@include <WWW/HTCore/htlist.goh>
+@include <WWW/HTCore/htstring.goh>
+@include <WWW/HTCore/htnet.goh>
+@include <WWW/HTCore/htmime.goh>
+@include <WWW/HTCore/htguess.goh>
+@include <library.h>
+@include "htfatals.goh"
+#include <Ansi/string.h>
+#include <initfile.h>
+#include <sem.h>
+
+/* ----------------------------------------------------------------------
+ * 		PRIVATE DATA
+ * ----------------------------------------------------------------------*/
+
+/*
+ * Library won't compile unless there is a dgroup, this dummy does the job! :)
+ */
+byte htPolicyDummy;
+
+/* 
+ * The thread for running all protocol objects.
+ */
+static ThreadHandle policyThread = NULL;
+/* 
+ * List of registered client policy managers.
+ */
+static HTListHandle policyClientList = NULL;
+/*
+ * For synchronous access to policyClientList.
+ */
+static SemaphoreHandle policySynchSem = NULL;
+
+/* --------------------------------------------------------------------------
+ * 		PRIVATE DATATYPES
+ * --------------------------------------------------------------------------*/
+
+/*
+ * Structure for maintaining registered protocols.
+ * Here comes Geos intricacy. If dynamicLoad is TRUE, then the first 
+ * export in the "gp" file must be the protocol class. If dynamicLoad is
+ * FALSE, then fileName is no use, instead we need the class name.
+ */
+typedef struct {
+    Boolean HTP_dynamicLoad;           /* TRUE if to be dynamically loaded */
+    HTStringHandle HTP_name;           /* e.g., "http" */
+    HTStringHandle HTP_library;        /* e.g., "WWW HTTP Library Protocol */
+    ClassStruct _far * HTP_class;      /* e.g., HTTPClass */
+} HTProtocol;
+
+/*
+ * Client policy manager. 
+ */
+typedef struct {
+    GeodeHandle HTPC_clientHandle;
+    HTPolicyContentCallback HTPC_contentCbf;
+} HTPolicyClient;
+
+
+
+/* --------------------------------------------------------------------------
+ * 		PRIVATE FUNCTIONS
+ * --------------------------------------------------------------------------*/
+
+
+
+/***********************************************************************
+ *		HTPolicyGetDefaultProtocolHandler
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Create a Library default protocol handler if one exists.
+ * CALLED BY:	HTPolicyGetProtocolHandler
+ * RETURN:	HTStreamHandle, a protocol handler if found, else 
+ *              NUllOptr.
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:    All default protocol Libraries are loaded dynamically.
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	kkee	9/ 9/96   	Initial Revision
+ *
+ ***********************************************************************/
+static HTStreamHandle _pascal
+HTPolicyGetDefaultProtocolHandler (HTStringHandle protocol)
+{
+    GeodeLoadError loadError;
+    GeodeHandle libHandle;
+    ClassStruct *classPtr;
+    MemHandle block;
+    word dataSize;
+    char *name, *key;
+    HTStreamHandle handler = NullOptr;
+
+EC( ECCheckHTString(protocol);                                        )
+
+    /* All default content handlers are specified in the ini file */
+    key = (char *) HTStringLock(protocol);
+    if (key && !InitFileReadStringBlock("wwwLibrary",
+					key,
+					&block,
+					IFRF_READ_ALL,
+					&dataSize) && dataSize) {
+
+	name = (char *) MemLock(block);
+	while(isspace(*name)) name++;
+
+	/* We've got the protocol library name */
+	FilePushDir();
+	FileSetStandardPath(SP_SYSTEM);
+	libHandle = GeodeUseLibrary(name, 0, 0, &loadError);
+	FilePopDir();
+
+	if (libHandle) {
+	    /* Protocol lib must export converter class first */
+	    classPtr = (ClassStruct *) ProcGetLibraryEntry(libHandle, 0);
+	    handler = ObjInstantiateForThread(policyThread, classPtr);
+	    if (handler) @call handler::
+		MSG_HT_STREAM_SET_DYNAMICALLY_LOADED(libHandle);
+	}
+	    
+	MemFree(block);
+    }
+
+    HTStringUnlock(protocol);
+
+    return handler;
+}	/* End of HTPolicyGetDefaultProtocolHandler.	*/
+
+
+
+/***********************************************************************
+ *		HTPolicyGetDefaultContentHandler
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Create a Library default content handler if one exists.
+ * CALLED BY:	HTPolicyGetContentHandler.
+ * RETURN:	- HTStreamHandler, NullOptr if not found.
+ *              - outputType, if a stream is returned, outputType 
+ *                indicates MIME content-type is generated by this
+ *                content handler.
+ *              
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:    All default content handlers are loaded dynamically.
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	kkee	9/26/96   	Initial Revision
+ *
+ ***********************************************************************/
+static HTStreamHandle _pascal
+HTPolicyGetDefaultContentHandler (HTStringHandle inputType, 
+				  HTStringHandle *outputType)
+{
+    GeodeLoadError loadError;
+    GeodeHandle libHandle;
+    ClassStruct *classPtr;
+    MemHandle block;
+    word dataSize;
+    char *name, *key, *outType;
+    HTStreamHandle handler = NullOptr;
+
+
+EC( ECCheckHTString(inputType);                                        )
+
+    /* All default content handlers are specified in the ini file */
+    key = (char *) HTStringLock(inputType);
+    if (key && !InitFileReadStringBlock("wwwLibrary",
+					key,
+					&block,
+					IFRF_READ_ALL,
+					&dataSize) && dataSize) {
+	HTStringUnlock(inputType);
+
+	name = (char *) MemLock(block);
+	while(isspace(*name)) name++;
+	outType = strchr(name, ' ');
+	if (outType) {
+	    *outType = 0; outType++;
+	    while(isspace(*outType)) outType++;
+	}
+
+
+	if (!strcasecmp(name, "HTMIMEClass")) {
+	    /* We've got the converter class name */
+	    handler = 
+		ObjInstantiateForThread(policyThread,	
+					(ClassStruct *) &HTMIMEClass);
+
+	} else if (!strcasecmp(name, "HTGuessClass")) {
+	    /* We've got the converter class name */
+	    handler = 
+		ObjInstantiateForThread(policyThread,	
+					(ClassStruct *) &HTGuessClass);
+
+	} else {
+	    /* We've got the converter library name */
+	    FilePushDir();
+	    FileSetStandardPath(SP_SYSTEM);
+	    libHandle = GeodeUseLibrary(name, 0, 0, &loadError);
+	    FilePopDir();
+
+	    if (libHandle) {
+		/* Converter lib must export converter class first */
+		classPtr = (ClassStruct *) ProcGetLibraryEntry(libHandle, 0);
+		handler = ObjInstantiateForThread(policyThread, classPtr);
+		if (handler) @call handler::
+		    MSG_HT_STREAM_SET_DYNAMICALLY_LOADED(libHandle);
+	    }
+	}
+	    
+	/* We've got the converter output type */
+	if (outType) 
+	    *outputType = HTStringFor(outType);
+	else
+	    *outputType = NULL;
+	
+	MemFree(block);
+
+	} else
+	    HTStringUnlock(inputType);
+
+    return handler;
+}	/* End of HTPolicyGetDefaultContentHandler.	*/
+
+
+
+
+/***********************************************************************
+ *		HTPolicyGetClientContentHandler
+ ***********************************************************************
+ * SYNOPSIS:	Get a content handler from a client's director. The 
+ *              should have been registered with the Request Manager
+ *              (API HTRegister) and Policy Manager (API 
+ *              HTPolicyAddClient). inputType indicates what input data
+ *              format of the handler. output is what the handler will
+ *              generate.
+ * CALLED BY:	Library
+ * RETURN:	- HTStreamHandle, a content object inherited from 
+ *                HTStreamClass.
+ *              - outputType, the content object output format.
+ *
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	kkee	8/15/96   	Initial Revision
+ *
+ ***********************************************************************/
+HTStreamHandle _far _pascal
+HTPolicyGetClientContentHandler (HTRequestHandle request, 
+				 HTStringHandle inputType,
+				 HTStringHandle *outputType)
+{
+    word count, i, size;
+    HTPolicyClient policyClient;
+    GeodeHandle clientHandle;
+    HTRequest *rptr;
+    Boolean found = FALSE;
+    HTMemHandle htmh;
+    HTContentHandler *content;
+    HTStreamHandle handler = NullOptr;
+
+EC( ECCheckRequest(request);                                            )
+EC( ECCheckHTString(inputType);                                         )
+
+    rptr = (HTRequest *) MemThreadGrab(request);
+    clientHandle = rptr->HTR_clientGeodeHandle;
+    MemThreadRelease(request);
+
+EC( ECCheckGeodeHandle(clientHandle);                                   )
+
+    ThreadPSem(policySynchSem);
+
+    if (policyClientList != NULL) {
+	count = HTListGetCount(policyClientList);
+	size = sizeof(HTPolicyClient);
+	for (i=0; i<count; i++) {
+	    HTListGetItem(policyClientList, i, (void *)&policyClient, size);
+	    if (policyClient.HTPC_clientHandle == clientHandle) {
+		found = TRUE;
+		break;
+	    }
+	}
+    }
+
+    ThreadVSem(policySynchSem);
+
+EC( if (!found)                                                         )
+EC(    EC_ERROR(INVALID_POLICY_CLIENT);                                 )
+
+    if (found)
+	htmh = ProcCallFixedOrMovable_pascal(request, inputType,
+			policyClient.HTPC_contentCbf);
+    else 
+	htmh = NullOptr;
+
+    if (htmh) {
+
+EC(     ECCheckHTMemHandle(htmh);                                       )
+
+	content = (HTContentHandler *) HTMemLock(htmh);
+	
+	*outputType = content->HTCH_outputType;
+	handler = content->HTCH_handler;
+
+	HTMemUnlockAndFree(htmh);
+
+EC(     ECCheckOD(handler);                                             )
+EC(     ECCheckHTString(*outputType);                                   )
+
+    }
+    
+    return handler;
+}	/* End of HTPolicyGetClientContentHandler.	*/
+
+
+
+
+
+
+/***********************************************************************
+ *		HTPolicyGetClientContentStreamStack
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Request a stream stack from cleint to handle a content
+ *              type. Return NullOptr if client does not provide a 
+ *              complete stack that ends with outputType.
+ * CALLED BY:	HTPolicyGetClientContentStreamStack.
+ * RETURN:	head of the stream stack or NullOptr.
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	kkee	10/22/96   	Initial Revision
+ *
+ ***********************************************************************/
+static HTStreamHandle _pascal
+HTPolicyGetClientContentStreamStack (HTRequestHandle request, 
+				     HTStringHandle inputType,
+				     HTStringHandle outputType)
+{
+    HTStreamHandle stream, head = NullOptr, tail = NullOptr;
+    HTStringHandle outputFormat = NULL, inputFormat = inputType;
+
+    do {
+	stream = HTPolicyGetClientContentHandler(request, 
+						 inputFormat, 
+						 &outputFormat);
+	if (stream) {
+	    @call stream::MSG_HT_STREAM_SET_REQUEST(request);
+	    if (!head)
+		head = stream;
+	    if (tail)
+		@call tail::MSG_HT_STREAM_SET_TARGET(stream);
+	    tail = stream;
+	    inputFormat = outputFormat;
+	}
+
+	if (outputFormat == outputType) 
+	    break;
+
+    } while (stream);
+
+    if ((outputFormat != outputType) && head) {
+	@call head::MSG_HT_STREAM_ABORT();
+	return NullOptr;
+    }
+
+    return head;
+}	/* End of HTPolicyGetClientContentStreamStack.	*/
+
+
+
+
+/***********************************************************************
+ *		HTPolicyErrorStream
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Creates an error stream.
+ * CALLED BY:	
+ * RETURN:	HTStreamHandle, NULL currently.
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	kkee	11/13/96   	Initial Revision
+ *
+ ***********************************************************************/
+static HTStreamHandle _pascal
+HTPolicyErrorStream (void)
+{
+    return NULL;
+}	/* End of HTPolicyErrorStream.	*/
+
+
+
+/* -----------------------------------------------------------------------
+ * 		PUBLIC FUNCTIONS
+ * -----------------------------------------------------------------------*/
+
+
+/***********************************************************************
+ *		HTPOLICYADDPROTOCOLHANDLER
+ ***********************************************************************
+ * SYNOPSIS:	Add a protocol class to a list and bind it to a specific 
+ *		access scheme. The protocol library will be loaded by the 
+ *              Library to instantiate protocol objects. The protocol class
+ *              must be the first exported item (indicated in the gp file).
+ *              You need to bind list to a specific request for the Library
+ *              to use it. 
+ * CALLED BY:	Client.
+ * PASS:	list = list to register a protocol.
+ *              name = name of access scheme (e.g, "http").
+ *              library = library name.
+ * RETURN:	HT_OK if registration is accepted, else HT_NO.
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:	
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	kkee	4/21/96   	Initial Revision
+ *
+ ***********************************************************************/
+int _far _pascal
+HTPOLICYADDPROTOCOLHANDLER (HTListHandle list, 
+			    HTStringHandle name, HTStringHandle library)
+{	
+    HTProtocol protocol;
+
+EC( ECCheckHTList(list);                                                )
+EC( ECCheckHTString(name);                                              )
+EC( ECCheckHTString(library);                                           )
+
+    protocol.HTP_dynamicLoad = TRUE;
+    protocol.HTP_name = name;
+    protocol.HTP_library = library;
+
+    HTListAppend(list, &protocol, sizeof(HTProtocol));
+
+    return HT_OK;
+}	/* End of HTPOLICYADDPROTOCOLHANDLER.	*/
+
+
+
+/***********************************************************************
+ *		HTPolicySetThread
+ ***********************************************************************
+ * SYNOPSIS:	Set the thread that runs all objects created by the 
+ *		policy manager.
+ *      
+ * CALLED BY:	Library.
+ * RETURN:	Nothing
+ * SIDE EFFECTS:Nothing
+ *	
+ * STRATEGY:
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	kkee	6/ 3/96   	Initial Revision
+ *
+ ***********************************************************************/
+void _far _pascal
+HTPolicySetThread (ThreadHandle thread)
+{
+EC( ECCheckThreadHandle(thread);                                        )
+
+    PUSHDS;
+    SET_DS_LIB_DGROUP;
+
+    ThreadPSem(policySynchSem);
+    policyThread = thread;
+    ThreadVSem(policySynchSem);
+
+    POPDS;
+}	/* End of HTPolicySetThread.	*/
+
+
+
+
+/***********************************************************************
+ *		HTPolicyLibraryEntry
+ ***********************************************************************
+ * SYNOPSIS:	Delete a client policy manager from the Library policy
+ *              manager when a client detaches from the Library.
+ *              Create a default protocol list.
+ * CALLED BY:	HTCoreLibraryEntry
+ * RETURN:	Must return 0 to indicate ok to Geos.
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	kkee	8/17/96   	Initial Revision
+ *
+ ***********************************************************************/
+int _far _pascal
+HTPolicyLibraryEntry (LibraryCallType ty, GeodeHandle client)
+{
+    if (ty == LCT_ATTACH) {
+	/* Initialize policy stuff */
+	PUSHDS;
+	SET_DS_LIB_DGROUP;
+	policyClientList = HTListNew();
+
+	policySynchSem = ThreadAllocSem(1);
+	HandleModifyOwner(policySynchSem, GeodeGetCodeProcessHandle());
+
+	POPDS;
+
+    } else if (ty == LCT_CLIENT_EXIT) 
+	HTPolicyDeleteClient(client);
+
+    else if (ty == LCT_DETACH) {
+	PUSHDS;
+	SET_DS_LIB_DGROUP;
+	
+	HTListDelete(policyClientList);
+	policyClientList = NULL;	
+
+	ThreadFreeSem(policySynchSem);
+	policySynchSem = NULL;
+
+	policyThread = NULL;
+	POPDS;
+    }
+
+    return 0;
+}	/* End of HTPolicyLibraryEntry.	*/
+
+
+
+/***********************************************************************
+ *		HTPOLICYADDCLIENT
+ ***********************************************************************
+ * SYNOPSIS:	Register a client-specific director to the policy manager.
+ *              The director will be called by the Library when it needs
+ *              a content handler or presenter. If your director does not
+ *              provide a content handler when requested, the Library uses
+ *              its default (unless there is no default). However, your
+ *              director must provide a presenter if you want to display 
+ *              data. In the case where no handler (content or presenter)
+ *              is found, the Library will prompt the user to save it.
+ * CALLED BY:	Client.
+ * RETURN:	HT_OK if ok, or HT_ERROR if cannot add client.
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	kkee	8/15/96   	Initial Revision
+ *
+ ***********************************************************************/
+int _far _pascal
+HTPOLICYADDCLIENT (GeodeHandle clientHandle, 
+		   HTPolicyContentCallback contentCbf)
+{
+    HTPolicyClient policyClient;
+
+EC( ECCheckGeodeHandle(clientHandle);                                   )
+EC(   if (!contentCbf)                                                  )
+EC(      EC_ERROR(CONTENT_CALLBACK_NOT_PROVIDED);                       )
+
+    PUSHDS;
+    SET_DS_LIB_DGROUP;
+
+    ThreadPSem(policySynchSem);
+
+    policyClient.HTPC_clientHandle = clientHandle;
+    policyClient.HTPC_contentCbf = contentCbf;
+
+    HTListAppend(policyClientList, (void *)&policyClient, 
+		 sizeof(HTPolicyClient));
+    
+    ThreadVSem(policySynchSem);
+
+    POPDS;
+    return HT_OK;
+}	/* End of HTPOLICYADDCLIENT.	*/
+
+
+
+/***********************************************************************
+ *		HTPOLICYDELETECLIENT
+ ***********************************************************************
+ * SYNOPSIS:	Remove a client from the policy manager. Should be called
+ *              when a client exits. This is usually called by the 
+ *              Library entry point when it receives LCT_DETACH of a 
+ *              client.
+ * CALLED BY:	Client and Library.
+ * RETURN:	HT_OK if ok, or HT_ERROR if client not found.
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	kkee	8/15/96   	Initial Revision
+ *
+ ***********************************************************************/
+int _far _pascal
+HTPOLICYDELETECLIENT (GeodeHandle clientHandle)
+{
+    word count, i, size;
+    HTPolicyClient policyClient;
+    int index = -1;
+
+EC( ECCheckGeodeHandle(clientHandle);                                  )
+
+    PUSHDS;
+    SET_DS_LIB_DGROUP;
+
+    ThreadPSem(policySynchSem);
+
+    if (policyClientList != NULL) {
+	count = HTListGetCount(policyClientList);
+	size = sizeof(HTPolicyClient);
+	for (i=0; i<count; i++) {
+	    HTListGetItem(policyClientList, i, (void *)&policyClient, size);
+	    if (policyClient.HTPC_clientHandle == clientHandle) {
+		index = i;
+		break;
+	    }
+	}
+    }
+
+    if (index != -1) 
+	HTListRemoveItem(policyClientList, index, 
+			 (void *)&policyClient, size);
+
+    ThreadVSem(policySynchSem);
+    POPDS;
+    return HT_OK;
+}	/* End of HTPOLICYDELETECLIENT.	*/
+
+
+
+
+/***********************************************************************
+ *		HTPolicyGetProtocolHandler
+ ***********************************************************************
+ * SYNOPSIS:	Search registered protocols to find a suitable access 
+ *		method. A new protocol object is created. The protocol
+ *		class must have been registered earlier using 
+ *		HTPOLICYADDPROTOCOLHANDLER.
+ * CALLED BY:	Library.
+ * PASS:	request
+ *              list = list to obtain a protocol.
+ *              name = access method name, e.g. http.
+ *		request = the request.
+ * RETURN:	HTStreamHandle = the protocol object. NullOptr if not found.
+ * SIDE EFFECTS:Nothing.
+ *	
+ * STRATEGY:	
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	kkee	4/21/96   	Initial Revision
+ *
+ ***********************************************************************/
+HTStreamHandle _far _pascal
+HTPolicyGetProtocolHandler (HTRequestHandle request,
+			    HTListHandle list, HTStringHandle name)
+{
+    word count, i, size;
+    HTProtocol protocol;
+    HTStreamHandle handler = NullOptr;
+
+EC( ECCheckRequest(request);                                           )
+EC( ECCheckHTList(list);                                               )
+EC( ECCheckHTString(name);                                             )
+
+    if (!name) return NullOptr;
+
+    count = HTListGetCount(list);
+    size = sizeof(HTProtocol);
+
+    for (i=0; i<count; i++) {
+	HTListGetItem(list, i, &protocol, size);
+	
+	if (protocol.HTP_name == name) {
+	    handler =  ObjInstantiateForThread(policyThread, 
+					       protocol.HTP_class);
+	    break;
+	}
+    }
+
+    if (!handler) {
+	/* Use Library default if there is one. */
+	PUSHDS;
+	SET_DS_LIB_DGROUP;
+	handler = HTPolicyGetDefaultProtocolHandler(name);
+	POPDS;
+    }
+
+    if (handler)
+	@call handler::MSG_HT_STREAM_SET_REQUEST(request);
+
+    return handler;
+}	/* End of HTPolicyGetProtocolHandler.	*/
+
+
+
+/***********************************************************************
+ *		HTPOLICYSTREAMSTACK
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Create a filter stream stack.
+ * CALLED BY:	Client.
+ * RETURN:	HTStreamHandle, NULL if not created.
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:    Currently, outputFormat not used.
+ *                         guess not used.
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	kkee	11/13/96   	Initial Revision
+ *
+ ***********************************************************************/
+HTStreamHandle _far _pascal
+HTPOLICYSTREAMSTACK (HTStringHandle inputFormat, 
+		     HTStringHandle outputFormat,
+		     HTStreamHandle outputStream,
+		     HTRequestHandle request,
+		     Boolean guess)
+{
+    HTStreamHandle head, stream, tail;
+    HTStringHandle inputType = inputFormat;
+    HTStringHandle outputType = NULL;
+
+EC( ECCheckHTString(inputFormat);                                       )
+EC( ECCheckHTString(outputFormat);                                      )
+EC( ECCheckOD(outputStream);                                            )
+EC( ECCheckRequest(request);                                            )
+
+    if (inputFormat == outputFormat)
+	return outputStream ? outputStream : HTPolicyErrorStream();
+
+    /* First see if client wants to handle it completely.
+     * Once the client provide a handler, we *must* not overlap
+     * that with library default content handlers as we will 
+     * deadlock since they run in different threads. 
+     */
+    PUSHDS;
+    SET_DS_LIB_DGROUP;   
+
+    head = HTPolicyGetClientContentStreamStack(
+                    request, 
+		    inputType, 
+		    NULL);
+
+    if (head) {
+	POPDS;
+	if (outputStream) {
+	    @call outputStream::MSG_HT_STREAM_SET_TARGET(head);
+	    return outputStream;
+	}
+	return head; /* Client will handle data completely */
+    }
+
+    /* Ok to create library part of the stream stack */
+    tail = head;
+    do {
+	stream = HTPolicyGetDefaultContentHandler(inputType, 
+						  &outputType);
+	if (stream) {
+	    @call stream::MSG_HT_STREAM_SET_REQUEST(request);
+	    if (!head)
+		head = stream;
+	    if (tail)
+		@call tail::MSG_HT_STREAM_SET_TARGET(stream);
+	    tail = stream;
+	    inputType = outputType;
+	}
+
+    } while (stream);
+
+    /* 
+     * See if client wants to process the outputType.
+     */
+    stream = HTPolicyGetClientContentStreamStack(
+                      request, 
+		      inputType, 
+		      NULL);
+
+    if (stream) {
+	@call tail::MSG_HT_STREAM_SET_TARGET(stream);
+	@call stream::MSG_HT_STREAM_SET_REQUEST(request);
+
+    } else if (inputType != NULL) {
+	/*
+	 * If we don't get outputType NULL, the
+	 * client *must* provide a stream stack to handle the outputType 
+	 * from the Library. The final outputType from the client must 
+	 * be NULL. Otherwise the whole stream is 
+	 * aborted. Well...we should prompt the user to save it.
+	 */
+	if (head)
+	    @call head::MSG_HT_STREAM_ABORT();
+	/* 
+	 * No content handler to display/process data. We might want 
+	 * to prompt user if he/she wants to save the file on disk or 
+	 * something. To do that, we provide a save-to-file stream and
+	 * return that stream.
+	 */
+	POPDS;
+	return outputStream;
+    }
+
+    POPDS;
+
+    /* Link the stream stack we've just created to outputStream */
+    if (outputStream) {
+	@call outputStream::MSG_HT_STREAM_SET_TARGET(head);
+	return outputStream;
+    }
+
+    return head;
+}	/* End of HTPOLICYSTREAMSTACK.	*/

@@ -1,0 +1,171 @@
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Geoworks 1997.  All rights reserved.
+	GEOWORKS CONFIDENTIAL
+
+PROJECT:	Geos WWW Library
+MODULE:		ilog
+FILE:		ilog.goc
+
+AUTHOR:		Kok Kin Kee, Jun  2, 1997
+
+ROUTINES:
+	Name			Description
+	----			-----------
+
+REVISION HISTORY:
+	Name		Date		Description
+	----		----		-----------
+	kkee    	6/ 2/97   	Initial version.
+
+DESCRIPTION:
+
+	HTIMAP logging. Mainly for debugging purposes.
+
+	$Id: ilog.goc,v 1.1.6.1 97/09/05 10:52:30 jeremyb Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+
+@ifdef __LOG_HTIMAP__
+
+@include <WWW/HTCore/htutils.goh>
+@include <WWW/htimap.goh>
+#include <Ansi/string.h>
+@include "ilog.goh"
+
+static FileHandle logFile = 0;
+
+static void _pascal logState(HTIMAPState state);
+
+/***********************************************************************
+ *		logBegin
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Start logging session.
+ * CALLED BY:	Parser.
+ * RETURN:	Nothing
+ *	
+ * STRATEGY:	
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	kkee    	6/ 2/97   	Initial Revision
+ *	
+ ***********************************************************************/
+void _pascal
+logBegin (void)
+{
+    if (!logFile) {
+	FilePushDir();
+	FileSetStandardPath(SP_DOCUMENT);
+	PUSHDS;
+	SET_DS_LIB_DGROUP;  /* To use "htimap.log" */ 
+	logFile = FileCreate("htimap.log",
+			     FCF_NATIVE | FILE_CREATE_TRUNCATE |
+			     FILE_DENY_RW | FILE_ACCESS_RW, 
+			     FILE_ATTR_NORMAL);
+	POPDS;
+	FilePopDir();
+    }
+}	/* End of logBegin.	*/
+
+
+/***********************************************************************
+ *		logEnd
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Finish logging session.
+ * CALLED BY:	Parser
+ * RETURN:	Nothing
+ *	
+ * STRATEGY:	
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	kkee    	6/ 2/97   	Initial Revision
+ *	
+ ***********************************************************************/
+void _pascal
+logEnd (void)
+{
+    if (logFile) FileClose(logFile, FALSE);
+}	/* End of logEnd.	*/
+
+
+
+/***********************************************************************
+ *		log
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Log IMAP FSM parser.
+ * CALLED BY:	Parser routines.
+ * RETURN:	Nothing
+ *	
+ * STRATEGY:	id must be null-terminated. pass len=0 if data is null-
+ *              terminated.
+ *              This is how the log information is printed:
+ *
+ *              State: SP s; SP ID: SP id; SP Data; SP data CRLF
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	kkee    	6/ 2/97   	Initial Revision
+ *	
+ ***********************************************************************/
+void _pascal
+log (HTIMAPState s, const char *id, const char *data, word len)
+{
+    if (logFile) {
+	FileWrite(logFile, "State: ", 7, FALSE);
+	logState(s);
+	FileWrite(logFile, " ID: ", 5, FALSE);
+	FileWrite(logFile, id, strlen(id), FALSE);
+	FileWrite(logFile, " Data: ", 7, FALSE);
+	if (len)
+	    FileWrite(logFile, data, len, FALSE);
+	else 
+	    FileWrite(logFile, data, strlen(data), FALSE);
+    }
+}	/* End of log.	*/
+
+
+/***********************************************************************
+ *		logState
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Log a HTIMAPState.
+ * CALLED BY:	log
+ * RETURN:	Nothing
+ *	
+ * STRATEGY:	This is one big switch statement.
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	kkee    	6/ 2/97   	Initial Revision
+ *	
+ ***********************************************************************/
+static void _pascal
+logState (HTIMAPState state)
+{
+    if (!logFile) return;
+    switch (state) {
+    case HTIMAP_RESPONSE_DATA:
+	break;
+    case HTIMAP_RESPONSE_DONE:
+	break;
+    default:
+	break;
+    }
+}	/* End of logState.	*/
+
+
+
+@endif
+
+
+

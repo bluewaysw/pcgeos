@@ -1,0 +1,906 @@
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Geoworks 1997.  All rights reserved.
+	GEOWORKS CONFIDENTIAL
+
+PROJECT:	Geos WWW Library
+MODULE:		htsmtp
+FILE:		htsmtp.goc
+
+AUTHOR:		Kok Kin Kee, Apr 28, 1997
+
+ROUTINES:
+	Name			Description
+	----			-----------
+
+REVISION HISTORY:
+	Name		Date		Description
+	----		----		-----------
+	kkee    	4/28/97   	Initial version.
+
+DESCRIPTION:
+
+	RFC821 Simple Mail Transfer Protocol.
+
+	$Id: htsmtp.goc,v 1.10.3.1 97/09/05 10:51:36 jeremyb Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+@include <stdapp.goh>
+@include <WWW/HTCore/htconst.goh>
+@include <WWW/HTCore/htreq.goh>
+@include <WWW/HTCore/htsock.goh>
+@include <WWW/HTCore/htnet.goh>
+@include <WWW/HTCore/hturi.goh>
+@include <WWW/HTCore/htutils.goh>
+@include <WWW/htsmtp.goh>
+
+#include <Ansi/string.h>     /* memcpy */
+#include <Ansi/stdlib.h>
+
+@include "htfatals.goh"
+@include "message.goh"
+
+
+/* ---------------------------------------------------------------------
+ * 		PRIVATE DATA
+ * ---------------------------------------------------------------------*/
+
+#if ERROR_CHECK
+FatalErrors htsmtpFatalErrors;
+Warnings    htsmtpWarnings;
+#endif
+
+#ifndef SMTP_PORT
+#define SMTP_PORT 25             /* Default TCP port */
+#endif
+
+/* SMTP response parseState */
+#define SCAN_CODE         0      /* Parsing of status code */
+#define LAST_LINE         1      /* Parsing last line */
+#define INTERMEDIATE_LINE 2      /* Parsing intermediate line */
+#define FCR_LAST          3      /* Found CR of last line */
+#define FCR_INTERMEDIATE  4      /* Found CR of intermediate line */
+#define PARSE_DONE        5      /* Done parsing a response */
+
+char CRLF[] = {CR,LF,0};
+char BRCRLF[] = {'>',CR,LF,0};
+static char ENDDATA[] = {CR,LF,'.',CR,LF,0};
+
+/* --------------------------------------------------------------------
+ * 		PRIVATE FUNCTIONS
+ * --------------------------------------------------------------------*/
+
+/***********************************************************************
+ *		SMTPGetAddress
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Get the address of an SMTP request for connecting to 
+ *              network.
+ * CALLED BY:	MSG_HT_PROTOCOL_LOAD
+ * RETURN:	HTSocketAddress
+ *	
+ * STRATEGY:	SMTP does not use proxy!
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	kkee    	5/ 4/97   	Initial Revision
+ *	
+ ***********************************************************************/
+static void _pascal
+SMTPGetAddress (HTRequestHandle request, HTSocketAddress *htAddress)
+{
+    HTMemHandle htmh;
+    HTRequest *rptr;
+    char *cptr;
+
+EC( ECCheckRequest(request);                                           )
+
+    rptr = (HTRequest *) MemThreadGrab(request);
+
+    cptr = (char *) MemLock(rptr->HTR_uriString);
+    htmh = HTParseURI(cptr, NULL, HTURI_PARSE_HOST);
+    MemUnlock(rptr->HTR_uriString);
+
+    /* IP address */
+    cptr = (char *) HTMemLock(htmh);
+    strcpy(htAddress->HTSA_ipAddress, cptr);
+    HTMemUnlockAndFree(htmh);
+
+    /* Port number */
+    htAddress->HTSA_port = SMTP_PORT;
+    htAddress->HTSA_accessPoint = rptr->HTR_accessPoint;
+
+    MemThreadRelease(request);
+}	/* End of SMTPGetAddress.	*/
+
+
+/***********************************************************************
+ *		SMTPLocalIP
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Get the localip address for HELO with server.
+ * CALLED BY:   MSG_HT_PROTOCOL_LOAD	
+ * RETURN:	HTMemHandle, 0 if not available.
+ *	
+ * STRATEGY:	
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	kkee    	5/ 5/97   	Initial Revision
+ *	
+ ***********************************************************************/
+static HTMemHandle _far _pascal
+SMTPLocalIP (HTRequestHandle request)
+{
+    HTMemHandle htmh;
+    HTRequest *rptr;
+    char *cptr;
+
+EC( ECCheckRequest(request);                                           )
+
+    rptr = (HTRequest *) MemThreadGrab(request);
+
+    cptr = (char *) MemLock(rptr->HTR_uriString);
+    htmh = HTParseURI(cptr, NULL, HTURI_PARSE_HOST);
+    MemUnlock(rptr->HTR_uriString);
+
+    MemThreadRelease(request);
+    return htmh;
+}	/* End of SMTPLocalIP.	*/
+
+
+
+/***********************************************************************
+ *		SMTPNextState
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Based on the command executed in currentState and the 
+ *              responseCode from server, decide what state to go to.
+ * CALLED BY:	MSG_HT_STREAM_PUT_BLOCK
+ * RETURN:	HTSMTPState
+ *	
+ * STRATEGY:	If in Command Mode, use the Command State Diagram (the 
+ *              first state diagram) in RFC821. 
+ *
+ *              If in Data Mode, use the Data State Diagram (the second
+ *              state diagram) in RFC821.
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	kkee    	5/ 6/97   	Initial Revision
+ *	
+ ***********************************************************************/
+static HTSMTPState _pascal
+SMTPNextState (HTSMTPState nextState, int responseCode)
+{
+    switch (responseCode) {
+    case 211:                       /* System status */
+	return nextState;
+    case 214:                       /* Help message */
+	return nextState;    
+    case 220:                       /* Service ready */
+	return nextState;          
+    case 221:                       /* Service closing transmission */
+	return nextState;
+    case 250:                       /* Action okay */
+	return nextState;
+    case 251:                       /* User not local, will forward */
+	return nextState;
+    case 354:                       /* Start email input, end <CRLF>.<CRLF> */
+	return nextState;
+    case 421:                       /* Closing transmission */
+	return HTSMTP_CONNECTION_CLOSED;
+    case 450:                       /* Mailbox busy/unavailable */
+	return HTSMTP_MAILBOX_NOT_FOUND;
+    case 451:                       /* Aborted, local error in processing */
+	return HTSMTP_ERROR;
+    case 452:                       /* Insufficient system storage */
+	return HTSMTP_SERVER_OUT_OF_SPACE;
+    case 500:                       /* Command syntax error */
+	return HTSMTP_COMMAND_ERROR;
+    case 501:                       /* Bad arguments */
+	return HTSMTP_COMMAND_ERROR;
+    case 502:                       /* Command not implemented */
+	return HTSMTP_ERROR;
+    case 503:                       /* Bad sequence of commands */
+	return HTSMTP_COMMAND_ERROR;
+    case 504:                       /* Command parameter not implemented */
+	return HTSMTP_ERROR;
+    case 550:                       /* Mailbox not found/unavailable */
+	return HTSMTP_MAILBOX_NOT_FOUND;
+    case 551:                       /* User not local, try <forward-path> */
+	/* I am not forwarding, but I should later... */
+	return HTSMTP_MAILBOX_NOT_FOUND;
+    case 552:                       /* Aborted, exceed storage allocation */
+	return HTSMTP_SERVER_OUT_OF_SPACE;
+    case 553:                       /* Mailbox syntax incorrect/not allowed */
+	return HTSMTP_MAILBOX_NOT_FOUND;
+    case 554:                       /* Transaction failed, huh? */
+	return HTSMTP_ERROR;
+    default:
+	EC_ERROR(HTSMTP_RESPONSE_NOT_HANDLED);
+	return HTSMTP_ERROR;
+    }
+}	/* End of SMTPNextState.	*/
+
+
+
+/***********************************************************************
+ *		SMTPPushMailFrom
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Push: MAIL <SP> FROM:<reverse-path> <CRLF>
+ * CALLED BY:	MSG_HT_PROTOCOL_LOAD
+ * RETURN:	int
+ *               - HT_OK if all is well.
+ *               - HTSocketState
+ *               - 
+ *	
+ * STRATEGY:	The email message (headers and body) is in the client
+ *              space. We get it from the request's inputStream via
+ *              postCallback.
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	kkee    	5/ 6/97   	Initial Revision
+ *	
+ ***********************************************************************/
+static int _pascal
+SMTPPushMailFrom (HTNetThread *net, HTRequestHandle request)
+{
+    int ret;
+    HTRequest *rptr;
+    HTStreamHandle inputStream;
+
+EC( ECCheckRequest(request);                                           )
+
+    rptr = (HTRequest *) MemThreadGrab(request);
+EC( ECCheckStream(rptr->HTR_inputStream);                              )
+    inputStream = rptr->HTR_inputStream;
+    MemThreadRelease(request);
+
+    ret = HTSocketSend(net->HTNT_socket, (void *)"MAIL FROM:<", 11);
+    if (ret != HT_OK) return ret;
+
+    ret = @call inputStream::MSG_SMTPM_PUSH_SENDER();
+    if (ret != HT_OK) return ret;
+
+    ret = HTSocketSend(net->HTNT_socket, (void *)BRCRLF, 3);
+    if (ret != HT_OK) return ret;
+
+    return HT_OK;
+}	/* End of SMTPPushMailFrom.	*/
+
+
+
+/***********************************************************************
+ *		SMTPPushRcptTo
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Put: RCPT <SP> TO:<forward-path> <CRLF>
+ * CALLED BY:	MSG_HT_PROTOCOL_LOAD
+ * RETURN:	int
+ *                - HT_OK, all is well.
+ *	
+ * STRATEGY:	Put one receiver at a time. SMTP! Argh!!!
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	kkee    	5/ 6/97   	Initial Revision
+ *	
+ ***********************************************************************/
+static int _pascal
+SMTPPushRcptTo (HTNetThread *net, HTRequestHandle request,
+		int receiverIndex)
+
+{
+    int ret;
+    HTRequest *rptr;
+    HTStreamHandle inputStream;
+
+EC( ECCheckRequest(request);                                           )
+
+    rptr = (HTRequest *) MemThreadGrab(request);
+EC( ECCheckStream(rptr->HTR_inputStream);                              )
+    inputStream = rptr->HTR_inputStream;
+    MemThreadRelease(request);
+
+    ret = HTSocketSend(net->HTNT_socket, (void *)"RCPT TO:<", 9);
+    if (ret != HT_OK) return ret;
+
+    ret = @call inputStream::MSG_SMTPM_PUSH_RECEIVER(receiverIndex);
+    if (ret != HT_OK) return ret;
+
+    ret = HTSocketSend(net->HTNT_socket, (void *)BRCRLF, 3);
+    if (ret != HT_OK) return ret;
+
+    return HT_OK;
+}	/* End of SMTPPushRcptTo.	*/
+
+
+
+/***********************************************************************
+ *		SMTPPushMsg
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Put an RFC822 message to socket.
+ * CALLED BY:	MSG_HT_PROTOCOL_LOAD
+ * RETURN:	int
+ *                - HT_OK, all is well
+ *	
+ * STRATEGY:	
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	kkee    	5/ 7/97   	Initial Revision
+ *	
+ ***********************************************************************/
+static int _pascal
+SMTPPushMsg (HTRequestHandle request)
+{
+    HTRequest *rptr;
+    HTStreamHandle inputStream;
+
+EC( ECCheckRequest(request);                                           )
+
+    rptr = (HTRequest *) MemThreadGrab(request);
+EC( ECCheckStream(rptr->HTR_inputStream);                              )
+    inputStream = rptr->HTR_inputStream;
+    MemThreadRelease(request);
+
+    return @call inputStream::MSG_SMTPM_PUSH_MESSAGE();
+}	/* End of SMTPPushMsg.	*/
+
+
+
+
+/***********************************************************************
+		Class Declaration
+***********************************************************************/
+
+@classdecl	HTSMTPClass;
+
+/***********************************************************************
+		Message Handlers
+***********************************************************************/
+
+/***********************************************************************
+ *		MSG_META_INITIALIZE for HTSMTPClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    Initialize protocol instance data.
+ * PARAMETERS:	    void (void)
+ * SIDE EFFECTS:    Nothing
+ *
+ * STRATEGY:	    
+ *
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	kkee    	4/30/97   	Initial Revision
+ *	
+ ***********************************************************************/
+@method HTSMTPClass, MSG_META_INITIALIZE
+{
+    @self->HTSMTPI_previousState = HTSMTP_INVALID_STATE;
+    @self->HTSMTPI_currentState = HTSMTP_BEGIN;
+    @self->HTSMTPI_nextState = HTSMTP_INVALID_STATE;
+    @self->HTSMTPI_parseState = SCAN_CODE;
+    @callsuper();
+}	/* End of MSG_META_INITIALIZE.	*/
+
+
+
+/***********************************************************************
+ *		MSG_HT_STREAM_ABORT for HTSMTPClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    Trigger an abort sequence to abort both the input
+ *                  and output stream pipes bound to this protocol.
+ * PARAMETERS:	    void (int status)
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:	    Note: If we decide to add asynch operation, it must
+ *                  be terminated here. Currently, we do not have asynch
+ *                  operation.
+ *
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	kkee    	4/30/97   	Initial Revision
+ *	
+ ***********************************************************************/
+@method HTSMTPClass, MSG_HT_STREAM_ABORT
+{
+    HTRequest *rptr;
+
+    rptr = (HTRequest *) MemThreadGrab(@self->HTSI_request);
+
+    /* Abort input stream */
+    if (rptr->HTR_inputStream) 
+	@call rptr->HTR_inputStream::MSG_HT_STREAM_ABORT(status);
+
+    MemThreadRelease(@self->HTSI_request);
+
+    /* Abort output stream and self */
+    return @callsuper();
+}	/* End of MSG_HT_STREAM_ABORT.	*/
+
+
+
+/***********************************************************************
+ *		MSG_HT_STREAM_PUT_BLOCK for HTSMTPClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    Receive a block of data from HTSocket (i.e., server).
+ * PARAMETERS:	    int (const byte *data, word len)
+ * SIDE EFFECTS:    Changes @self->HTSMTPI_currentState.
+ *
+ * STRATEGY:	    The reply may be more than one line. The format of 
+ *                  multiline response requires that every line, except
+ *                  the last, begin with the reply code, followed imme-
+ *                  diately by hyphen, '-' (aka minus), followed by
+ *                  text. The last line will begin with the reply code,
+ *                  followed immediately by <SP>, optionally some text,
+ *                  and <CRLF>. For example
+ * 
+ *                     123-First line
+ *                     123-Second line
+ *                     123-234 text beginning with numbers
+ *                     123 The last line
+ *
+ *                  In the current implementation, we simply scan for 
+ *                  the reply code with a <SP>, text, and <CRLF>. We
+ *                  ignore all previous lines. We do not use the 
+ *                  information provided in reply text.
+ *
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	kkee    	5/ 5/97   	Initial Revision
+ *	
+ ***********************************************************************/
+@method HTSMTPClass, MSG_HT_STREAM_PUT_BLOCK
+{
+    while (len-- > 0) {
+	if (@self->HTSMTPI_parseState == SCAN_CODE) {
+	    /* 
+	     * Look for response code in the first three digits,
+	     * follow by a '-' or <SP>.
+	     */
+	    if (ISWHITE(*data)) {
+		@self->HTSMTPI_parseState = LAST_LINE;
+	    } else if (*data == '-') {
+		@self->HTSMTPI_parseState = INTERMEDIATE_LINE;
+	    } else if (ISDIGIT(*data)) {
+		/* Save the response code if it is not already saved */
+		if (@self->HTSMTPI_codeIndex < 3) {
+		    @self->HTSMTPI_codeBuf[@self->HTSMTPI_codeIndex++]=*data;
+		    @self->HTSMTPI_codeBuf[@self->HTSMTPI_codeIndex]=0;
+		    if (@self->HTSMTPI_codeIndex == 3)
+			@self->HTSMTPI_responseCode = 
+			    atoi(@self->HTSMTPI_codeBuf);
+		}
+	    } else {
+		EC_WARNING(HTSMTP_CORRUPTED_RESPONSE);
+		/* 
+		 * Based on the SMTP commands we use, this is more likely 
+		 * to be the last line than intermediate line.
+		 */
+		@self->HTSMTPI_parseState = LAST_LINE;
+	    }
+
+	} else if (@self->HTSMTPI_parseState == INTERMEDIATE_LINE) {
+	    /* Ignore text data, scan for end of line, <CRLF> */
+	    if (*data == CR) 
+		@self->HTSMTPI_parseState = FCR_INTERMEDIATE;
+	    else if (*data ==  LF) 
+		@self->HTSMTPI_parseState = SCAN_CODE;
+	    
+	} else if (@self->HTSMTPI_parseState == FCR_INTERMEDIATE) {
+	    if (*data == LF) 
+		@self->HTSMTPI_parseState = SCAN_CODE;
+
+	} else if (@self->HTSMTPI_parseState == LAST_LINE) {
+	    /* Ignore text data, scan for end of line, <CRLF> */
+	    if (*data == CR)
+		@self->HTSMTPI_parseState = FCR_LAST;
+	    else if (*data == LF) {
+		@self->HTSMTPI_parseState = PARSE_DONE;
+		break;     /* Done parsing, ignore the rest of data */
+	    }
+
+	} else if (@self->HTSMTPI_parseState == FCR_LAST) {
+	    if (*data == LF) {
+		@self->HTSMTPI_parseState = PARSE_DONE;
+		break;     /* Done parsing, ignore the rest of data */
+	    }
+	}
+
+	data++;
+    }
+
+    /* 
+     * If done parsing response, go to next state, else remain in
+     * current state to continue parsing.
+     */
+    if (@self->HTSMTPI_parseState == PARSE_DONE) {
+	@self->HTSMTPI_currentState = 
+	    SMTPNextState(@self->HTSMTPI_nextState,
+			  @self->HTSMTPI_responseCode);
+    }
+
+    return HT_OK;  /* We have no target to push data */
+}	/* End of MSG_HT_STREAM_PUT_BLOCK.	*/
+
+
+
+/***********************************************************************
+ *		MSG_HT_PROTOCOL_LOAD for HTSMTPClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    Run the SMTP finite state machine. 
+ * PARAMETERS:	    int (HTNetThread *net)
+ *                  If we return anything other than HT_OK, the protocol
+ *                  will be killed by the HTNetScheduler in HTCore.
+ *
+ *                  Possible return codes:
+ *                  HT_OK
+ *                     - generic success
+ *                  HT_ERROR, HT_NO
+ *                     - unrecoverable programming error.
+ *                  HT_SOCKET_ERROR
+ *                     - unrecoverable socket error.
+ *                  HT_CANNOT_RESOLVE_HOST_NAME
+ *                     - could not resolve host.
+ *                  HT_CANNOT_CONNECT
+ *                     - could not connect to server.
+ *                  HT_LINK_FAILED
+ *                     - low level link failed. Usually bad "ini" settings
+ *                       or some low level protocol not working. Reboot!
+ *                  HT_CONNECTION_CLOSED
+ *                     - connection closed prematurely by server or some 
+ *                       interference.
+ *		    HT_INTERRUPTED
+ *                     - interrupted by HTRequestKill or HTRequestKillAll.
+ *                  HT_SERVER_OUT_OF_MEMORY
+ *                     - server out of memory. Either message to send
+ *                       too big or try later.
+ *                  HT_OUT_OF_MEMORY
+ *                     - system out of memory.
+ *                  
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:	    HTSMTP is implemented as an FSM. This means that 
+ *                  this protocol handler exits if has nothing useful
+ *                  to do and enter later to resume execution from the 
+ *                  previous state.
+ *
+ *                  HTSMTP Finite state machine runs in two modes:
+ *                   1. Command Mode.
+ *                   2. Data Mode.
+ *        
+ *                  In Command Mode, HTSMTPClass interacts with an SMTP
+ *                  server using SMTP commands. These are all the SMTP
+ *                  commands other than DATA.
+ *
+ *                  In Data Mode, HTSMTPClass is used to push data to 
+ *                  server in using DATA command.
+ *
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	kkee    	4/30/97   	Initial Revision
+ *	
+ ***********************************************************************/
+@method HTSMTPClass, MSG_HT_PROTOCOL_LOAD
+{
+    int ret=HT_OK;
+
+EC( if (@self->HTSI_request == NULL) EC_ERROR(HTSMTP_REQUEST_NOT_SET);    )
+
+    /* 
+     * Now jump into the state machine. We know the state from the 
+     * previous run. This is one big switch loop.
+     */
+    while (1) {
+
+	switch (@self->HTSMTPI_currentState) {
+
+	case HTSMTP_BEGIN:
+	    {
+		HTStreamHandle stream;
+		HTRequest *r = (HTRequest *) MemThreadGrab(@self->HTSI_request);
+		/* Make sure client does not inadvertantly make SMTP request */
+		if (r->HTR_type != HTTPT_SMTP) ret=HT_ERROR;
+		MemThreadRelease(@self->HTSI_request);
+		if (ret!=HT_OK) return ret;
+		
+		/* Create and initialize a stream socket */
+		net->HTNT_socket = HTSocketCreate(net);
+		if (!net->HTNT_socket) return HT_OUT_OF_MEMORY;
+
+		@self->HTPI_streamSocket = 
+		    HTStreamSocketCreate(@self->HTSI_request);
+		if (!@self->HTPI_streamSocket) 
+		    return HT_OUT_OF_MEMORY;
+
+		/* Initialize the stream socket to handle a HTSocket */
+		@call @self->HTPI_streamSocket::
+		    MSG_HTSOCKET_INITIALIZE(net->HTNT_socket);
+
+		/* 
+		 * The stream socket is the FIRST stream object in both
+		 * the input and output stream stacks; it is used for 
+		 * writing by input stream stack in Data Mode and 
+		 * and writing/reading by HTSMTPClass in Command Mode.
+		 */
+		HTStreamGrowInputStreamStack(@self->HTSI_request,
+					     @self->HTPI_streamSocket);
+
+		/*
+		 * Create a MIME (RFC1521, RFC1522) / Internet Text
+		 * Message (RFC822) parser/checker (which we call 
+		 * SMTPMessage) and bind it to input stream stack.
+		 * 
+		 * HTSocket <-- SMTPMessage
+		 */
+		stream = SMTPMessageNew(@self->HTSI_request);
+		if (!stream) return HT_OUT_OF_MEMORY;
+		HTStreamGrowInputStreamStack(@self->HTSI_request, stream);
+
+		@self->HTSMTPI_currentState = HTSMTP_CONNECT;
+	    }
+	    break;
+
+	case HTSMTP_CONNECT:
+	    {
+		HTSocketAddress address;
+
+		SMTPGetAddress(@self->HTSI_request, &address);
+
+		if (HTSocketResolveAndConnect(net->HTNT_socket, 
+					      &address) == HT_OK) {
+
+		    @self->HTSMTPI_previousState = HTSMTP_CONNECT;
+		    @self->HTSMTPI_currentState = 
+			HTSMTP_CHECK_COMMAND_RESPONSE;
+		    @self->HTSMTPI_nextState = HTSMTP_HELO;
+
+		} else {
+		    /* 
+		     * If we failed to connect, retry? Let's make it
+		     * simple here...
+		     */
+		    return HTSocketState(net->HTNT_socket);
+		}
+	    }
+	    break;
+
+	case HTSMTP_HELO:
+	    /* 
+	     * Put: HELO <SP> <domain> <CRLF>
+	     */
+	    /* 
+	     * The first command in a session must be the HELO command. 
+	     * This state is entered before we begin sending a new email.
+	     */
+	    {
+		HTRequest *rptr;
+		HTMemHandle domain = SMTPLocalIP(@self->HTSI_request);
+		if (domain) {
+		    char *cptr;
+
+		    ret = HTSocketSend(net->HTNT_socket, (void *)"HELO ", 5);
+		    if (ret != HT_OK) return ret;
+
+		    cptr = (char *) HTMemLock(domain); 
+		    ret = HTSocketSend(net->HTNT_socket,
+				       (void *)cptr, strlen(cptr));
+		    HTMemUnlockAndFree(domain);
+		    if (ret != HT_OK) return ret;
+
+		    ret = HTSocketSend(net->HTNT_socket, (void *)CRLF, 2);
+		    if (ret != HT_OK) return ret;
+
+		    @self->HTSMTPI_previousState = HTSMTP_HELO;
+		    @self->HTSMTPI_currentState = 
+			HTSMTP_CHECK_COMMAND_RESPONSE;
+		    @self->HTSMTPI_nextState = HTSMTP_MAIL;
+		    
+		} else {
+		    /* 
+		     * Regardless if we can do HELO, we still need to 
+		     * send the email. Maybe I can use RSET...?
+		     */
+		    @self->HTSMTPI_currentState = HTSMTP_MAIL;
+		}
+
+		/* Get a new email to post from client using postCallback */
+		rptr = MemThreadGrab(@self->HTSI_request);
+		if (rptr->HTR_postCallback)
+		    ret = ProcCallFixedOrMovable_pascal(@self->HTSI_request, 
+							rptr->HTR_inputStream,
+							rptr->HTR_postCallback);
+		else 
+		    ret = HT_ERROR;
+		MemThreadRelease(@self->HTSI_request);
+		if (ret != HT_OK) return ret;
+	    }
+	    break;
+
+	case HTSMTP_MAIL:
+	    /* 
+	     * Put: MAIL <SP> FROM:<reverse-path> <CRLF>
+	     */
+	    {
+		HTRequest *rptr;
+
+		if ((ret = SMTPPushMailFrom(net, @self->HTSI_request)) 
+		    != HT_OK)
+		    return ret;
+		/*
+		 * Get ready to iterate through all receivers of SMTPMessage.
+		 */
+		@self->HTSMTPI_currentReceiver = 0;
+		rptr = MemThreadGrab(@self->HTSI_request);
+		@self->HTSMTPI_numReceiver =
+		    @call rptr->HTR_inputStream::
+			MSG_SMTPM_GET_RECEIVER_COUNT();
+		MemThreadRelease(@self->HTSI_request);
+	    }
+
+	    @self->HTSMTPI_numFailedReceiver = 0;
+	    @self->HTSMTPI_previousState = HTSMTP_MAIL;
+	    @self->HTSMTPI_currentState = HTSMTP_CHECK_COMMAND_RESPONSE;
+	    @self->HTSMTPI_nextState = HTSMTP_RCPT;
+	    break;
+
+	case HTSMTP_RCPT:
+	    /*
+	     * Put: RCPT <SP> TO:<forward-path> <CRLF>
+	     */
+	    if ((ret = SMTPPushRcptTo(net, @self->HTSI_request,
+		      @self->HTSMTPI_currentReceiver)) != HT_OK)
+		return ret;
+
+	    @self->HTSMTPI_previousState = HTSMTP_RCPT;
+	    @self->HTSMTPI_currentState = HTSMTP_CHECK_COMMAND_RESPONSE;
+
+	    if (++@self->HTSMTPI_currentReceiver<@self->HTSMTPI_numReceiver) 
+		/* There are more receivers */
+		@self->HTSMTPI_nextState = HTSMTP_RCPT;
+	    else
+		@self->HTSMTPI_nextState = HTSMTP_DATA;
+	    break;
+
+	case HTSMTP_DATA:
+	    /* 
+	     * Put: DATA <CRLF>
+	     */
+	    if ((ret = HTSocketSend(net->HTNT_socket, (void *)"DATA", 4))
+		 != HT_OK)
+		return ret;
+	    if ((ret = HTSocketSend(net->HTNT_socket, (void *)CRLF, 2))
+		!= HT_OK)
+		return ret;
+	    @self->HTSMTPI_previousState = HTSMTP_DATA;
+	    @self->HTSMTPI_currentState = HTSMTP_CHECK_COMMAND_RESPONSE;
+	    @self->HTSMTPI_nextState = HTSMTP_DATAI;
+	    break;
+
+	case HTSMTP_DATAI:
+	    /* 
+	     * Put message to server. Transparency of "<CRLF>.<CRLF>" is 
+	     * ensured by SMTPMessageClass.
+	     */
+	    ret = HTNetReportProgress(@self->HTSI_request, HT_SENDING_DATA);
+	    if (ret != HT_OK) return ret;
+	    if ((ret = SMTPPushMsg(@self->HTSI_request)) != HT_OK)
+		return ret;
+	    /* Put end of message */
+	    ret = HTSocketSend(net->HTNT_socket, (void*)ENDDATA, 5);
+	    if (ret != HT_OK) return ret;
+	    @self->HTSMTPI_previousState = HTSMTP_DATAI;
+	    @self->HTSMTPI_currentState = HTSMTP_CHECK_COMMAND_RESPONSE;
+	    @self->HTSMTPI_nextState = HTSMTP_QUIT;
+	    break;
+
+	case HTSMTP_QUIT:
+	    /*
+	     * Put: QUIT <CRLF>
+	     *
+	     * @@@
+	     * Actually, I can allow for more messages to be sent
+	     * in one session before quitting. Will see what Ericsson 
+	     * think.
+	     */
+	    HTSocketSend(net->HTNT_socket, (void *)"QUIT", 4);
+	    HTSocketSend(net->HTNT_socket, (void *)CRLF, 2);
+	    /* 
+	     * Don't even bother getting response as we are 
+	     * terminating the socket after this.
+	     */
+	    return HT_SENT;
+
+	case HTSMTP_CHECK_COMMAND_RESPONSE:
+	    /* 
+	     * Reset vars to receive response from server.
+	     */
+	    @self->HTSMTPI_parseState = SCAN_CODE;
+	    @self->HTSMTPI_responseCode = 0;
+	    @self->HTSMTPI_codeBuf[0] = 0;
+	    @self->HTSMTPI_codeIndex = 0;
+	    @self->HTSMTPI_currentState = HTSMTP_PUSH_RESP;
+	    break;
+
+	case HTSMTP_PUSH_RESP:
+	    /* 
+	     * We check the next response from server by pushing data from
+	     * HTSocket --> HTSMTP.
+	     */
+	    if (!HTSocketRecv(net->HTNT_socket, 10))
+		return HTSocketState(net->HTNT_socket);
+	    
+	    /* 
+	     * Inspect response from server and then set next state.
+	     */
+	    ret = HTSocketPush(oself, net->HTNT_socket);
+	    if (ret != HT_OK) return ret;
+
+	    /* State change is done in HTSMTP::MSG_HT_STREAM_PUT_BLOCK. */
+	    break;
+
+	case HTSMTP_MAILBOX_NOT_FOUND:
+	    /* 
+	     * This is the result of RCPT. If other mailboxes are OK,
+	     * we should continue to send to those mailboxes, else 
+	     * we simply abort sending this message.
+	     */
+	    /* 
+	     * @@@
+	     * Also, client may want to know which mailbox is bad. In
+	     * that, I will save that in WWW/HTCore/HTError/hterror.goc.
+	     * Will see what Ericsson think.
+	     */
+	    if (++@self->HTSMTPI_numFailedReceiver ==
+		@self->HTSMTPI_numReceiver)
+		return HT_ERROR;
+
+	    @self->HTSMTPI_currentState = @self->HTSMTPI_nextState;
+	    break;
+
+	case HTSMTP_CONNECTION_CLOSED:
+	    return HT_CONNECTION_CLOSED;
+
+	case HTSMTP_SERVER_OUT_OF_SPACE:
+	    return HT_SERVER_OUT_OF_MEMORY;
+
+	case HTSMTP_COMMAND_ERROR:
+	    /* kkee's fault, its programming error */
+	    EC_ERROR(HTSMTP_COMMAND_SYNTAX_ERROR);
+	    return HT_ERROR;
+
+	case HTSMTP_ERROR:
+	    /* 
+	     * Unrecoverable error, which should never happen if
+	     * server were implemented according to RFC821.
+	     */
+	    return HT_ERROR;
+
+	default:
+
+EC(         EC_ERROR(HTSMTP_STATE_NOT_HANDLED);                         )
+
+	    return HT_ERROR;
+	}
+    }
+}	/* End of MSG_HT_PROTOCOL_LOAD.	*/
+

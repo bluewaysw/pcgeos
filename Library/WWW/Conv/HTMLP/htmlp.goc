@@ -1,0 +1,1613 @@
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Geoworks 1996.  All rights reserved.
+	GEOWORKS CONFIDENTIAL
+
+PROJECT:	GeoBrowser
+MODULE:		text/xgw-html --> text/xgwp-html parser
+FILE:		html.goc
+
+AUTHOR:		Kok Kin Kee, Sep 15, 1996
+
+ROUTINES:
+	Name			Description
+	----			-----------
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	kkee	9/15/96   	Initial version.
+
+DESCRIPTION:
+
+	text/xgw-html --> text/xgwp-html parser. Parses HTML DTD 3.2
+        (http://www.w3.org/pub/WWW/MarkUp/Wilbur/HTML32.dtd).
+	It inputs and outputs the same data format. All this module
+	does is ensure proper html tag grammar and nesting. This
+	module can be made to be transparent if we know the document
+	we are parsing is correct. Uses the filter table in htmlft.goc.
+
+	$Id: htmlp.goc,v 1.18.1.5 97/12/29 18:02:49 jeremyb Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+
+@include <stdapp.goh>
+@include <WWW/HTCore/htreq.goh>
+@include <WWW/HTCore/htstream.goh>
+@include <WWW/HTCore/htlist.goh>
+@include <WWW/HTCore/htutils.goh>
+@include <WWW/sgml.goh>
+@include <WWW/htmlDTD.goh>
+@include <WWW/htmlp.goh>
+@include "htfatals.goh"
+#include <Ansi/string.h>		/* memcpy(), memcmp() */
+#include <Ansi/ctype.h>             
+
+extern SGMLDTD htmlDTD;               /* in htmlDTD.goc */
+@extern chunk ISO_Latin1;             /* in htmlDTD.goc */
+@extern chunk htmlContainment;        /* in htmlft.goc */
+@extern chunk htmlc_form;             /* in htmlft.goc */
+@extern chunk emptyAttr;              /* in htmlft.goc */
+
+#define ESTACK          parser->HTMLP_elementStack
+#define ETOP            parser->HTMLP_elementTop
+#define ETOPITEM        ESTACK[ETOP-1]
+#define MSTACK          parser->HTMLP_minusStack
+#define MTOP            parser->HTMLP_minusTop
+#define TAG             parser->HTMLP_tag
+#define BLOCK           parser->HTMLP_block
+#define CHUNK           parser->HTMLP_chunk
+#define TARGET          parser->HTMLP_target
+#define FORM            parser->HTMLP_form
+#define FORMGROUP       parser->HTMLP_formGroup
+
+#define CURRENTCONTENT  TAG[ETOPITEM.HTMLS_elementToken].HTMLT_content
+#define CURRENTINDEX    ETOPITEM.HTMLS_index
+#define CURRENTCOUNT    ETOPITEM.HTMLS_count
+
+/* It seems i can't use defines in methods!!! argh!! 
+ * Either @ or # does not work!
+ */
+/* @@@
+#define _ESTACK         @self->HTMLI_parser->HTMLP_elementStack
+#define _ETOP           @self->HTMLI_parser->HTMLP_elementTop
+#define _MSTACK         @self->HTMLI_parser->HTMLP_minusStack
+#define _MTOP           @self->HTMLI_parser->HTMLP_minusTop
+#define _BLOCK          @self->HTMLI_parser->HTMLP_block
+#define _CHUNK          @self->HTMLI_parser->HTMLP_chunk
+#define _TAG            @self->HTMLI_parser->HTMLP_tag
+#define _TARGET         @self->HTMLI_parser->HTMLP_target
+@@@ */
+
+/*-----------------------------------------------------------------------
+ *		Global Variables
+ *----------------------------------------------------------------------*/
+
+#if ERROR_CHECK
+FatalErrors htmlpFatalErrors;
+Warnings    htmlpWarnings;
+#endif
+
+/***********************************************************************
+		Class Declaration
+***********************************************************************/
+
+@classdecl	HTMLPClass;
+
+
+/***********************************************************************
+                Private Functions
+***********************************************************************/
+
+#define SearchContentOptr(content, elementToken) \
+    SearchContentPtr((HTMLAtom *) LMemDeref(content), elementToken)
+
+static int _pascal
+    SearchContentPtr(HTMLAtom *atom, word elementToken);
+
+static void _pascal
+    CheckRightToLeftGrammar (HTMLParser *parser, HTMLAtom *atom, int index);
+
+static Boolean _pascal
+    CheckStartElementGrammar (HTMLParser *parser, HTMLAtom *atom, int index);
+
+static int _pascal
+    HTMLParseStartElement (HTMLParser *parser, word elementToken);
+
+static int _pascal
+    HTMLParseEndElement (HTMLParser *parser, word elementToken);
+
+static int _pascal
+    HTMLAllowed (HTMLParser *parser, int index, word elementToken);
+
+static void _pascal
+    HTMLCorrectStartElement (HTMLParser *parser, word elementToken);
+
+static Boolean _pascal
+    HTMLCorrectTableStartElement (HTMLParser *parser, word elementToken);
+
+static int _pascal
+    HTMLPutStartElement (HTMLParser *parser, word elementToken, 
+			 MemHandle block, ChunkHandle chunk);
+
+static int _pascal
+    HTMLPutEndElement (HTMLParser *parser, word elementToken);
+
+static int _pascal
+    SearchElementStack(HTMLParser *parser, word elementToken);
+
+static int _pascal
+    SearchMinusStack(HTMLParser *parser, word elementToken);
+
+
+/***********************************************************************
+ *		SearchSimple
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Search a simple list of element tokens for a match.
+ * CALLED BY:	
+ * RETURN:	-1 if not found, else 0-th based index.
+ * SIDE EFFECTS:Nothing.
+ *	
+ * STRATEGY:    Binary search. atom[0].HTMLA_value.HTMLVA_numOfTokens
+ *              contains the number of tokens to search, excluding 
+ *              atom[0].
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	kkee	10/23/96   	Initial Revision
+ *
+ ***********************************************************************/
+static int _pascal
+SearchSimple (HTMLAtom *atom, word numOfTokens, word elementToken)
+{
+    int i, lower = 0;   
+    int upper = numOfTokens - 1;
+
+    while (upper >= lower) {
+	i = (lower + upper) / 2;
+
+	if (elementToken < atom[i].HTMLA_value.HTMLAV_token)
+	    upper = i -1;
+
+	else if (elementToken > atom[i].HTMLA_value.HTMLAV_token)
+	    lower = i + 1;
+
+	else 
+	    return i;
+
+    }
+
+    return -1;
+}	/* End of SearchSimple.	*/
+
+
+
+
+/***********************************************************************
+ *		SearchContentPtr
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Check to see if elementToken is allowed in a content. 
+ *              The passed in content is assumed to have its handle 
+ *              locked.
+ * CALLED BY:	SearchContentOptr
+ * RETURN:	-1 if not found, else 0th-based index into the content
+ *              list where the element is found.TRUE,
+ *              (Note the first element in HTMLTag table must be invalid, 
+ *              i.e., HTML_XXX_INVALID).
+ *
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:    No grammar checking here. Just simple search. Grammar
+ *              is checked after we have decided that elementToken is 
+ *              allowed in current content in atom.
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	kkee	10/20/96   	Initial Revision
+ *
+ ***********************************************************************/
+static int _pascal
+SearchContentPtr (HTMLAtom *atom, word elementToken)
+{
+    int i = 0;
+
+    while (1) {
+
+	switch (atom[i].HTMLA_type) {
+
+	case HTMLAT_CONTENT:
+	    /* 
+	     * Depth first search.
+	     */
+	    if ((SearchContentOptr(atom[i].HTMLA_value.HTMLAV_content, 
+				   elementToken)) > -1)
+		return i;
+	    break;
+
+	case HTMLAT_SIMPLE:
+	    /*
+	     * Optimize by using binary search 
+	     */
+	    if ((SearchSimple(&atom[1], 
+			      atom[0].HTMLA_value.HTMLAV_numOfTokens,
+			      elementToken)) > -1)
+		return i;
+	    return -1;
+
+	case HTMLAT_TOKEN:
+	    if (atom[i].HTMLA_value.HTMLAV_token == elementToken)
+		return i;
+	    break;
+
+	case HTMLAT_ALL:
+	    /* All overrides everything! */
+	    return i;
+
+	case 0:
+	    /* End of content list. So not allowed. */
+	    return -1;
+
+	default:
+	    /* Ignore non-searchable HTMLAT_... */
+	    break;
+	}
+
+	i += 1;
+    }
+
+    return -1;
+}	/* End of SearchContentPtr.	*/
+
+
+
+/***********************************************************************
+ *		HTMLAddAllowedContentModel
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Add a new allowed content model
+ * CALLED BY:	
+ * RETURN:	Nothing
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	kkee	10/31/96   	Initial Revision
+ *
+ ***********************************************************************/
+static void _pascal
+HTMLAddAllowedContentModel (HTMLParser *parser, word elementToken)
+{
+    int i;
+
+    if (TAG[elementToken].HTMLT_content ||
+	TAG[elementToken].HTMLT_mask & HTML_END_TAG_REQUIRED) {
+
+	ESTACK[ETOP].HTMLS_elementToken = elementToken;
+	ESTACK[ETOP].HTMLS_index = -1;
+
+	for (i=0; i<MAX_HTML_CONTENT_ITEMS; i++) 
+	    ESTACK[ETOP].HTMLS_count[i] = 0;
+
+	ETOP += 1;
+
+EC( if (ETOP == MAX_HTML_ALLOWED_NESTING_LEVEL)                         )
+EC(     EC_ERROR(EXCEED_NESTING_LEVEL);                                 )
+
+    }
+}	/* End of HTMLAddAllowedContentModel.	*/
+
+
+
+
+/***********************************************************************
+ *		HTMLAddMinusContentModel
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Add a new minus content model.
+ * CALLED BY:	
+ * RETURN:	Nothing
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	kkee	10/31/96   	Initial Revision
+ *
+ ***********************************************************************/
+static void _pascal
+HTMLAddMinusContentModel (HTMLParser *parser, word elementToken)
+{
+    if (TAG[elementToken].HTMLT_minus) {
+	MSTACK[MTOP++] = elementToken;
+
+EC( if (MTOP == MAX_HTML_DISALLOWED_NESTING_LEVEL)                      )
+EC(    EC_ERROR(EXCEED_NESTING_LEVEL);                                  )
+
+    }
+}	/* End of HTMLAddMinusContentModel.	*/
+
+
+
+
+
+/***********************************************************************
+ *		CheckRightToLeftGrammar
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Traverse right-to-left from atom for required elements
+ *              (i.e., comma separated elements) that were not pushed to 
+ *              target.
+ * CALLED BY:	CheckStartElementGrammar
+ * RETURN:	Nothing
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:    Now we cheat! If you look at the htmlContainment table
+ *              in htmlft.goc, all elements to the left of HTMLAT_COMMA
+ *              are all tokens. Furthermore, there is only one element
+ *              to the left of every HTMLAT_COMMA!
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	kkee	10/24/96   	Initial Revision
+ *
+ ***********************************************************************/
+static void _pascal
+CheckRightToLeftGrammar (HTMLParser *parser, HTMLAtom *atom, int index)
+{
+    int i;
+
+    /*
+     * index-1 points to a comma, so we can skip immediately index-2.
+     */
+    for (i=index-2; i >= 0; i--) {
+
+	switch (atom[i].HTMLA_type) {
+
+	case HTMLAT_ZERO_OR_MORE:
+	case HTMLAT_ZERO_OR_ONE:
+	    /* 
+	     * There is no need to check since they all mean that 
+	     * the next element is optional.
+	     */
+	    return;
+
+	case HTMLAT_TOKEN:
+	    /*
+	     * Must have been pushed to target. This happens when
+	     * the required element was not pushed and that the 
+	     * required element is not optional.
+	     */
+	    if ((CURRENTCOUNT[i]) &&
+		(TAG[atom[i].HTMLA_value.HTMLAV_token].
+		    HTMLT_mask & HTML_START_TAG_REQUIRED)) {
+
+		HTMLPutStartElement(parser, 
+				    atom[i].HTMLA_value.HTMLAV_token,
+				    OptrToHandle(@emptyAttr),
+				    OptrToChunk(@emptyAttr));
+
+		/* Also push the end element if it is required */
+		if (TAG[atom[i].HTMLA_value.HTMLAV_token].
+		    HTMLT_mask & HTML_END_TAG_REQUIRED) 
+		    
+		    HTMLPutEndElement(parser,
+				      atom[i].HTMLA_value.HTMLAV_token);
+	    }
+
+	    /* 
+	     * This must be set even if we did't push for 
+	     * optional starttags as we must not get the element
+	     * anymore.
+	     */
+	    CURRENTCOUNT[i] = 1;
+	    return;
+	    
+	default:
+	    /* Ignore the rest! */
+	    break;
+	}
+    }
+}	/* End of CheckRightToLeftGrammar.	*/
+
+
+
+
+
+/***********************************************************************
+ *		CheckStartElementGrammar
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Check a start tag against the current content grammar.
+ * CALLED BY:	MSG_HTMLP_HANDLE_ALLOWED.
+ * RETURN:	TRUE if pass grammar test, else FALSE. You should NOT
+ *              pass an element that failed grammar test to the target.
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:    Since this is a start elenment, we only have to do the 
+ *              following things:
+ *
+ *              1. We must make sure that all HTMLAT_COMMA neighbors 
+ *                 to left of state->HTMLS_index element were gotten.
+ *                 This involves traversing to the left of 
+ *                 state->HTMLS_index.
+ *
+ *              2. If element has zero-or-more occurence and it has
+ *                 been received before, then we ignore it else accept.
+ *                 This involves traversing to the right of
+ *                 state->HTMLS_index.
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	kkee	10/24/96   	Initial Revision
+ *
+ ***********************************************************************/
+static Boolean _pascal
+CheckStartElementGrammar (HTMLParser *parser, HTMLAtom *atom, int index)
+{
+
+EC( if (index < 0)                                                      )
+EC(    EC_ERROR(INVALID_INDEX);                                         )
+
+    /* 
+     * 1. Check immediate left first for a comma. We have a left neighbor 
+     *    only when index > 0.
+     */
+    if ((index) && (atom[index-1].HTMLA_type == HTMLAT_COMMA))
+
+	CheckRightToLeftGrammar(parser, atom, index);
+
+
+    /* 
+     * 2. Check immediate right neighbor second. We are guaranteed to have
+     *    an element to the right of index.
+     */
+    switch (atom[index+1].HTMLA_type) {
+
+    case HTMLAT_ONE_OR_MORE:
+    case HTMLAT_ZERO_OR_MORE:
+	/*
+	 * All these change the value of count[index] to 1. However,
+	 * they are interpreted differently when we get an end element
+	 * in MSG_HT_STRUCTURED_PUT_END_ELEMENT.
+	 */
+	CURRENTCOUNT[index] = 1;  /* indicate we have seen this element */
+	return TRUE;
+
+    case HTMLAT_ZERO_OR_ONE:
+	/* 
+	 * We are not supposed to get the same element more than once!
+	 * Some text/html viewer can deal with it, but we choose 
+	 * not to pass this again to Geos text/html UI Generator.
+	 */
+    case HTMLAT_COMMA:
+    case HTMLAT_AND:
+    case HTMLAT_OR:
+    case 0:
+	/* 
+	 * No occurence, so one instance only!
+	 */
+	if (!CURRENTCOUNT[index]) {
+	    CURRENTCOUNT[index] = 1;
+	    return TRUE;
+	}
+	return FALSE;
+	
+    case HTMLAT_ALL:
+	/* 
+	 * Not supposed to get this as it only need to go through the 
+	 * containment parser, not grammar parser.
+	 */
+    default:
+
+EC(     EC_ERROR(INVALID_GRAMMAR_TABLE);                                )
+	return FALSE;   /* To be safe, we ignore the element */
+
+    }
+
+}	/* End of CheckStartElementGrammar.	*/
+
+
+
+/***********************************************************************
+ *		CheckEndElementGrammar
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Check that a terminating content model grammar is 
+ *              correct. If necessary, we push the required elements
+ *              to correct it.
+ * CALLED BY:	MSG_HT_STRUCTURED_PUT_END_ELEMENT.
+ * RETURN:	Nothing
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:    Make sure all the elements we were supposed to get in 
+ *              atom's content were actually gotten. If not, we generate
+ *              our own and push them to target. 
+ *
+ *              1. Make sure all HTMLAT_COMMA contents to the right of
+ *                 state->HTMLS_index'ed element were were gotten.
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	kkee	10/24/96   	Initial Revision
+ *
+ ***********************************************************************/
+static void _pascal
+CheckEndElementGrammar (HTMLParser *parser, HTMLAtom *atom, int index)
+{
+
+    /* 
+     * It seems the htmlContainment table is simple enough not to
+     * correct end element grammar.
+     */
+}	/* End of CheckEndElementGrammar.	*/
+
+
+
+/***********************************************************************
+ *		HTMLCorrectStartElement
+ ***********************************************************************
+ *
+ * SYNOPSIS:	A start element is not allowed, attempt to correct.
+ * CALLED BY:	
+ * RETURN:	Nothing.
+ *	
+ * STRATEGY:	The correction is based on the element's startScope
+ *              with respect to the startScope of those elements on the 
+ *              elementStack. Here is what we do.
+ *
+ *              From each element from top of ESTACK to bottom of ESTACK, 
+ *              if elementToken's startScope < element's startScope,
+ *              remove the element. Each element is tested until 
+ *              elementToken is allowed or not allowed.
+ *              
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	kkee    	7/15/97   	Initial Revision
+ *	
+ ***********************************************************************/
+static void _pascal
+HTMLCorrectStartElement (HTMLParser *parser, word elementToken)
+{
+    /* ETOP>1 because we must not remove the first HTMLT_HTML element */
+    if (ETOP>1 && 
+	(TAG[ESTACK[ETOP-1].HTMLS_elementToken].HTMLT_startScope >
+	TAG[elementToken].HTMLT_startScope)) {
+	HTMLParseEndElement(parser, ESTACK[ETOP-1].HTMLS_elementToken);
+	/* Try the start element again, this is a recursive call */
+	HTMLParseStartElement(parser, elementToken);
+    }
+}	/* End of HTMLCorrectStartElement.	*/
+
+
+
+
+/***********************************************************************
+ *		HTMLCorrectTableStartElement
+ ***********************************************************************
+ *
+ * SYNOPSIS:	HTMLT_TR or HTLMT_TH is not allowed. Attempt to correct.
+ * CALLED BY:	
+ * RETURN:	TRUE if the element is accepted (after the correction),
+ *              FALSE otherwise.
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:    Just one level of error correcting by looking at the
+ *              current content model. Don't try to outsmart the user 
+ *              by going down to previous content models.  
+ *
+ *              We limit to correcting HTMLT_TR for now; where we 
+ *              insert a <TR> if there is no <TR> before <TD> or <TH>.
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	kkee	10/31/96   	Initial Revision
+ *
+ ***********************************************************************/
+static Boolean _pascal
+HTMLCorrectTableStartElement (HTMLParser *parser, word elementToken)
+{
+    int i;
+    HTMLAtom *atom;
+
+EC( if (!ETOP)                                                          )
+EC(    EC_ERROR(NO_CONTENT_MODEL);                                      )
+
+
+    if (!CURRENTCONTENT) return FALSE;
+
+    atom = (HTMLAtom *)	LMemDeref(CURRENTCONTENT);
+
+    i = 0;
+    while (atom[i].HTMLA_type) {
+
+	/* Correct TR only! */
+	if ((atom[i].HTMLA_type == HTMLAT_TOKEN) &&
+	    (atom[i].HTMLA_value.HTMLAV_token == HTMLT_TR)) {
+	    
+	    if (SearchContentOptr(TAG[HTMLT_TR].
+			   HTMLT_content, elementToken) > -1) {
+		
+		HTMLPutStartElement(parser, HTMLT_TR,
+				    OptrToHandle(@emptyAttr),
+				    OptrToChunk(@emptyAttr));
+
+	        /* No end element needed for HTMLAT_TR */
+
+		HTMLPutStartElement(parser, elementToken, BLOCK, CHUNK);
+
+		/* Make sure to update the current content model */
+		CURRENTCOUNT[i] = 1;
+
+		/* Add TR content model to stack */
+		HTMLAddAllowedContentModel(parser, HTMLT_TR);
+
+		/* Add elemenetTokens' (i.e., TD or TH) content model */
+		HTMLAddAllowedContentModel(parser, elementToken);
+
+		/* 
+		 * No need to push minus content as we know this
+		 * elementToken does not have one.
+		 */
+		return TRUE; 
+	    }
+
+	}
+
+	i += 1;
+
+    }
+    return FALSE;
+}	/* End of HTMLCorrectTableStartElement.	*/
+
+
+
+
+/***********************************************************************
+ *		HTMLPutStartElement
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Put a start element to target.
+ * CALLED BY:	
+ * RETURN:	Nothing
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:    Make use of the element to set the states we want to be 
+ *              in next.
+ *                   1. whether we are in <FORM>. DTD 3.2 bug does not
+ *                      capture that %form elements must be in <FORM>.
+ *
+ *                   2. whether we are to accept the next leading 
+ *                      whitespace. SGML has already reduced consecutive 
+ *                      whitespaces to a single space. We need to decide 
+ *                      whether we want the next whitespace though. 
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	kkee	10/31/96   	Initial Revision
+ *
+ ***********************************************************************/
+static int _pascal
+HTMLPutStartElement (HTMLParser *parser, word elementToken, 
+		     MemHandle block, ChunkHandle chunk)
+{
+    parser->HTMLP_whitespaceOK = 
+	TAG[elementToken].HTMLT_mask & HTML_ACCEPT_WHITESPACE;
+
+    return @call TARGET::
+	MSG_HT_STRUCTURED_PUT_START_ELEMENT(elementToken,
+					    block, 
+					    chunk);
+}	/* End of HTMLPutStartElement.	*/
+
+
+
+
+/***********************************************************************
+ *		HTMLPutEndElement
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Put an end element to target.
+ * CALLED BY:	
+ * RETURN:	Nothing
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	kkee	10/31/96   	Initial Revision
+ *
+ ***********************************************************************/
+static int _pascal
+HTMLPutEndElement (HTMLParser *parser, word elementToken)
+{
+    return @call TARGET::
+	MSG_HT_STRUCTURED_PUT_END_ELEMENT(elementToken);
+}	/* End of HTMLPutEndElement.	*/
+
+
+
+
+/***********************************************************************
+ *		HTMLAllowed
+ ***********************************************************************
+ *
+ * SYNOPSIS:	elementToken is allowed in a current content. We may
+ *              have to do some correction before closing the previous
+ *              element(s).
+ * CALLED BY:	HTMLParseStartElement
+ * RETURN:	int, whatever is returned from pushing data.
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:    Check grammar of current content model before closing it.
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	kkee	10/31/96   	Initial Revision
+ *
+ ***********************************************************************/
+static int _pascal
+HTMLAllowed (HTMLParser *parser, int index, word elementToken)
+{
+    HTMLAtom *atom;
+    Boolean accepted = FALSE;
+
+    /* 
+     * Check the allowed element against the current content grammar.
+     */
+    atom = (HTMLAtom *) LMemDeref(CURRENTCONTENT);
+    
+    switch (atom[0].HTMLA_type) {
+
+    case HTMLAT_ALL:
+	/*
+	 * This means everything accepted! Index is not affected.
+	 */
+    case HTMLAT_SIMPLE:
+    case HTMLAT_NO_GRAMMAR:
+	/* 
+	 * These two optimizations do not need grammar checking at all.
+	 * Index is not affected by these two.
+	 */
+	accepted = TRUE;
+	break;
+
+    default:
+	/* The rest must go through grammar checker */
+	accepted = CheckStartElementGrammar(parser, atom, index);
+	break;
+    }
+
+    if (!accepted) {
+
+/* @@@
+EC(     EC_WARNING(TAG_NOT_ALLOWED_IN_CURRENT_CONTENT);                  )
+@@@ */
+
+	return HT_OK;
+    }
+    
+    /* 
+     * Change to elementToken's allowed content model.
+     */
+    HTMLAddAllowedContentModel(parser, elementToken);
+
+    /* 
+     * Change to elementToken's minus content model.
+     */
+    HTMLAddMinusContentModel(parser, elementToken);
+
+    return HTMLPutStartElement(parser, elementToken,
+			       BLOCK, CHUNK);
+}	/* End of HTMLAllowed.	*/
+
+
+
+
+/***********************************************************************
+ *		HTMLNotAllowed
+ ***********************************************************************
+ *
+ * SYNOPSIS:	elementToken is not allowed in current content model.
+ *              We may have to do some checking and correction to see
+ *              if it will be allowed.
+ * CALLED BY:	HTMLParseStartElement.
+ * RETURN:	int, whatever is returned from pushing data.
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:    It maybe allowed in previous content models. Hence
+ *              can be used to terminate the current content model
+ *              (and maybe some of previous content models). This 
+ *              only happens if the previous content models do not
+ *              require end tags. So, we deduce that if elementToken
+ *              is not allowed in one of those contents, then it 
+ *              serves as the end tag for these contents.
+ *                  
+ *              So we go down the stack looking for the first element
+ *              that allows elementToken or until we encounter an
+ *              element that requires an end element. If all these
+ *              elements do not allow elementToken, then elementToken 
+ *              is ignored.
+ *
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	kkee	10/31/96   	Initial Revision
+ *
+ ***********************************************************************/
+static int _pascal
+HTMLNotAllowed (HTMLParser *parser, word elementToken)
+{
+    int i, index = -1;
+    
+    for (i=ETOP-1; i>=0; i--) {
+	if (TAG[ESTACK[i].HTMLS_elementToken].HTMLT_content &&
+	    ((SearchContentOptr(TAG[ESTACK[i].HTMLS_elementToken].HTMLT_content,
+			       elementToken)) > -1)) {
+	    index = i;
+	    break;
+	} else if (TAG[ESTACK[i].HTMLS_elementToken].HTMLT_mask & 
+		   HTML_END_TAG_REQUIRED)
+	    break;
+    }
+
+    if (index == -1) {
+
+/* @@@
+EC(	EC_WARNING(TAG_NOT_ALLOWED_IN_CURRENT_CONTENT);                  )
+@@@ */
+	Boolean corrected = FALSE;
+	
+	/* 
+	 * A specific correction.
+	 * This correction is tailored to correcting elements
+	 * in @htmlc_tr only...for speed.
+	 */
+	if (elementToken == HTMLT_TH || elementToken == HTMLT_TD)
+	    corrected = HTMLCorrectTableStartElement(parser, elementToken);
+
+        /*
+	 * After all specific corrections, try the last generic correction.
+	 */
+	if (!corrected) HTMLCorrectStartElement(parser, elementToken);
+	return HT_OK;
+    }
+
+    /* 
+     * Start popping all start elements of the stack until we reach
+     * the element before index. We need not push the popped elements'
+     * end tags and these elements do not require the end tags. 
+     */
+    ETOP = index+1;
+
+    /* 
+     * Change to elementToken's allowed content model.
+     */
+    HTMLAddAllowedContentModel(parser, elementToken);
+	
+    /* 
+     * Change to elementToken's minus content model.
+     */
+    HTMLAddMinusContentModel(parser, elementToken);
+
+    return HTMLPutStartElement(parser, elementToken, BLOCK, CHUNK);
+}	/* End of HTMLNotAllowed.	*/
+
+
+
+
+
+/***********************************************************************
+ *		HTMLParseStartElement
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Parse a start element against the current content model.
+ * CALLED BY:	MGS_HT_STRUCTURED_PUT_START_ELEMENT.
+ * RETURN:	HT_OK or return code from pushing data.
+ * SIDE EFFECTS:Nothing.
+ *	
+ * STRATEGY:
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	kkee	10/31/96   	Initial Revision
+ *
+ ***********************************************************************/
+static int _pascal
+HTMLParseStartElement (HTMLParser *parser, word elementToken)
+{
+    HTMLAtom *atom;
+    int i, index = -1;
+
+EC( if (!ETOP)                                                          )
+EC(     EC_ERROR(NO_CONTENT_MODEL);                                     )
+
+    /*
+     * mzhu - FORM EVERYWHERE!
+     */
+    if (elementToken == HTMLT_FORM) {
+	if(parser->HTMLP_form) 
+	    /* sorry, no forms inside form */
+	    return HT_OK; 
+        else {
+	    parser->HTMLP_form = TRUE;
+	    return HTMLPutStartElement(parser, elementToken,
+			       BLOCK, CHUNK);
+	}
+    }
+
+
+    /* 
+    ** First, check minus contents.
+    **
+    ** If elementToken is forbidden by one of the previous contents, we 
+    ** ignore the element.
+    */
+    for (i=MTOP-1; i>=0; i--) {
+
+	if ((SearchContentOptr(TAG[MSTACK[i]].HTMLT_minus,
+			       elementToken)) > -1)
+	    return HT_OK;
+    }
+
+
+    /* 
+    ** Second, check against allowed contents.
+    **
+    ** If elementToken is allowed, we may optionally try to correct 
+    ** grammar.
+    */
+    if (CURRENTCONTENT) {
+	atom = (HTMLAtom *) LMemDeref(CURRENTCONTENT);
+	index = SearchContentPtr(atom, elementToken);
+    }
+
+    if (index > -1) {
+	/* Allowed */ 
+	
+	/* 
+	 * Handle special cases first, where %form elements must appear
+	 * in <FORM> and not specified in the DTD.
+	 */
+	if (((SearchSimple(&FORMGROUP[1], 
+			  FORMGROUP[0].HTMLA_value.HTMLAV_numOfTokens,
+			  elementToken)) > -1) && !FORM)
+	    return HT_OK;
+
+	return HTMLAllowed(parser, index, elementToken);
+	
+    } else {
+
+	/* Not allowed, try to correct */
+	return HTMLNotAllowed(parser, elementToken);
+    }
+}	
+/* End of HTMLParseStartElement.	*/
+
+
+
+/***********************************************************************
+ *		HTMLParseEndElement
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Parse end element. Correct if necesary.
+ * CALLED BY:	MSG_HT_STRUCTURED_PUT_START_ELEMENT.
+ * RETURN:	Return code from pushing element to target.
+ *	
+ * STRATEGY:	
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	kkee    	7/15/97   	Initial Revision
+ *	
+ ***********************************************************************/
+static int _pascal
+HTMLParseEndElement (HTMLParser *parser, word elementToken)
+{
+    int allowedIndex, minusIndex;
+    int i;
+
+    if (elementToken == HTMLT_FORM) {
+	if(!parser->HTMLP_form) 
+	    return HT_OK; 
+        else {
+	    parser->HTMLP_form = FALSE;
+	    return HTMLPutEndElement(parser, elementToken);
+	}
+    }
+
+    /*
+     * We go down the stack looking for the matching start element.
+     * If we can't find it, it means (1) SGML has messed up, or
+     * (2) HTMLParseStartElement has messed up, or (3)
+     * the tag was not allowed (provided it does not have a minus
+     * content). Case (3) is obviously the case.
+     */
+    allowedIndex = SearchElementStack(parser, elementToken);
+    minusIndex = SearchMinusStack(parser, elementToken);
+
+    /*
+     * Remove minusIndex as it would be at the top of minusStack since
+     * elementToken is the latest token. 
+     */
+    if (minusIndex > -1)
+	MTOP = minusIndex;
+
+    /* 
+     * Start popping all start elements of the stack until we reach
+     * the indexed element. At the same time, we need to check grammar
+     * and if necessary perform error correcting.
+     */
+
+    /*
+     * I don't see a need for end element correction yet, so I am 
+     * just deleting a range of start elements from the elementStack
+     * instead of popping each of them and checking the grammar.
+     */
+
+    /*
+     * Remove allowed content models including allowedIndex. 
+     * We must push all end elements from top of the stack up to,
+     * but not including, allowedIndex. allowedIndex'ed element (which
+     * is elementToken) is pushed at the end of this routine.
+     */
+    if (allowedIndex > -1) {
+	word popElement;
+	for (i=ETOP-1; i>allowedIndex; i--) {
+            popElement = ESTACK[i].HTMLS_elementToken;
+	    /* 
+	     * A start element was put to element stack if:
+             * 1. End element was required OR
+             * 2. It has a content model.
+	     */
+	    if (TAG[popElement].HTMLT_mask & HTML_END_TAG_REQUIRED) {
+		HTMLPutEndElement(parser, popElement);
+	    }
+
+            /* 
+	     * If the popped element we push has a minus content, it
+	     * must be on the minusStack, and we must remove it.
+	     */
+	    if (TAG[popElement].HTMLT_minus && MTOP &&
+		MSTACK[MTOP-1] == popElement) {
+		MTOP -= 1;
+	    }
+	}
+
+        /* Remove all elements pushed to target */
+	ETOP = allowedIndex;
+    }
+	
+    if ((allowedIndex > -1) || (minusIndex > -1)) 
+	/* 
+	 * If (allowedIndex > -1), obviously there is a matching start element
+	 * on ESTACK. If (minusIndex > -1), then there is a matching end 
+	 * element on MSTACK. We use an || here because an element may have 
+	 * a minus content but no element content. Hence, it may not be in 
+	 * ESTACK but could be in MSTACK. If an element is on either ESTACK
+	 * or MSTACK, then it's start element was pushed to target.
+	 */
+	if (TAG[elementToken].HTMLT_mask & HTML_END_TAG_REQUIRED)
+	    return HTMLPutEndElement(parser, elementToken);
+
+    return HT_OK;
+}	/* End of HTMLParseEndElement.	*/
+
+
+
+/***********************************************************************
+ *		SearchElementStack
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Search element stack for an elementToken. Search from
+ *              top to bottom of element stack.
+ * CALLED BY:	MSG_HT_STRUCTURED_PUT_END_ELEMENT
+ * RETURN:	-1 if not found, else valid 0-based index.
+ *	
+ * STRATEGY:	
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	kkee    	4/29/97   	Initial Revision
+ *	
+ ***********************************************************************/
+static int _pascal
+SearchElementStack (HTMLParser *parser, word elementToken)
+{
+    int i, index = -1;
+    for (i=ETOP-1; i>=0; i--) {
+	if (ESTACK[i].HTMLS_elementToken == elementToken) {
+	    index = i;
+	    break;   /* found! */
+	}
+    }
+
+    return index;
+}	/* End of SearchElementStack.	*/
+
+
+
+/***********************************************************************
+ *		SearchMinusStack
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Search minus stack for an elementToken. Search from 
+ *              top to bottom of minus stack.
+ * CALLED BY:	MSG_HT_STRUCTURED_PUT_END_ELEMENT
+ * RETURN:	-1 if not found, else valid 0-based index.
+ *	
+ * STRATEGY:	
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	kkee    	4/29/97   	Initial Revision
+ *	
+ ***********************************************************************/
+static int _pascal
+SearchMinusStack (HTMLParser *parser, word elementToken)
+{
+    int i, index = -1;
+
+    if (!TAG[elementToken].HTMLT_minus) return -1;
+
+    for (i=MTOP-1; i>=0; i--) {
+	if (MSTACK[i] == elementToken) {
+	    index = i;
+	    break;   /* done! */
+	}
+    }
+
+    return index;
+}	/* End of SearchMinusStack.	*/
+
+
+
+/***********************************************************************
+		Message Handlers
+***********************************************************************/
+
+
+
+/***********************************************************************
+ *		MSG_META_INITIALIZE for HTMLPClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    Initialize instance data.
+ * PARAMETERS:	    void (void)
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	kkee	10/15/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method HTMLPClass, MSG_META_INITIALIZE
+{
+    /* 
+     * Allocate a HTML parser and lock it. No need to unlock until we 
+     * abort and free it.
+     */
+@ifdef PRODUCT_RESPONDER
+	pself = ObjDeref(oself,0);
+@endif
+    @self->HTMLI_parserBlock = MemAlloc(sizeof(HTMLParser), 
+					HF_SHARABLE | HF_SWAPABLE,
+					HAF_ZERO_INIT | HAF_LOCK);
+
+@ifdef PRODUCT_RESPONDER
+	pself = ObjDeref(oself,0);
+@endif
+    if (@self->HTMLI_parserBlock) {
+
+@ifdef PRODUCT_RESPONDER
+	pself = ObjDeref(oself,0);
+@endif
+	@self->HTMLI_parser = (HTMLParser *) 
+	    MemDeref(@self->HTMLI_parserBlock);
+	
+	/* 
+	 * Must be lock as long as we are parsing, unlock only when we 
+	 * are done in MSG_HT_STREAM_ABORT.
+	 */
+	MemLock(OptrToHandle(@htmlContainment));
+@ifdef PRODUCT_RESPONDER
+	pself = ObjDeref(oself,0);
+@endif
+	@self->HTMLI_parser->HTMLP_tag = LMemDeref(@htmlContainment);
+
+	/* When first started, we are in the HTML content model */
+@ifdef PRODUCT_RESPONDER
+	pself = ObjDeref(oself,0);
+@endif
+	@self->HTMLI_parser->HTMLP_elementStack[0].HTMLS_elementToken =
+	    HTMLT_HTML;
+@ifdef PRODUCT_RESPONDER
+	pself = ObjDeref(oself,0);
+@endif
+	@self->HTMLI_parser->HTMLP_elementStack[0].HTMLS_index = -1;
+@ifdef PRODUCT_RESPONDER
+	pself = ObjDeref(oself,0);
+@endif
+	@self->HTMLI_parser->HTMLP_elementTop = 1;
+
+	/* 
+	 * We always need to search form group since it is not 
+	 * specified in DTD 3.2; a DTD spec bug.
+	 */
+@ifdef PRODUCT_RESPONDER
+	pself = ObjDeref(oself,0);
+@endif
+	@self->HTMLI_parser->HTMLP_formGroup = 
+	    (HTMLAtom *) LMemDeref(@htmlc_form);
+    }
+
+    /* TEST SGML by making ourself transparent */
+@ifdef PRODUCT_RESPONDER
+	pself = ObjDeref(oself,0);
+@endif
+    /* @self->HTSI_transparent = TRUE; */
+
+    @callsuper();
+}	/* End of MSG_META_INITIALIZE.	*/
+
+
+
+
+/***********************************************************************
+ *		MSG_HT_STRUCTURED_GET_DTD for HTMLPClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    We must provide a DTD since we intend to process
+ *                  tokens from SGML parser (we becomes a target of
+ *                  an SGML parser).
+ * PARAMETERS:	    void * (void)
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	kkee	9/26/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method HTMLPClass, MSG_HT_STRUCTURED_GET_DTD
+{
+    return (void *)&htmlDTD;
+}	/* End of MSG_HT_STRUCTURED_GET_DTD.	*/
+
+
+
+
+/***********************************************************************
+ *		MSG_HT_STREAM_IS_TRANSPARENT for HTStreamClass
+ ***********************************************************************
+ * SYNOPSIS:	    We can never be transparent as we provide the DTD.
+ * PARAMETERS:	    Boolean (void) 
+ *                  return FALSE.
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:        
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	kkee	7/ 9/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method HTMLPClass, MSG_HT_STREAM_IS_TRANSPARENT
+{
+    return FALSE;
+}	/* End of MSG_HT_STREAM_IS_TRANSPARENT.	*/
+
+
+
+
+
+/***********************************************************************
+ *		MSG_HT_STREAM_SET_TARGET for HTMLPClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    Set the target for pushing data.
+ * PARAMETERS:	    void (HTStreamHandle target);
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	kkee	10/31/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method HTMLPClass, MSG_HT_STREAM_SET_TARGET
+{
+    @callsuper();
+
+@ifdef PRODUCT_RESPONDER
+	pself = ObjDeref(oself,0);
+@endif
+    if (@self->HTMLI_parser)
+@ifdef PRODUCT_RESPONDER
+	pself = ObjDeref(oself,0);
+@endif
+	@self->HTMLI_parser->HTMLP_target = target;
+
+}	/* End of MSG_HT_STREAM_SET_TARGET.	*/
+
+
+
+
+/***********************************************************************
+ *		MSG_HT_STREAM_ABORT for HTMLPClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    Cleanup and free.
+ * PARAMETERS:	    int (void)
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:        We need to send MSG_META_FINAL_OBJ_FREE instead of 
+ *                  MSG_META_OBJ_FREE to bypass MSG_META_OBJ_FLUSH_QUEUE 
+ *                  which loops back to thread ui:0 generating a 
+ *                  FatalError as the content thread would have exited.
+ *        
+ *                  You are guaranteed by the WWW Library that there will
+ *                  not be any messages sent to your content objects once 
+ *                  you've received MSG_HT_STREAM_ABORT. (Just make sure 
+ *                  you don't send messages to your object after sending
+ *                  MSG_META_FINAL_OBJ_FREE.)
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	kkee	9/15/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method HTMLPClass, MSG_HT_STREAM_ABORT
+{
+@ifdef PRODUCT_RESPONDER
+	pself = ObjDeref(oself,0);
+@endif
+    if (@self->HTMLI_parserBlock)
+@ifdef PRODUCT_RESPONDER
+	pself = ObjDeref(oself,0);
+@endif
+	MemFree(@self->HTMLI_parserBlock);
+
+	/*
+	 */
+	MemUnlock(OptrToHandle(@htmlContainment));
+
+    return @callsuper();
+}	/* End of MSG_HT_STREAM_ABORT.	*/
+
+
+
+
+/***********************************************************************
+ *		MSG_HT_STREAM_PUT_BLOCK for HTMLPClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    We get PCDATA here. Because of the confusing CDATA
+ *                  and RCDATA content models, we also get that here as
+ *                  they are parsed using PCDATA.
+ * PARAMETERS:	    int (byte *data, word len)
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:        
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	kkee	9/15/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method HTMLPClass, MSG_HT_STREAM_PUT_BLOCK
+{
+@ifdef PRODUCT_RESPONDER
+	pself = ObjDeref(oself,0);
+@endif
+EC( if (@self->HTSI_target) ECCheckStream(@self->HTSI_target);           )
+
+    if (!data || !len) return HT_OK;
+
+@ifdef PRODUCT_RESPONDER
+	pself = ObjDeref(oself,0);
+@endif
+    if (!@self->HTMLI_parserBlock) return HT_OUT_OF_MEMORY;
+
+@ifdef PRODUCT_RESPONDER
+	pself = ObjDeref(oself,0);
+@endif
+    if (!@self->HTMLI_parser->HTMLP_whitespaceOK) {
+@ifdef PRODUCT_RESPONDER
+	pself = ObjDeref(oself,0);
+@endif
+	@self->HTMLI_parser->HTMLP_whitespaceOK = TRUE;   /* reset to ok */
+
+	if (ISWHITE(data[0]))
+	    return @call @self->HTSI_target::
+		MSG_HT_STREAM_PUT_BLOCK(++data, --len);
+    }
+
+@ifdef PRODUCT_RESPONDER
+	pself = ObjDeref(oself,0);
+@endif
+    return @call @self->HTSI_target::MSG_HT_STREAM_PUT_BLOCK(data, len);
+}	/* End of MSG_HT_STREAM_PUT_BLOCK.	*/
+
+
+
+
+/***********************************************************************
+ *		MSG_HT_STRUCTURED_PUT_START_ELEMENT for HTMLPClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    Accept a HTML start element.
+ * PARAMETERS:	    int (HTMLToken elementToken, MemHandle block,
+ *                       ChunkHandle chunk);
+ *                  - elementToken matches the tag list we've put in
+ *                    the DTD passed to our caller.
+ *                  - block and chunk contains an array of SGMLEntity
+ *                    as defined in sgml.goh. All chunks in SGMLEntity
+ *                    belong to the same block. 
+ * 
+ *                    The list is terminated by 
+ *                    SGMLEntity.SGMLE_token == 0; Therefore we must
+ *                    not use 0 as a valid token (which we map to  
+ *                    HTMLT_XXX_INVALID).
+ * 
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:       
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	kkee	10/ 2/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method HTMLPClass, MSG_HT_STRUCTURED_PUT_START_ELEMENT
+{
+
+#if ERROR_CHECK
+    if ((elementToken <= HTMLT_XXX_INVALID) ||
+	(elementToken >= HTMLT_XXX_NULL))
+	EC_ERROR(INVALID_HTML_ELEMENT_TOKEN);
+
+@ifdef PRODUCT_RESPONDER
+	pself = ObjDeref(oself,0);
+@endif
+    ECCheckStream(@self->HTSI_target);
+#endif
+
+@ifdef PRODUCT_RESPONDER
+	pself = ObjDeref(oself,0);
+@endif
+    if (!@self->HTMLI_parserBlock) return HT_OUT_OF_MEMORY;
+
+@ifdef PRODUCT_RESPONDER
+	pself = ObjDeref(oself,0);
+@endif
+    if (@self->HTSI_transparent)
+	return @call @self->HTSI_target::
+	    MSG_HT_STRUCTURED_PUT_START_ELEMENT(elementToken,
+						block, chunk);
+
+    /* Make sure we always have a content model */
+@ifdef PRODUCT_RESPONDER
+	pself = ObjDeref(oself,0);
+@endif
+    if (!@self->HTMLI_parser->HTMLP_elementTop)
+	HTMLAddAllowedContentModel(@self->HTMLI_parser, HTMLT_HTML);
+
+    /* 
+     * Support and non-supported elements 
+     */
+@ifdef PRODUCT_RESPONDER
+	pself = ObjDeref(oself,0);
+@endif
+    if (@self->HTMLI_parser->HTMLP_tag[elementToken].HTMLT_content 
+	== -1) {
+
+	/* Not supported */
+        return HT_OK;
+
+    } else {
+
+	/* Supported element */
+@ifdef PRODUCT_RESPONDER
+	pself = ObjDeref(oself,0);
+@endif
+	@self->HTMLI_parser->HTMLP_block = block;
+	@self->HTMLI_parser->HTMLP_chunk = chunk;
+
+	return HTMLParseStartElement(@self->HTMLI_parser, elementToken);
+    }
+}	/* End of MSG_HT_STRUCTURED_PUT_START_ELEMENT.	*/
+
+
+
+/***********************************************************************
+ *		MSG_HT_STRUCTURED_PUT_END_ELEMENT for HTMLPClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    Accept the end of a HTML element.
+ * PARAMETERS:	    int (word elementToken);
+ *                  - element number matches the tag list we've put in 
+ *                    the DTD passed to our caller.
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:        
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	kkee	10/ 2/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method HTMLPClass, MSG_HT_STRUCTURED_PUT_END_ELEMENT
+{
+
+#if ERROR_CHECK
+    if ((elementToken <= HTMLT_XXX_INVALID) ||
+	(elementToken >= HTMLT_XXX_NULL))
+	EC_ERROR(INVALID_HTML_ELEMENT_TOKEN);
+
+@ifdef PRODUCT_RESPONDER
+	pself = ObjDeref(oself,0);
+@endif
+    ECCheckStream(@self->HTSI_target);
+
+@ifdef PRODUCT_RESPONDER
+	pself = ObjDeref(oself,0);
+@endif
+    if (@self->HTMLI_parser->HTMLP_tag[elementToken].HTMLT_token 
+	!= elementToken)
+	EC_ERROR(HTML_CONTAINMENT_TABLE_OUT_OF_ORDER);
+#endif
+
+@ifdef PRODUCT_RESPONDER
+	pself = ObjDeref(oself,0);
+@endif
+    if (!@self->HTMLI_parserBlock) return HT_OUT_OF_MEMORY;
+
+    /* Simply forward all data if we are transparent */
+@ifdef PRODUCT_RESPONDER
+	pself = ObjDeref(oself,0);
+@endif
+    if (@self->HTSI_transparent)
+	return @call @self->HTSI_target::
+	    MSG_HT_STRUCTURED_PUT_END_ELEMENT(elementToken);
+
+    return HTMLParseEndElement(@self->HTMLI_parser, elementToken);
+}	/* End of MSG_HT_STRUCTURED_PUT_END_ELEMENT.	*/
+
+
+

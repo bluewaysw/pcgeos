@@ -1,0 +1,1735 @@
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Geoworks 1997.  All rights reserved.
+	GEOWORKS CONFIDENTIAL
+
+PROJECT:	Geos WWW Library
+MODULE:		message
+FILE:		message.goc
+
+AUTHOR:		Kok Kin Kee, May  3, 1997
+
+ROUTINES:
+	Name			Description
+	----			-----------
+
+REVISION HISTORY:
+	Name		Date		Description
+	----		----		-----------
+	kkee    	5/ 3/97   	Initial version.
+
+DESCRIPTION:
+
+	SMTP Outbound Message Handler. Parse outgoing message for
+	correctness and formatting. Normal setup is as follows:
+ 
+	$Id: message.goc,v 1.12.5.1 97/09/05 10:51:41 jeremyb Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+@include <stdapp.goh>
+@include <WWW/HTCore/htreq.goh>
+@include <WWW/HTCore/htstream.goh>
+@include <WWW/HTCore/htpolicy.goh>
+@include <WWW/HTCore/htnet.goh>
+@include <WWW/HTCore/htobj.goh>
+@include <WWW/htsmtp.goh>
+#include <WWW/htmem.h>
+
+#include <Ansi/string.h>     /* strlen, memcpy */
+#include <Ansi/stdio.h>      /* sprintf */
+
+@include "htfatals.goh"
+@include "qpenc.goh"         /* Quoted-printable encoding stream */
+@include "b64enc.goh"        /* Base64 encoding stream */
+
+/*
+ * Email address and its encoded form. May have quoted printable 
+ * encoding.
+ */
+typedef struct {
+    HTMemHandle email;        /* E.g., "jsmith@geoworks.com" */
+    HTMemHandle name;         /* E.g., "Joe_Smith=76=FA" */
+    SMTPEncodingType enc;   
+} SMTPAddress;
+
+/*
+ * An attachment.
+ */
+typedef struct {
+    HTMemHandle filename;            /* E.g., "c:/pene.ec/geosec.ini" */
+    HTStringHandle contentType;      /* E.g., "text/plain" */
+    HTMemHandle name;                /* E.g., "geosec.ini" */
+	CharConverterCallback cbf;		 /* Callback for converting chars */
+} SMTPAttachment;
+
+
+/*
+ * Message body parser state for transparency of "<CRLF>.<CRLF>".
+ */
+#define PARSE_BEGIN  0
+#define FLF          1              /* Found LF */
+
+
+/*
+ * Message headers, don't bother putting this in a string resource as we
+ * are porting this. The define lengths are here so we speed things up
+ * instead of using strlen, yikes!!
+ */
+#define       HDR_MIME_VERSION_LEN 17
+static char   HDR_MIME_VERSION[] = "MIME-Version: 1.0";
+
+#define       HDR_CONTENT_TYPE_TEXT_PLAIN_LEN 44
+static char   HDR_CONTENT_TYPE_TEXT_PLAIN[] = \
+    "Content-Type: text/plain; charset=iso-8859-1";
+
+#define       HDR_CONTENT_TYPE_APPLICATION_OCTET_STREAM_LEN 46
+static char   HDR_CONTENT_TYPE_APPLICATION_OCTET_STREAM[] = \
+    "Content-Type: application/octet-stream; name=\"";
+
+#define       HDR_CONTENT_TYPE_MULTIPART_MIXED_LEN 41
+static char   HDR_CONTENT_TYPE_MULTIPART_MIXED[] = \
+    "Content-Type: multipart/mixed; boundary=\"";
+
+#define       HDR_CONTENT_TRANSFER_ENCODING_LEN 27
+static char   HDR_CONTENT_TRANSFER_ENCODING[] = \
+    "Content-Transfer-Encoding: ";
+
+#define       HDR_US_ASCII_LEN 13
+static char   HDR_US_ASCII[] = "=?us-ascii?q?";
+
+#define       HDR_ISO_8859_1_LEN 15
+static char   HDR_ISO_8859_1[] = "=?iso-8859-1?q?";
+
+/* 
+ * Misc. headers terminators and folding. The notations are:
+ * CM - COMMA
+ * CR - Carriage Return
+ * LF - Line Fee
+ * BR - Bracket, can mean < or >
+ * FOLD - Folding to a new line with spaces after CRLF
+ * QUOTE - "
+ * SP - Whitespace
+ * QT - ?
+ */
+extern char   CRLF[];     /* In htsmtp.goc */
+extern char   BRCRLF[];   /* In htsmtp.goc */
+
+#define       CRLFFOLD_LEN 6
+static char   CRLFFOLD[] = {CR,LF,' ',' ',' ',' ',0};
+
+#define       QTEQCRLFFOLD_LEN 8
+static char   QTEQCRLFFOLD[] = {'?','=',CR,LF,' ',' ',' ',' ',0};
+
+#define       QUOTECRLF_LEN 3
+static char   QUOTECRLF[] = {'\"',CR,LF,0};
+
+#define       CMSP_LEN 2
+static char   CMSP[] = {',',' ',0};
+
+static char qEncodeTable[] = "0123456789ABCDEF";
+
+#define PUTBLOCK(target, data, len)  \
+        @call target::MSG_HT_STREAM_PUT_BLOCK(data, len)
+
+
+/***********************************************************************
+		Private Functions
+***********************************************************************/
+
+static void _pascal
+    DeleteAddrList (HTListHandle list);
+
+static HTMemHandle _pascal
+    QEncode (const byte *bufToCode, int nbytes);
+
+static HTMemHandle _pascal
+    RandomizeBoundary();
+
+static int _pascal
+    PutEncodedHeader (HTStreamHandle target, HTMemHandle field, 
+		      SMTPEncodingType enc, int *fold);
+
+static int _pascal
+    PutEmailAddress (HTStreamHandle target, HTMemHandle email, int *fold);
+
+static int _pascal
+    PutFrom (HTStreamHandle target, HTMemHandle name,
+	     SMTPEncodingType enc, HTMemHandle email);
+
+static int _pascal
+    PutSubject (HTStreamHandle target, HTMemHandle subject,
+		SMTPEncodingType enc);
+
+static int _pascal
+    PutTo (HTStreamHandle target, HTListHandle list);
+
+static int _pascal
+    PutCc (HTStreamHandle target, HTListHandle list);
+
+static int _pascal
+    PutBcc (HTStreamHandle target, HTListHandle list);
+
+static int _pascal
+    PutContentType (HTStreamHandle target, HTStringHandle contentType, 
+		    HTMemHandle value);
+static int _pascal
+    PutTransferEncoding (HTStreamHandle target, SMTPEncodingType encode);
+
+static int _pascal
+    PutBoundary (HTStreamHandle target, HTMemHandle boundary);
+
+static int _pascal
+    PutBodyFile (HTStreamHandle target, HTMemHandle fn, 
+		 CharConverterCallback cbf);
+
+static int _pascal
+    PutAttachmentList (HTStreamHandle hdrTarget, HTStreamHandle encTarget,
+		       HTListHandle list, HTMemHandle boundary);
+
+
+/***********************************************************************
+ *		DeleteAddrList
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Delete an email address list.
+ * CALLED BY:	MSG_HT_STREAM_ABORT
+ * RETURN:	Nothing
+ *	
+ * STRATEGY:	
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	kkee    	5/ 8/97   	Initial Revision
+ *	
+ ***********************************************************************/
+static void _pascal
+DeleteAddrList (HTListHandle list)
+{
+    word count, i;
+    SMTPAddress addr;
+
+    count = HTListGetCount(list);
+    for (i=0; i<count; i++) {
+	    HTListRemoveItem(list, 0, (void *)&addr, sizeof(SMTPAddress));
+	    if (addr.email) HTMemFree(addr.email);
+	    if (addr.name) HTMemFree(addr.name);
+    }
+    HTListDelete(list);
+}	/* End of DeleteAddrList.	*/
+
+
+/***********************************************************************
+ *		RandomizeBoundary
+ ***********************************************************************
+ *
+ * SYNOPSIS:    Generate a secure and reliable boundary.
+ * CALLED BY:	MSG_SMTPM_PUSH_MESSAGE
+ * RETURN:	HTMemHandle of a boundary.
+ *	
+ * STRATEGY:	The boundary is semi-random because we want to recognize
+ *              our boundary for debugging purposes. Some general 
+ *              guidelines for generating safe boundaries:
+ *              1. Include "=_" as this is quoted-printable safe.
+ *              2. Include "=====" as this is base64 safe. The padding 
+ *                 in base64 is max three '='.
+ *              3. See RFC1521 pg 33 on characters allowed in a boundary.
+ *
+ *                  bcharnospace := DIGIT / ALPHA / "'" / "(" / ")" /
+ *                                / "+" / "_" / "," / "-" / "." / "/"
+ *                                / ":" / "=" / "?"
+ *
+ *                  Correspond to the following character values;
+ *                      48-57, 65-90, 97-122, 39, 40, 41, 43, 95,
+ *                      44, 45, 46, 47, 58, 61, 63
+ *
+ *                  Order in the following ranges:
+ *                      ISDIGIT, ISALPHA, 39-41, 43-47, 58, 61, 63, 95.
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	kkee    	6/19/97   	Initial Revision
+ *	
+ ***********************************************************************/
+static HTMemHandle _pascal
+RandomizeBoundary ()
+{
+    /* Randomize a seed */
+    int boundarySeed = (int) TimerGetCount();
+    HTMemHandle ret;
+    int i;
+    char *b = HTMemAllocAndLock(&ret, 42);
+
+    strcat(b, "---======_");
+    i = 10;  /* Continue at tail of b */
+    while (i<41) {
+	boundarySeed = (boundarySeed * 5821) % 65535;
+	if (boundarySeed < 0) boundarySeed *= -1;
+	b[i] = (char) ((boundarySeed*99999/65535) % 123);
+	if (ISDIGIT(b[i]) || ISALPHA(b[i]) || 
+	    (b[i] >= 39 && b[i] <= 41) ||
+	    (b[i] >= 43 && b[i] <= 47) ||
+	    b[i] == 58 || b[i] == 61 || b[i] == 63 || b[i] == 95)
+	    i++;  /* Acceptable character */
+    }
+    b[40]=0;  /* Null-terminate */
+    HTMemUnlock(ret);
+    return ret;
+}	/* End of RandomizeBoundary.	*/
+
+
+
+/***********************************************************************
+ *		QEncode
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Q encode bufToCode into bufCode as per RFC1522 (slightly
+ *              different from Quoted-printable RFC1521 in Library/WWW/
+ *              HTUU/htqp.goc).
+ * CALLED BY:	PutSubject.
+ * RETURN:	HTMemHandle contains NULL-terminated string and number
+ *              bytes codes, or NULL and 0.
+ *	
+ * STRATEGY:	Q encoding is a slightly different variation of Quoted-
+ *              printable encoding.
+ * 
+ *              1. The quoted buffer, bufCoded, should only contain 
+ *                 'a'-'z', 'A'-'Z', '0'-'9', "!" (33), "*" (42), 
+ *                 "+" (43), "-" (45), "/" (47), "=" (61), and "_" (95).
+ *
+ *              2. The following characters in bufToCode will be coded.
+ *                 SPACE (32), TAB (9), "_", "=", "?", and NON-USASCII
+ *                 characters.
+ *                 
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	kkee    	5/16/97   	Initial Revision
+ *	
+ ***********************************************************************/
+static HTMemHandle _pascal
+QEncode (const byte *bufToCode, int nbytes)
+{
+    byte *bufCoded;
+    HTMemHandle ret;
+    int i, len=0;
+
+    if (!bufToCode || !nbytes) return 0;
+
+    bufCoded = (byte *) HTMemAllocAndLock(&ret, 3*nbytes*+1);
+
+    for (i=0; i<nbytes; i++) {
+	if (((*bufToCode >=  'a')  && (*bufToCode <= 'z'))  ||
+            ((*bufToCode >=  'A')  && (*bufToCode <= 'Z'))  ||
+            ((*bufToCode >=  '0')  && (*bufToCode <= '9'))  ||
+            ((*bufToCode >=   42)  && (*bufToCode <=  43))  ||
+	    (*bufToCode == 33)     ||
+	    (*bufToCode == 45)     ||
+	    (*bufToCode == 47)) {
+	    /* Safe NOT to encode */
+	    *bufCoded++ = *bufToCode;
+	    len++;
+
+	} else if ((*bufToCode == 32) || (*bufToCode == 9)) {
+	    /* SPACE and TAB coded to '_' */
+	    *bufCoded++ = '_';
+	    len++;
+
+	} else {
+	    *bufCoded++ = '=';
+	    *bufCoded++ = qEncodeTable[(byte)((*bufToCode & 0xF0) >> 4)];
+	    *bufCoded++ = qEncodeTable[(byte)(*bufToCode & 0x0F)];
+	    len += 3;
+	}
+
+	bufToCode++;
+    }
+
+    *bufCoded = 0;   /* null-terminate for safety */
+
+    HTMemUnlock(ret);
+    return HTMemReAlloc(ret, len+1);   /* Just the right size */
+}	/* End of QEncode.	*/
+
+
+
+/***********************************************************************
+ *		PutEncodedHeader
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Put encoded header field to target. Fold if necessary.
+ * CALLED BY:	PutTo, PutCc, PutBcc, PutSubject.
+ * RETURN:	Last line length after folding in the passed in fold.
+ *              Return code from pushing to target.
+ *	
+ * STRATEGY:	
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	kkee    	5/18/97   	Initial Revision
+ *	
+ ***********************************************************************/
+static int _pascal
+PutEncodedHeader (HTStreamHandle target, HTMemHandle field, 
+		  SMTPEncodingType enc, int *fold)
+{
+    char *p = HTMemLock(field);
+    int len = strlen(p);
+    int fit, nbytes;
+    int ret=HT_OK;
+    int ovhd;
+
+    switch (enc) {
+    case ENCODE_QUOTED_PRINTABLE:
+	ovhd = HDR_ISO_8859_1_LEN+2;     /* +2 for "?=" at end of line */
+	break;
+    case ENCODE_US_ASCII:
+	ovhd = HDR_US_ASCII_LEN+2;       /* +2 for "?=" at end of line */
+	break;
+    default:
+	ovhd = 0;                        /* No encoding */
+	break;
+    }
+
+    while (len) {
+	fit = 75-*fold-ovhd;
+	if (fit < 3) {
+	    /* Must at least fit an encoded octet; i.e., three bytes) */
+	    /* If not, go to new line */
+	    PUTBLOCK(target, (byte*)CRLFFOLD, CRLFFOLD_LEN);
+	    *fold = 4;
+	    fit = 75-4-ovhd;
+	}
+	if (len > fit) {
+	    /*
+	     * Do not break a line in the middle of an encoded octet.
+	     */
+	    if (*(p+fit) == '=') {
+		len -= fit;
+		nbytes = fit;
+	    } else if (*(p+fit-1) == '=') {
+		len -= (fit-1);
+		nbytes = (fit-1);
+	    } else if (*(p+fit-2) == '=') {
+		len -= (fit-2);
+		nbytes = (fit-2);
+	    } else {
+		len -= fit;
+		nbytes = fit;
+	    }
+
+	} else {
+	    nbytes = len;
+	    len = 0;
+	}
+
+	if (nbytes) {
+	    if (enc == ENCODE_QUOTED_PRINTABLE)
+		PUTBLOCK(target, (byte*)HDR_ISO_8859_1, HDR_ISO_8859_1_LEN);
+	    else if (enc == ENCODE_US_ASCII)
+		PUTBLOCK(target, (byte*)HDR_US_ASCII, HDR_US_ASCII_LEN);
+	    ret = PUTBLOCK(target, (byte*)p, nbytes);
+	    if (ret != HT_OK) break;
+	    
+	    if (len) {
+		if (enc != ENCODE_NONE)
+		    PUTBLOCK(target, (byte*)QTEQCRLFFOLD, QTEQCRLFFOLD_LEN);
+		else 
+		    PUTBLOCK(target, (byte*)CRLFFOLD, CRLFFOLD_LEN);
+		*fold = 4;          /* Indent new line 4 spaces */
+
+	    } else {
+		if (enc != ENCODE_NONE)
+		    PUTBLOCK(target, (byte*)"?= ", 3);
+		else
+		    PUTBLOCK(target, (byte*)" ", 1);
+		*fold += (nbytes+ovhd+1);  /* +1 for " " */
+	    }
+	    
+	}
+
+	p += nbytes;
+    }
+
+    HTMemUnlock(field);
+    return ret;
+}	/* End of PutEncodedHeader.	*/
+
+
+
+/***********************************************************************
+ *		PutEmailAddress
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Put email address to target. Fold if necessary.
+ * CALLED BY:	PutTo, PutCc, PutBcc
+ * RETURN:	Last line length after folding in the passed in fold.
+ *              Return code from pushing data to client.
+ *	
+ * STRATEGY:	
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	kkee    	5/18/97   	Initial Revision
+ *	
+ ***********************************************************************/
+static int _pascal
+PutEmailAddress (HTStreamHandle target, HTMemHandle email, int *fold)
+{
+    int ret=HT_OK;
+    char *p = (char *) HTMemLock(email);
+    int len = strlen(p);
+
+    *fold += len+2;  /* +2 for "<" and ">" enclosing an email addr */
+    if (*fold > 75) {
+	*fold = 4;
+	PUTBLOCK(target, (byte*)CRLFFOLD, CRLFFOLD_LEN);
+    }
+
+    PUTBLOCK(target, (byte*)"<", 1);
+    PUTBLOCK(target, (byte*)p, len);
+    ret = PUTBLOCK(target, (byte*)">", 1);
+
+    HTMemUnlock(email);
+    return ret;
+}	/* End of PutEmailAddress.	*/
+
+
+
+/***********************************************************************
+ *		PutFrom
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Put: From: <emailAddr> <CRLF>. EmailAddr is assumed to
+ *              be encoded.
+ * CALLED BY:	MSG_SMTPM_PUSH_MESSAGE
+ * RETURN:	Return code from pushing data.
+ *	
+ * STRATEGY:	
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	kkee    	5/ 9/97   	Initial Revision
+ *	
+ ***********************************************************************/
+static int _pascal
+PutFrom (HTStreamHandle target, HTMemHandle name, 
+	 SMTPEncodingType enc, HTMemHandle email)
+{
+    int fold=6;
+
+    PUTBLOCK(target, (byte *)"From: ", 6);
+    /* Put name, follow by email address */
+    if (name)
+	PutEncodedHeader(target, name, enc, &fold);
+    PutEmailAddress(target, email, &fold);
+    return PUTBLOCK(target, (byte *)CRLF, 2);
+}	/* End of PutFrom.	*/
+
+
+
+/***********************************************************************
+ *		PutSubject
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Put: Subject: <string> <CRLF>
+ * CALLED BY:	MSG_SMTPM_PUSH_MESSAGE
+ * RETURN:	Return code from pushing data.
+ *	
+ * STRATEGY:	Uses Q encoding as specified in RFC1522.
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	kkee    	5/ 9/97   	Initial Revision
+ *	
+ ***********************************************************************/
+static int _pascal
+PutSubject (HTStreamHandle target, HTMemHandle subject, 
+	    SMTPEncodingType enc)
+{
+    int fold=9;
+    int ret = HT_OK;  /* Subject is optional */
+    if (subject) {
+	PUTBLOCK(target, (byte *)"Subject: ", 9);
+	PutEncodedHeader(target, subject, enc, &fold);
+	ret = PUTBLOCK(target, (byte *)CRLF, 2);
+    }
+    return ret;
+}	/* End of PutSubject.	*/
+
+
+
+/***********************************************************************
+ *		PutTo
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Put: To: <list-comma-separated-addresses>
+ * CALLED BY:	MSG_SMTPM_PUSH_MESSAGE
+ * RETURN:	Return code from pushing data.
+ *	
+ * STRATEGY:	Fold on  <= 76 character lines.
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	kkee    	5/ 9/97   	Initial Revision
+ *	
+ ***********************************************************************/
+static int _pascal
+PutTo (HTStreamHandle target, HTListHandle list)
+{
+    SMTPAddress addr;
+    word i, count;
+    int fold=4;
+
+    if (!list) return HT_OK;
+
+    PUTBLOCK(target, (byte *)"To: ", 4);
+
+    count = HTListGetCount(list);
+
+    for(i=0; i<count; i++) {
+	HTListGetItem(list, i, (void *)&addr, sizeof(SMTPAddress));
+
+	/* Put encoded name, follow by email address */
+	if (addr.name)
+	    PutEncodedHeader(target, addr.name, addr.enc, &fold);
+	PutEmailAddress(target, addr.email, &fold);
+
+	if (i != count-1) {
+	    /* Separate the addresses */
+	    PUTBLOCK(target, (byte *)CMSP, CMSP_LEN);
+	    fold += CMSP_LEN;
+	}
+    }
+    
+    return PUTBLOCK(target, (byte *)CRLF, 2);
+}	/* End of PutTo.	*/
+
+
+/***********************************************************************
+ *		PutCc
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Put: cc: ...
+ * CALLED BY:	MSG_SMTPM_PUSH_MESSAGE
+ * RETURN:	Return code from pushing data.
+ *	
+ * STRATEGY:	
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	kkee    	5/ 9/97   	Initial Revision
+ *	
+ ***********************************************************************/
+static int _pascal
+PutCc (HTStreamHandle target, HTListHandle list)
+{
+    SMTPAddress addr;
+    word i, count;
+    int fold=4;
+
+    if (!list) return HT_OK;
+
+    PUTBLOCK(target, (byte *)"cc: ", 4);
+
+    count = HTListGetCount(list);
+
+    for(i=0; i<count; i++) {
+	HTListGetItem(list, i, (void *)&addr, sizeof(SMTPAddress));
+
+	/* Put encoded name, follow by email address */
+	if (addr.name)
+	    PutEncodedHeader(target, addr.name, addr.enc, &fold);
+	PutEmailAddress(target, addr.email, &fold);
+
+	if (i != count-1) {
+	    /* Separate the addresses */
+	    PUTBLOCK(target, (byte *)CMSP, CMSP_LEN);
+	    fold += CMSP_LEN;
+	}
+    }
+
+    return PUTBLOCK(target, (byte *)CRLF, 2);
+}	/* End of PutCc.	*/
+
+
+
+/***********************************************************************
+ *		PutBcc
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Put: Bcc: ...
+ * CALLED BY:	MSG_SMTPM_PUSH_MESSAGE
+ * RETURN:	Return code from pushing data.
+ *
+ * STRATEGY:	
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	kkee    	5/ 9/97   	Initial Revision
+ *	
+ ***********************************************************************/
+static int _pascal
+PutBcc (HTStreamHandle target, HTListHandle list)
+{
+    return HT_OK;
+}	/* End of PutBcc.	*/
+
+
+
+/***********************************************************************
+ *		PutContentType
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Put: Content-Type: ...
+ * CALLED BY:	MSG_SMTPM_PUSH_MESSAGE
+ * RETURN:	Return code from pushing data.
+ *	
+ * STRATEGY:	
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	kkee    	5/ 9/97   	Initial Revision
+ *	
+ ***********************************************************************/
+static int _pascal
+PutContentType (HTStreamHandle target, HTStringHandle contentType, 
+		HTMemHandle value)
+{
+    char *p;
+
+    if (contentType == HT_CONTENT_TYPE_TEXT_PLAIN) {
+	PUTBLOCK(target, 
+		 (byte *)HDR_CONTENT_TYPE_TEXT_PLAIN,
+		 HDR_CONTENT_TYPE_TEXT_PLAIN_LEN);
+
+	if (value) {
+	    PUTBLOCK(target, (byte *)"; name=\"", 8);
+	    p = (char *) HTMemLock(value);
+	    PUTBLOCK(target, (byte *)p, strlen(p));
+	    HTMemUnlock(value);
+
+	    return PUTBLOCK(target, (byte *)QUOTECRLF, QUOTECRLF_LEN);
+	} else
+	    return PUTBLOCK(target, (byte *)CRLF, 2);
+
+    } else if (contentType == HT_CONTENT_TYPE_APPLICATION_OCTET_STREAM) {
+	PUTBLOCK(target, 
+		 (byte *)HDR_CONTENT_TYPE_APPLICATION_OCTET_STREAM,
+		 HDR_CONTENT_TYPE_APPLICATION_OCTET_STREAM_LEN);
+
+	if (value) {
+	    p = (char *) HTMemLock(value);
+	    PUTBLOCK(target, (byte *)p, strlen(p));
+	    HTMemUnlock(value);
+	}
+
+	return PUTBLOCK(target, (byte *)QUOTECRLF, QUOTECRLF_LEN);
+
+    } else if (contentType == HT_CONTENT_TYPE_MULTIPART_MIXED) {
+	PUTBLOCK(target,
+		 (byte *)HDR_CONTENT_TYPE_MULTIPART_MIXED,
+		 HDR_CONTENT_TYPE_MULTIPART_MIXED_LEN);
+
+	p = (char *) HTMemLock(value);
+	PUTBLOCK(target, (byte *)p, strlen(p));
+	HTMemUnlock(value);
+
+	return PUTBLOCK(target, (byte *)QUOTECRLF, QUOTECRLF_LEN);
+
+    } else {
+	EC_WARNING(HTSMTP_CONTENT_TYPE_NOT_HANDLED);
+
+	PUTBLOCK(target, (byte *)"Content-Type: ", 14);
+	p= (char *)HTStringLock(contentType);
+	PUTBLOCK(target, (byte *)p, strlen(p));
+	HTStringUnlock(contentType);
+	PUTBLOCK(target, (byte *)"; name=\"", 8);
+	
+	if (value) {
+	    p = HTMemLock(value);
+	    PUTBLOCK(target, (byte*)p, strlen(p));
+	    HTMemUnlock(value);
+	}
+
+	return PUTBLOCK(target, (byte*)QUOTECRLF, QUOTECRLF_LEN);
+    }
+    
+}	/* End of PutContentType.	*/
+
+
+/***********************************************************************
+ *		PutTransferEncoding
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Put: Content-Transfer-Encoding: ....
+ * CALLED BY:	MSG_SMTPM_PUSH_MESSAGE
+ * RETURN:	Return code from pushing data to target.
+ *	
+ * STRATEGY:	
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	kkee    	5/12/97   	Initial Revision
+ *	
+ ***********************************************************************/
+static int _pascal
+PutTransferEncoding (HTStreamHandle target, SMTPEncodingType encode)
+{
+    PUTBLOCK(target, (byte *)HDR_CONTENT_TRANSFER_ENCODING,
+	     HDR_CONTENT_TRANSFER_ENCODING_LEN);
+
+    switch (encode) {
+    case ENCODE_QUOTED_PRINTABLE:
+	PUTBLOCK(target, (byte *)"quoted-printable", 16);
+	break;
+
+    case ENCODE_BASE64:
+	PUTBLOCK(target, (byte *)"base64", 6);
+	break;
+
+    default:
+	EC_ERROR(HTSMTP_ENCODING_TYPE_NOT_HANDLED);
+	return HT_NO;
+    }
+
+    return PUTBLOCK(target, (byte *)CRLF, 2);
+}	/* End of PutTransferEncoding.	*/
+
+
+
+/***********************************************************************
+ *		PutBoundary
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Put: --<BOUNDARY>
+ * CALLED BY:	MSG_SMTPM_PUSH_MESSAGE
+ * RETURN:	Return code from pushing data to client
+ *	
+ * STRATEGY:	
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	kkee    	5/12/97   	Initial Revision
+ *	
+ ***********************************************************************/
+static int _pascal
+PutBoundary (HTStreamHandle target, HTMemHandle boundary)
+{
+    int ret;
+    char *p = (char *) HTMemLock(boundary);
+
+    PUTBLOCK(target, (byte *)"--", 2);
+    PUTBLOCK(target, (byte *)p, strlen(p));
+    ret = PUTBLOCK(target, (byte *)CRLF, 2);
+
+    HTMemUnlock(boundary);
+    return ret;
+}	/* End of PutBoundary.	*/
+
+
+
+/***********************************************************************
+ *		PutBodyFile
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Put message body stored in a file.
+ * CALLED BY:	MSG_SMTPM_PUSH_MESSAGE
+ * RETURN:	Return code from pushing data.
+ *	
+ * STRATEGY:	Open file, read it, quoted-printable encode it, and then 
+ *              send it.
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	kkee    	5/ 9/97   	Initial Revision
+ *	
+ ***********************************************************************/
+static int _pascal
+PutBodyFile (HTStreamHandle target, HTMemHandle fn, 
+	     CharConverterCallback cbf)
+{
+    int ret;
+    FileHandle fp;
+    byte *buf;
+    word bytesRead;
+    HTMemHandle htmh=0;
+
+    char *f = (char *) HTMemLock(fn);
+    
+    fp = FileOpen(f, FILE_DENY_RW | FILE_ACCESS_R);
+    if (fp) {
+	buf = (byte *) HTMemAllocAndLock(&htmh, 512);
+	while ((bytesRead = FileRead(fp, buf, 512, FALSE)) != 0) {
+	    if (cbf) 
+		ProcCallFixedOrMovable_pascal((char *)buf, bytesRead, cbf);
+	    ret = PUTBLOCK(target, buf, bytesRead);
+	    if (ret != HT_OK) break;
+	}
+	FileClose(fp, FALSE);
+	HTMemUnlockAndFree(htmh);
+    } else
+	ret = HT_CANNOT_OPEN_FILE;
+
+    HTMemUnlock(fn);
+    return ret;
+}	/* End of PutBodyFile.	*/
+
+
+/***********************************************************************
+ *		PutAttachmentList
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Put attachments as parts in MIME multipart format.
+ * CALLED BY:	MSG_SMTPM_PUSH_MESSAGE
+ * RETURN:	Return code from pushing data or HT_CANNOT_OPEN_FILE.
+ *	
+ * STRATEGY:	while (more attachments) {
+ *                  put CRLF;
+ *                  put "--" + boundary;
+ *                  put content-type;
+ *                  put content-transfer-encoding;
+ *                  put content-disposition;           !!not done!!
+ *                  put CRLF;
+ *                  put body;
+ *                  put CRLF;
+ *              }
+ *              put "--" + boundary + "--" + <CRLF>;
+ *
+ *              we won't bother checking the return code that often
+ *              for error.
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	kkee    	5/ 9/97   	Initial Revision
+ *	
+ ***********************************************************************/
+static int _pascal
+PutAttachmentList (HTStreamHandle hdrTarget,  HTStreamHandle encTarget, 
+		   HTListHandle list, HTMemHandle boundary)
+{
+    int ret;
+    FileHandle fp;
+    char *fn;
+    HTMemHandle htmh;
+    byte *buf;
+    word count, i, bytesRead;
+    SMTPAttachment attach;
+    char *b = (char *) HTMemLock(boundary);
+    int len = strlen(b);
+
+    /* 
+     * Buffer must be multiple of 57, i.e., 513=57*9 because our target
+     * is HTBase64EncodeClass. See MSG_HT_PUT_BLOCK of that class.
+     */
+    buf = (byte *) HTMemAllocAndLock(&htmh, 513);
+
+    count = HTListGetCount(list);
+    for (i=0; i<count; i++) {
+
+	HTListGetItem(list, i, (void*)&attach, sizeof(SMTPAttachment));
+	fn = (char *)HTMemLock(attach.filename);
+	fp = FileOpen(fn, FILE_DENY_RW | FILE_ACCESS_R);
+	HTMemUnlock(attach.filename);
+	if (!fp) {
+	    ret = HT_CANNOT_OPEN_FILE;
+	    break;
+	}
+
+	/* Headers for the attachment */
+	PUTBLOCK(hdrTarget, (byte *)"--", 2);
+	PUTBLOCK(hdrTarget, (byte *)b, len);
+	PUTBLOCK(hdrTarget, (byte *)CRLF, 2);
+	PutContentType(hdrTarget, attach.contentType, attach.name);
+	PutTransferEncoding(hdrTarget, ENCODE_BASE64);
+	PUTBLOCK(hdrTarget, (byte *)CRLF, 2);
+	
+	/* Body of the attachment */
+	while ((bytesRead = FileRead(fp, buf, 513, FALSE)) != 0) {
+	    if (attach.cbf)
+		ProcCallFixedOrMovable_pascal((char *)buf, bytesRead, 
+					      attach.cbf);
+	    ret = PUTBLOCK(encTarget, buf, bytesRead);
+	    if (ret != HT_OK) break;
+	}
+	PUTBLOCK(hdrTarget, (byte *)CRLF, 2);
+
+	FileClose(fp, FALSE);
+
+	if (ret != HT_OK) break;
+    }
+
+    if (ret == HT_OK) {
+	PUTBLOCK(hdrTarget, (byte*)"--", 2);
+	PUTBLOCK(hdrTarget, (byte*)b, len);
+	PUTBLOCK(hdrTarget, (byte*)"--", 2);
+	ret = PUTBLOCK(hdrTarget, (byte *)CRLF, 2);
+    }
+    HTMemUnlockAndFree(htmh);
+    HTMemUnlock(boundary);
+    return ret;
+}	/* End of PutAttachmentList.	*/
+
+
+
+
+/***********************************************************************
+		Class Declaration
+***********************************************************************/
+
+@classdecl	SMTPMessageClass;
+
+
+/***********************************************************************
+ *		SMTPMessageNew
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Create a Mesasge handler for parsing outgoing messages.
+ * CALLED BY:	MSG_HT_PROTOCOL_LOAD
+ * RETURN:	HTStreamHandle, NullOptr if not created.
+ *	
+ * STRATEGY:	
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	kkee    	5/ 3/97   	Initial Revision
+ *	
+ ***********************************************************************/
+HTStreamHandle _far _pascal
+SMTPMessageNew (HTRequestHandle request)
+{
+    HTStreamHandle stream;
+
+EC( ECCheckRequest(request);                                            )
+
+    stream = HTObjInstantiateForThread(0, &SMTPMessageClass);
+
+    if (!stream) {
+	/* Log error */
+    } else {
+	/* Initialize the stream instance data */
+	@call stream::MSG_HT_STREAM_SET_REQUEST(request);
+    }
+    return stream;
+}	/* End of SMTPMessageNew.	*/
+
+
+
+/***********************************************************************
+		Message Handlers
+***********************************************************************/
+
+
+/***********************************************************************
+ *		MSG_SMTPM_PUSH_SENDER for SMTPMessageClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    Put the sender email address onto target.
+ * PARAMETERS:	    int (void)
+ *                    - return code from pushing data.
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:	    Use reqeust->HTR_postCallback to get data from
+ *                  client. We just get enough data to decide on
+ *                  who the sender is.
+ *
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	kkee    	5/ 6/97   	Initial Revision
+ *	
+ ***********************************************************************/
+@method SMTPMessageClass, MSG_SMTPM_PUSH_SENDER
+{
+    char *cptr;
+    int ret = HT_NO;     /* Assume no address */
+    
+    if (@self->SMTPMI_senderEmail) {
+	cptr = (char *) HTMemLock(@self->SMTPMI_senderEmail);
+	ret = @call @self->HTSI_target::
+	    MSG_HT_STREAM_PUT_BLOCK((byte *)cptr, strlen(cptr));
+	HTMemUnlock(@self->SMTPMI_senderEmail);
+    }
+    return ret;
+}	/* End of MSG_SMTPM_PUSH_SENDER.	*/
+
+
+
+/***********************************************************************
+ *		MSG_SMTPM_GET_RECEIVER_COUNT for SMTPMessageClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    Total number of receivers of current message.
+ * PARAMETERS:	    int (void)
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:	    Receivers are in To:, Cc:, and Bcc: lists.
+ *
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	kkee    	5/ 8/97   	Initial Revision
+ *	
+ ***********************************************************************/
+@method SMTPMessageClass, MSG_SMTPM_GET_RECEIVER_COUNT
+{
+    if (@self->SMTPMI_to)
+	@self->SMTPMI_toCount = HTListGetCount(@self->SMTPMI_to);
+    else 
+	@self->SMTPMI_toCount = 0;
+    if (@self->SMTPMI_cc) 
+	@self->SMTPMI_ccCount = HTListGetCount(@self->SMTPMI_cc);
+    else
+	@self->SMTPMI_ccCount = 0;
+    if (@self->SMTPMI_bcc)
+	@self->SMTPMI_bccCount = HTListGetCount(@self->SMTPMI_bcc);
+    else 
+	@self->SMTPMI_bccCount = 0;
+    return (@self->SMTPMI_toCount + @self->SMTPMI_ccCount + 
+	    @self->SMTPMI_bccCount);
+}	/* End of MSG_SMTPM_GET_RECEIVER_COUNT.	*/
+
+
+
+/***********************************************************************
+ *		MSG_SMTPM_PUSH_RECEIVER for SMTPMessageClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    Put one receiver email address onto target. 
+ * PARAMETERS:	    int (void)
+ *                    - return code from pushing data to target.
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:	    
+ *
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	kkee    	5/ 6/97   	Initial Revision
+ *	
+ ***********************************************************************/
+@method SMTPMessageClass, MSG_SMTPM_PUSH_RECEIVER
+{
+    SMTPAddress addr;
+    char *cptr;
+    int ret = HT_NO;
+
+    if (num < @self->SMTPMI_toCount) {
+	HTListGetItem(@self->SMTPMI_to, num, (void*)&addr, 
+		      sizeof(SMTPAddress));
+    } else {
+	num -= @self->SMTPMI_toCount;
+	if (num < @self->SMTPMI_ccCount) {
+	    HTListGetItem(@self->SMTPMI_cc, num, (void*)&addr,
+			  sizeof(SMTPAddress));
+	} else {
+	    num -= @self->SMTPMI_ccCount;
+	    if (num < @self->SMTPMI_bccCount) {
+		HTListGetItem(@self->SMTPMI_bcc, num, (void*)&addr,
+			      sizeof(SMTPAddress));
+	    } else {
+		EC_ERROR(HTSMTP_NO_RECEIVER_AT_THIS_INDEX);
+		return HT_NO;
+	    }
+	}
+    }
+
+    if (addr.email) {
+	cptr = HTMemLock(addr.email);
+	ret = @call @self->HTSI_target::
+	    MSG_HT_STREAM_PUT_BLOCK((byte *)cptr, strlen(cptr));
+	HTMemUnlock(addr.email);
+    }
+
+    return ret;
+}	/* End of MSG_SMTPM_PUSH_RECEIVER.	*/
+
+
+
+/***********************************************************************
+ *		MSG_SMTPM_PUSH_MESSAGE for SMTPMessageClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    Put an RFC822 message down to target.
+ * PARAMETERS:	    int (void)
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:	    Format message according to RFC822, RFC1521, and 
+ *                  RFC1522 and put it to target.
+ *
+ *                  I. HEADERS:
+ *                  See RFC822. This list here is not complete.
+ *
+ *                  1. Folding of email addresses at the end of a logical 
+ *                     address; that is, after a comma.
+ *
+ *                  2. If present, headers to appear in the following order:
+ *                     Return-Path, Received, Date, From, Subject, Sender,
+ *                     To, cc, bcc, Message-ID, MIME-Version, Content-Type,
+ *                     Status, X-Status.
+ *               
+ *                  II. BODY.
+ *
+ *                  1. Must implement "<CRLF>.<CRLF>" transparency as per
+ *                     RFC821, that is:
+ *                     Before sending a line mail text the sender-SMTP
+ *                     checks the first character of the line. If it is a
+ *                     period, one additional period is inserted at the
+ *                     beginning of the line.
+ *
+ *                  III. MIME FORMATTING.
+ *                 
+ *                  1. If there are attachments, content-type is taken to
+ *                     be multipart/mixed and must generate a random header.
+ *                     Otherwise content-type is taken to be text/plain.
+ *
+ *                  IV. MIME ENCODING.
+ * 
+ *                  1. Message body must be encoded in quoted-printable
+ *                     as per RFC1522 non-USASCII characters.
+ *                   
+ *                  2. All attachments will be content-transfer-encoded
+ *                     in base64.
+ * 
+ *                  3. Reciepients and subject headers must be encoded 
+ *                     in quoted-printable as per RFC1522 for non-USASCII
+ *                     characters.
+ *
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	kkee    	5/ 6/97   	Initial Revision
+ *	
+ ***********************************************************************/
+@method SMTPMessageClass, MSG_SMTPM_PUSH_MESSAGE
+{
+    int ret;
+
+    /* Initialize vars */
+    @self->SMTPMI_parseState = PARSE_BEGIN;
+
+    /* From: ... */
+    ret = PutFrom(@self->HTSI_target, @self->SMTPMI_sender, 
+		  @self->SMTPMI_senderEnc, @self->SMTPMI_senderEmail);
+    if (ret != HT_OK) return ret;
+
+    /* Subject: ... */
+    ret = PutSubject(@self->HTSI_target, @self->SMTPMI_subject, 
+		     @self->SMTPMI_subjectEnc);
+    if (ret != HT_OK) return ret;
+
+    /* To: ... */
+    ret = PutTo(@self->HTSI_target, @self->SMTPMI_to);
+    if (ret != HT_OK) return ret;
+
+    /* cc: ... */
+    ret = PutCc(@self->HTSI_target, @self->SMTPMI_cc);
+    if (ret != HT_OK) return ret;
+
+    /* Bcc: ... */
+    ret = PutBcc(@self->HTSI_target, @self->SMTPMI_bcc);
+    if (ret != HT_OK) return ret;
+
+    /* MIMI-Version: ... */
+    PUTBLOCK(@self->HTSI_target, (byte *)HDR_MIME_VERSION,
+	     HDR_MIME_VERSION_LEN);
+    ret = PUTBLOCK(@self->HTSI_target, (byte *)CRLF, 2);
+    if (ret != HT_OK) return ret;
+
+    /* Message body: requires quoted-printable encoding */
+    /* 
+     * Stream for qpencoding as;
+     *
+     * HTSocket <-- SMTPMessage <-- HTQPEncode
+     */
+    @self->SMTPMI_quotedPrintable = HTQPEncodeNew(@self->HTSI_request,
+						  oself);
+    if (!@self->SMTPMI_attachment) {
+	ret = PutContentType(@self->HTSI_target,
+			     HT_CONTENT_TYPE_TEXT_PLAIN, 0);
+	if (ret != HT_OK) return ret;
+
+	ret = PutTransferEncoding(@self->HTSI_target, 
+				  ENCODE_QUOTED_PRINTABLE);
+	if (ret != HT_OK) return ret;
+
+	/* Empty line separating headers from message body */
+	PUTBLOCK(@self->HTSI_target, (byte *)CRLF, 2);
+
+	if (@self->SMTPMI_bodyFile) {
+	    return PutBodyFile(@self->SMTPMI_quotedPrintable, 
+			       @self->SMTPMI_bodyFile,
+			       @self->SMTPMI_charCodeCbf);
+
+	} else if (@self->SMTPMI_bodyCbf) {
+	    return ProcCallFixedOrMovable_pascal(@self->HTSI_request, 
+					 @self->SMTPMI_quotedPrintable,
+					 @self->SMTPMI_bodyCbf);
+	} else
+	    return HT_OK;  /* OK to not have message body */
+    }
+
+    /* 
+     * Message body + attachments: if there are attachments, message body 
+     * is treated as a multipart.
+     */
+    /* Boundary should be generated semi-randomly */
+    @self->SMTPMI_boundary = RandomizeBoundary();
+    PutContentType(@self->HTSI_target, 
+		   HT_CONTENT_TYPE_MULTIPART_MIXED, 
+		   @self->SMTPMI_boundary);
+    /* Empty line separating headers from attachments */
+    PUTBLOCK(@self->HTSI_target, (byte *)CRLF, 2);
+
+    /* First attachment is the main message body */
+    ret = PutBoundary(@self->HTSI_target, @self->SMTPMI_boundary);
+    if (ret != HT_OK) return ret;
+    ret = PutContentType(@self->HTSI_target,
+			 HT_CONTENT_TYPE_TEXT_PLAIN, 0);
+    if (ret != HT_OK) return ret;
+    ret = PutTransferEncoding(@self->HTSI_target, ENCODE_QUOTED_PRINTABLE);
+    if (ret != HT_OK) return ret;
+
+    /* Empty line separating headers from message body */
+    PUTBLOCK(@self->HTSI_target, (byte *)CRLF, 2);
+
+    if (@self->SMTPMI_bodyFile) {
+	ret = PutBodyFile(@self->SMTPMI_quotedPrintable, 
+			  @self->SMTPMI_bodyFile,
+			  @self->SMTPMI_charCodeCbf);
+	
+    } else if (@self->SMTPMI_bodyCbf) {
+	ret = ProcCallFixedOrMovable_pascal(@self->HTSI_request, 
+					    @self->SMTPMI_quotedPrintable,
+					    @self->SMTPMI_bodyCbf);
+    } /* else OK to not have message body */
+    if (ret != HT_OK) return ret;
+    PUTBLOCK(@self->HTSI_target, (byte *)CRLF, 2);
+    
+    /* Other attachments */
+    @self->SMTPMI_base64 = HTBase64EncodeNew(@self->HTSI_request, oself);
+    /* 
+     * Stream stack for base64 and qp encoding:
+     *
+     *                              <--- HTQPEncode
+     *                             |
+     * HTSocket <-- SMTPMessage <--|
+     *                             |
+     *                              <--- HTBase64Encode
+     */
+    return PutAttachmentList(@self->HTSI_target, @self->SMTPMI_base64, 
+			     @self->SMTPMI_attachment,
+			     @self->SMTPMI_boundary);
+
+}	/* End of MSG_SMTPM_PUSH_MESSAGE.	*/
+
+
+
+/***********************************************************************
+ *		MSG_SMTPM_PUT_SENDER for SMTPMessageClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    Sender of a message.
+ * PARAMETERS:	    int (const char *name, const char *addr);
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:	    
+ *
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	kkee    	5/ 8/97   	Initial Revision
+ *	
+ ***********************************************************************/
+@method SMTPMessageClass, MSG_SMTPM_PUT_SENDER
+{
+EC( if (!addr || !*addr) EC_ERROR(HTSMTP_MUST_HAVE_EMAIL_ADDR);         )
+    if (!addr || !*addr) return HT_NO; 
+
+    if (@self->SMTPMI_senderEmail) {
+	HTMemFree(@self->SMTPMI_senderEmail);
+	@self->SMTPMI_senderEmail = 0;
+    }
+    if (@self->SMTPMI_sender) {
+	HTMemFree(@self->SMTPMI_sender);
+	@self->SMTPMI_sender = 0;
+    }
+
+    if (addr) {
+	@self->SMTPMI_senderEmail = HTStrAllocCopy(addr);
+	if (name) {
+	    /* If there char codes > 127, QEncode it */
+	    byte *p = (byte *) name;
+	    @self->SMTPMI_senderEnc = ENCODE_NONE;   /* Assume none */
+	    while (*p)
+		if (*p++ > 127) {
+		    @self->SMTPMI_senderEnc = ENCODE_QUOTED_PRINTABLE;
+		    break;
+		}
+	    if (@self->SMTPMI_senderEnc == ENCODE_NONE)
+		@self->SMTPMI_sender = HTStrAllocCopy(name);
+	    else 
+		@self->SMTPMI_sender = QEncode((byte *)name, strlen(name));
+	}
+    } else {
+	EC_ERROR(HTSMTP_MUST_HAVE_A_SENDER);
+	return HT_NO;
+    }
+
+    return HT_OK;
+}	/* End of MSG_SMTPM_PUT_SENDER.	*/
+
+
+
+/***********************************************************************
+ *		MSG_SMTPM_PUT_RECEIVER for SMTPMessageClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    Receiver of a message.
+ * PARAMETERS:	    int (const char *name, const char *addr, 
+ *                       SMTPAddressRole role);
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:	    Appended to the appropriate address list.
+ *
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	kkee    	5/ 8/97   	Initial Revision
+ *	
+ ***********************************************************************/
+@method SMTPMessageClass, MSG_SMTPM_PUT_RECEIVER
+{
+    SMTPAddress saddr = {0,0,ENCODE_NONE};
+
+EC( if (!addr || !*addr) EC_ERROR(HTSMTP_MUST_HAVE_EMAIL_ADDR);         )
+    if (!addr || !*addr) return HT_NO; 
+
+    if (addr) {
+	saddr.email = HTStrAllocCopy(addr);
+	if (name) {
+	    /* If there char codes > 127, QEncode it */
+	    byte *p = (byte *) name;
+	    while (*p)
+		if (*p++ > 127) {
+		    saddr.enc = ENCODE_QUOTED_PRINTABLE;
+		    break;
+		}
+	    if (saddr.enc == ENCODE_NONE) 
+		saddr.name = HTStrAllocCopy(name);
+	    else 
+		saddr.name = QEncode((byte *)name, strlen(name));
+	}
+    } else {
+	EC_ERROR(HTSMTP_MUST_HAVE_EMAIL_ADDR);
+	return HT_NO;
+    }
+
+    switch (role) {
+    case SMTPAR_TO:
+	if (!@self->SMTPMI_to) @self->SMTPMI_to = HTListNew();
+	HTListAppend(@self->SMTPMI_to, (void *)&saddr,
+			 sizeof(SMTPAddress));
+	break;
+
+    case SMTPAR_CC:
+	if (!@self->SMTPMI_cc) @self->SMTPMI_cc = HTListNew();
+	HTListAppend(@self->SMTPMI_cc, (void *)&saddr,
+			 sizeof(SMTPAddress));
+	break;
+
+    case SMTPAR_BCC:
+	if (!@self->SMTPMI_bcc) @self->SMTPMI_bcc = HTListNew();
+	HTListAppend(@self->SMTPMI_bcc, (void *)&saddr,
+			 sizeof(SMTPAddress));
+	break;
+
+    default:
+	EC_ERROR(HTSMTP_INVALID_ADDRESS_ROLE);
+	break;
+    }
+    return HT_OK;
+}	/* End of MSG_SMTPM_PUT_RECEIVER.	*/
+
+
+
+/***********************************************************************
+ *		MSG_SMTPM_PUT_SUBJECT for SMTPMessageClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    Subject of a message.
+ * PARAMETERS:	    int (const char *subject)
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:	    
+ *
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	kkee    	5/ 8/97   	Initial Revision
+ *	
+ ***********************************************************************/
+@method SMTPMessageClass, MSG_SMTPM_PUT_SUBJECT
+{
+    if (@self->SMTPMI_subject) { 
+	HTMemFree(@self->SMTPMI_subject);
+	@self->SMTPMI_subject = 0;
+    }
+    if (subject) {
+	    /* If there char codes > 127, QEncode it */
+	    byte *p = (byte *)subject;
+	    @self->SMTPMI_subjectEnc = ENCODE_NONE;
+	    while (*p)
+		if (*p++ > 127) {
+		    @self->SMTPMI_subjectEnc = ENCODE_QUOTED_PRINTABLE;
+		    break;
+		}
+	    if (@self->SMTPMI_subjectEnc == ENCODE_NONE) 
+		@self->SMTPMI_subject = HTStrAllocCopy(subject);
+	    else 
+		@self->SMTPMI_subject = QEncode((byte *)subject, 
+						strlen(subject));
+    }
+    return HT_OK;
+}	/* End of MSG_SMTPM_PUT_SUBJECT.	*/
+
+
+
+/***********************************************************************
+ *		MSG_SMTPM_PUT_BODY_FILENAME for SMTPMessageClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    Message body in a file.
+ * PARAMETERS:	    int (const char *filename, CharConverterCallback cbf);
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:	    
+ *
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	kkee    	5/ 8/97   	Initial Revision
+ *	
+ ***********************************************************************/
+@method SMTPMessageClass, MSG_SMTPM_PUT_BODY_FILENAME
+{
+    if (@self->SMTPMI_bodyFile) {
+	HTMemFree(@self->SMTPMI_bodyFile);
+	@self->SMTPMI_bodyFile = 0;
+    }
+    if (filename) @self->SMTPMI_bodyFile = HTStrAllocCopy(filename);
+    @self->SMTPMI_charCodeCbf = cbf;
+    return HT_OK;
+}	/* End of MSG_SMTPM_PUT_BODY_FILENAME.	*/
+
+
+
+/***********************************************************************
+ *		MSG_SMTPM_PUT_BODY_CALLBACK for SMTPMessageClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    Send message body via callback. 
+ * PARAMETERS:	    int (HTPostCallback cbf)
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:	    
+ *
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	kkee    	5/ 8/97   	Initial Revision
+ *	
+ ***********************************************************************/
+@method SMTPMessageClass, MSG_SMTPM_PUT_BODY_CALLBACK
+{
+    @self->SMTPMI_bodyCbf = cbf;
+    return HT_OK;
+}	/* End of MSG_SMTPM_PUT_BODY_CALLBACK.	*/
+
+
+
+/***********************************************************************
+ *		MSG_SMTPM_PUT_ATTACHMENT for SMTPMessageClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    Add an attachment to current message.
+ * PARAMETERS:	    int (const char *filename, const char *contentType,
+ *                       const char *name, CharConverterCallback cbf)
+ *                   - filename must be a valid fullpath filename.
+ *                   - contentType is optional and default to 
+ *                      application/octet-stream
+ *                   - name is optional.
+ *					 - cbf is the callback routine for converting data
+ *                     before being put to the server. Normally this is
+ *                     used to convert from native character codes to 
+ *                     ISO character codes.
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:	    
+ *
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	kkee    	5/ 8/97   	Initial Revision
+ *	
+ ***********************************************************************/
+@method SMTPMessageClass, MSG_SMTPM_PUT_ATTACHMENT
+{
+    SMTPAttachment attach = {0,0,0,0};
+
+    if (!@self->SMTPMI_attachment) 
+	@self->SMTPMI_attachment = HTListNew();
+
+    if (filename) attach.filename = HTStrAllocCopy(filename);
+    else {
+	EC_ERROR(HTSMTP_ATTACHMENT_MUST_HAVE_FILENAME);
+	return HT_NO;
+    }
+
+    if (contentType) 
+	attach.contentType = HTStringFor(contentType);
+    else 
+	/* Default */
+	attach.contentType = HTStringFor("application/octet-stream");
+
+    if (name) attach.name = HTStrAllocCopy(name);
+
+    attach.cbf = cbf;
+
+    HTListAppend(@self->SMTPMI_attachment, (void*) &attach, 
+		 sizeof(SMTPAttachment));
+    return HT_OK;
+}	/* End of MSG_SMTPM_PUT_ATTACHMENT.	*/
+
+
+
+/***********************************************************************
+ *		MSG_HT_STREAM_PUT_BLOCK for SMTPMessageClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    Put a block of body. All message body and attachment
+ *                  bodies must go through this.
+ * PARAMETERS:	    int (const byte *data, word len)
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:        Ensure transparency of "<CRLF>.<CRLF>" by first 
+ *                  putting a "." for every new line that begins 
+ *                  with a ".".
+ *
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	kkee    	5/ 8/97   	Initial Revision
+ *	
+ ***********************************************************************/
+@method SMTPMessageClass, MSG_HT_STREAM_PUT_BLOCK
+{
+    int ret;
+    const byte *start = data;
+
+    if (!data || !len) return HT_OK;
+
+    while (len--) {
+	if (@self->SMTPMI_parseState == FLF) {
+	    if (*data == '.') {
+		/* Push all data before '.' */
+		ret = PUTBLOCK(@self->HTSI_target, start, data-start);
+		if (ret != HT_OK) return ret; 
+
+		/* Push an extra '.' */
+		ret = PUTBLOCK(@self->HTSI_target, (byte *)".", 1);
+		if (ret != HT_OK) return ret;
+		start = data;
+	    }
+
+	    @self->SMTPMI_parseState = PARSE_BEGIN;
+
+	} else if (*data == LF) {
+	    @self->SMTPMI_parseState = FLF;
+
+	} 
+	
+	data++;
+    }
+
+    return PUTBLOCK(@self->HTSI_target, start, data-start);
+}	/* End of MSG_HT_STREAM_PUT_BLOCK.	*/
+
+
+
+/***********************************************************************
+ *		MSG_HT_STREAM_ABORT for SMTPMessageClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    Clean up all instance data.
+ * PARAMETERS:	    int (int status)
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:	    
+ *
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	kkee    	5/ 8/97   	Initial Revision
+ *	
+ ***********************************************************************/
+@method SMTPMessageClass, MSG_HT_STREAM_ABORT
+{
+    word count, i;
+    SMTPAttachment attach;
+
+    if (@self->SMTPMI_senderEmail) HTMemFree(@self->SMTPMI_senderEmail);
+    if (@self->SMTPMI_sender) HTMemFree(@self->SMTPMI_sender);
+    if (@self->SMTPMI_to) DeleteAddrList(@self->SMTPMI_to);
+    if (@self->SMTPMI_cc) DeleteAddrList(@self->SMTPMI_cc);
+    if (@self->SMTPMI_bcc) DeleteAddrList(@self->SMTPMI_bcc);
+    if (@self->SMTPMI_subject) HTMemFree(@self->SMTPMI_subject);
+    if (@self->SMTPMI_bodyFile) HTMemFree(@self->SMTPMI_bodyFile);
+    if (@self->SMTPMI_attachment) {
+	count = HTListGetCount(@self->SMTPMI_attachment);
+	for (i=0; i<count; i++) {
+	    HTListRemoveItem(@self->SMTPMI_attachment, 0,
+			     (void *)&attach, sizeof(SMTPAttachment));
+	    if (attach.filename) HTMemFree(attach.filename);
+	    if (attach.name) HTMemFree(attach.name);
+	}
+	HTListDelete(@self->SMTPMI_attachment);
+    }
+    if (@self->SMTPMI_boundary)
+	HTMemFree(@self->SMTPMI_boundary);
+
+    if (@self->SMTPMI_quotedPrintable) {
+	/* Target has been abort by SMTPMessageClass in callsuper() */
+	/* As this share the same target as SMTPMessageClass */
+	@call @self->SMTPMI_quotedPrintable::
+	    MSG_HT_STREAM_SET_TARGET((HTStreamHandle)0);
+	@call @self->SMTPMI_quotedPrintable::
+	    MSG_HT_STREAM_ABORT(status);
+    }
+
+    if (@self->SMTPMI_base64) {
+	/* Target has been abort by SMTPMessageClass in callsuper() */
+	/* As this share the same target as SMTPMessageClass */
+	@call @self->SMTPMI_base64::
+	    MSG_HT_STREAM_SET_TARGET((HTStreamHandle)0);
+	@call @self->SMTPMI_base64::MSG_HT_STREAM_ABORT(status);
+    }
+
+    return @callsuper();
+}	/* End of MSG_HT_STREAM_ABORT.	*/

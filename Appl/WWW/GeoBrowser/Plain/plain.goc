@@ -1,0 +1,129 @@
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Geoworks 1996 -- All Rights Reserved
+
+PROJECT:	GeoBrowser.
+MODULE:		text/plain
+FILE:		plain.goc
+
+AUTHOR:		Kok Kin Kee, Aug 17, 1996
+
+ROUTINES:
+	Name			Description
+	----			-----------
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	kkee	8/17/96   	Initial version.
+
+DESCRIPTION:
+
+	text/plain content-type handler for GeoBrowser.
+
+	$Id: plain.goc,v 1.1 97/04/04 17:20:16 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+
+@include <stdapp.goh>
+@include <WWW/HTCore/htreq.goh>
+@include "Plain/plain.goh"
+
+
+/***********************************************************************
+		Class Declaration
+***********************************************************************/
+
+@classdecl	HTPlainClass;
+
+
+/***********************************************************************
+		Message Handlers
+***********************************************************************/
+
+
+
+/***********************************************************************
+ *		MSG_HT_STREAM_GET_TARGET for HTPlainClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    We do not want anyone to know about our target
+ *                  as the target is not a stream class!
+ * PARAMETERS:	    
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	kkee	10/ 1/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method HTPlainClass, MSG_HT_STREAM_GET_TARGET
+{
+    return NullOptr;
+}	/* End of MSG_HT_STREAM_GET_TARGET.	*/
+
+
+
+
+/***********************************************************************
+ *		MSG_HT_STREAM_ABORT for HTPlainClass
+ ***********************************************************************
+ * SYNOPSIS:	    We must make sure we don't abort the target.
+ * PARAMETERS:	    int (void)
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:        We need to send MSG_META_FINAL_OBJ_FREE instead of 
+ *                  MSG_META_OBJ_FREE to bypass MSG_META_OBJ_FLUSH_QUEUE 
+ *                  which loops back to thread browser:0 generating a 
+ *                  FatalError as the content thread would have exited.
+ *        
+ *                  You are guaranteed by the WWW Library that there will
+ *                  not be any messages sent to your content objects once 
+ *                  you've received MSG_HT_STREAM_ABORT. (Just make sure 
+ *                  you don't send messages to your object after sending
+ *                  MSG_META_FINAL_OBJ_FREE.)
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	kkee	8/17/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method HTPlainClass, MSG_HT_STREAM_ABORT
+{
+    ObjIncInUseCount(OptrToHandle(oself));
+    @send, forceQueue oself::MSG_META_FINAL_OBJ_FREE();
+    return HT_OK;
+}	/* End of MSG_HT_STREAM_ABORT.	*/
+
+
+
+
+/***********************************************************************
+ *		MSG_HT_STREAM_PUT_BLOCK for HTPlainClass
+ ***********************************************************************
+ * SYNOPSIS:	    Write to display canvas.
+ * PARAMETERS:	    int (byte *data, word len)
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	kkee	8/17/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method HTPlainClass, MSG_HT_STREAM_PUT_BLOCK
+{
+
+    if (len > 0)
+	@call @self->HTSI_target::MSG_VIS_TEXT_APPEND_PTR((char *)data, 
+							  len);
+
+    return HT_OK;
+}	/* End of MSG_HT_STREAM_PUT_BLOCK.	*/

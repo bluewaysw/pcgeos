@@ -1,0 +1,63 @@
+//---------------------------------------------------------------------------
+//                
+//	Copyright (C) Geoworks 1998.  All rights reserved.
+//	GEOWORKS CONFIDENTIAL
+//
+// PROJECT:	Geos-SC WWW Library
+// MODULE:	WWFrame
+// FILE:	wwframe.cpp
+//
+// AUTHOR:	Kok Kin Kee: Apr 16, 1998
+//
+// REVISION HISTORY:
+//	Name		Date		Description
+//	----		----		-----------
+//	kkee    	4/16/98  	Initial version
+//
+// DESCRIPTION:
+//
+//	//depot/liberty/project/ellery/980805/library/www/html/wwframe.cpp#1
+//
+//	$Id: wwframe.goc,v 1.1 98/08/24 11:53:18 edwin Exp $
+//
+//---------------------------------------------------------------------------
+// #include <system.h>
+// #include "wwframe.h"
+
+@include "WWW2/Conv/wwframe.goh"
+
+#define _sem        (pself->__sem)
+#define _numRequest (pself->__numRequest)
+
+
+@classdecl WWFrameClass, neverSaved;
+
+
+@method 
+WWFrameClass, WWFrame // () : 
+{
+    _sem = ThreadAllocSem(1);
+    _numRequest = ThreadAllocSem(0);
+}
+
+
+@method // inline void
+WWFrameClass, WWFrameIncNumRequest // () 
+{
+    ThreadPSem(_sem);
+    _numRequest++;
+    ThreadVSem(_sem);
+}
+
+
+@method // inline void
+WWFrameClass, WWFrameDecNumRequest // ()
+{
+    ThreadPSem(_sem);
+    if (_numRequest) _numRequest--;
+    Boolean done = (_numRequest == 0 ? TRUE : FALSE);
+    ThreadVSem(_sem);
+    if (done) {
+        @call self::WWFrameDone();
+    }
+}

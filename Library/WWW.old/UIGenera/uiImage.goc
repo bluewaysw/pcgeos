@@ -1,0 +1,1375 @@
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Geoworks 1996 -- All Rights Reserved
+
+PROJECT:	Penelope
+MODULE:		Image module
+FILE:		uiImage.goc
+
+AUTHOR:		Edwin Yu, July 8, 1996
+
+ROUTINES:
+	Name			Description
+	----			-----------
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	EY	7/8/96   	Initial version.
+
+DESCRIPTION:
+	This files defines all the message handlers that are 
+	responsible for creating image ui object.
+	
+
+	$Id: uiImage.goc,v 1.1 97/04/07 11:49:33 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+@include <stdapp.goh>
+@include <WWW/pmanager.goh>
+@include <WWW/uigenera.goh>
+@include "uifatals.goh"
+#include <Ansi/string.h>
+#include <Ansi/stdlib.h>        /* atoi defined */
+
+@classdecl	HTGenImageClass;
+@extern chunk BoxCursor;
+
+optr FindImageObjectWithName (optr UIGen, char *name);
+Boolean FigureDestinationForMouseEvent
+	(HTListHandle areaHandle, int x, int y, optr pmanager, optr image);
+void ConvertRectSize (char *coord, Rectangle *rect);
+Point *ConvertPolygonSize(char *coord, int *num, Rectangle *rect);
+void ConvertCircleSize (char *coord, long *cx, long *cy, long *cr);
+
+
+HTListHandle	AreaMaps = NULL;
+
+
+/***********************************************************************
+ *		MSG_UI_GENERATOR_CREATE_IMAGE for UIGeneratorClass
+ ***********************************************************************
+ * SYNOPSIS:	    Create an image object to render an image file.
+ * PARAMETERS:	    (MemHandle block, SGML *entity, Boolean load)
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:	
+ *		
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	EY	7/ 8/96   	Initial Revision
+ *
+ ***********************************************************************/
+@extern method UIGeneratorClass, MSG_UI_GENERATOR_CREATE_IMAGE
+{
+  optr dummy;
+  HTMemHandle usemap;
+  /* 
+   *  If there is some object in UIG_target, we can assume the
+   *  object is done.  Thus, give the object to the presentation
+   *  manager for rendering.
+   */
+  if (pself->UIG_target.class == (ClassStruct *)&HTGenTCellClass ||
+      pself->UIG_target.class == (ClassStruct *)&HTGenTableClass ||
+      pself->UIG_target.class == (ClassStruct *)&HTGenFormClass)
+    @call pself->UIG_pmObj::MSG_PM_TAKE_UNFINISHED_UI_OBJ \
+		(pself->UIG_target.obj);
+  else if (pself->UIG_target.obj) {
+    @call pself->UIG_pmObj::MSG_PM_TAKE_FINISHED_UI_OBJ \
+		(pself->UIG_target.obj);
+#if 1
+    @call self::MSG_UI_GENERATOR_BROADCAST_RESIZE_POSITION(pself->UIG_target.obj);
+#endif
+  }
+  /*
+   *  Now create an image object and store it in target.obj.  Next, 
+   *  process the passed attribute list.
+   */
+  dummy = @call pself->UIG_pmObj::MSG_PM_OBJECT_INSTANTIATE
+	((ClassStruct *)&HTGenImageClass);
+
+  usemap = @call dummy::MSG_GEN_IMAGE_PROCESS_ATTRIBUTE(block,entity,load);
+  /*
+   *  
+  if (usemap) {
+
+  }
+   */
+  /*
+   *  Set hyperlink on it if the current content has <A>...</A>
+   */
+  if (pself->UIG_hrefToken != -1) {
+    @call dummy::MSG_META_SET_OBJ_BLOCK_OUTPUT(pself->UIG_pmObj);
+    @call dummy::MSG_GEN_IMAGE_SET_HYPERLINK(pself->UIG_hrefToken);
+  }
+
+  /*
+   *  Done with the image object
+   */
+  @call pself->UIG_pmObj::MSG_PM_TAKE_FINISHED_UI_OBJ(dummy);
+#if 1
+  @call self::MSG_UI_GENERATOR_BROADCAST_RESIZE_POSITION(dummy);
+#endif
+  @call pself->UIG_pmObj::MSG_PM_GET_RECV_OBJ_OPTR_AND_CLASS
+	(&(pself->UIG_target.obj), &(pself->UIG_target.class));
+  if (pself->UIG_target.obj == pself->UIG_pmObj) {
+	pself->UIG_target.obj = NULL;
+	pself->UIG_target.class = NULL;
+  }
+/*   return UI_GEN_NO_ERROR; */
+  return dummy;
+}	/* End of MSG_UI_GENERATOR_CREATE_IMAGE.	*/
+
+
+
+/***********************************************************************
+ *		MSG_UI_GENERATOR_CREATE_SINGLE_IMAGE for UIGeneratorClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    create a single image object
+ * PARAMETERS:	    nothing
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	mzhu	1/28/97   	Initial Revision
+ *
+ ***********************************************************************/
+@extern method UIGeneratorClass, MSG_UI_GENERATOR_CREATE_SINGLE_IMAGE
+{
+  optr dummy;
+
+  dummy = @call pself->UIG_pmObj::MSG_PM_OBJECT_INSTANTIATE
+	((ClassStruct *)&HTGenImageClass);
+
+  @call pself->UIG_pmObj::MSG_PM_TAKE_FINISHED_UI_OBJ(dummy);
+
+  return dummy;
+}	/* End of MSG_UI_GENERATOR_CREATE_SINGLE_IMAGE.	*/
+
+
+
+/***********************************************************************
+ *		MSG_GEN_IMAGE_SET_BOUNDS for HTGenImageClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    
+ * PARAMETERS:	    word width, word height
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	mzhu	1/28/97   	Initial Revision
+ *
+ ***********************************************************************/
+@method HTGenImageClass, MSG_GEN_IMAGE_SET_BOUNDS
+{
+  @self->HTGI_width = width;
+  @self->HTGI_height= height;
+  /*
+   *  Should be removed!!!!
+   */
+  @call self::MSG_VIS_SET_SIZE(width, height);
+
+  return;
+}	/* End of MSG_GEN_IMAGE_SET_BOUNDS.	*/
+
+
+
+
+/***********************************************************************
+ *		MSG_GEN_IMAGE_GET_SRC for HTGenImageClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    Return the SRC attribute value.
+ * PARAMETERS:	    HTMemHandle ()
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	mzhu	1/23/97   	Initial Revision
+ *
+ ***********************************************************************/
+@method HTGenImageClass, MSG_GEN_IMAGE_GET_SRC
+{
+    return @self->HTGI_src;
+}	/* End of MSG_GEN_IMAGE_GET_SRC.	*/
+
+
+
+
+/***********************************************************************
+ *		MSG_GEN_IMAGE_PROCESS_ATTRIBUTE for HTGenImageClass
+ ***********************************************************************
+ * SYNOPSIS:	    Process IMG attribute list
+ * PARAMETERS:	    HTMemHandle (MemHandle block, SGMLEntity *entity)
+ *			If this image is an image map, the optr
+ *			containing the USEMAP name is returned.
+ * SIDE EFFECTS:    The passed block MUST be locked!
+ *
+ * STRATEGY:	Supported Attrs: 
+ *		BORDER:
+ *		HEIGHT:
+ *		ISMAP:
+ *		SRC:
+ *		USEMAP:
+ *		WIDTH:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	EY	7/ 8/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method HTGenImageClass, MSG_GEN_IMAGE_PROCESS_ATTRIBUTE
+{
+  char *cptr, *value;
+  int	index;
+  HTMemHandle tmpChunk;
+
+  @self->HTGI_load = load;
+
+  @self->HTGI_usemap = NULL;  /* initialize to 0 */
+  @self->HTGI_pageRow = -1;   /* initialize to -1 */
+
+  for(index = 0; entity[index].SGMLE_token; index++) {
+    if (!entity[index].SGMLE_value) {
+	if(entity[index].SGMLE_token == HTML_ATTR_ISMAP)
+	    @self->HTGI_ismap = TRUE;
+	continue;
+    }
+    value = (char *)LMemDerefHandles(block, entity[index].SGMLE_value);
+    switch(entity[index].SGMLE_token) {
+    case HTML_ATTR_SRC:    /* SRC */
+    case HTML_ATTR_ALT:    /* ALT */
+    case HTML_ATTR_USEMAP: /* USEMAP */
+      /*
+       *  Allocate a chunk to store a copy of the attribute value.
+       */
+      tmpChunk = HTMemAlloc(sizeof(char) * (strlen(value)+1));
+      cptr = (char *)HTMemLock(tmpChunk);
+      strcpy(cptr,value);
+      HTMemUnlock(tmpChunk);
+      if (entity[index].SGMLE_token == HTML_ATTR_SRC)	   /* SRC */
+	@call self::MSG_GEN_IMAGE_REQUEST(tmpChunk);
+      else if (entity[index].SGMLE_token == HTML_ATTR_ALT) /* ALT */
+	@self->HTGI_alt = tmpChunk;
+      else				                   /* USEMAP */
+	@self->HTGI_usemap = tmpChunk;
+      break;
+    case HTML_ATTR_ISMAP:                                  /* ISMAP */
+      @self->HTGI_ismap = TRUE;
+      break;
+    case HTML_ATTR_BORDER:                                 /* BORDER */
+      @send self::MSG_META_ADD_VAR_DATA(HINT_DRAW_IN_BOX,0,NULL);
+      break;
+    case HTML_ATTR_WIDTH:                                  /* WIDTH */
+      @self->HTGI_width = atoi(value);
+      break;
+    case HTML_ATTR_HEIGHT:                                 /* HEIGHT */
+      @self->HTGI_height= atoi(value);
+      break;
+    }
+  }
+  pself->HTGI_focalAnchor = -1;  /* no focus on it initially */
+  /*
+   *  Return the USEMAP optr.   NULL if there is none.
+   */
+  return @self->HTGI_usemap;
+}	/* End of MSG_GEN_IMAGE_PROCESS_ATTRIBUTE.	*/
+
+
+/***********************************************************************
+ *		MSG_META_INITIALIZE for HTGenImageClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    Initalize a field.  The reason I intercept this 
+ *                  routine and initialize one particular field is
+ *                  that user may simply load a .gif or .jpg file
+ *                  into a browser.  In that case, MSG_GEN_IMAGE_
+ *                  PROCESS_ATTRIBUTE is not called to initialize
+ *                  hrefToken field to -1.  Note, hrefToken stores
+ *                  href token of the image.
+ * PARAMETERS:	    
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:	    
+ *
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	edwin   	3/28/97   	Initial Revision
+ *	
+ ***********************************************************************/
+@method HTGenImageClass, MSG_META_INITIALIZE
+{
+  @self->HTGI_hrefToken = -1;
+  @callsuper();
+  return;
+}	/* End of MSG_META_INITIALIZE.	*/
+
+
+
+/***********************************************************************
+ *		MSG_GEN_IMAGE_REQUEST for HTGenImageClass
+ ***********************************************************************
+ * SYNOPSIS:	    Tell the imaeg object to receive the imgae file.
+ * PARAMETERS:	    (HTMemHandle src);
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	EY	8/26/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method HTGenImageClass, MSG_GEN_IMAGE_REQUEST
+{
+	pself->HTGI_src = srcOptr;
+	return;
+}	/* End of MSG_GEN_IMAGE_REQUEST.	*/
+
+
+/***********************************************************************
+ *		MSG_GEN_IMAGE_SET_HYPERLINK for HTGenImageClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    Set the hyperlink token on the image.
+ * PARAMETERS:	    (int hrefToken)
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	edwin	10/ 8/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method HTGenImageClass, MSG_GEN_IMAGE_SET_HYPERLINK
+{
+  pself->HTGI_hrefToken = hrefToken;
+}	/* End of MSG_GEN_IMAGE_SET_HYPERLINK.	*/
+
+
+/***********************************************************************
+ *		MSG_GEN_IMAGE_SET_BITMAP for HTGenImageClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    
+ * PARAMETERS:	    VMFileHandle bitmapFile, VMBlockHandle bitmapBlock
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	mzhu	1/24/97   	Initial Revision
+ *
+ ***********************************************************************/
+@method HTGenImageClass, MSG_GEN_IMAGE_SET_BITMAP
+{
+    @self->HTGI_bitmapFile = bitmapFile;
+    @self->HTGI_bitmapBlock = bitmapBlock;
+    @self->first_draw = TRUE;
+
+/*    @send self::MSG_VIS_MARK_INVALID(VOF_IMAGE_INVALID, VUM_NOW); */
+}	/* End of MSG_ADD_GSTRING.	*/
+
+
+/***********************************************************************
+ *		MSG_GEN_IMAGE_ADD_ONE_LINE for HTGenImageClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    
+ * PARAMETERS:	    word line
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:	    
+ *
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	mzhu    	1/30/97   	Initial Revision
+ *	
+ ***********************************************************************/
+@method HTGenImageClass, MSG_GEN_IMAGE_ADD_ONE_LINE
+{
+  GStateHandle gstate;
+
+  if(@self->first_draw) {
+ 	@send self::MSG_VIS_MARK_INVALID(
+		VOF_IMAGE_INVALID, VUM_DELAYED_VIA_UI_QUEUE);
+	@self->first_draw = FALSE;
+	return;
+  } else {
+      gstate = @call self::MSG_VIS_VUP_CREATE_GSTATE();
+      @send self::MSG_VIS_DRAW(0, gstate);
+      GrDestroyState(gstate);
+  }
+}	/* End of MSG_GEN_IMAGE_ADD_ONE_LINE.	*/
+
+
+/***********************************************************************
+ *		MSG_GEN_IMAGE_DRAW_FOCUS for HTGenImageClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    Draw the focus outline.
+ * PARAMETERS:	    (GStateHandle gstate, Rectangle *objRect, 
+ *                   RectDWord *rect)
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:	    
+ *
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	edwin   	3/24/97   	Initial Revision
+ *	
+ ***********************************************************************/
+@method HTGenImageClass, MSG_GEN_IMAGE_DRAW_FOCUS
+{
+  EventHandle msg;
+
+  if (pself->HTGI_hrefToken != -1 && pself->HTGI_ismap == FALSE) {
+    rect->RD_left = objRect->R_left + 1;
+    rect->RD_top = objRect->R_top + 1;
+    rect->RD_right = objRect->R_right - 1;
+    rect->RD_bottom = objRect->R_bottom - 1;
+    GrDrawRect(gstate, rect->RD_left, rect->RD_top, 
+	       rect->RD_right, rect->RD_bottom);
+    pself->HTGI_focalAnchor = 0;
+    pself->HTGI_focalBound = *rect;
+
+    msg = @record PresentationManagerClass::MSG_PM_DISPLAY_HREF_TARGET
+	(@self->HTGI_hrefToken);
+    @send self::MSG_VIS_VUP_SEND_TO_OBJECT_OF_CLASS(msg);
+
+  }
+  else
+      rect->RD_right = rect->RD_left = 0;
+
+  return;
+}	/* End of MSG_GEN_IMAGE_DRAW_FOCUS.	*/
+
+
+/***********************************************************************
+ *		MSG_GEN_IMAGE_UNDRAW_FOCUS for HTGenImageClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    Erase the focus outline.
+ * PARAMETERS:	    (GStateHandle gstate)
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:	    
+ *
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	edwin   	3/24/97   	Initial Revision
+ *	
+ ***********************************************************************/
+@method HTGenImageClass, MSG_GEN_IMAGE_UNDRAW_FOCUS
+{
+    GrSaveState(gstate);
+    GrSetLineMaskSys(gstate, SDM_50);
+    GrSetLineColor(gstate, CF_INDEX, C_LIGHT_GREY, 0, 0);
+    GrSetMixMode(gstate, MM_XOR);
+    GrDrawRect(gstate, 
+	       pself->HTGI_focalBound.RD_left, 
+	       pself->HTGI_focalBound.RD_top, 
+	       pself->HTGI_focalBound.RD_right, 
+	       pself->HTGI_focalBound.RD_bottom);
+    GrRestoreState(gstate);
+    pself->HTGI_focalAnchor = -1;
+    return;
+}	/* End of MSG_GEN_IMAGE_UNDRAW_FOCUS.	*/
+
+
+/***********************************************************************
+ *		MSG_GEN_IMAGE_FIND_LINK_IN_RECT for HTGenImageClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    Does this image have hyperlink on it?
+ * PARAMETERS:	    
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:	    
+ *
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	edwin   	3/24/97   	Initial Revision
+ *	
+ ***********************************************************************/
+@method HTGenImageClass, MSG_GEN_IMAGE_FIND_LINK_IN_RECT
+{
+    if (pself->HTGI_hrefToken != -1 && pself->HTGI_ismap)
+	return TRUE;
+    else
+	return FALSE;
+}	/* End of MSG_GEN_IMAGE_FIND_LINK_IN_RECT.	*/
+
+
+/***********************************************************************
+ *		MSG_META_DETACH for HTGenImageClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    when destroy the image, clean its bitmap.
+ * PARAMETERS:	    
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:	    
+ *
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	mzhu    	2/ 5/97   	Initial Revision
+ *	
+ ***********************************************************************/
+@method HTGenImageClass, MSG_META_DETACH
+{
+    HugeArrayDestroy(@self->HTGI_bitmapFile, @self->HTGI_bitmapBlock);
+    if (pself->HTGI_src)
+	HTMemFree(pself->HTGI_src);
+    if (pself->HTGI_alt)
+	HTMemFree(pself->HTGI_alt);
+    if (pself->HTGI_usemap)
+	HTMemFree(pself->HTGI_usemap);
+
+    @callsuper();
+}	/* End of MSG_META_DETACH.	*/
+
+@start BmpData;
+@include "Art/ImageIconBitmap.goh"
+@end BmpData;
+
+
+/***********************************************************************
+ *		MSG_VIS_DRAW for HTGenImageClass
+ ***********************************************************************
+ * SYNOPSIS:	    Draw the image object.
+ * PARAMETERS:	    void (DrawFlags drawFlags, 
+ *			  GStateHandle gstate)
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	EY	8/26/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method HTGenImageClass, MSG_VIS_DRAW
+{
+  Rectangle bounds;
+  Bitmap *bmp;
+
+  @call self::MSG_VIS_GET_BOUNDS(&bounds);
+
+  if(@self->HTGI_load) {
+      /*
+       * if the image been loaded, draw the real image
+       */
+      if(@self->HTGI_bitmapFile && @self->HTGI_bitmapBlock) {
+	  GrDrawHugeBitmap(gstate, bounds.R_left + 3, bounds.R_top + 3,
+		       @self->HTGI_bitmapFile, @self->HTGI_bitmapBlock);
+      }
+      if (pself->HTGI_hrefToken != -1 && pself->HTGI_ismap == FALSE 
+	  && pself->HTGI_focalAnchor != -1) {
+	  /*
+	   *  Draw the focus outline if it currently has the navigation focus.
+	   */
+	  GrSetLineMaskSys(gstate, SDM_50);
+	  GrSetLineColor(gstate, CF_INDEX, C_BLACK, 0, 0);
+	  GrDrawRect(gstate, 
+	       pself->HTGI_focalBound.RD_left, 
+	       pself->HTGI_focalBound.RD_top, 
+	       pself->HTGI_focalBound.RD_right, 
+	       pself->HTGI_focalBound.RD_bottom);
+      }
+  } else {
+      /*
+       * else just draw a small icon
+       */
+      MemLock(OptrToHandle(@ImageIcon));
+      bmp = LMemDeref(@ImageIcon);
+      GrDrawBitmap(gstate, bounds.R_left + 3, bounds.R_top + 3,
+		   bmp, 0);
+      MemUnlock(OptrToHandle(@ImageIcon));
+  }
+}	/* End of MSG_VIS_DRAW.	*/
+
+
+
+@method HTGenImageClass, MSG_VIS_RECALC_SIZE
+{
+  VisTextInstance  *vself;
+  SizeAsDWord size;
+
+  if (pself->HTGI_width && pself->HTGI_height) /* 5 to make some margin */
+    size = MAKE_SIZE_DWORD(pself->HTGI_width+5,pself->HTGI_height+5);
+  else if (pself->HTGI_width)
+    size = MAKE_SIZE_DWORD(pself->HTGI_width+5,pself->HTGI_width+5);
+  else if (pself->HTGI_height)
+    size = MAKE_SIZE_DWORD(pself->HTGI_height+5, pself->HTGI_height+5);
+  else
+    size = MAKE_SIZE_DWORD(20,20);
+  /*
+   *  Tell the Geometry Manager to send a messaeg instead of caling a
+   *  a routine.
+   */
+  vself = ObjDerefVis(oself);
+  vself->VI_geoAttrs &= ~VGA_USE_VIS_SET_POSITION;
+
+  return size;
+}	/* End of MSG_VIS_RECALC_SIZE.	*/
+
+
+/***********************************************************************
+ *		MSG_VIS_POSITION_BRANCH for HTGenImageClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    
+ * PARAMETERS:	    
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	edwin	10/28/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method HTGenImageClass, MSG_VIS_POSITION_BRANCH
+{
+  XYValueAsDWord xy = @call @genParent::MSG_VIS_GET_POSITION();
+
+  xOrigin = DWORD_X(xy) + pself->HTGI_xPos;
+  yOrigin = DWORD_Y(xy) + GetItsPotentialHeight(oself, pself->HTGI_pageRow);
+  @callsuper();
+}	/* End of MSG_VIS_POSITION_BRANCH.	*/
+
+
+
+/***********************************************************************
+ *		MSG_META_UIG_CALC_POSITION for HTGenImageClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    
+ * PARAMETERS:	    
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	edwin	10/28/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method HTGenImageClass, MSG_META_UIG_CALC_POSITION
+{
+  int row;
+  SizeAsDWord size = @call self::MSG_VIS_GET_SIZE();
+  /*
+   *  Get an estimated position of the object
+   */
+  pself->HTGI_xPos = UpdateItsPotentialPosition(oself, size, &row);
+  pself->HTGI_pageRow = row;
+
+  return;
+}	/* End of MSG_META_UIG_CALC_POSITION.	*/
+
+
+
+/***********************************************************************
+ *		MSG_META_START_SELECT for HTGenImageClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Pass the mouse coordinates to the server.    
+ * PARAMETERS:	void (MouseReturnParams *retVal,
+ *		      sword xPosition, sword yPosition,
+ *		      word inputState)
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	edwin	9/12/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method HTGenImageClass, MSG_META_START_SELECT
+{
+  Rectangle bound;
+  int rel_x, rel_y, count, i;
+  char *name, *name2;
+  MapItem *mapItem;
+  optr pmanager;
+  HTMemHandle map;
+
+  @callsuper();
+  if (!(GET_BUTTON_INFO(inputState) & BI_PRESS))
+    return;
+  /*
+   *  Find the mouse position relative to the (left, top) of the image.
+   */
+  @call self::MSG_VIS_GET_BOUNDS(&bound);
+  rel_x = xPosition - bound.R_left;
+  rel_y = yPosition - bound.R_top;
+  if (pself->HTGI_usemap) {
+      /*
+       *  If there is a usemap, find the right map item from the usemap 
+       *  list and find get the area item in that map item.
+       */
+      if ((count = HTListGetCount(AreaMaps)) > 0) {
+	name2=(char*)HTMemLock(pself->HTGI_usemap);
+        for (i = 0; i < count; i++) {
+	  HTListGetItem(AreaMaps, i, &map, sizeof(HTMemHandle));
+	  mapItem = (MapItem *)HTMemLock(map);
+	  name=(char*)HTMemLock(mapItem->MI_mapName);
+	  if (strcmp(name, name2+1) == 0) {
+	    /*
+	     *  Found the right <MAP> item.  See which <AREA> item that
+	     *  the mouse event falls into.
+	     */
+	    pmanager = @call self::MSG_META_GET_OBJ_BLOCK_OUTPUT();
+	    FigureDestinationForMouseEvent
+		(mapItem->MI_areas, rel_x, rel_y, pmanager, oself);
+	    HTMemUnlock(mapItem->MI_mapName);
+	    HTMemUnlock(map);
+	    break;
+	  }
+	  else {
+	    HTMemUnlock(mapItem->MI_mapName);
+	    HTMemUnlock(map);
+	  }
+	}
+	HTMemUnlock(pself->HTGI_usemap);
+      }
+  }
+  else if (pself->HTGI_ismap == TRUE && pself->HTGI_src) {
+    /*  There is a href Token on this image */
+    pmanager = @call self::MSG_META_GET_OBJ_BLOCK_OUTPUT();
+    @call pmanager::MSG_PM_REFER_MAPLINK(rel_x, rel_y, pself->HTGI_src);
+  }
+  else if (pself->HTGI_hrefToken != -1) {
+    /*  There is a href Token on this image */
+    pmanager = @call self::MSG_META_GET_OBJ_BLOCK_OUTPUT();
+    @call pmanager::MSG_PM_REFER_HYPERLINK(pself->HTGI_hrefToken);
+  }
+  else if (pself->HTGI_hrefToken == -1) {
+    /*  There is no href Token on this image */
+    pmanager = @call self::MSG_META_GET_OBJ_BLOCK_OUTPUT();
+    @call pmanager::MSG_PM_CLEAR_HREF_LINK();
+  }
+  return;
+}	/* End of MSG_META_START_SELECT.	*/
+
+
+
+/***********************************************************************
+ *		MSG_META_PTR for HTGenImageClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    
+ * PARAMETERS:	    
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	edwin	11/18/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method HTGenImageClass, MSG_META_PTR
+{
+  Rectangle bound;
+  Boolean found = FALSE;
+  char *name, *name2;
+  MapItem *mapItem;
+  HTMemHandle map;
+  int rel_x, rel_y, i, count;
+
+
+  @callsuper();
+
+  if (pself->HTGI_usemap) {
+    /*
+     *  If there is a usemap, find the right map item from the usemap 
+     *  list and find get the area item in that map item.
+     */
+    if ((count = HTListGetCount(AreaMaps)) > 0) {
+      @call self::MSG_VIS_GET_BOUNDS(&bound);
+      rel_x = xPosition - bound.R_left;
+      rel_y = yPosition - bound.R_top;
+      /*
+       *  Get an element and lock down its block.
+       */
+      name2 = (char*)HTMemLock(pself->HTGI_usemap);
+      for (i = 0; i < count; i++) {
+	HTListGetItem(AreaMaps, i, &map, sizeof(HTMemHandle));
+	mapItem = (MapItem *)HTMemLock(map);
+	name=(char *)HTMemLock(mapItem->MI_mapName);
+	if (strcmp(name, name2+1) == 0) {
+	  /*
+	   *  Found the right <MAP> item.  See which <AREA> item that
+	   *  the mouse event falls into.
+	   */
+	  found = FigureDestinationForMouseEvent
+	    (mapItem->MI_areas, rel_x, rel_y, NULL, oself);
+	  HTMemUnlock(mapItem->MI_mapName);
+	  HTMemUnlock(map);
+	  break;
+	}
+	else {
+	  HTMemUnlock(mapItem->MI_mapName);
+	  HTMemUnlock(map);
+	}
+      }
+      HTMemUnlock(pself->HTGI_usemap);
+    }
+  }
+  else if (pself->HTGI_hrefToken != -1) {
+    found = TRUE;
+  }
+
+  if (found == TRUE) {
+    /*  There is a href Token on this image */
+    retVal->ptrImage = @BoxCursor;
+    /* this event processed */
+    retVal->flags = MRF_PROCESSED | MRF_SET_POINTER_IMAGE;
+  }
+  else
+    retVal->flags = MRF_PROCESSED | MRF_CLEAR_POINTER_IMAGE;
+  return;
+}	/* End of MSG_META_PTR.	*/
+
+
+
+/***********************************************************************
+ *	MSG_UI_GENERATOR_START_MAP for UIGeneratorClass
+ ***********************************************************************
+ * SYNOPSIS:	    Create a MAP memory block to sotre AREA coordinates.
+ * PARAMETERS:	    (MemHandle block, SGMLEntity *entity)
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:	
+ *		
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	EY	7/ 8/96   	Initial Revision
+ *
+ ***********************************************************************/
+@extern method UIGeneratorClass, MSG_UI_GENERATOR_START_MAP
+{
+  char *value, *cptr;
+  HTMemHandle mapItem, nameChunk;
+  MapItem *item;
+  int index;
+  /*
+   *  Get the NAME attribute
+   */
+  for(index = 0; entity[index].SGMLE_token; index++) {
+    if (!entity[index].SGMLE_value)
+      continue;
+    value = (char *)LMemDerefHandles(block, entity[index].SGMLE_value);
+    switch(entity[index].SGMLE_token) {
+    case HTML_ATTR_NAME:
+      /*
+       *  Create a list if not exists.
+       */
+      if (!AreaMaps)
+	return UI_GEN_ERROR;
+      /*
+       *  Allocate a MapItem
+       */
+      mapItem = HTMemAlloc(sizeof(MapItem));
+      nameChunk = HTMemAlloc(sizeof(char) * (strlen(value)+1));
+      /*
+       *  Store the map name in MapItem.
+       */
+      item = (MapItem *)HTMemLock(mapItem);
+      item->MI_mapName = nameChunk;
+      cptr = (char *)HTMemLock(item->MI_mapName);
+      strcpy(cptr, value);
+      HTMemUnlock(item->MI_mapName);
+      /*
+       *  Allocate a memory block for the storage of the AREAs information.
+       */
+      item->MI_areas = HTListNew();
+      HTMemUnlock(mapItem);
+      /*
+       *  Set the current mapItem in the UIGenerator, thus the later
+       *  <AREA> elements are attached to this current MAP info.
+       */
+      @self->UIG_currentMap = mapItem;
+      /*
+       *  Append this map info in the list.
+       */
+      HTListAppend(AreaMaps, (void *)&mapItem, sizeof(HTMemHandle));
+    }
+  }
+
+  return UI_GEN_NO_ERROR;
+}	/* End of MSG_UI_GENERATOR_START_MAP.	*/
+
+
+
+/***********************************************************************
+ *		MSG_UI_GENERATOR_END_MAP for UIGeneratorClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    End the <MAP> business.
+ * PARAMETERS:	    none.
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	edwin	9/14/96   	Initial Revision
+ *
+ ***********************************************************************/
+@extern method UIGeneratorClass, MSG_UI_GENERATOR_END_MAP
+{
+  /* 
+   *  Done with the current Map.
+   */
+  pself->UIG_currentMap = NULL;
+  return UI_GEN_NO_ERROR;
+}	/* End of MSG_UI_GENERATOR_END_MAP.	*/
+
+
+
+/***********************************************************************
+ *		FindImageObjectWithName
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Scan thru the ui tree to find the image having the same
+ *		USEMAP name.
+ * CALLED BY:	MSG_UI_GENERATOR_START_MAP
+ * RETURN:	optr image
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	edwin	9/13/96   	Initial Revision
+ *
+ ***********************************************************************/
+optr
+FindImageObjectWithName (optr UIGen, char *name)
+{
+  return NULL;
+}	/* End of FindImageObjectWithName.	*/
+
+
+
+/***********************************************************************
+ *		MSG_UI_GENERATOR_CREATE_AREA for UIGeneratorClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    Specifies the shape of a "hot spot" in a client-
+ *		    side image map.
+ * PARAMETERS:	    (MemHandle block, SGMLEntity *entity)
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	edwin	9/13/96   	Initial Revision
+ *
+ ***********************************************************************/
+@extern method UIGeneratorClass, MSG_UI_GENERATOR_CREATE_AREA
+{
+  char *value, *cptr;
+  int index;
+  HTMemHandle areaItem, tmpChunk;
+  AreaItem *aItem;
+  MapItem *mItem;
+
+  if (!AreaMaps || !pself->UIG_currentMap)
+    return UI_GEN_ERROR;		/*  <AREA> appears outside of <MAP>! */
+
+  /*
+   *  Allocate an AREA item to store the information
+   */
+  areaItem = HTMemAlloc(sizeof(AreaItem));
+  aItem = (AreaItem *)HTMemLock(areaItem);
+  aItem->AI_shape = AREA_RECT;  /* default shape */
+  aItem->AI_coords = NULL;
+  /*
+   *  Get the NAME attribute
+   */
+  for(index = 0; entity[index].SGMLE_token; index++) {
+    if (!entity[index].SGMLE_value)
+      continue;
+    value = (char *)LMemDerefHandles(block, entity[index].SGMLE_value);
+    switch(entity[index].SGMLE_token) {
+    case HTML_ATTR_HREF:
+    case HTML_ATTR_COORDS:
+      tmpChunk = HTMemAlloc(sizeof(char) *strlen(value)+1);
+      cptr = (char *)HTMemLock(tmpChunk);
+      strcpy(cptr,value);
+      HTMemUnlock(tmpChunk);
+      if (entity[index].SGMLE_token == HTML_ATTR_HREF)	/* href */
+	aItem->AI_href = tmpChunk;
+      else
+	aItem->AI_coords = tmpChunk;
+      break;
+    case HTML_ATTR_ALT:
+      break;
+    case HTML_ATTR_SHAPE:
+      if (strcasecmp("rect", value) == 0 || 
+	  strcasecmp("rectangle", value) == 0)
+	aItem->AI_shape = AREA_RECT;
+      else if (strcasecmp("circ", value) == 0 ||
+	       strcasecmp("circle", value) == 0)
+	aItem->AI_shape = AREA_CIRC;
+      else if (strcasecmp("poly", value) == 0 ||
+	       strcasecmp("polygon", value) == 0)
+	aItem->AI_shape = AREA_POLY;
+      else
+	aItem->AI_shape = AREA_DEFAULT;
+      break;
+    }
+  }
+
+  mItem = (MapItem *)HTMemLock(@self->UIG_currentMap);
+
+  HTListAppend(mItem->MI_areas,	(void *)&areaItem, sizeof(HTMemHandle));
+  HTMemUnlock(@self->UIG_currentMap);
+  HTMemUnlock(areaItem);
+
+  return UI_GEN_NO_ERROR;
+}	/* End of MSG_UI_GENERATOR_CREATE_AREA.	*/
+
+
+
+/***********************************************************************
+ *		FigureDestinationForMouseEvent
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Given the mouse coordinate and a list of <AREA>s, 
+ *		check which <AREA> the mouse event falls into and 
+ *		loads the specified URL.
+ * CALLED BY:	void (HTListHandle areas;, rel_x, rel_y, optr image)
+ * RETURN:	none.
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	edwin	9/15/96   	Initial Revision
+ *
+ ***********************************************************************/
+Boolean FigureDestinationForMouseEvent
+(HTListHandle areaHandle, int x, int y, optr pmanager, optr image)
+{
+  int count, i, num;
+  long c_x, c_y, cr;
+  char *coord;
+  AreaItem *areaItem;
+  HTMemHandle area;
+  GStateHandle gstate;
+  Point *list;
+  Rectangle rect;
+  Boolean found = FALSE;
+  WindowHandle win;
+
+#if 0
+  /* start testing */
+  Rectangle test;
+  /* end testing */
+#endif 0
+
+  if ((count = HTListGetCount(areaHandle)) > 0) {
+    for (i = 0; i < count; i++) {
+      HTListGetItem(areaHandle, i, &area, sizeof(HTMemHandle));
+      areaItem = (AreaItem *)HTMemLock(area);
+      if (!areaItem->AI_coords && !areaItem->AI_href) {
+	HTMemUnlock(area);
+	break;
+      }
+      else if (!areaItem->AI_coords && areaItem->AI_href) {
+	if (areaItem->AI_shape == AREA_DEFAULT && pmanager) {
+	  @call pmanager::MSG_PM_REFER_MAPLINK(-1,-1,areaItem->AI_href);
+	  found = TRUE;
+	}
+	HTMemUnlock(area);
+	break;
+      }
+      coord = (char*)HTMemLock(areaItem->AI_coords);
+      /*
+       *  Now check if the mouse event falls into the area.
+       */
+      if (areaItem->AI_shape == AREA_RECT) {
+	ConvertRectSize(coord, &rect);
+#if 0
+	/* start testing */
+	@call image::MSG_VIS_GET_BOUNDS(&test);
+	win = @call image::MSG_VIS_QUERY_WINDOW();
+	gstate = GrCreateState(win);
+	GrDrawRect(gstate, test.R_left+rect.R_left, test.R_top+rect.R_top,
+		   test.R_left+rect.R_right, test.R_top+rect.R_bottom);
+	GrDestroyState(gstate);
+	/* end testing */
+#endif
+	if (rect.R_left < x && rect.R_right > x && 
+	    rect.R_top < y && rect.R_bottom > y) {
+	  if (pmanager)
+	    @call pmanager::MSG_PM_REFER_MAPLINK(-1,-1,areaItem->AI_href);
+	  found = TRUE;
+	  HTMemUnlock(areaItem->AI_coords);
+	  HTMemUnlock(area);
+	  break;
+        }
+      }
+      else if (areaItem->AI_shape == AREA_CIRC) {
+	ConvertCircleSize(coord, &c_x, &c_y, &cr);
+#if 0
+	/* start testing */
+	@call image::MSG_VIS_GET_BOUNDS(&test);
+	win = @call image::MSG_VIS_QUERY_WINDOW();
+	gstate = GrCreateState(win);
+	GrDrawEllipse(gstate, test.R_left+c_x-cr, test.R_top+c_y-cr, 
+		      test.R_left+c_x+cr, test.R_top+c_y+cr);
+	GrDestroyState(gstate);
+	/* end testing */
+#endif
+	c_x = (c_x > x) ? (c_x - x) : (x - c_x);
+	c_y = (c_y > y) ? (c_y - y) : (y - c_y);
+	if ((c_x*c_x + c_y*c_y) < cr*cr) {
+	  if (pmanager)
+	    @call pmanager::MSG_PM_REFER_MAPLINK(-1,-1,areaItem->AI_href);
+	  found = TRUE;
+	  HTMemUnlock(areaItem->AI_coords);
+	  HTMemUnlock(area);
+	  break;
+        }
+      }
+      else if (areaItem->AI_shape == AREA_POLY) {
+	win = @call image::MSG_VIS_QUERY_WINDOW();
+	gstate = GrCreateState(win);
+	@call image::MSG_VIS_GET_BOUNDS(&rect);
+	if((list = ConvertPolygonSize(coord, &num, &rect)) == NULL) {
+	  GrDestroyState(gstate);
+	  HTMemUnlock(areaItem->AI_coords);
+	  HTMemUnlock(area);
+	  break;
+	}
+#if 0
+	/* start testing */
+	GrDrawPolyline(gstate, list, num);
+	/* end testing */
+#endif
+	if (GrTestPointInPolygon
+	    (gstate,ODD_EVEN,list,num,x+rect.R_left,y+rect.R_top)) {
+	  if (pmanager)
+	    @call pmanager::MSG_PM_REFER_MAPLINK(-1,-1,areaItem->AI_href);
+	  found = TRUE;
+	  free(list);
+	  GrDestroyState(gstate);
+	  HTMemUnlock(areaItem->AI_coords);
+	  HTMemUnlock(area);
+	  break;
+	}
+	else {
+	  free(list);
+	  GrDestroyState(gstate);
+	}
+      }
+      HTMemUnlock(areaItem->AI_coords);
+      HTMemUnlock(area);
+    }
+
+  }
+  return found;
+}	/* End of FigureDestinationForMouseEvent.	*/
+
+
+/***********************************************************************
+ *		ConvertRectSize
+ ***********************************************************************
+ *
+ * SYNOPSIS:	
+ * CALLED BY:	
+ * RETURN:	
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	edwin	9/16/96   	Initial Revision
+ *
+ ***********************************************************************/
+int nextInteger(char *cptr)
+{
+  int i;
+  for (i = 0; cptr[i] != NULL && cptr[i] != ',' &&
+	cptr[i] >= '0' && cptr[i] <= '9'; i++)
+	;
+  if (cptr[i] == ',')
+	i++;
+  return i;
+}
+
+
+/***********************************************************************
+ *		ConvertRectSize
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Read a char array, and return Rectangle.
+ * CALLED BY:	void (char *coord, Rectangle *rect)
+ * RETURN:	
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	edwin	9/17/96   	Initial Revision
+ *
+ ***********************************************************************/
+void ConvertRectSize (char *coord, Rectangle *rect)
+{
+  int	len;
+
+  rect->R_left = rect->R_top = rect->R_right = rect->R_bottom = 0;
+
+  rect->R_left = atoi(coord);
+  if ((len = nextInteger(coord)) == 0)
+	return;
+  coord += len;
+  rect->R_top = atoi(coord);
+  if ((len = nextInteger(coord)) == 0)
+	return;
+  coord += len;
+  rect->R_right = atoi(coord);
+  if ((len = nextInteger(coord)) == 0)
+	return;
+  coord += len;
+  rect->R_bottom = atoi(coord);
+
+  return;
+}	/* End of ConvertRectSize.	*/
+
+
+
+/***********************************************************************
+ *		ConvertPolygonSize
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Read a char array, create and return a array of Points.
+ * CALLED BY:	
+ * RETURN:	Points *
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	edwin	9/16/96   	Initial Revision
+ *
+ ***********************************************************************/
+Point *
+ConvertPolygonSize(char *coord, int *cnt, Rectangle *rect)
+{
+  int len, i;
+  char *cptr = coord;
+  Point *point;
+
+  for(*cnt = 1, cptr = coord; *cptr != NULL; cptr++) {
+    if (*cptr == ',')
+	(*cnt)++;
+  }
+  if (*cnt % 2)		/* not a pair */
+    return NULL;
+
+  *cnt = *cnt / 2;
+  point = malloc(sizeof(Point) * (*cnt));
+
+  for (i = 0; i < *cnt; i++) {
+    point[i].P_x = atoi(coord) + rect->R_left;
+    len = nextInteger(coord);
+    EC_WARNING_IF(len == 0, UIG_UNBALANCED_POLY_PAIRS);
+    coord += len;
+    point[i].P_y = atoi(coord) + rect->R_top;
+    len = nextInteger(coord);
+    EC_WARNING_IF(len == 0, UIG_UNBALANCED_POLY_PAIRS);
+    coord += len;
+  }
+  return point;
+}	/* End of ConvertPolygonSize.	*/
+
+
+
+/***********************************************************************
+ *		ConvertCircleSize
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Read a char array, and get the (x, y) and r values.
+ * CALLED BY:	void (char *coord, int *cx, int *cy, int *r);
+ * RETURN:	
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	edwin	9/17/96   	Initial Revision
+ *
+ ***********************************************************************/
+void 
+ConvertCircleSize (char *coord, long *cx, long *cy, long *cr)
+{
+  int len;
+
+  *cx = atoi(coord);
+  len = nextInteger(coord);
+  EC_WARNING_IF(len == 0, UIG_UNBALANCED_POLY_PAIRS);
+  coord += len;
+  *cy = atoi(coord);
+  len = nextInteger(coord);
+  EC_WARNING_IF(len == 0, UIG_UNBALANCED_POLY_PAIRS);
+  coord += len;
+  *cr = atoi(coord);
+
+  return;
+}	/* End of ConvertCircleSize.	*/
+

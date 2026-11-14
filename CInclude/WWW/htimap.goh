@@ -1,0 +1,261 @@
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Geoworks 1997.  All rights reserved.
+	GEOWORKS CONFIDENTIAL
+
+PROJECT:	Geos WWW Library
+MODULE:		htimap
+FILE:		htimap.goh
+
+AUTHOR:		Kok Kin Kee, May 19, 1997
+
+ROUTINES:
+	Name			Description
+	----			-----------
+
+REVISION HISTORY:
+	Name		Date		Description
+	----		----		-----------
+	kkee    	5/19/97   	Initial version.
+
+DESCRIPTION:
+
+	RFC2060 IMAP4 Client
+
+	$Id: htimap.goh,v 1.16.5.1 97/09/05 10:10:46 jeremyb Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+
+@ifndef __HT_IMAP_GOH__
+@define __HT_IMAP_GOH__
+
+@deflib htimap
+
+@include <WWW/HTCore/htstream.goh>
+@include <WWW/HTCore/htreq.goh>
+@include <WWW/HTCore/htsock.goh>
+#include <WWW/htbuck.h>
+
+/* --------------------------------------------------------------------------
+ * 		I. FREQUENTLY ASKED QUESTIONS - FAQ
+ * --------------------------------------------------------------------------*/
+
+
+/* --------------------------------------------------------------------------
+ * 		A. IMAP Responses to client
+ * --------------------------------------------------------------------------*/
+
+/****************************************************************************
+
+  A client application using HTIMAP and WWW/HTCore issues requests using 
+  the APIs in CInclude/WWW/HTCore/htreq.goh.  The responses from IMAP are
+  returned to client by the client response parser registered via API
+  HTRequestSetResponseParser(). The client response parser will be called via
+  MSG_HT_STREAM_PUT_BLOCK to receive the responses. The following are the 
+  data structures of the responses. The specific type fo each response 
+  depends on the request, hence the client parse must cast the parameters
+  in MSG_HT_STREAM_PUT_BLOCK accordingly.
+
+ ****************************************************************************/
+
+/*
+ * IMAP message encoding type.
+ */
+typedef enum {
+    IE_UNKNOWN = -1,          /* Unknown, must be -1 */
+    IE_NOTSET = 0,            /* Default value, must be 0 */
+    IE_7BIT,
+    IE_8BIT,
+    IE_BINARY,
+    IE_BASE64,
+    IE_QUOTED_PRINTABLE,
+} HTIMAPEncoding;
+
+
+/*
+ * IMAP message flags. Each is bitwise exclusive.
+ */
+typedef enum {
+    IF_SEEN          = 0x1,
+    IF_DELETED       = 0x2
+} HTIMAPFlags;
+
+/*
+ * Type addresses; To:, Cc:, or Bcc:.
+ */
+typedef enum {
+    IMAPAR_TO,
+    IMAPAR_CC,
+    IMAPAR_BCC,
+    IMAPAR_FROM,                        /* Not used */
+    IMAPAR_SENDER,                      /* Not used */
+    IMAPAR_REPLY_TO                     /* Not used */
+} HTIMAPAddressRole;
+
+
+/*
+ * Recipient of a message.
+ */
+typedef struct {
+    HTMemHandle        IR_name;              /* "Joe Smith" */
+    HTMemHandle        IR_address;           /* jsmith@small.com */
+    HTIMAPAddressRole  IR_role;              /* Only IMAPAR_TO, IMAPAR_CC,
+						and IMAPAR_BCC */
+} HTIMAPRecipient;
+
+
+/****************************************************************************
+ *       RESPONSES from IMAP to client via MSG_HT_STREAM_PUT_BLOCK to the
+ *       client stream registered using HTRequestSetResponseParser(); see 
+ *       CInclude/WWW/HTCore/htreq.goh for this API. Note that these reponses
+ *       are sent only on success; which is followed by sending HT_LOADED to
+ *       your "after" callback.
+ ****************************************************************************/
+
+/* 
+ * Response to "imap://server/;logon" request.
+ */
+typedef struct {
+    HTMemHandle    ILR_uidValidity;
+} HTIMAPLogonResp;
+
+/*
+ * Response to "imap://server/;attach" request.
+ */
+typedef struct {
+    HTMemHandle    IAR_partNumber;     /* e.g., 1, 2.1.2 */
+    dword          IAR_size;
+    HTMemHandle    IAR_name;
+    HTMemHandle    IAR_contentType;    /* e.g., "APPLICATION/OCTET-STREAM" */
+    HTMemHandle    IAR_charset;        /* e.g., "iso-8859-1" */
+    HTIMAPEncoding IAR_encoding;       /* Content transfer encoding */
+} HTIMAPAttachResp;
+
+/*
+ * Response to "imap://server/;pattach" request. Note: the data items
+ * shared with HTIMAPAttachResp must be in the same order.
+ */
+typedef struct {
+    HTMemHandle    IAR_partNumber;
+    dword          IAR_size;
+    HTMemHandle    IAR_name;
+    HTMemHandle    IAR_contentType;  /* e.g., "TEXT/PLAIN" */
+    HTMemHandle    IAR_charset;
+    HTIMAPEncoding IAR_encoding;
+
+    /* Extra data items to HTIMAPAttachResp */
+    dword          IAR_start;
+    dword          IAR_length;
+} HTIMAPPAttachResp;
+
+/*
+ * Response to "imap://server/;list" request. If there is a main message
+ * body, it is normally attachment 1 in ILR_attachmentList.
+ */
+typedef struct {
+    dword         ILR_totalSize;           /* RFC822.SIZE */
+    HTMemHandle   ILR_senderName;          /* "Joe Smith" */
+    HTMemHandle   ILR_senderEmail;         /* jsmith@small.com */
+    HTMemHandle   ILR_subject;
+    HTListHandle  ILR_attachmentList;      /* List of HTIMAPAttachResp */
+    HTMemHandle   ILR_date;
+    HTMemHandle   ILR_uid;
+    HTIMAPFlags   ILR_flags;
+} HTIMAPListResp;
+
+/*
+ * Response to "imap://server/;body" request.
+ */
+typedef struct {
+    HTMemHandle  IBR_partNumber;
+    HTListHandle IBR_recipientList;        /* List of HTIMAPRecipient */
+    HTMemHandle  IBR_subject;
+    HTMemHandle  IBR_date;
+} HTIMAPBodyResp;
+
+/*
+ * Response to "imap://server/;pbody" request. Note: the data items
+ * shared with HTIMAPBodyResp must be in the same order.
+ */
+typedef struct {
+    HTMemHandle  IBR_partNumber;
+    HTListHandle IBR_recipientList;
+    HTMemHandle  IBR_subject;
+    HTMemHandle  IBR_date;
+
+    /* Extra data items to HTIMAPPBodyResp */
+    dword        IBR_start;
+    dword        IBR_length;
+} HTIMAPPBodyResp;
+
+/*
+ * Response to "imap://server/;logout" and "imap://server/;delete" requests
+ * is MSG_HT_STREAM_PUT_BLOCK(0, 0) on success.
+ */
+
+
+
+/* --------------------------------------------------------------------------
+ * 		B. HTIMAP CLASS
+ * --------------------------------------------------------------------------*/
+
+/****************************************************************************
+
+  The HTIMAPClass is inherited from HTProtocolClass defined in htstream.goh.
+  It is implmented as a protocol loaded and run by Library/WWW/HTCore.
+
+  We intercept all the methods in the class to implement the protocol. The most
+  important method is MSG_HT_PROTOCOL_LOAD. The method is implemented in a
+  finite-state machine manner, i.e., HTIMAP keeps track of its execution state
+  so that it knows where to resume execution when it is scheduled to run 
+  again. Scheduling a protocol is done in the Net Manager, see API 
+  HTNetNewClient in file htnet.goh{goc}.
+
+  All intercepted methods must return codes defined in WWW/CInclude/htreq.goh.
+
+ ****************************************************************************/
+
+/* --------------------------------------------------------------------------
+ * 		C. REFERENCES
+ * --------------------------------------------------------------------------*/
+
+/****************************************************************************
+  
+ The IMAP protocol is implemented from:
+ 
+              RFC2060 INTERNET MESSAGE ACCESS PROTOCOL - 4rev1
+
+ ****************************************************************************/
+
+
+@class HTIMAPClass, HTProtocolClass;
+
+/* --------------------------------------------------------------------------
+ * 		Instance Data.
+ * --------------------------------------------------------------------------*/
+
+/*
+ * Protocol current and next states. These decide the execution of the FSM.
+ */
+@instance word HTIMAPI_currentState;
+@instance word HTIMAPI_nextState;
+
+/*
+ * URL parameters for negotiating with server.
+ */
+@instance HTMemHandle HTIMAPI_params;
+
+/*
+ * parser.
+ */
+@instance HTMemHandle HTIMAPI_parser;
+
+@endc
+
+@endlib
+
+@endif  /* __HT_IMAP_GOH__ */
+
+
+

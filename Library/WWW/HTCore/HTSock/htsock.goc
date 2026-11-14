@@ -1,0 +1,1339 @@
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Geoworks 1996 -- All Rights Reserved
+
+PROJECT:	Geos WWW Library
+MODULE:		Socket
+FILE:		htsock.goc
+
+AUTHOR:		Kok Kin Kee, Jun 15, 1996
+
+ROUTINES:
+	Name			Description
+	----			-----------
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	kkee	6/15/96   	Initial version.
+
+DESCRIPTION:
+	The Socket class.
+
+	$Id: htsock.goc,v 1.38.1.6 97/11/18 15:39:00 kkee Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+@include <stdapp.goh>
+#include <sem.h>
+#include <sockmisc.h>
+@include <timer.h>
+@include <WWW/HTCore/htsock.goh>
+@include <WWW/HTCore/htnet.goh>
+#include <Ansi/stdio.h>
+#include <Ansi/string.h>
+#include <WWW/htmem.h>
+@include <WWW/HTCore/htreqMan.goh>
+@include <WWW/HTCore/hturi.goh>
+@include <WWW/HTCore/htobj.goh>
+@include <WWW/HTCore/htutils.goh>
+@include "htfatals.goh"
+@include "HTNet/htnetMan.goh"
+
+/* --------------------------------------------------------------------------
+ * 		PRIVATE DATA
+ * --------------------------------------------------------------------------*/
+
+char tcpDomain[] = "TCPIP";
+static Boolean wwwMediumIsUp = FALSE;      /* wwwMedium is up and running */
+static MediumAndUnit wwwMedium;
+static Boolean shutdown = FALSE;           /* HTShutDown and HTActivate */
+static SemaphoreHandle htSockSem = NULL;   /* Protects wwwMediumIsUp */
+
+/* SSL stuff */
+#ifdef SSL_ENABLE
+static SSL_CTX *ssl_ctx;
+#endif
+
+#define HTSOCKET_PROGRESS_REPORT_SIZE 512  /* Report progress every 
+											  >= 512 bytes */
+
+#ifdef __LOG_INPUT_HTSOCK__
+FileHandle htSocketInputLogFile = 0;
+#endif
+
+#ifdef __LOG_OUTPUT_HTSOCK__
+FileHandle htSocketOutputLogFile = 0;
+#endif
+
+
+/***********************************************************************
+ *		HTSocketSetOpen
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Indicate that physical link is open (connected)
+ * CALLED BY:	Socket callback in HTNet.
+ * RETURN:	Nothing
+ *	
+ * STRATEGY:	
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	kkee    	11/15/97   	Initial Revision
+ *	
+ ***********************************************************************/
+void _far _pascal
+HTSocketSetOpen (void)
+{
+    wwwMediumIsUp = TRUE;
+}	/* End of HTSocketSetOpen.	*/
+
+
+
+
+/***********************************************************************
+ *		HTSocketOpen
+ ***********************************************************************
+ *
+ * SYNOPSIS:	If link not already up, bring it up.
+ * CALLED BY:	Prior to calling socket resolve and socket connect.
+ * RETURN:	TRUE if link is up else FALSE.
+ *	
+ * STRATEGY:	
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	kkee    	8/28/97   	Initial Revision
+ *	
+ ***********************************************************************/
+static Boolean _pascal
+HTSocketOpen (word accPnt)
+{
+    Boolean ret;
+    struct Caveat {
+	/* Used to force the order of the following two items */
+        SocketAddress sa;
+	TcpAccPntResolvedAddress xa; /* Must follow SocketAddress */
+    };
+    struct Caveat ca;
+
+    PUSHDS;
+    SET_DS_LIB_DGROUP;
+
+    ca.sa.SA_port.SP_port = 80;
+    ca.sa.SA_port.SP_manuf =  MANUFACTURER_ID_SOCKET_16BIT_PORT;
+    ca.sa.SA_domainSize = sizeof(tcpDomain)-1;
+    ca.sa.SA_domain = tcpDomain;
+    ca.sa.SA_addressSize = sizeof(TcpAccPntResolvedAddress);
+
+    ca.xa.TAPRA_linkSize = 3;
+    ca.xa.TAPRA_linkType = LT_ID;
+    ca.xa.TAPRA_accPntID = accPnt;
+
+    if (!wwwMediumIsUp && 
+	(SocketOpenDomainMedium(&(ca.sa), 3600)==SE_NORMAL)) {
+	SocketGetAddressMedium(&(ca.sa), &wwwMedium);
+	wwwMediumIsUp = TRUE;
+    }
+    ret=wwwMediumIsUp;
+
+    POPDS;
+    return ret;
+}	/* End of HTSocketOpen.	*/
+
+
+/***********************************************************************
+ *		HTSockLibraryEntry
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Initialization.
+ * CALLED BY:	HTCoreLibraryEntry
+ * RETURN:	0, required by Kernel.
+ *	
+ * STRATEGY:	
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	kkee    	4/10/97   	Initial Revision
+ *	
+ ***********************************************************************/
+int _far _pascal
+HTSockLibraryEntry (LibraryCallType ty, GeodeHandle client)
+{
+    if (ty == LCT_ATTACH) {
+	PUSHDS;
+	SET_DS_LIB_DGROUP;
+	htSockSem = ThreadAllocSem(1);
+	HandleModifyOwner(htSockSem, GeodeGetCodeProcessHandle());
+	/* SSL stuff */
+#ifdef SSL_ENABLE
+	SSLeay_add_ssl_algorithms();
+	ssl_ctx = SSL_CTX_new(SSLv2_client_method());
+#endif
+	POPDS;
+
+    } else if (ty == LCT_DETACH) {
+	PUSHDS;
+	SET_DS_LIB_DGROUP;
+	ThreadFreeSem(htSockSem);
+	htSockSem = 0;
+	/* SSL stuff */
+#ifdef SSL_ENABLE
+	SSL_CTX_free(ssl_ctx);
+#endif
+	POPDS;
+    }
+
+    return 0;
+}	/* End of HTSockLibraryEntry.	*/
+
+
+
+
+/***********************************************************************
+ *		HTSOCKETCREATE
+ ***********************************************************************
+ * SYNOPSIS:	Creates an HTSocket.
+ * CALLED BY:   Client.	
+ * RETURN:	HTSocketHandle, NullHandle if not created.
+ * SIDE EFFECTS:Nothing
+ *	
+ * STRATEGY:    Uses Geos socket Library.
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	kkee	6/11/96   	Initial Revision
+ *
+ ***********************************************************************/
+#ifdef SSL_ENABLE
+HTSocketHandle _far _pascal
+HTSOCKETCREATE (HTNetThread *net, Boolean secure)
+#else
+HTSocketHandle _far _pascal
+HTSOCKETCREATE (HTNetThread *net)
+#endif
+{
+    HTSocket *sptr;
+    HTSocketHandle socket;
+
+    socket = MemAlloc(sizeof(HTSocket), HF_SHARABLE | HF_SWAPABLE,
+		      HAF_ZERO_INIT | HAF_LOCK);
+
+    if (!socket) return NullHandle;
+
+    sptr = (HTSocket *) MemDeref(socket);
+
+    /* 
+     * Allocate a Geos socket.
+     */
+    if ((sptr->HTS_sockfd = SocketCreate(SDT_STREAM)) == 0) {
+	MemFree(socket);
+	return NullHandle;
+    }
+
+    /*
+     * SSL stuff
+     */
+#ifdef SSL_ENABLE
+    if (secure) {
+	PUSHDS;
+	SET_DS_LIB_DGROUP;
+	if ((ssl_ctx == 0) || ((sptr->HTS_con = SSL_new(ssl_ctx)) == 0)) {
+	    MemFree(socket);
+	    POPDS;
+	    return NullHandle;
+	}
+	POPDS;
+	/* we can do this here or right after connect */
+	if (!SSL_set_fd(sptr->HTS_con, sptr->HTS_sockfd)) {
+	    SSL_free(sptr->HTS_con);
+	    MemFree(socket);
+	    return NullHandle;
+	}
+    } else {
+	sptr->HTS_con = 0;
+    }
+#endif
+
+    /* 
+     * Other default values for Geos socket specific info.
+     */
+    sptr->HTS_sockAddress.SA_port.SP_manuf = MANUFACTURER_ID_SOCKET_16BIT_PORT;
+    PUSHDS;
+    SET_DS_LIB_DGROUP;
+    sptr->HTS_sockAddress.SA_domainSize = sizeof(tcpDomain) - 1;
+    sptr->HTS_sockAddress.SA_domain = tcpDomain;
+    POPDS;
+
+    sptr->HTS_tcpAddress.HA_linkAddress.HTLA_size = 3;
+    sptr->HTS_tcpAddress.HA_linkAddress.HTLA_type = LT_ID;
+
+    sptr->HTS_state = HT_OK;
+
+	sptr->HTS_progressSize = HTSOCKET_PROGRESS_REPORT_SIZE;
+
+    sptr->HTS_net = net;
+    MemUnlock(socket);
+
+    return socket;
+}	/* End of HTSOCKETCREATE.	*/
+
+
+/***********************************************************************
+ *		HTSOCKETDELETE
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Close and delete a HTSocket.
+ * CALLED BY:	
+ * RETURN:	Nothing
+ *	
+ * STRATEGY:	"Fast" socket close sequence recommended by Eric Weber.
+ *                  SocketCloseSend
+ *                  SocketReset
+ *                  SocketClose
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	kkee    	3/27/97   	Initial Revision
+ *	
+ ***********************************************************************/
+void _far _pascal
+HTSOCKETDELETE (HTSocketHandle htsock)
+{
+    HTSocket *sptr;
+
+EC( ECCheckHTSocket(htsock);                                            )
+
+    sptr = (HTSocket *) MemLock(htsock);
+    /*
+     * SSL stuff
+     */
+#ifdef SSL_ENABLE
+    if (sptr->HTS_con) {
+	SSL_shutdown(sptr->HTS_con);
+	SSL_free(sptr->HTS_con);
+    }
+#endif
+    if (sptr->HTS_sockfd) {
+	SocketCloseSend(sptr->HTS_sockfd);
+	SocketReset(sptr->HTS_sockfd);
+	SocketClose(sptr->HTS_sockfd);
+    }
+    MemFree(htsock);
+}	/* End of HTSOCKETDELETE.	*/
+
+
+/***********************************************************************
+ *		HTSOCKETCLOSE
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Close a HTSocket, but does not delete it.
+ * CALLED BY:	Client
+ * RETURN:	Nothing
+ *	
+ * STRATEGY:	
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	kkee    	10/17/97   	Initial Revision
+ *	
+ ***********************************************************************/
+void _far _pascal
+HTSOCKETCLOSE (HTSocketHandle htsock)
+{
+    HTSocket *sptr;
+
+EC( ECCheckHTSocket(htsock);                                            )
+
+    sptr = (HTSocket *) MemLock(htsock);
+    /*
+     * SSL stuff
+     */
+#ifdef SSL_ENABLE
+    if (sptr->HTS_con) {
+	SSL_shutdown(sptr->HTS_con);
+    }
+#endif
+    if (sptr->HTS_sockfd) {
+	SocketCloseSend(sptr->HTS_sockfd);
+	SocketReset(sptr->HTS_sockfd);
+	SocketClose(sptr->HTS_sockfd);
+	/*
+	 * The only way for Geos socket to reuse a socket is 
+	 * delete it in SocketClose and recreate a new one.
+	 */
+	sptr->HTS_sockfd = SocketCreate(SDT_STREAM);
+    }
+    MemUnlock(htsock);
+}	/* End of HTSOCKETCLOSE.	*/
+
+
+
+
+/***********************************************************************
+ *		HTSocketResolveAndConnect
+ ***********************************************************************
+ * SYNOPSIS:	Resolve and connect.
+ * CALLED BY:   
+ * RETURN:	HT_OK or HT_NO.
+ * SIDE EFFECTS:
+ * STRATEGY:    
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	kkee	8/ 6/96   	Initial Revision
+ *
+ ***********************************************************************/
+int _far _pascal
+HTSOCKETRESOLVEANDCONNECT (HTSocketHandle socket, HTSocketAddress *htAddress)
+{
+    int ret;
+    HTSocket *sptr;
+
+EC( ECCheckMemHandle(socket);                                           )
+
+    sptr = (HTSocket *) MemLock(socket); 
+
+    /* Copy the HTSocketAddress */
+    strcpy(sptr->HTS_tcpAddress.HA_ipAddress, htAddress->HTSA_ipAddress);
+    sptr->HTS_sockAddress.SA_port.SP_port = htAddress->HTSA_port;
+    /*
+     * SSL stuff
+     */
+#ifdef SSL_ENABLE
+    if ((sptr->HTS_con) && (htAddress->HTSA_port == 80)) {
+	sptr->HTS_sockAddress.SA_port.SP_port = 443;
+    }
+#endif
+    sptr->HTS_tcpAddress.HA_linkAddress.HTLA_id = htAddress->HTSA_accessPoint;
+
+    if ((ret=HTSocketResolve(sptr)) == HT_OK) 
+	ret = HTSocketConnect(sptr);
+
+    MemUnlock(socket);
+    
+    return ret;
+}	/* End of HTSOCKETRESOLVEANDCONNECT.	*/
+
+
+
+
+/***********************************************************************
+ *		HTSOCKETRESOLVE
+ ***********************************************************************
+ * SYNOPSIS:	Blocking resolve.
+ * CALLED BY:   
+ * RETURN:	HT_OK if ok, else HT_NO.
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	kkee	8/ 6/96   	Initial Revision
+ *
+ ***********************************************************************/
+int _far _pascal
+HTSOCKETRESOLVE (HTSocket *sptr)
+{
+    int ret = HT_OK;
+    HTRequest *req = (HTRequest *) MemThreadGrab(sptr->HTS_net->HTNT_request);
+
+    if (req->HTR_resolvedLength) {
+	sptr->HTS_sockAddress.SA_addressSize = req->HTR_resolvedLength;
+	memcpy(sptr->HTS_resolvedAddress, req->HTR_resolvedAddress,
+	       req->HTR_resolvedLength);
+    } else {
+	/* Should have been resolved by HTNet in HTSocketFastResolve */
+	EC_ERROR(BUFFER_CANNOT_BE_ZERO_SIZE);
+	sptr->HTS_state = HT_CANNOT_RESOLVE_HOST_NAME;
+    }
+    MemThreadRelease(sptr->HTS_net->HTNT_request);
+
+    return ret;
+}	/* End of HTSOCKETRESOLVE.	*/
+
+
+/***********************************************************************
+ *		HTSOCKETFASTRESOLVE
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Simple resolve without all these idiosynchracies of 
+ *              Geos socket.
+ * CALLED BY:	Client
+ * RETURN:	HT_OK if resolved. 
+ *              HT_LINK_FAILED if cannot allocate link.
+ *              HT_CANNOT_RESOLVE_HOST_NAME if cannot resolve.
+ *              Or return code from client request callback.
+ *	
+ * STRATEGY:	Uses req->HTR_request, req->HTR_resolvedAddress, 
+ *              and req->HTR_resolvedLength, req->HTR_accessPoint.
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	kkee    	5/21/97   	Initial Revision
+ *	
+ ***********************************************************************/
+int _far _pascal
+HTSOCKETFASTRESOLVE (HTRequest *req, byte *ip)
+{
+    int size, ret = HT_OK;
+    struct SimpleSocket {
+	HTLinkAddress link;
+	char          ip[MAX_IP_ADDR_STRING_LENGTH];
+    };
+
+    struct SimpleSocket mySocket;
+    mySocket.link.HTLA_size=3;
+    mySocket.link.HTLA_type=LT_ID;
+    mySocket.link.HTLA_id=req->HTR_accessPoint;
+    strncpy(mySocket.ip, (char *)ip, MAX_IP_ADDR_STRING_LENGTH);
+    
+    ret = HTNetReportProgress(req->HTR_requestHandle, HT_RESOLVING_HOST);
+    if (ret != HT_OK) {
+	return ret;
+    }
+
+    PUSHDS;
+    SET_DS_LIB_DGROUP;
+    ThreadPSem(htSockSem);
+    if (HTSocketOpen(req->HTR_accessPoint)) {
+	req->HTR_resolvedLength = 
+	    SocketResolve(tcpDomain, (byte *)&mySocket, 
+			  sizeof(HTLinkAddress)+strlen((char *)ip),
+			  req->HTR_resolvedAddress, 
+			  MAX_RESOLVED_ADDRESS_LENGTH);
+	if (!req->HTR_resolvedLength) {
+	    ret = HT_CANNOT_RESOLVE_HOST_NAME;
+	}
+    } else {
+	ret = HT_LINK_FAILED;
+    }
+    ThreadVSem(htSockSem);
+    POPDS;
+
+    return ret;
+}	/* End of HTSOCKETFASTRESOLVE.	*/
+
+
+
+/***********************************************************************
+ *		HTSOCKETCONNECT
+ ***********************************************************************
+ * SYNOPSIS:	Blocking connect. Possible HTSocket states after this
+ *              call: HT_CONNECTING_TO_SERVER, HT_OK, HT_LINK_FAILED, 
+ *              HT_INTERRUPTED, HT_CANNOT_CONNECT, or non-HT_OK return 
+ *              code from client in request callback.
+ * CALLED BY:	HTSocketResolveAndConnect.
+ * RETURN:	HT_OK if ok, else HT_NO.
+ * SIDE EFFECTS:Update socket state in HTSocketInfo.HTSI_state.
+ *
+ * STRATEGY:   
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	kkee	6/11/96   	Initial Revision
+ *
+ ***********************************************************************/
+int _far _pascal
+HTSOCKETCONNECT (HTSocket *sptr)
+{
+    byte errorCode;  /* why can't SocketError errorCode work?? */
+    int ret = HT_OK;
+    
+    PUSHDS;
+    SET_DS_LIB_DGROUP;
+    if (shutdown) {
+	sptr->HTS_state = HT_SHUT_DOWN;
+	ret = HT_NO;
+    } else if (sptr->HTS_net->HTNT_sharedCmd != HT_OK) {
+	sptr->HTS_state = sptr->HTS_net->HTNT_sharedCmd;
+	ret = HT_NO;
+    }
+    POPDS;
+    if (ret != HT_OK) return HT_NO;
+
+    ret = HTNetReportProgress(sptr->HTS_net->HTNT_request,
+			      HT_CONNECTING_TO_SERVER);
+    if (ret != HT_OK) {
+	sptr->HTS_state = ret;
+	return HT_NO;
+    }
+		
+    sptr->HTS_state = HT_CONNECTING_TO_SERVER;
+
+    errorCode = SocketConnect(sptr->HTS_sockfd, 
+			      (SocketAddress *)&(sptr->HTS_sockAddress),
+			      SOCKET_NO_TIMEOUT);
+
+    /*
+     * SSL stuff
+     */
+#ifdef SSL_ENABLE
+    if ((errorCode == SE_NORMAL) && (sptr->HTS_con)) {
+	if (SSL_connect(sptr->HTS_con) <=0) {
+	    errorCode = SE_CONNECTION_ERROR;
+	}
+    }
+#endif
+
+    PUSHDS;
+    SET_DS_LIB_DGROUP;
+    if (shutdown) {
+	sptr->HTS_state = HT_SHUT_DOWN;
+	ret = HT_NO;
+    } else if (sptr->HTS_net->HTNT_sharedCmd != HT_OK) {
+	sptr->HTS_state = sptr->HTS_net->HTNT_sharedCmd;
+	ret = HT_NO;
+    }
+    POPDS;
+    if (ret != HT_OK) return HT_NO;
+
+    if (sptr->HTS_state == HT_INTERRUPTED) {
+	ret = HT_NO;
+	
+    } else if ((errorCode == SE_NORMAL) || (errorCode == SE_SOCKET_IN_USE)) {
+	/* 
+	 * If we get SE_SOCKET_IN_USE, it means we are attempting to 
+	 * connect an already connected socket. This is possible since 
+	 * we may reuse HTSockets. 
+	 */
+	ret = HTNetReportProgress(sptr->HTS_net->HTNT_request, 
+				  HT_CONNECTED);
+	if (ret != HT_OK) {
+	    sptr->HTS_state = ret;
+	    ret = HT_NO;
+	} else {
+	    sptr->HTS_state = HT_OK;
+	    ret = HT_OK;
+	}
+
+    } else if ((errorCode == SE_LINK_FAILED) ||
+	       (errorCode == SE_CONNECTION_RESET)) {
+	/*
+	 * LINK_FAILED indicates for some reason that we are not able
+	 * use Geos socket; e.g., hardware not setup right, "ini" not
+	 * correct.
+	 * CONNECTION_RESET indicates that the server is refusing to 
+	 * connect to us or we lack authentication. The authentication 
+	 * here is not the same as HTTP authentcation.
+	 */
+        sptr->HTS_state = HT_LINK_FAILED;	
+	ret = HT_NO;
+
+    } else if (errorCode == SE_INTERRUPT) {
+	sptr->HTS_state = HT_INTERRUPTED;
+	ret = HT_NO;
+
+    } else {
+	sptr->HTS_state = HT_CANNOT_CONNECT;
+	ret = HT_NO;
+    }
+
+    return ret;
+}	/* End of HTSOCKETCONNECT.	*/
+
+
+
+/***********************************************************************
+ *		HTSOCKETISCONNECTED
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Test that a htsocket is still connected.
+ * CALLED BY:	Client
+ * RETURN:	HT_OK if connected, else HT_NO.
+ *	
+ * STRATEGY:	We take a peek at the socket and test the return 
+ *              error code.
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	kkee    	10/17/97   	Initial Revision
+ *	
+ ***********************************************************************/
+int _far _pascal
+HTSOCKETISCONNECTED (HTSocketHandle htsock)
+{
+    int ret;
+    HTSocket *sptr;
+
+    sptr = (HTSocket *) MemLock(htsock);
+    if (!SocketRecv(sptr->HTS_sockfd, 
+		    sptr->HTS_buffer,
+		    1,      /* Just need one byte */
+		    1,      /* Make it a very shortime out */
+		    SRF_PEEK,
+		    (SocketAddress *)0) &&
+	(ThreadGetError() != SE_NORMAL)) {
+	    ret = HT_NO;
+    } else {
+	ret = HT_OK; /* Still connected */
+    }
+    MemUnlock(htsock);
+
+    return ret;
+}	/* End of HTSOCKETISCONNECTED.	*/
+
+
+
+
+/***********************************************************************
+ *		HTSOCKETRECV
+ ***********************************************************************
+ * SYNOPSIS:	Read data into buffer. Possible HTSocket states after
+ *              this call: HT_CONNECTION_CLOSED, HT_OK, HT_INTERRUPTED,
+ *              HT_SOCKET_ERROR, HT_LOADED.
+ * CALLED BY:	
+ * RETURN:	number of bytes read
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:    We can't use SOCKET_NO_TIMEOUT as we do not want the
+ *              client to wait. The client can always try reading again.
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	kkee	8/ 6/96   	Initial Revision
+ *
+ ***********************************************************************/
+word _far _pascal
+HTSOCKETRECV (HTSocketHandle htsock, int timeOut)
+{
+    word ret;
+    int state = HT_OK;
+    SocketError errorCode = SE_NORMAL;
+    HTSocket *sptr;
+    HTRequest *rptr;
+    HTRequestHandle request;
+#ifdef SSL_ENABLE
+    int sslRet;
+#endif
+
+EC( ECCheckHTSocket(htsock);                                            )
+
+    sptr = (HTSocket *) MemLock(htsock);
+
+    PUSHDS;
+    SET_DS_LIB_DGROUP;
+    if (shutdown) {
+	sptr->HTS_state = HT_SHUT_DOWN;
+	state = HT_NO;
+    } else if (sptr->HTS_net->HTNT_sharedCmd != HT_OK) {
+	sptr->HTS_state = sptr->HTS_net->HTNT_sharedCmd;
+	state = HT_NO;
+    }
+    POPDS;
+    if (state != HT_OK) {
+	MemUnlock(htsock);
+	return 0;
+    }
+
+    /*
+     * SSL stuff
+     */
+#ifdef SSL_ENABLE
+    if (sptr->HTS_con) {
+	sslRet = SSL_read(sptr->HTS_con,
+				    (char *)sptr->HTS_buffer,
+				    HTSOCKET_BUFFER_SIZE);
+	if ((sslRet < 0) && (ThreadGetError() == SE_CONNECTION_CLOSED)) {
+	    sptr->HTS_length = 0;
+	} else if (sslRet < 0) {
+	    ThreadSetError(SE_OUT_OF_MEMORY);
+	    sptr->HTS_length = 0;
+	} else {
+	    sptr->HTS_length = sslRet;
+	}
+    } else {
+#endif
+	sptr->HTS_length  =  SocketRecv(sptr->HTS_sockfd, 
+				    sptr->HTS_buffer,
+				    HTSOCKET_BUFFER_SIZE,
+				    timeOut,
+				    0, 
+				    (SocketAddress *)0);
+#ifdef SSL_ENABLE
+    }
+#endif
+    /* Null-terminate the buffer to be safe */
+    *(sptr->HTS_buffer + sptr->HTS_length) = 0;
+
+    /* Accounting of number of pushed to client */
+    rptr = (HTRequest*) MemThreadGrab(sptr->HTS_net->HTNT_request);
+    rptr->HTR_bytesPushed += sptr->HTS_length;
+    request = rptr->HTR_requestHandle;
+    MemThreadRelease(sptr->HTS_net->HTNT_request);
+
+    PUSHDS;
+    SET_DS_LIB_DGROUP;
+
+    #ifdef __LOG_INPUT_HTSOCK__
+    if (htSocketInputLogFile && sptr->HTS_length)
+	FileWrite(htSocketInputLogFile, sptr->HTS_buffer, 
+		  sptr->HTS_length, FALSE);
+    #endif
+
+    if (shutdown) {
+	sptr->HTS_state = HT_SHUT_DOWN;
+	state = HT_NO;
+    } else if (sptr->HTS_net->HTNT_sharedCmd != HT_OK) {
+	sptr->HTS_state = sptr->HTS_net->HTNT_sharedCmd;
+	state = HT_NO;
+    }
+    POPDS;
+    if (state == HT_SHUT_DOWN) {
+	MemUnlock(htsock);
+	return 0;
+    }
+
+    ret = sptr->HTS_length;
+
+    if (sptr->HTS_state == HT_INTERRUPTED) {
+	ret = 0;
+	sptr->HTS_length = 0;
+
+    } else if (ret > 0) {
+	/* Data read. Ok */
+	sptr->HTS_state = HT_OK;
+
+    } else if (((errorCode=ThreadGetError()) == SE_CONNECTION_CLOSED)
+	       || (errorCode == SE_CONNECTION_RESET)) {
+	rptr = (HTRequest*) MemThreadGrab(sptr->HTS_net->HTNT_request);
+	if (!rptr->HTR_bytesPushed) {
+	    /* Haven't got any data at all! */
+	    sptr->HTS_state = HT_CONNECTION_CLOSED;
+	} else {
+	    dword len = HTAnchorContentLength(rptr->HTR_anchor);
+	    if (rptr->HTR_bytesRead && rptr->HTR_bytesRead >= len) {
+		sptr->HTS_state = HT_LOADED;
+	    } else {
+		sptr->HTS_state = HT_CONNECTION_CLOSED;
+	    }
+	}
+	MemThreadRelease(sptr->HTS_net->HTNT_request);
+	/* If persistent, set it to none persistent */
+	HTNetSetPersistent(sptr->HTS_net, FALSE);
+ 
+    } else if ((errorCode == SE_NORMAL) || (errorCode == SE_TIMED_OUT)) {
+	/* 
+	 * No data, but HTSI_state is still connected.
+	 * Client should read later.
+	 */
+	sptr->HTS_state = HT_OK;
+
+    } else if (errorCode == SE_INTERRUPT) {
+	sptr->HTS_state = HT_INTERRUPTED;
+
+    } else if (errorCode != SE_NORMAL)
+	sptr->HTS_state = HT_SOCKET_ERROR;
+
+	/* Make a progress report */
+	if (ret && sptr->HTS_state == HT_OK) {
+		sptr->HTS_state = HTNetReportProgress(request, HT_MORE_DATA);
+		if (sptr->HTS_state != HT_OK) 
+			ret = 0;
+	}
+
+    MemUnlock(htsock);
+
+    return ret;
+}	/* End of HTSOCKETRECV.	*/
+
+
+
+/***********************************************************************
+ *		HTSOCKETSEND
+ ***********************************************************************
+ * SYNOPSIS:	Send data in buffer. Possible states after this call:
+ *              HT_CONNECTION_CLOSED, HT_INTERRUPTED, HT_SOCKET_ERROR,
+ *              HT_OK.
+ * CALLED BY:	
+ * RETURN:	HTSocketState
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	kkee	8/10/96   	Initial Revision
+ *
+ ***********************************************************************/
+int _far _pascal
+HTSOCKETSEND (HTSocketHandle htsock, void *data, word length)
+{
+    SocketError status;
+    HTSocket *sptr;
+    HTRequestHandle request;
+    int ret = HT_OK;
+
+EC( ECCheckHTSocket(htsock);                                            )
+
+    sptr = (HTSocket *) MemLock(htsock);
+
+    PUSHDS;
+    SET_DS_LIB_DGROUP;
+    if (shutdown) {
+	sptr->HTS_state = HT_SHUT_DOWN;
+	ret = HT_SHUT_DOWN;
+    } else if (sptr->HTS_net->HTNT_sharedCmd != HT_OK) {
+	sptr->HTS_state = sptr->HTS_net->HTNT_sharedCmd;
+	ret = sptr->HTS_state;
+    }
+    POPDS;
+    if (ret != HT_OK) {
+	MemUnlock(htsock);
+	return ret;
+    }
+
+    /*
+     * SSL stuff
+     */
+#ifdef SSL_ENABLE
+    if (sptr->HTS_con) {
+	if (SSL_write(sptr->HTS_con, data, length) == length) {
+	    status = SE_NORMAL;
+	} else {
+	    /* typical SSL error */
+	    status = SE_OUT_OF_MEMORY;
+	}
+    } else {
+#endif
+	status = SocketSend(sptr->HTS_sockfd, data, length, 0, 
+			(SocketAddress *)0);
+#ifdef SSL_ENABLE
+    }
+#endif
+
+    PUSHDS;
+    SET_DS_LIB_DGROUP;
+
+    #ifdef __LOG_OUTPUT_HTSOCK__
+    if (htSocketOutputLogFile)
+	FileWrite(htSocketOutputLogFile, data, length, FALSE);
+    #endif
+
+    if (shutdown) {
+	sptr->HTS_state = HT_SHUT_DOWN;
+	ret = HT_SHUT_DOWN;
+    } else if (sptr->HTS_net->HTNT_sharedCmd != HT_OK) {
+	sptr->HTS_state = sptr->HTS_net->HTNT_sharedCmd;
+	ret = sptr->HTS_state;
+    }
+    POPDS;
+    if (ret != HT_OK) {
+	MemUnlock(htsock);
+	return ret;
+    }
+
+    if (sptr->HTS_state == HT_INTERRUPTED) {
+	ret = HT_INTERRUPTED;
+	
+    } else if (status == SE_CONNECTION_CLOSED) {
+	sptr->HTS_state = HT_CONNECTION_CLOSED;
+	ret = HT_CONNECTION_CLOSED;
+
+    } else if (status == SE_INTERRUPT) {
+	sptr->HTS_state = HT_INTERRUPTED;
+	ret = HT_INTERRUPTED;
+
+    } else if (status != SE_NORMAL)  {
+	sptr->HTS_state = HT_SOCKET_ERROR;
+	ret = HT_SOCKET_ERROR;
+
+    } else {
+	HTRequest *rptr;
+	sptr->HTS_state = HT_OK;
+
+	/* Accounting of number of bytes put to server */
+	rptr = (HTRequest*) MemThreadGrab(sptr->HTS_net->HTNT_request);
+	rptr->HTR_bytesPut += length;
+	request = rptr->HTR_requestHandle;
+	MemThreadRelease(sptr->HTS_net->HTNT_request);
+
+	/* Make a progress report */
+	sptr->HTS_progressSize = (length >= sptr->HTS_progressSize) ? 
+	    HTSOCKET_PROGRESS_REPORT_SIZE : (sptr->HTS_progressSize-length);
+	if (ret == HT_OK && 
+	    sptr->HTS_progressSize == HTSOCKET_PROGRESS_REPORT_SIZE)
+	    ret = HTNetReportProgress(request, HT_SENDING_MORE_DATA);
+    }
+
+    MemUnlock(htsock);
+
+    return ret;
+}	/* End of HTSOCKETSEND.	*/
+
+
+/***********************************************************************
+ *		HTSOCKETSTOP
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Stop a htsocket from whatever it is doing. This API 
+ *              should be called from a different thread.
+ * CALLED BY:	
+ * RETURN:	HT_OK or HT_NO.
+ *	
+ * STRATEGY:	We can't SocketClose here as it will crash someone 
+ *              currently using socket.
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	kkee    	3/27/97   	Initial Revision
+ *	
+ ***********************************************************************/
+int _far _pascal
+HTSOCKETSTOP (HTSocketHandle htsock)
+{
+    HTSocket *sptr;
+
+EC( ECCheckHTSocket(htsock);                                            )
+
+    sptr = (HTSocket *) MemLock(htsock);
+    SocketInterrupt(sptr->HTS_sockfd);
+    sptr->HTS_state = HT_INTERRUPTED;
+    MemUnlock(htsock);
+
+    return HT_OK;
+}	/* End of HTSOCKETSTOP.	*/
+
+
+
+
+/***********************************************************************
+ *		HTSOCKETSTATE
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Get the current state of a htsocket.
+ * CALLED BY:	
+ * RETURN:	int (HTSocketHandle htsock);
+ *                  HT_OK
+ *                     - previous operation on HTSocket was ok.
+ *                  HT_LOADED 
+ *                     - all data completely loaded.
+ *                  HT_CANNOT_RESOLVE_HOST_NAME
+ *                     - could not resolve host.
+ *                  HT_CONNECTING_TO_SERVER
+ *                     - in the midst of connecting to server.
+ *                  HT_CANNOT_CONNECT
+ *                     - could not connect to server.
+ *                  HT_CONNECTION_CLOSED
+ *                     - connection closed.
+ *                  HT_LINK_FAILED
+ *                     - low level link failed. Usually bad "ini" settings
+ *                       or some low level protocol not working. Reboot!
+ *                  HT_INTERRUPTED
+ *                     - socket was interrupted.
+ *                  HT_SOCKET_ERROR, HT_NO
+ *                     - other generic unrecoverable socket error.
+ *	
+ * STRATEGY:	
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	kkee    	3/27/97   	Initial Revision
+ *	
+ ***********************************************************************/
+int _far _pascal
+HTSOCKETSTATE (HTSocketHandle htsock)
+{
+    HTSocket *sptr;
+    int ret;
+
+EC( ECCheckHTSocket(htsock);                                           )
+
+    sptr = (HTSocket *) MemLock(htsock);
+    ret = sptr->HTS_state;
+    MemUnlock(htsock);
+    
+    return ret;
+}	/* End of HTSOCKETSTATE.	*/
+
+
+
+/***********************************************************************
+ *		HTSOCKETGETINFO
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Get socket information that uniquely identifies a 
+ *              socket connection.
+ * CALLED BY:	Client
+ * RETURN:	Modifies all passed in data.
+ *	
+ * STRATEGY:	
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	kkee    	5/22/97   	Initial Revision
+ *	
+ ***********************************************************************/
+void _far _pascal
+HTSOCKETGETINFO (HTSocketHandle htsock, word *port, byte *server,
+		 int *serverLen)
+{
+    HTSocket *sptr;
+EC( ECCheckHTSocket(htsock);                                            )
+
+    sptr = MemLock(htsock);
+    *port = sptr->HTS_sockAddress.SA_port.SP_port;
+    *serverLen = sptr->HTS_sockAddress.SA_addressSize;
+EC( if (*serverLen > MAX_RESOLVED_ADDRESS_LENGTH)                       )
+EC(     EC_ERROR(BUFFER_IS_NOT_BIG_ENOUGH);                             )
+    if (*serverLen < MAX_RESOLVED_ADDRESS_LENGTH)
+	memcpy(server, sptr->HTS_resolvedAddress, *serverLen);
+    MemUnlock(htsock);
+}	/* End of HTSOCKETGETINFO.	*/
+
+
+
+/***********************************************************************
+ *		HTSOCKETPUSH
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Push data to target.
+ * CALLED BY:	
+ * RETURN:	Return code from pushing data to target.
+ *	
+ * STRATEGY:	
+*	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	kkee    	3/27/97   	Initial Revision
+ *	
+ ***********************************************************************/
+int _far _pascal
+HTSOCKETPUSH (HTStreamHandle target, HTSocketHandle htsock)
+{
+    int ret;
+    HTSocket *sptr;
+
+EC( ECCheckHTSocket(htsock);                                            )
+EC( ECCheckStream(target);                                              )
+
+    sptr = (HTSocket *) MemLock(htsock);
+
+    ret = @call target::MSG_HT_STREAM_PUT_BLOCK(sptr->HTS_buffer, 
+						sptr->HTS_length);
+    MemUnlock(htsock);
+
+    return ret;
+}	/* End of HTSOCKETPUSH.	*/
+
+
+
+
+/***********************************************************************
+ *		HTSHUTDOWN
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Shut down all open connections. This is a rude way to end
+ *              all communication in the Web Library as this call affects
+ *              all Web Library clients. All other HTSocket APIs calls 
+ *              will return HT_SHUT_DOWN until HTActivate is called.
+ * CALLED BY:	GLOBAL
+ * RETURN:	Nothing
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:    Uses global variable wwwMedium which was initialized by
+ *              htsock.goc.
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	kkee	12/12/96   	Initial Revision
+ *
+ ***********************************************************************/
+void _far _pascal
+HTSHUTDOWN (void)
+{
+    PUSHDS;
+    SET_DS_LIB_DGROUP;
+    ThreadPSem(htSockSem);
+    if (wwwMediumIsUp) {
+	SocketCloseDomainMedium(tcpDomain, &wwwMedium, TRUE);
+	wwwMediumIsUp = FALSE;
+	shutdown = TRUE;
+    }
+    ThreadVSem(htSockSem);
+    HTNetKillAll(0, HT_SHUT_DOWN);
+    POPDS;
+}	/* End of HTSHUTDOWN.	*/
+
+
+/***********************************************************************
+ *		HTActivate
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Activate communication after HTShutDown. 
+ *              If not called after HTShutDown, all future HTSocketConnect,
+ *              HTSocketResolve, HTSocketSend, HTSocketRecv, and 
+ *              HTSocketPush will fail with state HT_SHUT_DOWN.
+ * CALLED BY:	GLOBAL
+ * RETURN:	Nothing
+ *	
+ * STRATEGY:	
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	kkee    	4/ 9/97   	Initial Revision
+ *	
+ ***********************************************************************/
+void _far _pascal
+HTActivate (void)
+{
+    PUSHDS;
+    SET_DS_LIB_DGROUP;
+    shutdown = FALSE;
+
+    #ifdef __LOG_OUTPUT_HTSOCK__
+    FilePushDir();
+    FileSetStandardPath(SP_DOCUMENT);
+    if (!htSocketOutputLogFile) {
+	htSocketOutputLogFile = FileCreate("htsock.out",
+					   FCF_NATIVE | FILE_CREATE_TRUNCATE |
+					   FILE_DENY_W | FILE_ACCESS_RW, 
+					   FILE_ATTR_NORMAL);
+    }
+    FilePopDir();
+    #endif
+
+    #ifdef __LOG_INPUT_HTSOCK__
+    FilePushDir();
+    FileSetStandardPath(SP_DOCUMENT);
+    if (!htSocketInputLogFile) {
+	htSocketInputLogFile = FileCreate("htsock.in",
+					  FCF_NATIVE | FILE_CREATE_TRUNCATE |
+					  FILE_DENY_W | FILE_ACCESS_RW, 
+					  FILE_ATTR_NORMAL);
+    }
+    FilePopDir();
+    #endif
+
+    POPDS;
+}	/* End of HTActivate.	*/
+
+
+
+/***********************************************************************
+ *		HTSTREAMSOCKETCREATE
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Create a HTStreamSocket.
+ * CALLED BY:	Client
+ * RETURN:	
+ *	
+ * STRATEGY:	
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	kkee    	3/27/97   	Initial Revision
+ *	
+ ***********************************************************************/
+HTStreamHandle _far _pascal
+HTSTREAMSOCKETCREATE (HTRequestHandle request)
+{
+
+    HTStreamHandle stream;
+
+EC( ECCheckRequest(request);                                            )
+    
+    PUSHDS;
+    SET_DS_LIB_DGROUP;
+    stream = HTObjInstantiateForThread(0, &HTSocketClass);
+    POPDS;
+
+    if (!stream) {
+	/* Log error */
+    } else {
+	/* Initialize the stream instance data */
+	@call stream::MSG_HT_STREAM_SET_REQUEST(request);
+    }
+
+    return stream;
+}	/* End of HTSTREAMSOCKETCREATE.	*/
+
+
+
+/***********************************************************************
+		Class Declaration
+***********************************************************************/
+
+@classdecl	HTSocketClass;
+
+
+/***********************************************************************
+ *		MSG_HTSOCKET_INITIALIZE for HTSocketClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    Initalize a stream socket with a HTSocket.
+ * PARAMETERS:	    void (HTSocketHandle htsock);
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:	    
+ *
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	kkee    	3/27/97   	Initial Revision
+ *	
+ ***********************************************************************/
+@method HTSocketClass, MSG_HTSOCKET_INITIALIZE
+{
+
+EC( ECCheckHTSocket(htsock);                                            )
+
+    @self->HTSI_socket = htsock;
+}	/* End of MSG_HTSOCKET_INITIALIZE.	*/
+
+
+
+
+/***********************************************************************
+ *		MSG_HT_STREAM_PUT_BLOCK for HTSocketClass
+ ***********************************************************************
+ * SYNOPSIS:	    Put a block of data down HTSocket.
+ * PARAMETERS:	    int (const byte *data, int len)
+ *                  pass data = data to put.
+ *                  pass len  = length of data in bytes.
+ *                  Possible return codes are the same as HTSocketState.
+
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:        
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	kkee	6/24/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method HTSocketClass, MSG_HT_STREAM_PUT_BLOCK
+{
+
+
+EC( if (!@self->HTSI_socket)                                            )
+EC(     EC_WARNING(HTSOCKET_NOT_INITIALIZED);                           )
+
+    if (!len || !data || !@self->HTSI_socket) return HT_OK;
+    return HTSocketSend(@self->HTSI_socket, data, len);
+}	/* End of MSG_HT_STREAM_PUT_BLOCK.	*/
+
+
+

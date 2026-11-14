@@ -1,0 +1,295 @@
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Geoworks 1996.  All rights reserved.
+	GEOWORKS CONFIDENTIAL
+
+PROJECT:	Geos WWW Library
+MODULE:		httee
+FILE:		httee.goc
+
+AUTHOR:		Kok Kin Kee, Oct 10, 1996
+
+ROUTINES:
+	Name			Description
+	----			-----------
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	kkee	10/10/96   	Initial version.
+
+DESCRIPTION:
+
+	Tee stream.
+
+	$Id: httee.goc,v 1.1 97/04/07 11:49:06 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+@include <WWW/HTCore/httee.goh>
+@include <WWW/HTCore/htreq.goh>
+@include "htfatals.goh"
+
+#define PUTBLOCK(target, data, len)  \
+        @call target::MSG_HT_STREAM_PUT_BLOCK(data, len)
+
+/***********************************************************************
+		Class Declaration
+***********************************************************************/
+
+@classdecl	HTTeeClass;
+
+/***********************************************************************
+                Private Functions
+***********************************************************************/
+
+
+/***********************************************************************
+ *		DefaultResolver
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Default function for resolving the return values from 
+ *              two streams.
+ * CALLED BY:	MSG_HT_STREAM_PUT_BLOCK, MSG_HT_STREAM_FLUSH, 
+ *              MSG_HT_STREAM_ABORT.
+ * RETURN:	int, the resolved value of the two passed values.
+ * SIDE EFFECTS:Nothing
+ *	
+ * STRATEGY:    We try to return the most critical return code.
+ *              As we described in htreq.goh, the return values ranges
+ *              from -32768 to +32768. The Library uses -1 to 32768.
+ *              Here the precedence of choosing a return code.
+ *              1. HT_ERROR (which is -1)
+ *              2. -2 and below (client's own return code)
+ *              3. The min of two numbers (since lower number is more
+ *                 "severe" than higher numbers, e.g., HT_INTERRUPTED
+ *                  vs. HT_CANNOT_CONNECT).
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	kkee	10/10/96   	Initial Revision
+ *
+ ***********************************************************************/
+static int _far _pascal
+DefaultResolver (int value1, int value2)
+{
+    /* Case 1. */
+    if ((value1 == HT_ERROR) || (value2 == HT_ERROR))
+	return value1;
+
+    /* Cases 2 and 3. */
+    if (value1 < value2)
+	return value1;
+
+    return value2;
+}	/* End of DefaultResolver.	*/
+
+
+
+/***********************************************************************
+		Message Handlers
+***********************************************************************/
+
+
+
+/***********************************************************************
+ *		MSG_HT_TEE_SET_TARGETS for HTTeeClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    Initialize a Tee stream with its two targets and 
+ *                  a resolver callback function. If you want to use the
+ *                  the default resolver, pass NULL for cbf.
+ * PARAMETERS:	    void (HTStreamHandle target1, HTStreamHandle target2,
+ *                        HTTeeResolver cbf);
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	kkee	10/10/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method HTTeeClass, MSG_HT_TEE_SET_TARGETS
+{
+
+EC( if ((!target1) || (!target2))                                      )
+EC(   EC_ERROR(INVALID_HTSTREAMHANDLE);                                )
+EC( ECCheckOD(target1);                                                )
+EC( ECCheckOD(target2);                                                )
+
+    @self->HTSI_target = target1;
+    @self->HTTI_secondTarget = target2;
+    @self->HTTI_resolverCbf = cbf;
+}	/* End of MSG_HT_TEE_SET_TARGETS.	*/
+
+
+
+
+/***********************************************************************
+ *		MSG_HT_STREAM_PUT_BLOCK for HTTeeClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    Push data to both targets.
+ * PARAMETERS:	    int (byte *data, word len)
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	kkee	10/10/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method HTTeeClass, MSG_HT_STREAM_PUT_BLOCK
+{
+    int ret1, ret2;
+
+EC( if ((!@self->HTSI_target) || (!@self->HTTI_secondTarget))          )
+EC(   EC_ERROR(INVALID_HTSTREAMHANDLE);                                )
+EC( ECCheckOD(@self->HTSI_target);                                     )
+EC( ECCheckOD(@self->HTTI_secondTarget);                               )
+
+    /* Ignore empty data */
+    if (!data || !len)
+	return HT_OK;
+
+    ret1 = PUTBLOCK(@self->HTSI_target, data, len);
+    ret2 = PUTBLOCK(@self->HTTI_secondTarget, data, len);
+
+    if (@self->HTTI_resolverCbf) 
+	return ProcCallFixedOrMovable_pascal(ret1, ret2);
+
+    return DefaultResolver(ret1, ret2);
+}	/* End of MSG_HT_STREAM_PUT_BLOCK.	*/
+
+
+
+
+/***********************************************************************
+ *		MSG_HT_STREAM_FLUSH for HTTeeClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    Flush data to two streams.
+ * PARAMETERS:	    int (void)
+ * SIDE EFFECTS:    Nothing
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	kkee	10/10/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method HTTeeClass, MSG_HT_STREAM_FLUSH
+{
+    int ret1, ret2;
+
+EC( if ((!@self->HTSI_target) || (!@self->HTTI_secondTarget))          )
+EC(   EC_ERROR(INVALID_HTSTREAMHANDLE);                                )
+EC( ECCheckOD(@self->HTSI_target);                                     )
+EC( ECCheckOD(@self->HTTI_secondTarget);                               )
+
+    ret1 = @call @self->HTSI_target::MSG_HT_STREAM_FLUSH();
+    ret2 = @call @self->HTTI_secondTarget::MSG_HT_STREAM_FLUSH();
+
+    if (@self->HTTI_resolverCbf) 
+	return ProcCallFixedOrMovable_pascal(ret1, ret2);
+
+    return DefaultResolver(ret1, ret2);
+}	/* End of MSG_HT_STREAM_FLUSH.	*/
+
+
+
+
+
+/***********************************************************************
+ *		MSG_HT_STREAM_ABORT for HTTeeClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    Abort targets and self.
+ * PARAMETERS:	    void (void)
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:        The only thing different from the default method 
+ *                  handler is that we need to abort the second target.
+ *                  Don't callsuper.
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	kkee	10/11/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method HTTeeClass, MSG_HT_STREAM_ABORT
+{
+    if (@self->HTSI_target != NullOptr) {
+	@call @self->HTSI_target::MSG_HT_STREAM_ABORT();
+	@self->HTSI_target = NullOptr;
+    }
+
+    if (@self->HTTI_secondTarget != NullOptr) {
+	@call @self->HTTI_secondTarget::MSG_HT_STREAM_ABORT();
+	@self->HTTI_secondTarget = NullOptr;
+    }
+
+    /* Finally free the object */
+    @send,forceQueue oself::MSG_META_OBJ_FREE();
+    return HT_OK;
+}	/* End of MSG_HT_STREAM_ABORT.	*/
+
+
+
+
+/* -----------------------------------------------------------------------
+ * 		PUBLIC ROUTINES
+ * -----------------------------------------------------------------------*/
+
+
+/***********************************************************************
+ *		HTTEECREATE
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Create a Tee stream and bind the two targets together.
+ * CALLED BY:	Client.
+ * RETURN:	HTStreamHandle, the Tee stream.
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	kkee	11/14/96   	Initial Revision
+ *
+ ***********************************************************************/
+HTStreamHandle _far _pascal
+HTTEECREATE (HTRequestHandle request, HTStreamHandle target1, 
+	     HTStreamHandle target2, HTTeeResolver cbf)
+{
+    HTStreamHandle stream;
+
+EC( ECCheckOD(target1);                                                 )
+EC( ECCheckOD(target2);                                                 )
+EC( ECCheckRequest(request);                                            )
+
+    PUSHDS;
+    SET_DS_LIB_DGROUP;
+    stream = ObjInstantiateForThread(0, &HTTeeClass);
+    POPDS;
+
+    if (!stream) {
+	/* Log error */
+    } else {
+	/* Initialize the stream instance data */
+	@call stream::MSG_HT_STREAM_SET_REQUEST(request);
+	@call stream::MSG_HT_TEE_SET_TARGETS(target1, target2, cbf);
+    }
+    
+    return stream;
+}	/* End of HTTEECREATE.	*/
+

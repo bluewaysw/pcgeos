@@ -1,0 +1,1421 @@
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Geoworks 1997.  All rights reserved.
+	GEOWORKS CONFIDENTIAL
+
+PROJECT:	Geos WWW Library
+MODULE:		htimap
+FILE:		htimap.goc
+
+AUTHOR:		Kok Kin Kee, May 19, 1997
+
+ROUTINES:
+	Name			Description
+	----			-----------
+
+REVISION HISTORY:
+	Name		Date		Description
+	----		----		-----------
+	kkee    	5/19/97   	Initial version.
+
+DESCRIPTION:
+
+	IMAP4 Client.
+
+	$Id: htimap.goc,v 1.27.1.1 97/09/05 10:52:05 jeremyb Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+@include <stdapp.goh>
+@include <WWW/HTCore/hturi.goh>
+@include <WWW/HTCore/htnet.goh>
+@include <WWW/HTCore/htsock.goh>
+@include <WWW/HTCore/htassoc.goh>
+@include <WWW/HTCore/htlist.goh>
+@include <WWW/HTCore/htobj.goh>
+@include <WWW/HTCore/htchar.goh>
+@include <WWW/HTCore/htfwrite.goh>
+@include <WWW/HTCore/htreqMan.goh>
+@include <WWW/htimap.goh>
+
+#include <Ansi/string.h>                 /* strcpy, strlen */
+#include <Ansi/stdio.h>                  /* sprintf */
+
+@ifdef __LOG_HTIMAP__
+@include "ilog.goh"
+@endif
+
+@include "parse.goh"                     /* IMAP response parser */
+@include "const.goh"
+@include "resp.goh"
+@include "htfatals.goh"
+
+
+/* ---------------------------------------------------------------------
+ * 		PRIVATE DATA
+ * ---------------------------------------------------------------------*/
+
+#if ERROR_CHECK
+FatalErrors htimapFatalErrors;
+Warnings    htimapWarnings;
+#endif
+
+#ifndef IMAP_PORT
+#define IMAP_PORT 143             /* Default TCP port */
+#endif
+
+char CRLF[] = {CR,LF,0};
+
+#define FETCH_LIST_LEN  34
+static char FETCH_LIST[] = " (RFC822.SIZE BODY FLAGS ENVELOPE)";
+
+/* --------------------------------------------------------------------
+ * 		PRIVATE FUNCTIONS
+ * --------------------------------------------------------------------*/
+
+static void _pascal
+    IMAPGetAddress (HTRequestHandle request, HTSocketAddress *htAddress);
+static HTStreamHandle _pascal
+    UseClientResponseParser (HTRequestHandle request);
+static HTStreamHandle _pascal SaveStream(HTRequestHandle request,
+										HTListHandle list);
+static void _pascal ParseParams (HTListHandle *list, char *params);
+static char* _pascal GetParamValue(HTListHandle list, char *name, 
+				   Boolean remove);
+static Boolean _pascal AdjustPartialBoundary(dword *start, dword *length,
+					     dword *estart, dword *elength,
+					     HTIMAPEncoding encoding);
+static int _pascal PutNewTag (HTNetThread *net, HTAssocList cmdList, 
+			      HTIMAPState cmd);
+static int _far _pascal PutLogin (HTNetThread *net, HTListHandle list);
+static int _pascal PutSelect (HTNetThread *net, HTMemHandle params);
+static int _pascal PutSearch (HTNetThread *net, HTListHandle list);
+static int _pascal PutFetchList (HTNetThread *net, HTListHandle msgList);
+static int _pascal PutAttach (HTNetThread *net, HTListHandle list);
+static int _pascal PutBody (HTNetThread *net, HTListHandle list);
+static int _pascal PutEnvelope (HTNetThread *net, HTListHandle list);
+static int _pascal PutPBody (HTNetThread *net, IMAPParser *p,
+			     HTListHandle list);
+static int _pascal PutFlags (HTNetThread *net, HTListHandle list, HTIMAPFlags
+			     flags);
+
+/***********************************************************************
+ *		IMAPGetAddress
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Get the address of an IMAP request for connecting to 
+ *              network.
+ * CALLED BY:	MSG_HT_PROTOCOL_LOAD
+ * RETURN:	HTSocketAddress
+ *	
+ * STRATEGY:	IMAP does not use proxy!
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	kkee    	5/20/97   	Initial Revision
+ *	
+ ***********************************************************************/
+static void _pascal
+IMAPGetAddress (HTRequestHandle request, HTSocketAddress *htAddress)
+{
+    HTMemHandle htmh;
+    HTRequest *rptr;
+    char *cptr;
+
+EC( ECCheckRequest(request);                                           )
+
+    rptr = (HTRequest *) MemThreadGrab(request);
+
+    cptr = (char *) MemLock(rptr->HTR_uriString);
+    htmh = HTParseURI(cptr, NULL, HTURI_PARSE_HOST);
+    MemUnlock(rptr->HTR_uriString);
+
+    /* IP address */
+    cptr = (char *) HTMemLock(htmh);
+    strcpy(htAddress->HTSA_ipAddress, cptr);
+    HTMemUnlockAndFree(htmh);
+
+    /* Port number */
+    htAddress->HTSA_port = IMAP_PORT;
+    htAddress->HTSA_accessPoint = rptr->HTR_accessPoint;
+
+    MemThreadRelease(request);
+}	/* End of IMAPGetAddress.	*/
+
+
+
+/***********************************************************************
+ *		UseClientResponseParser
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Use client response parser to accept parsed data from
+ *              HTIMAP.
+ * CALLED BY:	MSG_HT_PROTOCOL_LOAD
+ * RETURN:	HTStreamHandle or NULL.
+ *	
+ * STRATEGY:	
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	kkee    	5/27/97   	Initial Revision
+ *	
+ ***********************************************************************/
+static HTStreamHandle _pascal
+UseClientResponseParser (HTRequestHandle request)
+{
+    HTRequest *rptr;
+    HTStreamHandle stream = NullOptr;
+
+EC( ECCheckRequest(request);                                            )
+
+    rptr = (HTRequest *) MemThreadGrab(request);
+    if (rptr->HTR_responseParserClass) 
+	stream = HTObjInstantiateForThread(0, rptr->HTR_responseParserClass);
+    MemThreadRelease(request);
+
+    if (stream) 
+	@call stream::MSG_HT_STREAM_SET_REQUEST(request);
+
+    return stream;
+}	/* End of UseClientResponseParser.	*/
+
+
+
+/***********************************************************************
+ *		ParseParams
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Parse out the parameters of an IMAP URL and store in list.
+ *              Changes the passed in params.
+ * CALLED BY:	HTIMAP::MSG_HT_PROTOCOL_LOAD.
+ * RETURN:	list or list = NULL.
+ *	
+ * STRATEGY:	The params must appear as name=value pairs.
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	kkee    	6/10/97   	Initial Revision
+ *	
+ ***********************************************************************/
+static void _pascal
+ParseParams (HTListHandle *list, char *params)
+{
+    char *p, *q;
+    *list = HTListNew();
+    while ((p = NextToken(&params)) != 0) {
+	if ((q = NextToken(&params)) != 0) {
+	    /* Name & value pair */
+	    HTListAppend(*list, (void*)&p, sizeof(char*));
+	    HTListAppend(*list, (void*)&q, sizeof(char*));
+	} else {
+	    /* Error, no value */
+	    HTListDelete(*list);
+	    *list=0;
+	    return;
+	}
+    }
+}	/* End of ParseParams.	*/
+
+
+/***********************************************************************
+ *		GetParamValue
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Get a parameter value given its name.
+ * CALLED BY:	All other Put... routines
+ * RETURN:      Value else NULL.
+ *	
+ * STRATEGY:	
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	kkee    	6/16/97   	Initial Revision
+ *	
+ ***********************************************************************/
+static char* _pascal
+GetParamValue (HTListHandle list, char *name, Boolean remove)
+{
+    int i, count = HTListGetCount(list);
+    char *n, *ret=0;
+
+EC( ECCheckHTList(list);                                                )
+EC( if (count%2 != 0) EC_ERROR(HTIMAP_BAD_REQUEST_URL);                 )
+
+    for (i=0; i<count; i+=2) {
+	HTListGetItem(list, i, (void*)&n, sizeof(char*));
+	if (!strcasecmp(name, n)) {
+	    /* Found! */
+	    if (remove) {
+		HTListRemoveItem(list, i, 0, sizeof(char*));
+		HTListRemoveItem(list, i, (void*)&ret, sizeof(char*));
+	    } else 
+		HTListGetItem(list, i+1, (void*)&ret, sizeof(char*));
+	    return ret;
+	}
+    }
+    /* Either the URL is bad or we have asked for the wrong thing */
+    EC_ERROR(HTIMAP_BAD_REQUEST_URL);
+    return ret;
+}	/* End of GetParamValue.	*/
+
+
+
+/***********************************************************************
+ *		AdjustPartialBoundary
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Adjust the start and length of a partial fetch to meet
+ *              the boundary of the encoding. The given start and length 
+ *              are the decoded values and we return the modified start,
+ *              length and the encoded estart and elength.
+ * CALLED BY:	PutPBody and PutPAttach.
+ * RETURN:	TRUE if the start and length are valid (may or may not
+ *              be changed). FALSE if the encoding has no boundary and
+ *              hence the start and length cannot be determined. If you
+ *              get FALSE, you should not proceed to get the data as 
+ *              it will not be decoded properly once you get the data.
+ *	
+ * STRATEGY:
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	kkee    	6/16/97   	Initial Revision
+ *	
+ ***********************************************************************/
+static Boolean _pascal
+AdjustPartialBoundary (dword *start, dword *length, 
+		       dword *estart, dword *elength, 
+		       HTIMAPEncoding encoding)
+{
+    if (encoding == IE_BASE64) {
+	dword x2;
+
+	/* estart, start, and length */
+	if (*start == 0) *start = 1;
+	*estart = ((*start-1)/3)*4+1;
+	x2 = ((*estart-1)/4)*3+1;
+	*length = (*start-x2)+*length;
+	*start = x2;
+
+	/* elength, +4 to make up for throwing away remainder in div */
+	if (*length) {
+	    *elength = (*length/3)*4 + 4;
+	    /* Adjust for CRLF after every 76 bytes */
+	    *elength += ((*estart+*elength)/76)*2;
+	} else
+	    *elength = 0;
+	/* Adjust for CRLF after every 76 bytes */
+	*estart += (*estart/76)*2;
+	return TRUE;
+
+    } else if (encoding == IE_QUOTED_PRINTABLE) {
+	return FALSE;
+
+    } else {
+	*estart = *start;
+	*elength = *length;
+	return TRUE;
+    }
+}	/* End of AdjustPartialBoundary.	*/
+
+
+
+/***********************************************************************
+ *		SaveStream
+ ***********************************************************************
+ *
+ * SYNOPSIS:    Create a save to file stream stack, with possible a 
+ *              local character converter stream.
+ * CALLED BY:	MSG_HT_PROTOCOL_LOAD
+ * RETURN:	HTStreamHandle else NULL.
+ *	
+ * STRATEGY:	
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	kkee    	6/11/97   	Initial Revision
+ *	
+ ***********************************************************************/
+static HTStreamHandle _pascal
+SaveStream (HTRequestHandle request, HTListHandle list)
+{
+	HTRequest *rptr;
+	HTStreamHandle stream;
+    char *v;   /* Name and value pair */
+
+EC( if (HTListGetCount(list) < 2) EC_ERROR(HTIMAP_BAD_REQUEST_URL);     )
+
+    /* File writer stream */
+    if ((v = GetParamValue(list, "filename", TRUE)) == 0) return 0;
+    /* filename maybe encoded */
+    v = HTDecodeHex(v);
+    stream = HTFWriteNew(v,0);
+	
+	/* ISO to local char converter stream */
+	rptr = (HTRequest *) MemThreadGrab(request);
+	if (rptr->HTR_toLocalCharCbf)
+		stream = HTCharNew(request, stream, rptr->HTR_toLocalCharCbf);
+	MemThreadRelease(request);
+	return stream;
+}	/* End of SaveStream.	*/
+
+
+
+
+/***********************************************************************
+ *		PutNewTag
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Create a new tag for an IMAP command.
+ * CALLED BY:	MSG_HT_PROTOCOL_LOAD.
+ * RETURN:	Return code from pushing data to HTSocket.
+ *	
+ * STRATEGY:	
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	kkee    	5/26/97   	Initial Revision
+ *	
+ ***********************************************************************/
+static int _pascal
+PutNewTag (HTNetThread *net, HTAssocList cmdList, HTIMAPState cmd)
+{
+#define IMAP_TAG_LENGTH     8
+
+    char tag[IMAP_TAG_LENGTH];
+    sprintf(tag, "a%d ", net->HTNT_data);
+    HTAssocDwordListAdd(cmdList, (dword) net->HTNT_data, (dword) cmd);
+    net->HTNT_data += 1;                  /* Next free tag */
+    return HTSocketSend(net->HTNT_socket, (void*)tag, strlen(tag));
+}	/* End of PutNewTag.	*/
+
+
+/***********************************************************************
+ *		PutLogin
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Put "LOGIN username password".
+ * CALLED BY:	MSG_HT_PROTOCOL_LOAD
+ * RETURN:	HT_NO if bad URL, 
+ *              Return code from pushing data to HTSocket.
+ *	
+ * STRATEGY:	
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	kkee    	5/26/97   	Initial Revision
+ *	
+ ***********************************************************************/
+static int _far _pascal
+PutLogin (HTNetThread *net, HTListHandle list)
+{
+    char *user, *pass;
+
+    user = GetParamValue(list, "username", TRUE);
+    pass = GetParamValue(list, "password", TRUE);
+
+    if (!user || !pass) return HT_NO;
+
+    HTSocketSend(net->HTNT_socket, (void*)"LOGIN ", 6);
+    user = HTDecodeHex(user);
+    HTSocketSend(net->HTNT_socket, (void*)user, strlen(user));
+    HTSocketSend(net->HTNT_socket, (void*)" ", 1);
+    pass = HTDecodeHex(pass);
+    HTSocketSend(net->HTNT_socket, (void*)pass, strlen(pass));
+    return HTSocketSend(net->HTNT_socket, (void*)CRLF, 2);
+}	/* End of PutLogin.	*/
+
+
+
+/***********************************************************************
+ *		PutSelect
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Put "SELECT INBOX".
+ * CALLED BY:	MSG_HT_PROTOCOL_LOAD
+ * RETURN:	Return code from pushing data to HTSocket.
+ *	
+ * STRATEGY:	
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	kkee    	5/27/97   	Initial Revision
+ *	
+ ***********************************************************************/
+static int _pascal
+PutSelect (HTNetThread *net, HTMemHandle params)
+{
+    /* 
+     * For Ericsson's WMI, we only select INBOX, hence
+     * the parameter is not used. But I can see us extending
+     * this to select other mailboxes, no big deal.
+     */
+    return HTSocketSend(net->HTNT_socket, 
+			(void*)"SELECT INBOX\x0D\x0A", 14);
+}	/* End of PutSelect.	*/
+
+
+
+/***********************************************************************
+ *		PutSearch
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Put "UID SEARCH ..."
+ * CALLED BY:	MSG_HT_PROTOCOL_LOAD
+ * RETURN:	HT_NO if bad URL, 
+ *              Return code from pushing data to HTSocket.
+ *	
+ * STRATEGY:	message=null, unseen=false => UID SEARCH ALL
+ *              message=null, unseen=true  => UID SEARCH UNSEEN
+ *              message=365,  unseen=false => UID SEARCH UID 365:*
+ *              message=365,  unseen=true  => UID SEARCH UID 365:* UNSEEN
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	kkee    	5/27/97   	Initial Revision
+ *	
+ ***********************************************************************/
+static int _pascal
+PutSearch (HTNetThread *net, HTListHandle list)
+{
+    char *msg, *unseen;
+
+    msg = GetParamValue(list, "message", TRUE);
+    unseen = GetParamValue(list, "unseen", TRUE);
+
+    if (!msg || !unseen) return HT_NO;
+
+    HTSocketSend(net->HTNT_socket, (void*)"UID SEARCH ", 11);
+    if (!strcasecmp(msg, "null")) {
+	if (!strcasecmp(unseen, "false"))
+	    HTSocketSend(net->HTNT_socket, (void*)"ALL", 3);
+	else
+	    HTSocketSend(net->HTNT_socket, (void*)"UNSEEN", 6);
+    } else {
+	HTSocketSend(net->HTNT_socket, (void*)"UID ", 4);
+	HTSocketSend(net->HTNT_socket, (void*)msg, strlen(msg));
+	HTSocketSend(net->HTNT_socket, (void*)":* ", 3);
+	if (strcasecmp(unseen, "false"))
+	    HTSocketSend(net->HTNT_socket, (void*)"UNSEEN", 6);
+    }
+    return HTSocketSend(net->HTNT_socket, (void*)CRLF, 2);
+}	/* End of PutSearch.	*/
+
+
+
+/***********************************************************************
+ *		PutFetchList
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Put "UID FETCH message_set ..." msgList must have at 
+ *              least one item.
+ * CALLED BY:	MSG_HT_PROTOCOL_LOAD
+ * RETURN:	Return code from pushing data to HTSocket.
+ *	
+ * STRATEGY:	Fetch the list of messages in msgList.
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	kkee    	5/27/97   	Initial Revision
+ *	
+ ***********************************************************************/
+static int _pascal
+PutFetchList (HTNetThread *net, HTListHandle msgList)
+{
+#define MS_BEGIN     0
+#define MS_SEPARATOR 1
+#define MS_RANGE     2
+
+    char str[12];        /* nz_numbers are 32 bits, 0<n<4,294,967,296 */
+    int count, i;
+    int state = MS_BEGIN;
+    dword msg, prev;
+
+    HTSocketSend(net->HTNT_socket, (void*)"UID FETCH ", 10);
+
+    /*
+     * The list of messages. 
+     */
+    count = HTListGetCount(msgList);
+    for (i=0; i<count; i++) {
+	HTListRemoveItem(msgList, 0, (void*)&msg, sizeof(dword));
+	UtilHex32ToAscii(str, msg, UHTAF_SBCS_STRING | UHTAF_NULL_TERMINATE);
+
+	if (state == MS_BEGIN) {
+	    HTSocketSend(net->HTNT_socket, (void*)str, strlen(str));
+	    state = MS_SEPARATOR;
+	    prev = msg;
+	} else if (state == MS_SEPARATOR) {
+	    /* Put ":" or "," */
+	    if (msg == prev+1) {
+		HTSocketSend(net->HTNT_socket, (void*)":", 1);
+		state = MS_RANGE;  /* Looking for end of range */
+		if (i == count-1)  /* last one */
+		    HTSocketSend(net->HTNT_socket, (void*)str, strlen(str));
+	    } else {
+		HTSocketSend(net->HTNT_socket, (void*)",", 1);
+		HTSocketSend(net->HTNT_socket, (void*)str, strlen(str));
+		state= MS_SEPARATOR;
+	    }
+	    prev = msg;
+	} else if (state == MS_RANGE) {
+	    /* Looking for end of range */
+	    if (msg != prev+1) {
+		UtilHex32ToAscii(str, prev, UHTAF_SBCS_STRING | 
+				 UHTAF_NULL_TERMINATE);
+		strcat(str, ",");
+		HTSocketSend(net->HTNT_socket, (void*)str, strlen(str));
+		UtilHex32ToAscii(str, msg, UHTAF_SBCS_STRING | 
+				 UHTAF_NULL_TERMINATE);
+		HTSocketSend(net->HTNT_socket, (void*)str, strlen(str));
+		state = MS_SEPARATOR;
+	    } if (i == count-1)        /* last one */
+		HTSocketSend(net->HTNT_socket, (void*)str, strlen(str));
+	    prev = msg;
+	}
+    }
+
+    HTSocketSend(net->HTNT_socket, (void*)FETCH_LIST, FETCH_LIST_LEN);
+    return HTSocketSend(net->HTNT_socket, (void*)CRLF, 2);
+}	/* End of PutFetchList.	*/
+
+
+
+/***********************************************************************
+ *		PutAttach
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Put "UID FETCH uid (BODY BODY[part]) CRLF" OR
+ *              Put "UID FETCH uid BODY[part] CRLF".
+ * CALLED BY:	MSG_HT_PROTOCOL_LOAD
+ * RETURN:      HT_NO if bad URL.
+ *             Return code from pushing data to HTSocket. The part  
+ *              number is not removed from the list.
+ *	
+ * STRATEGY:	Fetch an attachment.
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	kkee    	6/ 8/97   	Initial Revision
+ *	
+ ***********************************************************************/
+static int _pascal
+PutAttach (HTNetThread *net, HTListHandle list)
+{
+    char *uid, *part;
+
+    uid = GetParamValue(list, "message", TRUE);
+    part = GetParamValue(list, "part", FALSE);
+
+EC( if (!uid || !part) EC_ERROR(HTIMAP_BAD_REQUEST_URL);                )
+
+    if (!uid || !part) return HT_NO;
+
+    HTSocketSend(net->HTNT_socket, (void*)"UID FETCH ", 10);
+    HTSocketSend(net->HTNT_socket, (void*)uid, strlen(uid));
+//    HTSocketSend(net->HTNT_socket, (void*)" BODY[", 6);
+//    HTSocketSend(net->HTNT_socket, (void*)part, strlen(part));
+//    HTSocketSend(net->HTNT_socket, (void*)"]", 1);
+    HTSocketSend(net->HTNT_socket, (void*)" (BODY BODY[", 12);
+    HTSocketSend(net->HTNT_socket, (void*)part, strlen(part));
+    HTSocketSend(net->HTNT_socket, (void*)"])", 2);
+    return HTSocketSend(net->HTNT_socket, (void*)CRLF, 2);
+}	/* End of PutAttach.	*/
+
+
+
+/***********************************************************************
+ *		PutBody
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Put "UID FETCH uid (BODY ENVELOPE BODY[part]) CRLF"
+ * CALLED BY:	MSG_HT_PROTOCOL_LOAD
+ * RETURN:      HT_NO if bad URL.
+ *              Return code from pushing data to HTSocket. The part  
+ *              number is not removed from the list.
+ *	
+ * STRATEGY:	Fetch main message body of a msg.
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	kkee    	6/15/97   	Initial Revision
+ *	
+ ***********************************************************************/
+static int _pascal
+PutBody (HTNetThread *net, HTListHandle list)
+{
+    char *uid, *part;
+
+    uid = GetParamValue(list, "message", TRUE);
+    part = GetParamValue(list, "part", FALSE);
+
+EC( if (!uid || !part) EC_ERROR(HTIMAP_BAD_REQUEST_URL);                )
+
+    if (!uid || !part) return HT_NO;
+
+    HTSocketSend(net->HTNT_socket, (void*)"UID FETCH ", 10);
+    HTSocketSend(net->HTNT_socket, (void*)uid, strlen(uid));
+    HTSocketSend(net->HTNT_socket, (void*)" (BODY ENVELOPE BODY[", 21);
+    HTSocketSend(net->HTNT_socket, (void*)part, strlen(part));
+    HTSocketSend(net->HTNT_socket, (void*)"])", 2);
+    return HTSocketSend(net->HTNT_socket, (void*)CRLF, 2);
+}	/* End of PutBody.	*/
+
+
+/***********************************************************************
+ *		PutEnvelope
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Put "aXXX UID FETCH msg (BODY ENVELOPE)"
+ * CALLED BY:	MSG_HT_PROTOCOL_LOAD
+ * RETURN:	HT_OK, HT_NO if bad URL, or HT_ERROR.
+ *	
+ * STRATEGY:	
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	kkee    	6/18/97   	Initial Revision
+ *	
+ ***********************************************************************/
+static int _pascal
+PutEnvelope (HTNetThread *net, HTListHandle list)
+{
+    char *uid = GetParamValue(list, "message", TRUE);
+
+EC( if (!uid) EC_ERROR(HTIMAP_BAD_REQUEST_URL);                         )
+
+    if (!uid) return HT_NO;
+
+    HTSocketSend(net->HTNT_socket, (void*)"UID FETCH ", 10);
+    HTSocketSend(net->HTNT_socket, (void*)uid, strlen(uid));
+    HTSocketSend(net->HTNT_socket, (void*)" (BODY ENVELOPE)", 16);
+    return HTSocketSend(net->HTNT_socket, (void*)CRLF, 2);
+}	/* End of PutEnvelope.	*/
+
+
+/***********************************************************************
+ *		PutPBody
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Put "aXXX PARTIAL nz_number BODY[part] start length"
+ * CALLED BY:	MSG_HT_PROTOCOL_LOAD
+ * RETURN:	HT_OK, HT_NO if bad URL, or HT_ERROR.
+ *	
+ * STRATEGY:	If length==0, we put the largest possible number.
+ *              According to RFC2070, the number is 4,294,967,296.
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	kkee    	6/16/97   	Initial Revision
+ *	
+ ***********************************************************************/
+static int _pascal
+PutPBody (HTNetThread *net, IMAPParser *p, HTListHandle list)
+{
+    dword len, s, estart, elength;
+    char *part, *start, *length;
+    char str[13];   /* Max number in RFC2060 is 10 digit long */
+
+    part = GetParamValue(list, "part", TRUE);
+    start = GetParamValue(list, "start", TRUE);
+    length = GetParamValue(list, "length", TRUE);
+
+EC( if (!part || !start || !length) EC_ERROR(HTIMAP_BAD_REQUEST_URL);    )
+
+    if (!part || !start || !length) return HT_NO;
+
+    UtilAsciiToHex32(start, (sdword *)&s);
+    UtilAsciiToHex32(length, (sdword *)&len);
+
+    /* If FALSE, not allowed to get the partial for the given encoding */
+    if (!AdjustPartialBoundary(&s, &len, &estart, &elength,
+			       p->retEncoding)) return HT_NO;
+    
+    /* Return the actual decoded start and length to client */
+    /* r->IBR_length will be changed to the actual value when
+     * start parsing response data in parse.goc.
+     */
+    if (p->wanted == IMAPC_PBODY) {
+	HTIMAPPBodyResp *r = (HTIMAPPBodyResp *) p->resp;
+	r->IBR_start = s; r->IBR_length = len;
+    } else if (p->wanted == IMAPC_PATTACH) {
+	HTIMAPPAttachResp *r = (HTIMAPPAttachResp *) p->resp;
+	r->IAR_start = s; r->IAR_length = len;
+    } 
+EC(   else EC_ERROR(HTIMAP_NOT_YET_IMPLEMENTED);                           )
+
+    HTSocketSend(net->HTNT_socket, (void*)"PARTIAL ", 8);
+    /* Use sequence number instead of UID */
+    UtilHex32ToAscii(str, p->retNum, UHTAF_SBCS_STRING | UHTAF_NULL_TERMINATE);
+    HTSocketSend(net->HTNT_socket, (void*)str, strlen(str));
+    HTSocketSend(net->HTNT_socket, (void*)" BODY[", 6);
+    HTSocketSend(net->HTNT_socket, (void*)part, strlen(part));
+    HTSocketSend(net->HTNT_socket, (void*)"] ", 2);
+    UtilHex32ToAscii(str, estart, UHTAF_SBCS_STRING | UHTAF_NULL_TERMINATE);
+    strcat(str, " ");
+    HTSocketSend(net->HTNT_socket, (void*)str, strlen(str));
+    if (elength) {
+	UtilHex32ToAscii(str, elength, UHTAF_SBCS_STRING | 
+			 UHTAF_NULL_TERMINATE);
+	HTSocketSend(net->HTNT_socket, (void*)str, strlen(str));
+    } else {
+	/* Largest allowed number */
+	HTSocketSend(net->HTNT_socket, (void*)"4294967295", 10);
+    }
+    return HTSocketSend(net->HTNT_socket, (void*)CRLF, 2);
+}	/* End of PutPBody.	*/
+
+
+
+/***********************************************************************
+ *		PutFlags
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Put "aXXX UID STORE msg +FLAGS (\DELETED)"
+ * CALLED BY:	MSG_HT_PROTOCOL_LOAD
+ * RETURN:	HT_OK, HT_NO for bad URL, return code from HTSocketSend
+ *	
+ * STRATEGY:	
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	kkee    	6/19/97   	Initial Revision
+ *	
+ ***********************************************************************/
+static int _pascal
+PutFlags (HTNetThread *net, HTListHandle list, HTIMAPFlags flags)
+{
+    char *uid = GetParamValue(list, "message", TRUE);
+
+EC( if (!uid) EC_ERROR(HTIMAP_BAD_REQUEST_URL);                         )
+
+    if (!uid) return HT_NO;
+    HTSocketSend(net->HTNT_socket, (void*)"UID STORE ", 10);
+    HTSocketSend(net->HTNT_socket, (void*)uid, strlen(uid));
+    HTSocketSend(net->HTNT_socket, (void*)" +FLAGS (\\DELETED)", 18);
+    return HTSocketSend(net->HTNT_socket, (void*)CRLF, 2);
+}	/* End of PutFlags.	*/
+
+
+
+/***********************************************************************
+		Class Declaration
+***********************************************************************/
+
+@classdecl	HTIMAPClass;
+
+/***********************************************************************
+		Message Handlers
+***********************************************************************/
+
+
+/***********************************************************************
+ *		MSG_META_INITIALIZE for HTIMAPClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    Initialize instance data.
+ * PARAMETERS:	    void (void)
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:	    
+ *
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	kkee    	5/19/97   	Initial Revision
+ *	
+ ***********************************************************************/
+@method HTIMAPClass, MSG_META_INITIALIZE
+{
+    #ifdef __LOG_HTIMAP__
+    logBegin();
+    #endif
+
+    @self->HTIMAPI_currentState = HTIMAP_BEGIN;
+    @self->HTIMAPI_nextState = HTIMAP_INVALID_STATE;
+    @self->HTIMAPI_parser = ParseNew();
+    @callsuper();
+}	/* End of MSG_META_INITIALIZE.	*/
+
+
+
+/***********************************************************************
+ *		MSG_HT_STREAM_ABORT for HTIMAPClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    Clean up instance data.
+ * PARAMETERS:	    int (int status);
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:	    
+ *
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	kkee    	5/23/97   	Initial Revision
+ *	
+ ***********************************************************************/
+@method HTIMAPClass, MSG_HT_STREAM_ABORT
+{
+    #ifdef __LOG_HTIMAP__
+    logEnd();
+    #endif
+
+    if (@self->HTIMAPI_parser) ParseDelete(@self->HTIMAPI_parser);
+    if (@self->HTIMAPI_params) HTMemFree(@self->HTIMAPI_params);
+    return @callsuper();
+}	/* End of MSG_HT_STREAM_ABORT.	*/
+
+
+
+/***********************************************************************
+ *		MSG_HT_PROTOCOL_LOAD for HTIMAPClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    Run the IMAP4 protocol. Only the following URLs are 
+ *                  valid with method HTM_GET and request type HTTPT_IMAP.
+ *
+ *                  Generic syntax: 
+ *                       imap://server/
+ *                           ;command1?param=value+param=value....
+ *
+ *                       The order of params *MUST* be followed.
+ *            
+ *                  Acceptable IMAP URLs:
+ *
+ *                       imap://server/
+ *                           ;logon?username=NAME&password=PASSWORD&
+ *                            [select=INBOX]
+ *
+ *                          - logon to server
+ *                          - selects inbox (default if no select command)
+ * 
+ *                       imap://server/
+ *                           ;list?message=UID&unseen=BOOLEAN
+ *                          
+ *                          - Use UID == NULL to list all messages.
+ *                          - search messages with UID and unseen.
+ *
+ *                       imap://server/
+ *                           ;body?message=UID&part=STRING&
+ *                            filename=STRING
+ *
+ *                          - read main text body of a message
+ *                          - normally part==1, but it may not be the case
+ *                            for message/rfc822 and other multipart messages.
+ *                          - filename MUST be encoded using HTEncodeForUri.
+ *
+ *                       imap://server/
+ *                           ;pbody?message=UID&part=STRING&
+ *                            start=INTEGER&length=INTEGER&
+ *                            filename=STRING
+ *
+ *                          - read partial main text body of a message
+ *                          - start is the start of the decoded body.
+ *                            It maybe adjusted by IMAP to fit the proper
+ *                            encoded boundary. 
+ *                          - length is the decoded length. Because start
+ *                            may be changed by IMAP, you will always get
+ *                            more or equal to the length you requested.
+ *
+ *                       imap://server/
+ *                           ;attach?message=UID&part=STRING&
+ *                            filename=STRING
+ *
+ *                          - read an attachment of a message.
+ *                          - note that normally part=1 is the main body. 
+ *                            If you use attach request to fetch body, you 
+ *                            will not get the body headers.
+ *                          - filename MUST be encoded using HTEncodeForUri.
+ *
+ *                       imap://server/
+ *                           ;pattach?message=UID&part=STRING&
+ *                            start=INTEGER&length=INTEGER&
+ *                            filename=STRING
+ *
+ *                          - read partial attachment of a message. 
+ *                          - start is the start of the decoded attachment.
+ *                            It maybe adjusted by IMAP to fit the proper
+ *                            encoded boundary. 
+ *                          - length if the decoded length. Because start
+ *                            may be changed by IMAP, you will always get
+ *                            more or equal to the length you requested.
+ *
+ *                       imap://server/
+ *                           ;delete?message=UID
+ *
+ *                          - delete messages UID
+ * 
+ *                       imap://server/
+ *                           ;logout
+ *
+ *                          - logout from IMAP server.
+ *                  
+ * PARAMETERS:	    int (HTNetThread *net)
+ *                  Return codes: IMPORTANT! If you get "after" callback 
+ *                  return code other than HT_OK, HT_NO, and HT_LOADED, the
+ *                  session's (and connection) would have been terminated.
+ *
+ *                  - HT_OK, all is well (client won't see this code as the 
+ *                           protocol will be scheduled again.
+ *                  (Client gets the following codes in "after" callback)
+ *                  - HT_NO, request not allowed; due to bad URL or command
+ *                              not supported by server. Persistent connection
+ *                              will be maintained for future requests.
+ *                  - HT_LOADED, request sucessfully executed.
+ *                  - HT_OUT_OF_MEMORY
+ *                  - HT_NO_CONTENT, client did not provide a response parser
+ *                              to accept parsed data.
+ *                  - HT_CANNOT_WRITE_FILE, failed to save data to file.
+ *                  - HT_ERROR, IMAP request command error and unable to 
+ *                              recover.
+ *            
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:	    Implements RFC2060.
+ *
+ *                  net->HTNT_data == tag number. A tag string is  
+ *                    "a"+net->HTNT_data.
+ *
+ *                  net->HTNT_data2 == IMAPServerVersion.
+ *
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	kkee    	5/19/97   	Initial Revision
+ *	
+ ***********************************************************************/
+@method HTIMAPClass, MSG_HT_PROTOCOL_LOAD
+{
+
+#define MYRETURN(code) {if (code!=HT_OK && code !=HT_NO)\
+			    {net->HTNT_persistent=FALSE;\
+				 return code;}\
+                        else return code;}
+
+    int ret=HT_OK;
+    HTListHandle list;
+    /* Parser is always locked */
+    IMAPParser *p = (IMAPParser *) HTMemDeref(@self->HTIMAPI_parser);
+
+    p->server = (IMAPServerVersion) net->HTNT_data2;
+
+EC( if (@self->HTSI_request == NULL) EC_ERROR(HTIMAP_REQUEST_NOT_SET);   )
+
+    /* 
+     * Now jump into the state machine. We know the state from the 
+     * previous run. This is one big switch loop.
+     */
+    while (1) {
+
+	switch (@self->HTIMAPI_currentState) {
+	    
+	case HTIMAP_BEGIN:
+	    {
+		HTRequest *r = (HTRequest *) MemThreadGrab(@self->HTSI_request);
+		/* Make sure client does not inadvertantly make IMAP request */
+		if (r->HTR_type != HTTPT_IMAP) ret=HT_ERROR;
+		MemThreadRelease(@self->HTSI_request);
+		if (ret!=HT_OK) return ret;
+
+		if (net->HTNT_persistent) {
+		    /* We don't need to setup the connection anymore */
+		    @self->HTIMAPI_currentState = HTIMAP_MAKE_REQUEST;
+		    break;
+		}
+
+		/* Create and initialize a stream socket */
+		net->HTNT_socket = HTSocketCreate(net);
+		if (!net->HTNT_socket) MYRETURN(HT_OUT_OF_MEMORY);
+
+		@self->HTIMAPI_currentState = HTIMAP_CONNECT;
+	    }
+	    break;
+
+	case HTIMAP_CONNECT:
+	    {
+		HTSocketAddress address;
+		
+		IMAPGetAddress(@self->HTSI_request, &address);
+
+		if (HTSocketResolveAndConnect(net->HTNT_socket, 
+					      &address) == HT_OK) {
+
+		    /* IMAP's persistent connection disonnects in logout */
+		    HTNetSetPersistent(net);
+		    @self->HTIMAPI_currentState = HTIMAP_MAKE_REQUEST;
+
+		} else {
+		    /* 
+		     * If we failed to connect, retry? Let's make it
+		     * simple here...
+		     */
+		    MYRETURN(HTSocketState(net->HTNT_socket));
+		}
+	    }
+	    break;
+
+	case HTIMAP_GET_RESPONSE:
+	    /* Inform client what we are doing with the request */
+	    ret = HTNetReportProgress(@self->HTSI_request,
+				      HT_WAITING_FOR_REPLY);
+	    if (ret != HT_OK) MYRETURN(ret);
+	    @self->HTIMAPI_currentState = HTIMAP_PUSH_RESP;
+	    break;
+
+	case HTIMAP_PUSH_RESP:
+	    /*
+	     * We check the next response from server by pushing
+	     * from HTSocket --> HTIMAP.
+	     */
+	    p->scanner.sock = (HTSocket *) MemLock(net->HTNT_socket);
+	    p->scanner.sock->HTS_length = 0;  /* In case we have a persistent
+						 connection */
+	    p->scanner.socket = net->HTNT_socket;
+	    ret = ParseResponse(p);
+	    MemUnlock(net->HTNT_socket);
+	    if (ret != HT_OK) MYRETURN(ret);
+
+        @self->HTIMAPI_currentState = @self->HTIMAPI_nextState;
+	    break;
+
+	case HTIMAP_MAKE_REQUEST:
+	    {
+		HTMemHandle params;
+		/* Parse out the URL and execute the request */
+		IMAPRequest req = IMAPParseCommand(@self->HTSI_request,
+						   &params);
+		@self->HTIMAPI_params = params;
+
+		switch (req) {
+		case IMAPC_LOGON:
+		    @self->HTIMAPI_currentState = HTIMAP_CAPABILITY;
+		    break;
+		case IMAPC_LIST:
+		    @self->HTIMAPI_currentState = HTIMAP_SEARCH;
+		    break;
+		case IMAPC_BODY:
+		    @self->HTIMAPI_currentState = HTIMAP_BODY_REQUEST;
+		    break;
+		case IMAPC_PBODY:
+		    @self->HTIMAPI_currentState = HTIMAP_PBODY_REQUEST;
+		    break;
+		case IMAPC_ATTACH:
+		    @self->HTIMAPI_currentState = HTIMAP_ATTACH_REQUEST;
+		    break;
+		case IMAPC_PATTACH:
+		    @self->HTIMAPI_currentState = HTIMAP_PATTACH_REQUEST;
+		    break;
+		case IMAPC_DELETE:
+		    @self->HTIMAPI_currentState = HTIMAP_DELETE;
+		    break;
+		case IMAPC_LOGOUT:
+		    @self->HTIMAPI_currentState = HTIMAP_LOGOUT;
+		    break;
+		default:
+		    EC_ERROR(HTIMAP_REQUEST_NOT_SUPPORTED);
+		    MYRETURN(HT_ERROR);
+		}
+
+		/* Create a client response parser to accept response */
+		RespNew(p, req);
+		@self->HTSI_target = 
+		    UseClientResponseParser(@self->HTSI_request);
+		if (!@self->HTSI_target) MYRETURN(HT_NO_CONTENT);
+		p->target = @self->HTSI_target;
+	    }
+	    break;
+
+	case HTIMAP_CAPABILITY:
+	    /* aXXX CAPABILITY */
+	    {
+		PutNewTag(net, p->taggedCmdList, HTIMAP_CAPABILITY);
+		ret=HTSocketSend(net->HTNT_socket, 
+				 (void *)"CAPABILITY\x0D\x0A", 12);
+		if (ret != HT_OK) MYRETURN(ret);
+		/* Use multiple requests; capability+login */
+		@self->HTIMAPI_currentState = HTIMAP_LOGIN;
+	    }
+	    break;
+
+	case HTIMAP_LOGIN:
+	    /* aXXX LOGIN username password */
+	    {
+		char *b = (char*) HTMemLock(@self->HTIMAPI_params);
+		ParseParams(&list, b);
+		if (list) {
+		    PutNewTag(net, p->taggedCmdList, HTIMAP_LOGIN);
+		    ret=PutLogin(net, list);
+		    HTListDelete(list);
+		} else ret = HT_NO;  /* bad URL */
+		HTMemUnlock(@self->HTIMAPI_params);
+		if (ret != HT_OK) MYRETURN(ret);
+		@self->HTIMAPI_currentState = HTIMAP_GET_RESPONSE;
+		@self->HTIMAPI_nextState = HTIMAP_SELECT;
+	    }
+	    break;
+
+	case HTIMAP_SELECT:
+	    /* aXXX SELECT INBOX */
+	    {
+		/* Last command in the logon sequence */
+		PutNewTag(net, p->taggedCmdList, HTIMAP_SELECT);
+		ret=PutSelect(net, @self->HTIMAPI_params);
+		if (ret != HT_OK) MYRETURN(ret);
+		@self->HTIMAPI_currentState = HTIMAP_GET_RESPONSE;
+		/* We have done login, so we know the server */
+		net->HTNT_data2 = (dword) p->server;
+		@self->HTIMAPI_nextState = HTIMAP_DONE;
+	    }
+	    break;
+
+	case HTIMAP_SEARCH:
+	    /* aXXX UID SEARCH ... */
+	    {
+		char *b = (char*) HTMemLock(@self->HTIMAPI_params);
+		ParseParams(&list, b);
+		if (list) {
+		    PutNewTag(net, p->taggedCmdList, HTIMAP_SEARCH);
+		    ret=PutSearch(net, list);
+		    HTListDelete(list);
+		} else ret = HT_NO;  /* bad URL */
+		HTMemUnlock(@self->HTIMAPI_params);
+		if (ret!=HT_OK) MYRETURN(ret);
+		@self->HTIMAPI_currentState = HTIMAP_GET_RESPONSE;
+		@self->HTIMAPI_nextState = HTIMAP_FETCH_LIST;
+	    }
+	    break;
+	    
+	case HTIMAP_FETCH_LIST:
+	    /* aXXX UID FETCH message_set ... */
+	    {
+		if (p->retList && HTListGetCount(p->retList)) {
+		    PutNewTag(net, p->taggedCmdList, HTIMAP_FETCH_LIST);
+		    ret=PutFetchList(net, p->retList);
+		    if (ret!=HT_OK) MYRETURN(ret);
+		    @self->HTIMAPI_currentState = HTIMAP_GET_RESPONSE;
+		    @self->HTIMAPI_nextState = HTIMAP_DONE;
+		} else {
+		    /* HTIMAP_SEARCH failed to find msgs we want */
+		    PUTBLOCK(p->target, 0, 0);
+		    @self->HTIMAPI_currentState = HTIMAP_DONE;
+		}
+	    }
+	    break;
+
+	case HTIMAP_BODY_REQUEST:
+	    /* 
+	     * aXXX UID FETCH msg (BODY ENVELOPE BODY[part])
+	     */
+	    {
+		char *b= (char*) HTMemLock(@self->HTIMAPI_params);
+		ParseParams(&list, b);
+		if (list) {
+		    char *n;
+		    PutNewTag(net, p->taggedCmdList, HTIMAP_BODY_REQUEST);
+		    ret=PutBody(net, list);
+		    n = GetParamValue(list, "part", TRUE);
+		    if (n) {
+			HTIMAPBodyResp *r = (HTIMAPBodyResp *) p->resp;
+			/* Getting this body partNumber */
+			r->IBR_partNumber = HTStrAllocCopy(n);
+		    }
+		    p->strTarget = SaveStream(@self->HTSI_request, list);
+		    HTListDelete(list);
+		} else ret=HT_NO;    /* bad URL */
+		HTMemUnlock(@self->HTIMAPI_params);
+		if (ret != HT_OK) MYRETURN(ret);
+		if (!p->strTarget) MYRETURN(HT_CANNOT_WRITE_FILE);
+		@self->HTIMAPI_currentState = HTIMAP_GET_RESPONSE;
+		@self->HTIMAPI_nextState = HTIMAP_DONE;
+	    }
+	    break;
+
+	case HTIMAP_PBODY_REQUEST:
+	    /*
+	     * aXXX UID FETCH msg ENVELOPE. We need to execute this 
+	     * command first to get the message sequence number for
+		 * the PARTIAL command.
+	     */
+	    {
+		char *b = (char*) HTMemLock(@self->HTIMAPI_params);
+		ParseParams(&list, b);
+		if (list) {
+		    char *n;
+		    PutNewTag(net, p->taggedCmdList, HTIMAP_PBODY_REQUEST);
+		    ret=PutEnvelope(net, list);
+		    n = GetParamValue(list, "part", FALSE);
+		    if (n) {
+			HTIMAPPBodyResp *r = (HTIMAPPBodyResp *) p->resp;
+			/* Getting this body partNumber */
+			r->IBR_partNumber = HTStrAllocCopy(n);
+		    }
+		    p->strTarget = SaveStream(@self->HTSI_request, list);
+		    /* Pass the list to the next command */
+		} else ret=HT_NO; /* bad URL */
+		HTMemUnlock(@self->HTIMAPI_params);
+		if (ret != HT_OK) {
+		    if (list) HTListDelete(list);
+		    MYRETURN(ret);
+		}
+		if (!p->strTarget) {
+		    if (list) HTListDelete(list);
+		    MYRETURN(HT_CANNOT_WRITE_FILE);
+		}
+		@self->HTIMAPI_currentState = HTIMAP_GET_RESPONSE;
+		@self->HTIMAPI_nextState = HTIMAP_PBODY_REQUEST2;
+	    }
+	    break;
+
+	case HTIMAP_PBODY_REQUEST2:
+	    /*
+	     * Note that "UID PARTIAL" is not a valid command. So
+	     * we rely on the pevious command HTIMAP_BODY_REQUEST to
+	     * get us the nz_number.
+	     *
+	     * aXXX PARTIAL nz_number BODY[part] start length.
+	     */
+	    {
+		PutNewTag(net, p->taggedCmdList, HTIMAP_PBODY_REQUEST2);
+		ret=PutPBody(net, p, list);
+		HTListDelete(list);
+		if (ret != HT_OK) MYRETURN(ret);
+		@self->HTIMAPI_currentState = HTIMAP_GET_RESPONSE;
+		@self->HTIMAPI_nextState = HTIMAP_DONE;
+	    }
+	    break;
+
+	case HTIMAP_ATTACH_REQUEST:
+	    /* aXXX UID FETCH msg (BODY BODY[part]) */
+	    {
+		char *b = (char*) HTMemLock(@self->HTIMAPI_params);
+		ParseParams(&list, b);
+		if (list) {
+		    char *n;
+		    PutNewTag(net, p->taggedCmdList, HTIMAP_ATTACH_REQUEST);
+		    ret=PutAttach(net, list);
+		    n = GetParamValue(list, "part", TRUE);
+		    if (n) {
+			HTIMAPAttachResp *r = (HTIMAPAttachResp *) p->resp;
+			/* Getting this body partNumber */
+			r->IAR_partNumber = HTStrAllocCopy(n);
+			p->strTarget = SaveStream(@self->HTSI_request, list);
+		    } else ret = HT_NO;  /* bad URL */
+		    HTListDelete(list);
+		} else ret = HT_NO; /* bad URL */
+		HTMemUnlock(@self->HTIMAPI_params);
+		if (!p->strTarget) MYRETURN(HT_CANNOT_WRITE_FILE);
+		if (ret != HT_OK) MYRETURN(ret);
+		@self->HTIMAPI_currentState = HTIMAP_GET_RESPONSE;
+		@self->HTIMAPI_nextState = HTIMAP_DONE;
+	    }
+	    break;
+
+	case HTIMAP_PATTACH_REQUEST:
+	    /*
+	     * aXXX UID FETCH msg BODY. Or if we don't need the body info,
+	     * aXXX UID FETCH msg UID (see commented code below)
+	     * We need to execute this first to get the sequence number 
+	     * before we get PARTIAL (which requires the sequence number).
+	     */
+	    {
+		char *b = (char*) HTMemLock(@self->HTIMAPI_params);
+		ParseParams(&list, b);
+		if (list) {
+		    char *uid, *n; 
+		    PutNewTag(net, p->taggedCmdList, HTIMAP_PBODY_REQUEST);
+		    uid = GetParamValue(list, "message", TRUE);
+		    n = GetParamValue(list, "part", FALSE);
+		    if (uid && n) {
+			HTIMAPAttachResp *r = (HTIMAPAttachResp *) p->resp;
+			HTSocketSend(net->HTNT_socket, (void*)"UID FETCH ", 10);
+			HTSocketSend(net->HTNT_socket, (void*)uid, strlen(uid));
+//			HTSocketSend(net->HTNT_socket, (void*)" UID", 4);
+			HTSocketSend(net->HTNT_socket, (void*)" BODY", 5);
+			ret=HTSocketSend(net->HTNT_socket, (void*)CRLF, 2);
+			/* Getting this body partNumber */
+			r->IAR_partNumber = HTStrAllocCopy(n);
+			p->strTarget = SaveStream(@self->HTSI_request, list);
+		    } else ret = HT_NO; /* bad URL */
+		    /* Pass the list to the next command */
+		} else ret = HT_NO;  /* bad URL */
+		HTMemUnlock(@self->HTIMAPI_params);
+		if (ret != HT_OK) {
+		    if (list) HTListDelete(list);
+		    MYRETURN(ret);
+		}
+		if (!p->strTarget) {
+		    if (list) HTListDelete(list);
+		    MYRETURN(HT_CANNOT_WRITE_FILE);
+		}
+		@self->HTIMAPI_currentState = HTIMAP_GET_RESPONSE;
+		/* Share the next command with HTIMAP_PBODY_ATTACH2 */
+		@self->HTIMAPI_nextState = HTIMAP_PBODY_REQUEST2;
+	    }
+	    break;
+	    
+	case HTIMAP_DELETE:
+	    /* Two commands in progress */
+	    /* aXXX UID STORE msg +FLAGS (\DELETED)
+	     * aXXX EXPUNGE
+	     */
+	    {
+		char *b = (char*) HTMemLock(@self->HTIMAPI_params);
+		ParseParams(&list, b);
+		if (list) {
+		    PutNewTag(net, p->taggedCmdList, HTIMAP_DELETE);
+		    PutFlags(net, list, IF_DELETED);
+		    PutNewTag(net, p->taggedCmdList, HTIMAP_EXPUNGE);
+		    HTSocketSend(net->HTNT_socket, (void*)"EXPUNGE", 7);
+		    ret=HTSocketSend(net->HTNT_socket, (void*)CRLF, 2);
+		    HTListDelete(list);
+		} else
+		    ret = HT_NO;
+		HTMemUnlock(@self->HTIMAPI_params);
+		if (ret!=HT_OK) MYRETURN(ret);
+		@self->HTIMAPI_currentState = HTIMAP_GET_RESPONSE;
+		@self->HTIMAPI_nextState = HTIMAP_DONE;
+	    }
+	    break;
+
+	case HTIMAP_LOGOUT:
+	    /* aXXX LOGOUT */
+	    {
+		PutNewTag(net, p->taggedCmdList, HTIMAP_LOGOUT);
+		HTSocketSend(net->HTNT_socket, (void*)"LOGOUT\x0D\x0A", 8);
+		@self->HTIMAPI_currentState = HTIMAP_GET_RESPONSE;
+		@self->HTIMAPI_nextState = HTIMAP_DONE;
+		/* Persistent connection is going away */
+		net->HTNT_persistent = FALSE;
+	    }
+	    break;
+
+	case HTIMAP_DONE:
+	    /* Success! Maintain persistent connection, don't use MYRETURN */
+	    return HT_LOADED; /* IMAP's success "after" callback ret code */
+
+	default:
+
+EC(         EC_ERROR(HTIMAP_STATE_NOT_HANDLED);                         )
+
+	    MYRETURN(HT_ERROR);
+	}
+    }
+}	/* End of MSG_HT_PROTOCOL_LOAD.	*/
+

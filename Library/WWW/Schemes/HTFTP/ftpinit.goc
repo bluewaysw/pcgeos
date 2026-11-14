@@ -1,0 +1,1255 @@
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Geoworks 1998.  All rights reserved.
+	GEOWORKS CONFIDENTIAL
+
+PROJECT:	Geobrowser
+MODULE:		ftp
+FILE:		ftpinit.goc
+
+AUTHOR:		Jeremy Broestl, Jun 22, 1998
+
+ROUTINES:
+	Name			Description
+	----			-----------
+
+REVISION HISTORY:
+	Name		Date		Description
+	----		----		-----------
+	jeremyb 	6/22/98   	Initial version.
+
+DESCRIPTION:
+
+	Contains all the initialization code.
+
+	$Id: ftpinit.goc,v 1.1.1.4 98/08/04 14:45:16 jeremyb Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+@include <nsftp.goh>
+#include <sem.h> /* filenameSem*/
+
+extern GeodeHandle ftpClientApp;
+extern word ftpClientMsg;
+extern SemaphoreHandle filenameSem;
+extern int idleCount;
+
+void _pascal
+FTPGetAddress (HTRequestHandle request, HTSocketAddress *htAddress);
+
+/***********************************************************************
+ *		FTPClientRegister
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Set things up so ftp and browser can communicate
+ * CALLED BY:	EXTERNAL browser
+ * RETURN:	none
+ *	
+ * STRATEGY:	
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	jeremyb 	7/30/98   	Initial Revision
+ *	
+ ***********************************************************************/
+void _far _pascal
+FTPClientRegister (GeodeHandle client, word message, optr view)
+{
+    PUSHDS;
+    SET_DS_LIB_DGROUP;
+
+    filenameSem = ThreadAllocSem(0);
+    ftpClientApp = client;
+    ftpClientMsg = message;
+
+    POPDS;
+}
+
+/***********************************************************************
+ *		InitFTPStructures
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    Geos answer to Netscape's net_FTPLoad
+ *
+ * PARAMETERS:	    int (HTNetThread *net)
+ *                  - return HT_OK if all is well.
+ *		    - return HT_ERROR if error occured
+ *
+ * SIDE EFFECTS:    ftpConHandle struct filled in
+ *
+ * STRATEGY:        Just do it.  Brutal.
+ * 
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	jeremyb	6/16/98   	Initial Revision
+ *
+ ***********************************************************************/
+HTMemHandle
+FTPInitStructures(HTNetThread *net)
+{
+    HTMemHandle hostHandle; 
+    HTMemHandle unamePwdHandle; 
+    char *unamePwd;
+    char *username,*colon,*password=NULL;
+    char * filename;
+    char * semi_colon;
+    FTPConData *cd;
+    HTMemHandle usernameHandle = NULL, passwordHandle = NULL;
+    HTMemHandle ftpConData = HTMemAlloc(sizeof(FTPConData));
+    char *reqUrlPtr ; /* The URL containing the ftp file to be grabbed*/
+    HTRequest *reqPtr ;
+    MemHandle reqUrlHandle, urlStructHandle;
+    char *path;
+
+    if (ftpConData == NULL) {
+	return (NullHandle);
+    }
+
+    reqPtr = (HTRequest *) MemLock(net->HTNT_request);
+    reqUrlHandle = reqPtr->HTR_uriString;
+    MemUnlock(net->HTNT_request);
+
+    /* Step 1: Copy the address from the request into the ce structure.  
+     * Complicated by the fixed memory used in Netscape.
+     */
+
+    cd = HTMemLock(ftpConData);
+
+    reqUrlPtr = MemLock(reqUrlHandle);
+    cd->addressHandle = HTMemAlloc(strlen(reqUrlPtr) + 1);
+    strcpy(HTMemLock(cd->addressHandle), reqUrlPtr);
+
+    HTMemUnlock(cd->addressHandle);
+    MemUnlock(reqUrlHandle);
+    
+    hostHandle = FTPParseURL(cd->addressHandle, GET_HOST_PART,
+			     NULL);
+    
+    unamePwdHandle = FTPParseURL(cd->addressHandle, 
+				 GET_USERNAME_PART | 
+				 GET_PASSWORD_PART, NULL);
+
+    /* Step 2: Grab some password stuff and keep track of it
+     * Note that the password stuff will only be kept if the URL contains it,
+     * there is no user interaction here.
+     */
+    unamePwd = HTMemLock(unamePwdHandle);
+    if( unamePwd && ((colon = strchr(unamePwd, ':')) != NULL) ) {
+	*colon='\0';
+	usernameHandle = HTMemAlloc(strlen(unamePwd)+1) ;
+	username = HTMemLock(usernameHandle);
+	strcpy(username, unamePwd);
+	/*password=strdup(colon+1);*/
+	passwordHandle = HTMemAlloc(strlen(colon)) ;
+	password = HTMemLock(passwordHandle);
+	strcpy(password, colon+1);
+	*colon=':';
+    } else {
+	username=unamePwd;
+    }
+    HTMemUnlockAndFree(unamePwdHandle);
+
+    /* can't do this: listen_sock needs to be persistent*/
+    /*cd->listen_sock   = NULL;*/
+    cd->pasv_mode     = TRUE;
+    cd->next_state_after_response = FTP_ERROR_DONE;
+    cd->cont_response     = -1;
+
+    if (usernameHandle && *username) {
+	char *usernameLocal;
+	char *passwordLocal;
+	cd->usernameHandle = HTMemAlloc(strlen(username)+1);
+	usernameLocal = HTMemLock(cd->usernameHandle);
+	strcpy(usernameLocal, username);
+	HTMemUnlock(cd->usernameHandle);
+	if (passwordHandle && *password) {
+	    cd->passwordHandle = HTMemAlloc(strlen(password)+1);
+	    passwordLocal = HTMemLock(cd->passwordHandle);
+	    strcpy(passwordLocal, password);
+	    HTMemUnlock(cd->passwordHandle);
+	}
+    } else {
+/*	const char *user = NULL;*/
+	if (usernameHandle) {
+	    HTMemFree(usernameHandle);
+	    passwordHandle = NULL;
+	}
+	if (passwordHandle) {
+	    HTMemFree(passwordHandle);
+	    passwordHandle = NULL;
+	}
+		
+    }
+
+    /* get the path */
+    cd->path_handle = FTPParseURL(cd->addressHandle, GET_PATH_PART, NULL);
+
+    if(!cd->path_handle) {
+        HTMemUnlockAndFree(ftpConData);
+        return(MK_OUT_OF_MEMORY);
+    }
+    path = HTMemLock(cd->path_handle);
+
+    if(path[0] == '\0') {
+	cd->use_default_path = TRUE;
+    }
+
+    /* if the path begins with /./ 
+     * use pwd to get the sub path
+     * and append the end to it
+     */
+    if(!strncmp(path, "/./", 3) || !strcmp(path, "/.")) {
+	/* slash the first 2 characters off the beginning */
+	char *tmp;
+	HTMemHandle tmpHandle = HTMemAlloc(strlen(path) -2 +1);
+	if(!tmpHandle) {
+	    HTMemUnlockAndFree(ftpConData);
+	    HTMemUnlockAndFree(cd->path_handle);
+	    return(MK_OUT_OF_MEMORY);
+	}
+	tmp = HTMemLock(tmpHandle);
+
+	/* skip the "/." and leave a slash at the beginning */
+	strcpy(tmp, path+2) ;
+	HTMemUnlockAndFree(cd->path_handle);
+	cd->path_handle = tmpHandle;
+	path = HTMemDeref(tmpHandle);
+
+	cd->use_default_path = TRUE;
+    }
+
+
+    /* set the default type for use later
+     */
+    cd->fileType = FTP_MODE_UNKNOWN;
+
+    /* look for the extra type information at the end per
+     * the RFC 1630.  It will be delimited by a ';'
+     */
+    if((semi_colon = strrchr(path, ';')) != NULL) {
+        /* just switch on the character at the end of this whole
+         * thing since it must be the type to use
+         */
+        switch(semi_colon[strlen(semi_colon)-1])
+          {
+            case 'a':
+            case 'A':
+                cd->fileType = FTP_MODE_ASCII;
+                break;
+
+            case 'i':
+            case 'I':
+                cd->fileType = FTP_MODE_BINARY;
+                break;
+          }
+
+        /* chop off the bits after the semi colon
+         */
+        *semi_colon = '\0';
+    }
+
+    /* find the filename in the path */
+    filename = strrchr(path, '/');
+    if(!filename) {
+        filename = path;
+    } else {
+	filename++;  /* go past slash */
+    }
+    
+    if (filename) {
+	char *filenameBuf ;
+	cd->filenameHandle = HTMemAlloc(strlen(filename)+1);
+	filenameBuf = HTMemLock(cd->filenameHandle);
+	strcpy(filenameBuf, filename);
+	HTMemUnlock(cd->filenameHandle);
+    }
+
+    HTMemUnlock(cd->path_handle);
+
+    /* Initialize the connection info struct in cd->cc*/
+    if(!cd->cc) {
+	int count, i;
+	char *host, *hostname; /* XXX: fix this*/
+
+        /* build a control connection structure so we
+         * can store the data as we go along
+         */
+
+	/* XXX: So why don't we just swipe the handle called hostHandle?*/
+	host = HTMemLock(hostHandle);
+	cd->hostnameHandle = HTMemAlloc(strlen(host)+2);
+	hostname = HTMemLock(cd->hostnameHandle);
+        strcpy(hostname, host);
+	HTMemUnlock(cd->hostnameHandle);
+	HTMemUnlock(hostHandle);
+        /* set the mode of the control connection unknown
+         */
+        cd->fileType = FTP_MODE_UNKNOWN;
+	cd->csock = NullHandle;
+	cd->server_type = FTP_GENERIC_TYPE;
+
+        cd->no_restart = FALSE; /* as far as we know so far */
+
+	/* gate the maximum number of cached connections
+	 * to one
+	 */
+	cd->next_state = FTP_CONTROL_CONNECT;
+
+    }
+
+    if (hostHandle) {
+	HTMemFree(hostHandle);
+    }
+    if (usernameHandle) {
+	HTMemUnlockAndFree(usernameHandle);
+    }
+    if (passwordHandle) {
+	HTMemUnlockAndFree(passwordHandle);
+    }
+    PUSHDS;
+    SET_DS_LIB_DGROUP;
+    idleCount = 0;
+    POPDS;
+
+    HTMemUnlock(ftpConData);
+    return(ftpConData);
+}
+
+
+/***********************************************************************
+ *		FTPGetAddress
+ ***********************************************************************
+ * SYNOPSIS:	Get the address of a HTTP request for connecting to 
+ *              the network.
+ *
+ * CALLED BY:	FTPInitStructures
+ * RETURN:	HTSocketAddress.
+ * SIDE EFFECTS:Nothing.
+ *	
+ * STRATEGY:    If a request uses a proxy, the proxy name is given higher
+ *              priority. Otherwise use the hostname provided in the URI. 
+ *
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	kkee	8/ 6/96   	Initial Revision
+ *
+ ***********************************************************************/
+void _pascal
+FTPGetAddress (HTRequestHandle request, HTSocketAddress *htAddress)
+{
+    HTMemHandle htmh;
+    HTRequest *rptr;
+    word port;
+    char *cptr;
+
+EC( ECCheckRequest(request);                                            )
+
+    rptr = (HTRequest *) MemThreadGrab(request);
+
+    /* IP address */
+    if (rptr->HTR_proxy) 
+	strcpy(htAddress->HTSA_ipAddress,
+	       (char *)rptr->HTR_proxyName);
+    else {
+	cptr = (char *) MemLock(rptr->HTR_uriString);
+	htmh = HTParseURI(cptr, NULL, HTURI_PARSE_HOST);
+	MemUnlock(rptr->HTR_uriString);
+
+	/* Check that htmh is allocated! */
+
+	cptr = (char *) HTMemLock(htmh);
+	strcpy(htAddress->HTSA_ipAddress, cptr);
+	HTMemUnlockAndFree(htmh);
+    }
+
+    /* Port number */
+    if (rptr->HTR_proxy) {
+	htAddress->HTSA_port = rptr->HTR_proxyPortNumber;
+    } else {
+	cptr = (char *) MemLock(rptr->HTR_uriString);
+	htmh = HTParseURI(cptr, NULL, HTURI_PARSE_PORT);
+	MemUnlock(rptr->HTR_uriString);
+
+	/* Check that htmh is allocated! */
+
+	cptr = (char *) HTMemLock(htmh);
+	port = atoi(cptr);
+	HTMemUnlockAndFree(htmh);
+
+	if (port)
+	    htAddress->HTSA_port = port;
+	else 
+	    htAddress->HTSA_port = FTP_PORT;
+    }
+
+    /* AccessPoint */
+    htAddress->HTSA_accessPoint = rptr->HTR_accessPoint;
+    
+    MemThreadRelease(request);
+}	/* End of FTPGetAddress.	*/
+
+
+/***********************************************************************
+ *		ftp_send_username
+ ***********************************************************************
+ *
+ * SYNOPSIS:	send the username to the server
+ * CALLED BY:	ftp state machine
+ * RETURN:	status
+ *	
+ * STRATEGY:	"USER anonymous" or "USER blah" if username is blah 
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	jeremyb 	7/29/98   	Initial Revision
+ *	
+ ***********************************************************************/
+int
+ftp_send_username (HTMemHandle ftpConHandle)
+{
+    char outBuf[60] = "USER";
+    FTPConData *cd;
+    int status;
+    char *userPtr;
+
+    cd = (FTPConData *) HTMemLock(ftpConHandle);
+
+    /* look for the word UNIX in the hello message
+     * if it is there assume a unix server that can
+     * use the LIST command
+     */	
+    if(cd->return_msg_handle) {
+	char *ptr = HTMemLock(cd->return_msg_handle);
+	if (strcasestr(ptr, "UNIX")) {
+	    cd->server_type = FTP_UNIX_TYPE;
+	}
+	HTMemUnlock(cd->return_msg_handle);
+    }
+    
+    if (cd->usernameHandle) {
+	userPtr = HTMemLock(cd->usernameHandle);
+	strcat(outBuf, userPtr);
+	strcat(outBuf, "\n");
+	HTMemUnlock(cd->usernameHandle);
+    } else {
+	strcpy(outBuf, "USER anonymous\n");
+    }
+	
+    cd->next_state = FTP_WAIT_FOR_RESPONSE;
+    cd->next_state_after_response = FTP_SEND_USERNAME_RESPONSE;
+
+    status = HTSocketSend(cd->csock, outBuf, strlen(outBuf));
+
+    HTMemUnlock(ftpConHandle);
+    
+    return(status);
+}
+
+
+/***********************************************************************
+ *		ftp_send_username_response
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Process server response to the username
+ * CALLED BY:	ftp state machine
+ * RETURN:	int status
+ *	
+ * STRATEGY:	
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	jeremyb 	7/29/98   	Initial Revision
+ *	
+ ***********************************************************************/
+int
+ftp_send_username_response (HTMemHandle ftpConHandle)
+{
+    FTPConData *cd;
+    int ret = 0;
+
+    cd = (FTPConData *) HTMemLock(ftpConHandle);
+
+    if (cd->response_code == 3) { /* 331 anonymous login... 331/100 =3*/
+	if(!cd->passwordHandle) {
+            cd->next_state = FTP_GET_PASSWORD;
+	} else {
+	    cd->next_state = FTP_SEND_PASSWORD;
+        }
+    } else if (cd->response_code == 2) { /* Logged in */
+          if(cd->no_restart ) {
+              cd->next_state = FTP_SEND_SYST;
+          } else {
+              cd->next_state = FTP_SEND_REST_ZERO;
+	  }
+    } else {
+	/* show the error
+	 */
+	
+	/* Probably want to call the client to show error.  A dialog?
+	 * How do you do?
+	 */
+        cd->next_state = FTP_ERROR_DONE;
+        ret = MK_UNABLE_TO_LOGIN;
+    }	
+
+    HTMemUnlock(ftpConHandle);
+    return(ret);
+
+} /* end ftp_send_username_response */
+
+/***********************************************************************
+ *		ftp_send_password
+ ***********************************************************************
+ *
+ * SYNOPSIS:	send the password to the server
+ * CALLED BY:	ftp state machine
+ * RETURN:	status
+ *	
+ * STRATEGY:	PASS <something bogus> or PASS <blah> if <blah> is the 
+ *               provided password.
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	jeremyb 	7/29/98   	Initial Revision
+ *	
+ ***********************************************************************/
+int
+ftp_send_password (HTMemHandle ftpConHandle)
+{
+    char outBuf[OUTPUT_BUFFER_SIZE] = "PASS "; /* Way too big*/
+    FTPConData *cd;
+    int status;
+    
+    cd = (FTPConData *) HTMemLock(ftpConHandle);
+
+    if (cd->passwordHandle) {
+	char *ptr = HTMemLock(cd->passwordHandle);
+	strcat(outBuf, ptr);
+	HTMemUnlock(cd->passwordHandle);
+    } else {
+	strcat(outBuf, "noone@nothing.com");
+    }
+    strcat(outBuf, "\n");
+
+    cd->next_state = FTP_WAIT_FOR_RESPONSE;
+    cd->next_state_after_response = FTP_SEND_PASSWORD_RESPONSE;
+
+    status = HTSocketSend(cd->csock, outBuf, strlen(outBuf));
+
+    HTMemUnlock(ftpConHandle);
+    
+    return(status);
+}
+
+/***********************************************************************
+ *		ftp_send_password_response
+ ***********************************************************************
+ *
+ * SYNOPSIS:	process server response to the password
+ * CALLED BY:	ftp state machine
+ * RETURN:	status
+ *	
+ * STRATEGY:	If we're logged, start talking with the server about the 
+ *               file we want.
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	jeremyb 	7/29/98   	Initial Revision
+ *	
+ ***********************************************************************/
+int
+ftp_send_password_response (HTMemHandle ftpConHandle)
+{
+    FTPConData *cd;
+    int ret = 0;
+    
+    cd = (FTPConData *) HTMemLock(ftpConHandle);
+
+    if (cd->response_code == 2) { 
+	 /* No caching of passwords*/
+
+	if( cd->no_restart ) {
+	    cd->next_state = FTP_SEND_SYST;
+	} else {
+	    cd->next_state = FTP_SEND_REST_ZERO;
+	}
+	@send (ConstructOptr(ftpClientApp, 0))::
+	    {MSG_FROM_FTP_PROCESS}(ftpClientMsg)
+		(FTP_LOGGED_IN, 0);
+    } else {
+	/*FREEIF(ftp_last_password_host);*/
+	/*FREEIF(ftp_last_password);*/
+	
+        cd->next_state = FTP_ERROR_DONE;
+        ret = MK_UNABLE_TO_LOGIN;  /* negative return code */
+    }
+
+    HTMemUnlock(ftpConHandle);
+
+    return(ret); /* good */
+}
+
+/***********************************************************************
+ *		ftp_get_password
+ ***********************************************************************
+ *
+ * SYNOPSIS:	ftp wants the password.
+ * CALLED BY:	ftp state machine
+ * RETURN:	int status
+ *	
+ * STRATEGY:	go straight to the send_password
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	jeremyb 	7/29/98   	Initial Revision
+ *	
+ ***********************************************************************/
+int
+ftp_get_password (HTMemHandle ftpConHandle)
+{
+    /* Does there needs to be some way to prompt the user for a password
+     * if the site requires one??  Is this the place to do it??
+     */
+    FTPConData *cd;
+    cd = (FTPConData *) HTMemLock(ftpConHandle);
+
+    cd->next_state = FTP_SEND_PASSWORD;
+
+    HTMemUnlock(ftpConHandle);
+
+    return 0;
+} // end ftp_get_password
+
+/***********************************************************************
+ *		ftp_send_syst
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Ask the server what kind of machine it is.
+ * CALLED BY:	ftp state machine, after logging in
+ * RETURN:	status
+ *	
+ * STRATEGY:	send "SYST"
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	jeremyb 	7/29/98   	Initial Revision
+ *	
+ ***********************************************************************/
+int
+ftp_send_syst (HTMemHandle ftpConHandle)
+{
+    FTPConData *cd;
+    int status ;
+    char outBuf[] = "SYST\n";
+    
+    cd = (FTPConData *) HTMemLock(ftpConHandle);
+
+    /*PR_snprintf(cd->output_buffer, OUTPUT_BUFFER_SIZE, "SYST%c%c", CR, LF);*/
+
+    cd->next_state = FTP_WAIT_FOR_RESPONSE;
+    cd->next_state_after_response = FTP_SEND_SYST_RESPONSE;
+
+    status = HTSocketSend(cd->csock, outBuf, strlen(outBuf));
+
+    HTMemUnlock(ftpConHandle);
+
+    return status;
+    
+} // end ftp_send_syst()
+
+/***********************************************************************
+ *		ftp_send_syst_response
+ ***********************************************************************
+ *
+ * SYNOPSIS:	process the server's system type
+ * CALLED BY:	ftp state machine, after receiving the server type
+ * RETURN:	status
+ *	
+ * STRATEGY:	
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	jeremyb 	7/29/98   	Initial Revision
+ *	
+ ***********************************************************************/
+int
+ftp_send_syst_response (HTMemHandle ftpConHandle)
+{
+    FTPConData *cd;
+    int ret ;
+    char *ptr;
+    
+    cd = (FTPConData *) HTMemLock(ftpConHandle);
+
+    if (cd->response_code == 2) {
+
+        /* default next state will be to try PASV mode
+	 *
+	 * TEST: set this default next state to FTP_SEND_PORT
+	 * to test the non-pasv mode ftp
+         */
+	if(cd->use_default_path) {
+		cd->next_state = FTP_SEND_PWD;
+	} else {
+        	cd->next_state = FTP_FIGURE_OUT_WHAT_TO_DO;
+	}
+	
+	ptr = HTMemLock(cd->return_msg_handle);
+	if (ptr == NULL) {
+	    cd->next_state = FTP_ERROR_DONE ;
+	} else if (!strncmp(ptr, 
+			       "UNIX Type: L8 MAC-OS MachTen", 28)) {
+        /* we got a line -- what kind of server are we talking to? */
+            cd->server_type = FTP_MACHTEN_TYPE;
+	} else if (strstr(ptr, "UNIX") != NULL) {
+	    cd->server_type = FTP_UNIX_TYPE;
+	} else if (strstr(ptr, "Windows_NT") != NULL) {
+	    cd->server_type = FTP_NT_TYPE;
+	} else if (strncmp(ptr, "VMS", 3) == 0) {
+	    cd->server_type = FTP_VMS_TYPE;
+	} else if ((strncmp(ptr, "VM/CMS", 6) == 0)
+                           || (strncmp(ptr, "VM ", 3) == 0)) {
+	    cd->server_type = FTP_CMS_TYPE;
+	} else if (strncmp(ptr, "DCTS", 4) == 0) {
+	    cd->server_type = FTP_DCTS_TYPE;
+	} else if (strstr(ptr, 
+			     "MAC-OS TCP/Connect II") != NULL) {
+	    cd->server_type = FTP_TCPC_TYPE;
+	    cd->next_state = FTP_SEND_PWD;
+	} else if (strncmp(ptr, 
+			      "MACOS Peter's Server", 20) == 0) {
+	    cd->server_type = FTP_PETER_LEWIS_TYPE;
+	    cd->next_state = FTP_SEND_MAC_BIN; 
+	} else if(cd->server_type == FTP_GENERIC_TYPE) {
+	    cd->next_state = FTP_SEND_PWD; 
+	}
+	HTMemUnlock(cd->return_msg_handle);
+
+    } else {
+	cd->next_state = FTP_SEND_PWD;
+    }
+
+    HTMemUnlock(ftpConHandle);
+
+    return(0);  /* good */
+
+} // end ftp_send_syst_response
+
+/***********************************************************************
+ *		ftp_send_pwd
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Get the current directory from the server.
+ * CALLED BY:	ftp state machine for certain types of servers
+ * RETURN:	status
+ *	
+ * STRATEGY:	send "PWD" - to my knowledge, never been tested
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	jeremyb 	7/29/98   	Initial Revision
+ *	
+ ***********************************************************************/
+int
+ftp_send_pwd (HTMemHandle ftpConHandle)
+{
+    FTPConData *cd;
+    int status ;
+    char outBuf[] = "PWD\n";
+    
+    cd = (FTPConData *) HTMemLock(ftpConHandle);
+
+    cd->next_state = FTP_WAIT_FOR_RESPONSE;
+    cd->next_state_after_response = FTP_SEND_PWD_RESPONSE;
+
+    status = HTSocketSend(cd->csock, outBuf, strlen(outBuf));
+
+    HTMemUnlock(ftpConHandle);
+
+    return status;
+} // end ftp_send_pwd
+
+/***********************************************************************
+ *		ftp_send_pwd_response
+ ***********************************************************************
+ *
+ * SYNOPSIS:	tweak things for different server types
+ * CALLED BY:	ftp state machine
+ * RETURN:	status
+ *	
+ * STRATEGY:	to my knowledge, untested
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	jeremyb 	7/29/98   	Initial Revision
+ *	
+ ***********************************************************************/
+int
+ftp_send_pwd_response (HTMemHandle ftpConHandle)
+{
+    FTPConData *cd;
+    int ret ;
+    char *ptr, *cp;
+
+    cd = (FTPConData *) HTMemLock(ftpConHandle);
+
+    ptr = HTMemLock(cd->return_msg_handle);
+    if (ptr == NULL) {
+	cd->next_state = FTP_ERROR_DONE;    
+	HTMemUnlock(ftpConHandle);
+	return (-1);
+    }
+    cp = strstr((ptr+5), "\"");
+
+    if(cp) {
+        *cp = '\0';
+    }
+    /* default next state */
+    /* don't send PASV if the server cant do it */
+    cd->next_state = FTP_FIGURE_OUT_WHAT_TO_DO;
+
+    /* Errr?? return Msgs are concatentated dontcha know!! 
+     * Who reset the thing so we 
+     * suddenly find stuff at the beginning!?!??
+     */
+    if (cd->server_type == FTP_TCPC_TYPE) {
+        cd->server_type = (*(ptr + 1) == '/' ? 
+			FTP_NCSA_TYPE : FTP_TCPC_TYPE);
+    } else if(cd->server_type == FTP_GENERIC_TYPE) {
+/*    	if (cd->return_msg[1] == '/') {*/
+	if (*(ptr+1) == '/') {
+            /* path names beginning with / imply Unix,
+             * right?
+             */
+            cd->server_type = FTP_UNIX_TYPE;
+            cd->next_state = FTP_SEND_MAC_BIN;  /* see if it's a mac */
+/*        } else if (cd->return_msg[strlen(cd->return_msg)-1] == ']') {*/
+	} else if ( *(ptr + strlen(ptr) -1) == ']') {
+             /* path names ending with ] imply VMS, right? */
+             cd->server_type = FTP_VMS_TYPE;
+        }
+    }
+
+    /* use the path returned by PWD if use_default_path is set
+     * don't do this for vms hosts
+     */
+    if(cd->use_default_path && cd->server_type != FTP_VMS_TYPE) {
+	char *path, *endPath ;
+	char *existing_path ;
+	/* Make your own strtok -- hope I did it right from the man page*/
+	path = strstr((ptr+1), "\"");
+	endPath = strstr((path+1), "\"");
+
+	if (endPath) {
+	    *endPath = '\0';
+	}
+	existing_path = HTMemLock(cd->path_handle);
+
+	/* NT can return a drive letter.  We can't
+	 * deal with a drive letter right now
+	 * so we need to just strip the drive letter
+	 */
+	if(*path != '/') {
+	    ptr = strstr(path, "/");
+	    /* If that didn't work, look for a backslash (e.g., OS/2) */
+	    if( ptr == (char *)0 ) {
+		ptr = strchr(path, '\\');
+		/* If that worked, then go flip the slashes 
+		 * so the URL is legal 
+		 */
+		if( ptr != (char *)0 ) {
+		    char *p;
+		    for( p = ptr; *p != '\0'; p++ ){
+			if( *p == '\\' ) {
+			    *p = '/';
+			}
+		    }
+		}
+	    }
+	} else {
+	    ptr = path;
+ 	}
+	if(ptr) {
+	    HTMemHandle new_url_handle;
+	    char *newPathPtr, *new_url;
+	    int urlLength;
+	    int length = strlen (ptr);
+	    HTMemHandle newPathHandle = HTMemAlloc(length + 1);
+	    newPathPtr = HTMemLock(newPathHandle);
+	    strcpy(newPathPtr, ptr);
+	    if(existing_path && existing_path[0] != '\0') {
+		/* if the new path has a / on the
+		 * end remove it since the
+		 * existing path already has
+		 * a slash at the beginning
+		 */
+		if(newPathPtr[0] != '\0') {
+/*		    char *end = &cd->path[strlen(cd->path)-1];*/
+		    char *end = (newPathPtr + length - 1);
+		    if(*end == '/') {
+			*end = '\0';
+		    }
+		}
+		HTMemUnlock(newPathHandle);
+		newPathHandle = HTMemReAlloc(newPathHandle, 
+					     strlen(existing_path) + length);
+		newPathPtr = HTMemLock(newPathHandle);
+		strcat(newPathPtr, existing_path);
+		HTMemUnlockAndFree(cd->path_handle);
+		cd->path_handle = newPathHandle;
+	    }
+	    /* strip the path part from the URL
+	     * and add the new path
+	     */
+	    
+	    new_url_handle = FTPParseURL(cd->addressHandle, 
+				   GET_PROTOCOL_PART | GET_USERNAME_PART | 
+				   GET_HOST_PART, &urlLength);
+	    new_url_handle = HTMemReAlloc(new_url_handle, urlLength + length);
+	    new_url = HTMemLock(new_url_handle);
+	    strcat(new_url, newPathPtr);
+	    HTMemFree(cd->addressHandle);
+	    cd->addressHandle = new_url_handle;
+	    HTMemUnlock(cd->addressHandle);
+	}
+
+	/* make sure we don't do this again for some reason */
+	cd->use_default_path = FALSE;
+
+	HTMemUnlock(cd->path_handle);
+    }
+
+    if (cd->server_type == FTP_NCSA_TYPE ||
+                       cd->server_type == FTP_TCPC_TYPE ||
+                       cd->server_type == FTP_PETER_LEWIS_TYPE) {
+        cd->next_state = FTP_SEND_MAC_BIN;
+    }
+   
+    /* XXX: redo this function: path_handle unlocked 2x*/
+    HTMemUnlock(cd->path_handle);
+    HTMemUnlock(cd->return_msg_handle);
+    HTMemUnlock(ftpConHandle);
+
+    return(0); /* good */
+} // end ftp_send_pwd_response
+
+/***********************************************************************
+ *		ftp_figure_out_what_to_do
+ ***********************************************************************
+ *
+ * SYNOPSIS:	if we can use pasv connections, try it.
+ * CALLED BY:	ftp state machine
+ * RETURN:	status
+ *	
+ * STRATEGY:	if possible to use pasv, do it.
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	jeremyb 	7/29/98   	Initial Revision
+ *	
+ ***********************************************************************/
+int
+ftp_figure_out_what_to_do (HTMemHandle ftpConHandle)
+{
+    FTPConData *cd;
+
+    cd = (FTPConData *) HTMemLock(ftpConHandle);
+
+    if(!cd->pasv_mode) {
+	cd->next_state = FTP_SEND_PORT;
+    } else {
+	cd->next_state = FTP_SEND_PASV;
+    }
+
+    HTMemUnlock(ftpConHandle);
+
+    return(0);
+} // end ftp_figure_out_what_to_do
+
+/***********************************************************************
+ *		ftp_send_rest_zero
+ ***********************************************************************
+ *
+ * SYNOPSIS:	tell the server that we want to start again from 
+ *               beginning
+ * CALLED BY:	ftp state machine
+ * RETURN:	status
+ *	
+ * STRATEGY:	send "REST 0"
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	jeremyb 	7/29/98   	Initial Revision
+ *	
+ ***********************************************************************/
+int
+ftp_send_rest_zero (HTMemHandle ftpConHandle)
+{
+    FTPConData *cd;
+    int status;
+    char outBuf[] = "REST 0\n";
+
+    cd = (FTPConData *) HTMemLock(ftpConHandle);
+    
+    cd->next_state = FTP_WAIT_FOR_RESPONSE;
+    cd->next_state_after_response = FTP_SEND_REST_ZERO_RESPONSE;
+
+    status = HTSocketSend(cd->csock, outBuf, strlen(outBuf));
+
+    HTMemUnlock(ftpConHandle);
+
+    return status;
+}
+
+/***********************************************************************
+ *		ftp_send_rest_zero_response
+ ***********************************************************************
+ *
+ * SYNOPSIS:	note it if the server can't do restarts.  XXX: Why?
+ * CALLED BY:	ftp state machine
+ * RETURN:	status
+ *	
+ * STRATEGY:	go to syst state.
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	jeremyb 	7/29/98   	Initial Revision
+ *	
+ ***********************************************************************/
+int
+ftp_send_rest_zero_response (HTMemHandle ftpConHandle)
+{
+    FTPConData *cd;
+
+    cd = (FTPConData *) HTMemLock(ftpConHandle);
+    
+    if (cd->response_code == 3) {
+        cd->no_restart = FALSE;
+    } else {
+        cd->no_restart = TRUE;
+    }
+    cd->next_state = FTP_SEND_SYST;
+
+    HTMemUnlock(ftpConHandle);
+    return 0;
+}
+
+/***********************************************************************
+ *		ftp_send_pasv
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Ask the server if it can do passive connections
+ * CALLED BY:	ftp state machine
+ * RETURN:	status
+ *	
+ * STRATEGY:	send PASV
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	jeremyb 	7/29/98   	Initial Revision
+ *	
+ ***********************************************************************/
+int
+ftp_send_pasv (HTMemHandle ftpConHandle)
+{
+    FTPConData *cd;
+    char outBuf[] = "PASV\n";
+    int status ;
+
+    cd = (FTPConData *) HTMemLock(ftpConHandle);
+
+    cd->next_state = FTP_WAIT_FOR_RESPONSE;
+    cd->next_state_after_response = FTP_SEND_PASV_RESPONSE;
+
+    status = HTSocketSend(cd->csock, outBuf, strlen(outBuf));
+
+    HTMemUnlock(ftpConHandle);
+
+    return status;
+} // end ftp_send_pasv
+
+/***********************************************************************
+ *		ftp_send_pasv_response
+ ***********************************************************************
+ *
+ * SYNOPSIS:	process server response to pasv
+ * CALLED BY:	ftp state machine
+ * RETURN:	status
+ *	
+ * STRATEGY:	note whether or not server can handle pasv connections
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	jeremyb 	7/29/98   	Initial Revision
+ *	
+ ***********************************************************************/
+int
+ftp_send_pasv_response (HTMemHandle ftpConHandle, HTNetThread *net)
+{
+    byte remAddress[6];
+    char  *cp, *return_msg;
+    int    status, i;
+    FTPConData *cd;
+    HTSocket *pPasvSock;
+
+    cd = (FTPConData *) HTMemLock(ftpConHandle);
+
+    if (cd->response_code !=2)  {
+	cd->next_state = FTP_SEND_PORT; /* default next state */
+	cd->pasv_mode = FALSE;
+	HTMemUnlock(ftpConHandle);
+	
+	return(0); /* continue */
+    }
+
+    return_msg = (char *)HTMemLock(cd->return_msg_handle);
+
+    /* find first comma or end of line */
+    for(cp=return_msg; *cp && *cp != ','; cp++)
+        ; /* null body */
+
+    /* find the begining of digits */
+    while (--cp > return_msg && '0' <= *cp && *cp <= '9') {
+        ; /* null body */   
+    }
+    /* go past the '(' when the return is of the
+     * form (128,234,563,356,356)
+     */
+    if(*cp < '0' || *cp > '9') {
+	cp++;
+    }
+    
+    i = 0;
+    while (1) {
+	if (isdigit(*cp)) {
+	    remAddress[i] = (byte) atoi(cp);
+	    i++;
+	    while(1) {
+		if (*cp == '\0') {
+		    break;
+		}
+		cp++;
+		if (*cp == ',') {
+		    break;
+		}
+	    }
+		
+	    if ((i == 6) || (*cp=='\0')) {
+		break;
+	    }
+	    cp++; /* advance past , */
+	} else {
+	    /* Assume it's a space thing -- advance to next digit or \0 */
+	    while((*cp != ',') && (*cp != '\0')) {
+		cp++;
+	    }
+
+	}
+    }
+
+    if (i<6) {
+        cd->next_state = FTP_SEND_PORT; /* default next state */
+        cd->pasv_mode = FALSE;
+        return(0);
+    }
+
+    cd->pasvSockHandle = HTSocketCreate(net); 
+    pPasvSock = (HTSocket *) MemLock(cd->pasvSockHandle);
+
+
+    /* OK, it's time for some serious hackage.  When Geos resolver gets done,
+     * it returns a structure like this: 03 00 01 01 00 ww xx yy zz ...
+     * The 03 00 is a word storing a 3, the length of some link info 
+     * immediately following.  Tag ESACA_linkSize (tcpipEntry.asm, 
+     * ECCheckIPAddrSize) for more details.  The 01 01 00 is some link info
+     * the details of which are not apparent, but appear to be related to the
+     * driver you're using to get the address (ppp in this case).  Then the 
+     * next four bytes are the actual ip addr of the remote site.  Don't put
+     * the port after it, but in the port piece of SocketAddress.
+     *
+     * "A well-documented hack is better than no hack at all"
+     */
+    pPasvSock->HTS_resolvedAddress[0] = 3 ;
+    pPasvSock->HTS_resolvedAddress[1] = 0 ;
+    pPasvSock->HTS_resolvedAddress[2] = 1 ;
+    pPasvSock->HTS_resolvedAddress[3] = 1 ;
+    pPasvSock->HTS_resolvedAddress[4] = 0 ;
+    for (i = 5; i< 9 ; i++) {
+	pPasvSock->HTS_resolvedAddress[i] = remAddress[i-5];
+    }
+    (pPasvSock->HTS_sockAddress).SA_port.SP_port = 
+	((remAddress[4] <<8) + remAddress[5]);
+    (pPasvSock->HTS_sockAddress).SA_addressSize = 9;
+    HTMemUnlock(cd->return_msg_handle);
+    MemUnlock(cd->pasvSockHandle);
+
+    cd->next_state = FTP_PASV_DATA_CONNECT;
+
+    HTMemUnlock(ftpConHandle);
+
+    return(0); /* OK */
+} // end ftp_send_pasv_response
+
+/***********************************************************************
+ *		ftp_pasv_data_connect
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Create a socket and connect to the specified address
+ * CALLED BY:	ftp state machine in pasv mode
+ * RETURN:	status
+ *	
+ * STRATEGY:	Use SocketConnect to establish the connection
+ *
+ *              XXX: In principle, this should be with ftp_send_port
+ *               (performing similar tasks)
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	jeremyb 	7/29/98   	Initial Revision
+ *	
+ ***********************************************************************/
+int
+ftp_pasv_data_connect (HTMemHandle ftpConHandle)
+{
+    FTPConData *cd;
+    int status;
+    HTSocket *pPasvSock;
+
+    cd = (FTPConData *) HTMemLock(ftpConHandle);
+
+    pPasvSock = (HTSocket *)MemLock(cd->pasvSockHandle);
+
+    status = SocketConnect(pPasvSock->HTS_sockfd, 
+			   &(pPasvSock->HTS_sockAddress), 5*60) ;
+    MemUnlock(cd->pasvSockHandle);
+
+    if (status == HT_OK) {
+	cd->next_state = FTP_GET_FILE_TYPE;
+    } else {
+	cd->next_state = FTP_LOGOUT_AND_DONE;
+    }
+
+    HTMemUnlock(ftpConHandle);
+
+    return(0);
+} // end ftp_pasv_data_connect

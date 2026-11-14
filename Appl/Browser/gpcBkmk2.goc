@@ -1,0 +1,870 @@
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Geoworks 1996.  All rights reserved.
+	GEOWORKS CONFIDENTIAL
+
+PROJECT:	
+MODULE:		
+FILE:		
+
+AUTHOR:		
+
+ROUTINES:
+	Name			Description
+	----			-----------
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	
+
+DESCRIPTION:
+
+	This the second file for the code related with the bookmarks.
+ 	This file mainly contains the code of local icons.
+
+	$Id: gpcBkmk2.goc,v 1.1 98/08/13 15:09:47 edwin Exp $
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+@include "gpcDecl.goh"
+@include "gpcUI.goh"
+#include <initfile.h>
+
+@ifndef PRODUCT_RESPONDER
+
+extern MemHandle ISHistoryHandle;
+extern ISViewType isView;
+
+extern word		ISCurrentSelection;
+extern ISBookmarkViewType	ISBookmarkView;
+extern word		ISLeftFirst;
+extern word		ISRightFirst;
+extern VMFileHandle	ISBookmarkFileHandle;
+
+extern ISBFolderStruct ISBuildInFolder;
+extern ISBFolderStruct ISUserFolder;
+
+extern void* _far _pascal GetBookmark(word item, ISBookmarkViewType type);
+
+/* functions defined in isApp.goc */
+extern char* _far _pascal GetCurrentTitle();
+extern char* _far _pascal GetCurrentURL();
+
+void _far _pascal FormalizeString (char *str);
+
+@ifdef BROTHER_KERNEL
+@extern object ISBookmarkList;
+@endif
+
+@ifdef PRODUCT_PENELOPE || BROTHER_KERNEL
+
+/***********************************************************************
+ *		MSG_GPC_CREATE_BOOKMARK_BEFORE for GPCProcessClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    To create a new bookmark which is the current loaded
+ *			document.
+ * PARAMETERS:	    
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:	Same as folders, the bookmarks in one folder are linked
+ *		by a list. The elements are DBItems. All the bookmarks 
+ *		in one folder are always in alphabetical order, same as
+ *		displaying.
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	mzhu	8/30/96   	Initial Revision
+ *
+ ***********************************************************************/
+@extern method GPCProcessClass, MSG_GPC_CREATE_BOOKMARK_BEFORE
+{
+@ifdef PRODUCT_PENELOPE
+    HTMemHandle titleHtmh, urlHtmh;
+    char *title, *url;
+
+    /* Prepares the Create Bookmark Dialog. */  
+    urlHtmh = UIDocCurrentURL();
+    if(!urlHtmh) {
+	@call EditNameField::MSG_VIS_TEXT_REPLACE_ALL_PTR("",0);
+	@call EditLocationField::MSG_VIS_TEXT_REPLACE_ALL_PTR("",0);
+	@send ISBEBOKButton::MSG_GEN_SET_NOT_ENABLED(VUM_DELAYED_VIA_UI_QUEUE);
+    } else {
+	titleHtmh = UIDocCurrentTitle();
+	title = titleHtmh? HTMemLock(titleHtmh):HTMemLock(urlHtmh);
+	url = titleHtmh? HTMemLock(urlHtmh):title;
+
+	@call EditNameField::MSG_VIS_TEXT_REPLACE_ALL_PTR(title,
+			min(strlen(title), ITEM_TEXT_LENGTH));
+	@call EditLocationField::MSG_VIS_TEXT_REPLACE_ALL_PTR(url,0);
+
+	HTMemUnlockAndFree(urlHtmh);
+	if(titleHtmh) HTMemUnlockAndFree(titleHtmh);
+    }
+
+    @send ISBEditBookmarkDialog::MSG_GEN_SET_WIN_POSITION(0,
+	              130, DIALOG_Y_POS);
+    @send ISBEBOKButton::MSG_GEN_TRIGGER_SET_ACTION_MSG
+	(MSG_GPC_CREATE_BOOKMARK_CLOSE);
+    @send ISBEditBookmarkDialog::MSG_GEN_INTERACTION_INITIATE();
+    @send EditNameField::MSG_META_GRAB_FOCUS_EXCL();
+@else
+    @send self::MSG_GPC_CREATE_BOOKMARK_CLOSE();
+@endif
+}
+
+
+/***********************************************************************
+ *		MSG_GPC_CREATE_BOOKMARK_CLOSE for GPCProcessClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    
+ * PARAMETERS:	    
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	mzhu	11/17/96   	Initial Revision
+ *
+ ***********************************************************************/
+@extern method GPCProcessClass, MSG_GPC_CREATE_BOOKMARK_CLOSE
+{
+    ISBookmarkStruct 	*bookmark;
+    DBItem 	bookmarkItem, nextItem, newItem;
+    char 	*url, *tmp;
+    char 	nextName[ITEM_TEXT_LENGTH+1];
+    char 	name[ITEM_TEXT_LENGTH+1];
+    word	size;
+    HTMemHandle 	urlHtmh, tmpHtmh;
+    int		cmp;
+    DBGroupAndItem	mapItem;
+    MapStruct		*map;
+@ifdef BROTHER_KERNEL
+    HTMemHandle titleHtmh;
+    char *title;
+@endif
+@ifdef PRODUCT_PENELOPE
+    @call EditNameField::MSG_VIS_TEXT_GET_ALL_PTR(name);
+    FormalizeString(name);
+    size = @call EditLocationField::MSG_VIS_TEXT_GET_TEXT_SIZE();
+    if(*name == 0 || size == 0) return;
+    url = HTMemAllocAndLock(&urlHtmh, size + 1);
+    @call EditLocationField::MSG_VIS_TEXT_GET_ALL_PTR(url);
+@else
+    urlHtmh = UIDocCurrentURL();
+    titleHtmh = UIDocCurrentTitle();
+    title = titleHtmh? HTMemLock(titleHtmh):HTMemLock(urlHtmh);
+    url = titleHtmh? HTMemLock(urlHtmh):title;
+
+    strncpy (name, title, ITEM_TEXT_LENGTH) ;
+    name[ITEM_TEXT_LENGTH]='\0';
+    name[ITEM_TEXT_LENGTH-1]='\0';
+    if (titleHtmh) HTMemUnlockAndFree(titleHtmh);
+    if(*name == 0 || !url) return;
+    FormalizeString(name);
+@endif
+
+    if(!strstr(url, "://")) {
+	/*
+	 * default protocol is http
+	 */
+	tmp = HTMemAllocAndLock(&tmpHtmh, strlen(url) + 8);
+	strcpy(tmp, "http://");
+	strcat(tmp, url);
+	HTMemUnlockAndFree(urlHtmh);
+	urlHtmh = tmpHtmh;
+	url = tmp;
+    }
+
+    /* Find the right position under alphabetical order 
+       for the new bookmark. */
+    nextItem = ISUserFolder.ISBFS_head;
+    bookmarkItem = NULL;
+    while(nextItem) {
+        bookmark = DBLock(ISBookmarkFileHandle,
+			ISUserFolder.ISBFS_group,
+			nextItem);
+        strcpy(nextName, (char *)((char *)bookmark + bookmark->ISBS_name));
+
+   	cmp = strcasecmp(nextName, name);
+        if(cmp > 0) {
+	    DBUnlock(bookmark);
+	    break;
+ 	} else if(!cmp) {
+	    cmp = strcmp(nextName, name);
+	    if(cmp > 0) {
+		DBUnlock(bookmark);
+		break;
+	    } else if(!cmp) { 	/* really same */
+
+	        /* There is a bookmark in the folder using the same name(title).*/
+	    	DBUnlock(bookmark);
+
+	    	if(UserDoDialog(@ISReplaceBookmarkDialog) != IC_OK) {
+		    HTMemUnlockAndFree(urlHtmh);
+		    /*
+		     * let the user try again.
+		     */
+@ifdef BROTHER_KERNEL
+		    return;
+@else
+		    @send, forceQueue self::MSG_GPC_CREATE_BOOKMARK_BEFORE();
+		    return;
+@endif
+	        } 
+	    	/* Uses the new one to replace the old one. Just resize the *
+	     	* old DBItem with the new size.				*/
+	    	DBReAlloc(ISBookmarkFileHandle, 
+			ISUserFolder.ISBFS_group,
+			nextItem,  sizeof(ISBookmarkStruct) 
+			+ strlen(name) + strlen(url) + 2);
+
+    	    	bookmark = DBLock(ISBookmarkFileHandle,
+			ISUserFolder.ISBFS_group, nextItem);
+    	    	bookmark->ISBS_url = sizeof(ISBookmarkStruct) + strlen(name) + 1;
+       	    	strcpy((char *)((char *)bookmark + bookmark->ISBS_name), name);
+    	    	strcpy((char *)((char *)bookmark + bookmark->ISBS_url), url);
+
+	    	DBDirty(bookmark);
+    	    	DBUnlock(bookmark);
+		VMUpdate(ISBookmarkFileHandle);
+ 	    	HTMemUnlockAndFree(urlHtmh);
+
+	    	return;
+	    }
+	}
+	bookmarkItem = nextItem;
+	nextItem = bookmark->ISBS_next;
+	DBUnlock(bookmark);
+    }    
+
+    /* Creates a new DBItem for the new bookmark. */
+    newItem = DBAlloc(ISBookmarkFileHandle, 
+			ISUserFolder.ISBFS_group,
+			sizeof(ISBookmarkStruct) 
+			+ strlen(name) + strlen(url) + 2);
+
+    /* Checks if the new bookmark is the first one or not.*/
+    if(bookmarkItem) {
+        bookmark = DBLock(ISBookmarkFileHandle,
+			ISUserFolder.ISBFS_group,
+			bookmarkItem);
+	nextItem = bookmark->ISBS_next;
+	bookmark->ISBS_next = newItem;
+	DBDirty(bookmark);
+	DBUnlock(bookmark);
+    } else {
+	nextItem = ISUserFolder.ISBFS_head;
+	ISUserFolder.ISBFS_head = newItem;
+    }
+    
+    /* Locks the new bookmark DBItem, and sets the fields. */
+    bookmark = DBLock(ISBookmarkFileHandle,
+		      ISUserFolder.ISBFS_group, newItem);
+
+    bookmark->ISBS_next = nextItem;
+    bookmark->ISBS_name = sizeof(ISBookmarkStruct);
+    bookmark->ISBS_url = sizeof(ISBookmarkStruct) + strlen(name) + 1;
+    
+    strcpy((char *)((char *)bookmark + bookmark->ISBS_name), name);
+    strcpy((char *)((char *)bookmark + bookmark->ISBS_url), url);
+
+    DBDirty(bookmark);
+    DBUnlock(bookmark);
+
+    ISUserFolder.ISBFS_size ++;
+
+@ifdef PRODUCT_PENELOPE
+    if(ISBookmarkView == ISBVT_USER)
+	@send self::MSG_GPC_LISTS_INITIALIZE(0);
+@endif
+    /*
+     * update the bookmark file
+     */
+    mapItem = DBGetMap(ISBookmarkFileHandle);
+    map = DBLockUngrouped(ISBookmarkFileHandle, mapItem);
+    map->MAP_user.ISBFS_size = ISUserFolder.ISBFS_size;
+    map->MAP_user.ISBFS_head = ISUserFolder.ISBFS_head;
+    DBDirty(map);
+    DBUnlock(map);
+
+    VMUpdate(ISBookmarkFileHandle);
+    HTMemUnlockAndFree(urlHtmh);
+
+@ifdef PRODUCT_PENELOPE
+    @send ISLIModifyButton::MSG_GEN_SET_USABLE(VUM_DELAYED_VIA_APP_QUEUE);
+@endif
+    @send ISLIDeleteButton::MSG_GEN_SET_USABLE(VUM_DELAYED_VIA_APP_QUEUE);
+    @send ISLIDeleteButton::MSG_SPEC_BUILD_BRANCH(0x0101);
+@ifdef PRODUCT_PENELOPE
+    @send ISLIModifyButton::MSG_SPEC_BUILD_BRANCH(0x0101);
+@endif
+
+@ifdef BROTHER_KERNEL
+{
+     word newsize ;
+    newsize = ISUserFolder.ISBFS_size;
+    @send ISBookmarkList::MSG_GEN_DYNAMIC_LIST_INITIALIZE(newsize); 
+    @send ISBookmarkList::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(GIGS_NONE,
+								  TRUE);
+}
+@endif
+
+}	/* End of MSG_GPC_CREATE_BOOKMARK_CLOSE.	*/
+
+
+
+@ifdef PRODUCT_PENELOPE
+
+/***********************************************************************
+ *		MSG_GPC_MODIFY_BOOKMARK_BEFORE for GPCProcessClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    To modify a bookmark in the current folder.
+ * PARAMETERS:	    
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	mzhu	9/17/96   	Initial Revision
+ *
+ ***********************************************************************/
+@extern method GPCProcessClass, MSG_GPC_MODIFY_BOOKMARK_BEFORE
+{
+    ISBookmarkStruct 	*bookmark;
+
+    bookmark = GetBookmark(ISCurrentSelection, ISBookmarkView);
+	
+    /* If it's an empty item, return.*/
+    if(!bookmark) return;
+
+    /* Save the bookmark's title. */
+
+    @call EditNameField::MSG_VIS_TEXT_REPLACE_ALL_PTR(
+		(char*)((char*)bookmark + bookmark->ISBS_name),0);
+    @call EditLocationField::MSG_VIS_TEXT_REPLACE_ALL_PTR(
+		(char*)((char*)bookmark + bookmark->ISBS_url),0);
+
+    DBUnlock(bookmark);
+
+    if(ISCurrentSelection < ISRightFirst) {
+    	@send ISBEditBookmarkDialog::MSG_GEN_SET_WIN_POSITION(0, 
+		DIALOG_X_POS_RIGHT, DIALOG_Y_POS);
+    } else {
+    	@send ISBEditBookmarkDialog::MSG_GEN_SET_WIN_POSITION(0, 
+		DIALOG_X_POS_LEFT, DIALOG_Y_POS);
+    }
+
+    @send ISBEBOKButton::MSG_GEN_TRIGGER_SET_ACTION_MSG
+	(MSG_GPC_MODIFY_BOOKMARK_CLOSE);
+    @send ISBEditBookmarkDialog::MSG_GEN_INTERACTION_INITIATE();
+    @send EditNameField::MSG_META_GRAB_FOCUS_EXCL();
+/*    @send EditNameField::MSG_VIS_TEXT_SELECT_ALL(); */
+}
+
+
+
+/***********************************************************************
+ *		MSG_GPC_MODIFY_BOOKMARK_CLOSE for GPCProcessClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    
+ * PARAMETERS:	    
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	mzhu	11/17/96   	Initial Revision
+ *
+ ***********************************************************************/
+@extern method GPCProcessClass, MSG_GPC_MODIFY_BOOKMARK_CLOSE
+{
+    ISBookmarkStruct 	*bookmark, *tmpBookmark;
+    DBItem		newItem, oldItem, oneBeforeOld, oneBeforeNew,
+			dbItem, nextItem;
+    char name[ITEM_TEXT_LENGTH+1], newName[ITEM_TEXT_LENGTH+1];
+    char *url, *newURL, *tmp;
+    HTMemHandle urlHtmh, tmpHtmh;
+    int  i, j, cmp, flag;
+    word size;
+    Boolean justChangeURL = FALSE;
+    DBGroupAndItem	mapItem;
+    MapStruct		*map;
+    ISBFolderStruct *folder;
+
+    @call EditNameField::MSG_VIS_TEXT_GET_ALL_PTR(newName);
+    FormalizeString(newName);
+
+    size = @call EditLocationField::MSG_VIS_TEXT_GET_TEXT_SIZE();
+    newURL = HTMemAllocAndLock(&urlHtmh, size + 1);;
+
+    @call EditLocationField::MSG_VIS_TEXT_GET_ALL_PTR(newURL);
+
+    /* Gets the current selected bookmark. */
+    bookmark = GetBookmark(ISCurrentSelection, ISBookmarkView);
+	
+    strcpy(name, (char *)((char *)bookmark + bookmark->ISBS_name));
+    url = (char *)((char *)bookmark + bookmark->ISBS_url);
+
+    /* If empty input or same as the previous one, return.*/
+    if( !*newName || !*newURL
+	|| (!strcmp(newName, name) && !strcmp(newURL, url))) {
+    	DBUnlock(bookmark);
+    	HTMemUnlockAndFree(urlHtmh);
+	return;
+    } 
+
+    if(!strstr(newURL, "://")) {
+	/*
+	 * default protocol is http
+	 */
+	tmp = HTMemAllocAndLock(&tmpHtmh, strlen(newURL) + 8);
+	strcpy(tmp, "http://");
+	strcat(tmp, newURL);
+	HTMemUnlockAndFree(urlHtmh);
+	urlHtmh = tmpHtmh;
+	newURL = tmp;
+    }
+
+    /*
+     * if just change the url, it's simple.
+     */
+    if(!strcmp(newName, name)) 	justChangeURL = TRUE;
+
+    DBUnlock(bookmark);
+
+    folder = (ISBookmarkView == ISBVT_USER)? &ISUserFolder : &ISBuildInFolder;
+ 
+    /* If this is a new valid title name, then find the right position *
+     * in the bookmark list.					       */
+    nextItem = folder->ISBFS_head;
+    newItem = NULL;
+    dbItem = NULL;
+    oneBeforeNew = NULL;
+    j = -1; flag = 0;
+    for(i=0; i<folder->ISBFS_size; i++) {
+        bookmark = DBLock(ISBookmarkFileHandle,
+			folder->ISBFS_group,
+			nextItem);
+	if(!flag) {
+            strcpy(name, (char *)((char *)bookmark + bookmark->ISBS_name));
+   	    cmp = strcasecmp(name, newName);
+            if(cmp > 0) {
+		/* Gets the DBItem which should be the one before the new one.*/
+		flag = 1;
+		oneBeforeNew = dbItem;
+	    } else if(!cmp) {
+		cmp = strcmp(name, newName);
+	 	if(cmp > 0) {
+		    flag = 1;
+		    oneBeforeNew = dbItem;
+	   	} else if(!cmp) {	
+		    
+		    if(justChangeURL) {
+			oldItem = nextItem;
+			DBUnlock(bookmark);
+			break;
+		    }
+		    
+		    if(ISBookmarkView == ISBVT_USER) {
+			/* There is another bookmark in the same folder uses 
+			 *  the  same title name. 			 */
+			if(UserDoDialog(@ISReplaceBookmarkDialog) != IC_OK) {
+			    DBUnlock(bookmark);
+			    /* Lets the user try again. */
+			    @send, 
+			    forceQueue self::MSG_GPC_MODIFY_BOOKMARK_BEFORE();
+			    HTMemUnlockAndFree(urlHtmh);
+			    return; 
+			}
+		    } else {
+			DBUnlock(bookmark);
+			HTMemUnlockAndFree(urlHtmh);
+			UserStandardDialog("Edit Bookmark",
+			     (char *)0, (char *)0, (char *)0,
+			     "Bookmark already exists\rand connot be replaced",
+			     (CDT_NOTIFICATION << CDBF_DIALOG_TYPE_OFFSET) | 
+			     (GIT_NOTIFICATION << CDBF_INTERACTION_TYPE_OFFSET));
+			
+			return;
+		    }
+
+		    /* User chose using the modified bookmark to replace the other.	*/
+		    newItem = nextItem;
+		    oneBeforeNew = dbItem;
+		    flag = 1;
+		}
+	    }
+	}
+
+	j++;
+
+	/* Gets the item before the being modified item. */
+	if(j == ISCurrentSelection) {
+	    oldItem = nextItem;
+	    oneBeforeOld = dbItem;
+	}
+
+	dbItem = nextItem;
+	nextItem = bookmark->ISBS_next;
+	DBUnlock(bookmark);
+    }    
+
+    if(!justChangeURL) {
+
+	if(!flag) { 
+	    oneBeforeNew = dbItem; 
+	}
+
+	if(newItem) {
+	    /* Uses the modified item to replace the item which has the same  *
+	     * title name. In the case, the being replaced item will be remove*
+	     * from the folder.					  	  */
+	    bookmark = DBLock(ISBookmarkFileHandle,
+			folder->ISBFS_group,
+			newItem);
+	    nextItem = bookmark->ISBS_next;
+	    DBUnlock(bookmark);
+	    DBFree(ISBookmarkFileHandle,
+			folder->ISBFS_group,
+			newItem);
+
+	    if(!oneBeforeNew) {
+		/* If adds to the first one in the folder, changes the DBGroup's
+ 		 * head.
+		 */
+		folder->ISBFS_head = nextItem;
+	    } else {
+		bookmark = DBLock(ISBookmarkFileHandle,
+			folder->ISBFS_group,
+			oneBeforeNew);
+		bookmark->ISBS_next = nextItem;
+		DBDirty(bookmark);
+		DBUnlock(bookmark);
+	    }
+
+	    /* Changes the current folder's size. */
+	    folder->ISBFS_size --;
+
+	    if(oneBeforeOld == newItem) oneBeforeOld = oneBeforeNew;
+	}
+    }
+
+    /* Resize it as necessary. */
+    DBReAlloc(ISBookmarkFileHandle, 
+		folder->ISBFS_group,
+		oldItem, 
+		sizeof(ISBookmarkStruct) + strlen(newName) + strlen(newURL) + 2);
+
+    /* Locks it again. */
+    bookmark = DBLock(ISBookmarkFileHandle,
+		      folder->ISBFS_group,
+		      oldItem);
+
+    /* Replaces the name with the new one. */
+    strcpy((char *)((char *)bookmark + bookmark->ISBS_name), newName);
+    /* And writes back the same url. */    
+    bookmark->ISBS_url = bookmark->ISBS_name + strlen(newName) + 1;
+    strcpy((char *)((char *)bookmark + bookmark->ISBS_url), newURL);
+    HTMemUnlockAndFree(urlHtmh);
+
+    if(!justChangeURL) {
+	/* Inserts the new item to the right position. */
+	if(oneBeforeNew != oneBeforeOld && oneBeforeNew != oldItem) {
+	    if(!oneBeforeNew) {
+		/* Move to the beginning of the folder .*/
+		nextItem = folder->ISBFS_head;
+		folder->ISBFS_head = oldItem;
+
+	    } else {	    
+		tmpBookmark = DBLock(ISBookmarkFileHandle,
+				     folder->ISBFS_group,
+				     oneBeforeNew);
+		nextItem = tmpBookmark->ISBS_next;
+		tmpBookmark->ISBS_next = oldItem;
+		DBDirty(tmpBookmark);
+		DBUnlock(tmpBookmark);
+	    }
+	
+	    if(!oneBeforeOld) {
+		/* Move from the beginning. */
+		folder->ISBFS_head = bookmark->ISBS_next;
+
+	    } else {
+		tmpBookmark = DBLock(ISBookmarkFileHandle,
+				     folder->ISBFS_group,
+				     oneBeforeOld);
+		tmpBookmark->ISBS_next = bookmark->ISBS_next;
+		DBDirty(tmpBookmark);
+		DBUnlock(tmpBookmark);
+	    }
+	    bookmark->ISBS_next = nextItem;
+	}
+
+    } 
+
+    DBDirty(bookmark);
+    DBUnlock(bookmark);
+    /*
+     * update the bookmark file
+     */
+    mapItem = DBGetMap(ISBookmarkFileHandle);
+    map = DBLockUngrouped(ISBookmarkFileHandle, mapItem);
+    if(ISBookmarkView == ISBVT_USER) {
+	map->MAP_user.ISBFS_size = ISUserFolder.ISBFS_size;
+	map->MAP_user.ISBFS_head = ISUserFolder.ISBFS_head;
+    } else {
+	map->MAP_buildin.ISBFS_size = ISBuildInFolder.ISBFS_size;
+	map->MAP_buildin.ISBFS_head = ISBuildInFolder.ISBFS_head;
+    }
+
+    DBDirty(map);
+    DBUnlock(map);
+    VMUpdate(ISBookmarkFileHandle);
+
+    /* Redisplay the folder's bookmarks. */
+    dbItem = folder->ISBFS_head;
+    bookmark = DBLock(ISBookmarkFileHandle, folder->ISBFS_group, 
+		      dbItem);
+    
+    ISCurrentSelection = 0;
+    while(strcmp(newName, (char *)((char*)bookmark + bookmark->ISBS_name))){
+	dbItem = bookmark->ISBS_next;
+	tmpBookmark = DBLock(ISBookmarkFileHandle, folder->ISBFS_group, dbItem);
+	DBUnlock(bookmark);
+	bookmark = tmpBookmark;
+	ISCurrentSelection ++ ;
+    }
+    DBUnlock(bookmark);
+    
+    @send self::MSG_GPC_LISTS_INITIALIZE(ISCurrentSelection);
+}	/* End of MSG_GPC_MODIFY_BOOKMARK_CLOSE.	*/
+
+@endif
+
+/***********************************************************************
+ *		MSG_GPC_DELETE_BOOKMARK for GPCProcessClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    Delete the current selected bookmark from the current
+ *			folder.
+ * PARAMETERS:	    
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	mzhu	9/18/96   	Initial Revision
+ *	sean	11/21/97	Broke this into two messages.
+ *				Look at ISP_DELETE_BOOKMARK_OK.
+ *				Fixes #73349 & #73350.
+ *
+ ***********************************************************************/
+@extern method GPCProcessClass, MSG_GPC_DELETE_BOOKMARK
+{
+    ISBookmarkStruct 	*bookmark;
+    Boolean             confirm;
+
+    /* If the selected bookmark is empty, return. */
+    bookmark = GetBookmark(ISCurrentSelection, ISBVT_USER);
+    if(!bookmark) return;
+    DBUnlock(bookmark);
+
+    /*
+     *  Put up dialog in correct place on the screen.
+     */
+@ifdef PRODUCT_PENELOPE
+    if(ISCurrentSelection < ISRightFirst) {
+	@send ISConfirmDeleteDialog::MSG_GEN_SET_WIN_POSITION(0, 
+			DIALOG_X_POS_RIGHT + 10, DIALOG_Y_POS + 25);
+    } else {
+	@send ISConfirmDeleteDialog::MSG_GEN_SET_WIN_POSITION(0, 
+		DIALOG_X_POS_LEFT, DIALOG_Y_POS + 25);
+    }
+
+    /*
+     * Check the global confirm delete set up.
+     * If not found, default is TRUE.
+     */
+    if(InitFileReadBoolean("pda options", "confirmDelete", &confirm))
+	confirm = TRUE;
+
+    /* If we need to confirm the deletion, then initiate this  */
+    /* confirmation dialog.  Otherwise, just delete it.	       */
+    if(confirm) 
+        @send ISConfirmDeleteDialog::MSG_GEN_INTERACTION_INITIATE();
+    else
+        @call self::MSG_GPC_DELETE_BOOKMARK_OK();
+
+@else
+
+    @call self::MSG_GPC_DELETE_BOOKMARK_OK();
+
+@endif
+
+}	/* End of MSG_GPC_DELETE_BOOKMARK.	*/
+
+
+
+/***********************************************************************
+ *		MSG_GPC_DELETE_BOOKMARK_OK for GPCProcessClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:		User confirmed deletion of this bookmark.	    
+ * PARAMETERS:		void(void)
+ * SIDE EFFECTS:    	none
+ *
+ * STRATEGY:	     	NOTE--This part was broken out of 
+ *			ISP_DELETE_BOOKMARK so we wouldn't have
+ *			to use thread-blocking UserDoDialog()
+ *
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	sean		11/21/97   	Initial Revision--Fixes #73349
+ *					and #73350.
+ *	
+ ***********************************************************************/
+@extern method GPCProcessClass, MSG_GPC_DELETE_BOOKMARK_OK
+{
+    ISBookmarkStruct 	*bookmark, *tmpBookmark;
+    DBGroupAndItem	mapItem;
+    DBItem	     	dbItem, nextItem;
+    MapStruct		*map;
+    int		     	i, lastItem, item;
+
+    nextItem = ISUserFolder.ISBFS_head;
+    lastItem = ISUserFolder.ISBFS_size;
+    item = ISCurrentSelection;
+
+    bookmark = DBLock(ISBookmarkFileHandle, 
+		      ISUserFolder.ISBFS_group, 
+		      nextItem);
+    dbItem = NULL;
+
+    /* Gets the DBItem of this selected bookmark. */    
+    for(i=0; i<lastItem && i<item; i++) {
+	dbItem = nextItem;
+	nextItem = bookmark->ISBS_next;
+	tmpBookmark = DBLock(ISBookmarkFileHandle, 
+			     ISUserFolder.ISBFS_group, 
+			     nextItem);
+	DBUnlock(bookmark);
+	bookmark = tmpBookmark;
+    }
+
+    if(!dbItem) {
+	/* Deletes from the beginning. */
+	ISUserFolder.ISBFS_head = bookmark->ISBS_next;
+    } else {    	
+    	tmpBookmark = DBLock(ISBookmarkFileHandle, 
+			     ISUserFolder.ISBFS_group, 
+			     dbItem);
+ 	tmpBookmark->ISBS_next = bookmark->ISBS_next;
+	DBDirty(tmpBookmark);
+	DBUnlock(tmpBookmark);
+    }
+
+    /* Decreases the folder's size. */
+    ISUserFolder.ISBFS_size --;
+    ISCurrentSelection = min(ISUserFolder.ISBFS_size-1, ISCurrentSelection);
+
+    DBUnlock(bookmark);
+  
+    DBFree(ISBookmarkFileHandle, ISUserFolder.ISBFS_group, nextItem);
+    /*
+     * update the bookmark file
+     */
+    mapItem = DBGetMap(ISBookmarkFileHandle);
+    map = DBLockUngrouped(ISBookmarkFileHandle, mapItem);
+    map->MAP_user.ISBFS_size = ISUserFolder.ISBFS_size;
+    map->MAP_user.ISBFS_head = ISUserFolder.ISBFS_head;
+    DBDirty(map);
+    DBUnlock(map);
+    VMUpdate(ISBookmarkFileHandle);
+
+@ifdef PRODUCT_PENELOPE
+    @send self::MSG_GPC_LISTS_INITIALIZE(ISCurrentSelection);
+    if(!ISUserFolder.ISBFS_size) {
+	@send ISLIModifyButton::MSG_GEN_SET_NOT_USABLE(VUM_NOW);
+	@send ISLIDeleteButton::MSG_GEN_SET_NOT_USABLE(VUM_NOW);
+    }
+@endif
+
+@ifdef BROTHER_KERNEL
+{
+     word size ;
+    size = ISUserFolder.ISBFS_size;
+    @send ISBookmarkList::MSG_GEN_DYNAMIC_LIST_INITIALIZE(size); 
+    @send ISBookmarkList::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(GIGS_NONE,
+								  TRUE);
+}
+@endif
+
+}	/* End of MSG_GPC_DELETE_BOOKMARK_OK.	*/
+
+
+
+/***********************************************************************
+ *		FormalizeString
+ ***********************************************************************
+ *	To chop the white space in the beginning and the end. Also, combine
+ *	the extra space between words to single one.
+ * SYNOPSIS:	
+ * CALLED BY:	
+ * RETURN:	formalized string
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:
+ *	The return string should always be shorter or equal to the source 
+ *	string, so the return string can use the old place.
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	mzhu	11/20/96   	Initial Revision
+ *
+ ***********************************************************************/
+void _far _pascal
+FormalizeString (char *str)
+{
+    char *checkPtr = str; 	/* point to the next char in the string */
+    char *returnPtr = str;	/* point to the next return char */
+    Boolean ahead = TRUE;	/* there is already a space */
+
+    while(*checkPtr) {
+	if(isspace(*checkPtr) && ahead)
+	    checkPtr ++;
+	else {
+	    if(isspace(*checkPtr)) ahead = TRUE;
+	    else ahead = FALSE;
+
+	    *returnPtr = *checkPtr;
+	    returnPtr ++; 
+	    checkPtr ++;
+	}
+    }
+
+    if(isspace(*(returnPtr - 1))) *(returnPtr - 1) = 0;
+    else *returnPtr = 0;
+
+    return;
+}	/* End of FormalizeString.	*/
+
+
+@endif
+
+@endif /* NIKE or PENELOPE */

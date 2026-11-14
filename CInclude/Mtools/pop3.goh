@@ -1,0 +1,173 @@
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Geoworks 1997.  All rights reserved.
+	GEOWORKS CONFIDENTIAL
+
+PROJECT:	
+MODULE:		
+FILE:		pop3.goh
+
+AUTHOR:		Kok Kin Kee, Mar 12, 1997
+
+ROUTINES:
+	Name			Description
+	----			-----------
+
+REVISION HISTORY:
+	Name		Date		Description
+	----		----		-----------
+	kkee    	3/12/97   	Initial version.
+
+DESCRIPTION:
+
+	
+
+	$Id: pop3.goh,v 1.1 97/04/04 15:55:53 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+/***********************************************************************
+ *
+ *      Copyright (c) STNC Enterprises Ltd. 1996 -- All Rights Reserved
+ *
+ * PROJECT:    Tungsten
+ * MODULE:     POP3 header
+ * FILE:			pop3.goh
+ *
+ * AUTHOR:  Bill Godfrey, <bgodfrey@stnc.com>
+ *
+ ***********************************************************************/
+
+#ifndef INCLUDE_POP3_GOH
+#define INCLUDE_POP3_GOH
+
+@include <stdapp.goh>
+@include <socket.goh>
+@include <mtools/ifile.goh>
+#include <ansi/stdio.h>
+@include <mtools/message.goh>
+@include <mtools/mterror.goh>
+@include <mtools/memutils.goh>
+
+
+#define MAX_RESP_LENGTH 2048
+
+		/* Response flags. */
+typedef enum {
+	NO_MLINE = 0x00,			/* No possible multi-line response. */
+	OK_MLINE = 0x01,			/* Multi-line on +OK response only. */
+	ERR_MLINE = 0x02,			/* Multi-line on -ERR response only. */
+
+	SIMPLE_RESPONSE = 0x10,	/* Just the + or - character. */
+	IGNORE_MLINE = 0x20,		/* Add to the above to ignore the responses. */
+	WAIT_MLINE = 0x40,		/* Don't give the SE_TIMED_OUT error to Mlines. */
+	WAIT_ALL = 0x80			/* Wait for the first line as well. */
+} P3RespType;
+#define BOTH_MLINE (OK_MLINE | ERR_MLINE)		/* Multiline, no matter what type of response. */
+
+		/* Records the state of POP3_GetResp. */
+typedef enum {
+	P3RS_NORMAL = 0,					/* Nothing loaded. */
+	P3RS_DONE,							/* Finished. */
+
+	P3RS_WAIT_FIRST=P3RS_NORMAL,	/* Waiting for the first line. */
+	P3RS_WAIT_MLINE					/* Waiting for a multi-line response. */
+} P3RespState;
+
+		/* Records the state of POP3_Open. */
+typedef enum {
+	P3OS_NORMAL = 0,					/* Nothing doing. */
+	P3OS_DONE,							/* Finished. */
+	P3OS_WAIT_RESP_OPEN,				/* Waiting for opening connection. */
+	P3OS_WAIT_RESP_USER,				/* Waiting for response to user cmd. */
+	P3OS_WAIT_RESP_PASS				/* Waiting for response to pass cmd. */
+} P3OpenStatus;
+
+		/* Information required by POP3_Open should it exit with a time out. */
+typedef struct {
+	P3OpenStatus s;		  /* Current stage of opening. */
+	Socket i;				  /* Socket handle. */
+} P3OpenState;
+#define ht_P3OpenState(h) ((P3OpenState*)ht_lock(h))
+
+		/* One line of a multi-line response linked list. */
+struct P3RespNode {
+	HTHANDLE rtext;		/* The text of the response line. */
+	HTHANDLE next;			/* The next line. */
+};
+typedef struct P3RespNode P3RespNode;
+#define ht_P3RespNode(h) ((P3RespNode*)ht_lock(h))
+
+		/* P3Resp - A single POP3 response. */
+typedef struct {
+	P3RespState status;	/* Waiting for a response? */
+	short int lines;		/* Number of lines, not including the first. */
+	char simp;				/* Simple response '+' or '-'. */
+	HTHANDLE first;		/* First full line of response, including '+OK' or '-ERR' */
+	HTHANDLE head;			/* First multi-line line. P3RespNode */
+	MailMessage *msg;		/* Alternatively, dump the multi-line responses here. */
+} P3Resp;
+#define ht_P3Resp(h) ((P3Resp*)ht_lock(h))
+
+	/* Error code for functions which doesn't return an error code itself. */
+#define p3ECode f_p3ECode()
+extern P3Error f_p3ECode(void);
+
+	/*	POP3_InitOpen - Starts off POP3_Open.
+			state - A P3OpenState structure.
+	*/
+extern void POP3_InitOpen(P3OpenState *state);
+
+	/* POP3_Open - Opens a POP3 session.
+			host   - Name of POP3 server.
+			accPnt - Access point id.
+			user   - User name.
+			pass   - Pass word.
+			state  - Structure initialised by POP_InitOpen.
+	*/
+extern Socket POP3_Open(char *host, int accPnt, char *user, char *pass, P3OpenState *state);
+
+	/* POP3_SendCommand - Sends a command and adds a crlf pair.
+			i - Socket handle.
+			command - POP3 command.
+		Returns error code.
+	*/
+extern P3Error POP3_SendCommand(Socket i, char *command);
+
+	/* POP3_InitResp - Initialise a response structure.
+			resp - Pointer to response.
+	*/
+extern void POP3_InitResp(P3Resp *resp);
+
+	/* POP3_InitRespForMessage - Initialise a pointer structure so that any multi-line responses
+				are stored in a MailMessage structure instead of the internal linked list.
+			resp - Response structure.
+			msg  - Pointer to MailMessage structure.
+	*/
+extern P3Error POP3_InitRespForMessage(P3Resp *resp, MailMessage *msg);
+
+	/* POP3_GetResp - Retrives a response. If the response was initailised with InitRespForMessage,
+				any multi-line responses will go into the specified MailMessage structure.
+			i     - Socket handle.
+			resp 	- Response structure.
+			rtype - Set of flags of type P3RespType each | together.
+		Returns error code.
+	*/
+extern P3Error POP3_GetResp(Socket i, P3Resp *resp, P3RespType rtype);
+
+	/* POP3_DelResp - Frees any resources used by the response structure, NOT including any
+				MailMessage structure specified.
+			resp - Response structure.
+	*/
+extern void POP3_DelResp(P3Resp *resp);
+
+	/* POP3_Close - Sends a QUIT command and closes the POP3 session. If the session has errors or
+				is called during an excessive delay, iclose must be called instead, so that the
+				server does not entry the UPDATE state.
+			i - Socket handle.
+		Returns error code.
+	*/
+extern P3Error POP3_Close(Socket i);
+
+
+
+#endif

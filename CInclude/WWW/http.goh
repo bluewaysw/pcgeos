@@ -1,0 +1,165 @@
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Geoworks 1996 -- All Rights Reserved
+
+PROJECT:	Geos WWW Library
+MODULE:		HTTP
+FILE:		http.goh
+
+AUTHOR:		Kok Kin Kee, May 23, 1996
+
+ROUTINES:
+	Name			Description
+	----			-----------
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	kkee	5/23/96   	Initial version.
+
+DESCRIPTION:
+	The HTTP protocol class, inherited from HTProtocolClass
+        in file htstream.goh{goc}.
+
+	$Id: http.goh,v 1.6.2.2 97/10/18 14:57:34 kkee Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+@ifndef __HTTP_GOH
+@define __HTTP_GOH
+
+@deflib	http
+
+@include <WWW/HTCore/htstream.goh>
+@include <WWW/HTCore/htreq.goh>
+@include <WWW/HTCore/htsock.goh>
+
+
+/* --------------------------------------------------------------------------
+ * 		I. FREQUENTLY ASKED QUESTIONS - FAQ
+ * --------------------------------------------------------------------------*/
+
+/* --------------------------------------------------------------------------
+ * 		A. HTTP CLASS
+ * --------------------------------------------------------------------------*/
+
+/****************************************************************************
+
+  The HTTPClass is inherited from HTProtocolClass defined in htstream.goh{goc}.
+  We intercept all the methods in the class to implement the protocol. The most
+  important method is MSG_HT_PROTOCOL_LOAD. The method is implemented in a
+  finite-state machine manner, i.e., HTTP keeps track of its execution state
+  so that it knows where to resume execution when it is scheduled to run 
+  again. Scheduling a protocol is done in the Net Manager, see API 
+  HTNetNewClient in file htnet.goh{goc}.
+
+  All intercepted methods must return HT_ERROR or HT_OK, an integer value.
+
+ ****************************************************************************/
+
+/* --------------------------------------------------------------------------
+ * 		B. Register HTTP CLASS
+ * --------------------------------------------------------------------------*/
+
+/****************************************************************************
+
+  In order for the Library to be aware of the HTTP class so as to use it,
+  you need to register the class with the Library through the Policy
+  Manager using API HTPolicyAddProtocolHandle in htpolicy.goh{goc}.
+  If you don't, the Library uses the default HTTP Library.
+  Whenever needed, the Library will instantiate an object of HTTP to handle
+  a HTTP request.
+
+ ****************************************************************************/
+
+#define HTTP_MAX_STATUS_LENGTH    100   /* Max chars to check StatusLine */
+
+/*
+ * HTTP states. Final states have negative value.
+ */
+typedef enum {
+    HTTP_GOT_DATA  		= -1,
+    HTTP_BEGIN     		= 0,
+    HTTP_PERSISTENT_BEGIN,
+    HTTP_NONPERSISTENT_BEGIN,
+    HTTP_NEED_CONNECTION,
+    HTTP_NEED_REQUEST,
+    HTTP_CHECK_RESPONSE,
+    HTTP_ERROR,
+    HTTP_RETRY,
+    HTTP_NOT_MODIFIED,
+    HTTP_AA,                              /* Access Authentication */
+    HTTP_PROXY_AUTH,                      /* Proxy Authentication */
+    HTTP_PERM_REDIRECT,
+    HTTP_TEMP_REDIRECT,
+    HTTP_NO_DATA,
+    HTTP_STREAM_ERROR_DATA,               /* Stream until no more error data */
+	                                  /* If no data to stream, generate 
+	                                     our own error data */
+    HTTP_STREAM_ALL_DATA,                 /* Stream until no more data */
+    HTTP_INVALID_STATE
+} HTTPState;
+
+
+@class HTTPClass, HTProtocolClass;
+
+/*
+ * Create a stream stack to handle output stream. HTTP checks what the 
+ * response is and creates a stream stack to process the data.
+ *
+ * Context:	Internal stream stack setup.
+ * Source:	MSG_HT_STREAM_PUT_BLOCK
+ * Destination:	self
+ * Interception:Nope
+ * Pass:        Nothing
+ * Return:      HT_OK or HT_ERROR.
+ */
+@message int MSG_HTTP_STREAM_PIPE();
+
+
+/* --------------------------------------------------------------------------
+ * 		Instance Data.
+ * --------------------------------------------------------------------------*/
+
+/*
+ * HTTP finite state machine info is kept by HTTPI_currentState
+ */
+@instance HTTPState HTTPI_currentState;
+@instance HTTPState HTTPI_nextState;
+
+/* 
+ * If we are retrying, this is the time to wait before we can 
+ * reconnect again. Given in time ticks.
+ */ 
+@instance dword HTTPI_timeToConnect;
+
+/*
+ * Buffer for storing status line. Careful in the use of HTTPI_buffer
+ * as this is an array! If you passed to function, its pointr may move!
+ */
+@instance char HTTPI_buffer[HTTP_MAX_STATUS_LENGTH+1];
+@instance int HTTPI_bufferLength;
+@instance int HTTPI_parseState;
+@instance int HTTPI_reason; /* Index into HTTPI_buffer. Don't use pointer! */
+
+/*
+ * Buffer for data while HTTP decides whether to push the data to 
+ * target or not.
+ */
+@instance HTMemHandle HTTPI_data;
+@instance word HTTPI_len;
+
+/*
+ * HTTP_STREAM_ALL_DATA return code. If we get into state HTTP_STREAM_ALL_DATA,
+ * the return code must be provided. If HT_OK, then return code from 
+ * stream data is used.
+ */
+@instance int HTTPI_streamDataRet;
+
+@endc
+
+@endlib
+
+
+@endif /* __HTTP_CLASS_GOH */
+

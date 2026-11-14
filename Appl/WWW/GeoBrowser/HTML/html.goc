@@ -1,0 +1,687 @@
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Geoworks 1996.  All rights reserved.
+	GEOWORKS CONFIDENTIAL
+
+PROJECT:	GeoBrowser
+MODULE:		text/html
+FILE:		html.goc
+
+AUTHOR:		Kok Kin Kee, Sep 15, 1996
+
+ROUTINES:
+	Name			Description
+	----			-----------
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	kkee	9/15/96   	Initial version.
+
+DESCRIPTION:
+
+	text/html content handler.
+
+	$Id: html.goc,v 1.1 97/04/04 17:20:18 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+
+@include <stdapp.goh>
+@include <WWW/HTCore/htreq.goh>
+@include <WWW/htmem.h>
+@include <WWW/HTCore/htstring.goh>
+@include <WWW/HTCore/htlist.goh>
+@include <WWW/sgml.goh>
+@include <WWW/htmlDTD.goh>
+@include <WWW/uigenera.goh>
+@include "HTML/html.goh"
+@include "htfatals.goh"
+#include <Ansi/string.h>
+
+#define __DISPLAY__
+
+@extern object @GBTextView;
+
+@start TestHTMLResource, data;
+
+/*
+ * We map elements to their strings so we make sure 
+ * that input == output. This table *MUST* be kept up 
+ * to date with the HTMLToken table in htmlDTD.goh.
+ */
+@chunk HTMLInputOutput htmlElementIOMap[] = {
+     {"XXX_INVALID"}
+    ,{"A"}
+    ,{"ABBREV"}
+    ,{"ABSTRACT"}
+    ,{"ACRONYM"}
+    ,{"ADDED"}
+    ,{"ADDRESS"}
+    ,{"APPLET"}
+    ,{"AREA"}
+    ,{"ARG"}
+    ,{"B"}
+    ,{"BASE"}
+    ,{"BASEFONT"}
+    ,{"BDO"}
+    ,{"BGSOUND"}
+    ,{"BIG"}
+    ,{"BLOCKQUOTE"}
+    ,{"BODY"}
+    ,{"BR"}
+    ,{"CAPTION"}
+    ,{"CENTER"}
+    ,{"CHANGED"}
+    ,{"CITE"}
+    ,{"CODE"}
+    ,{"COL"}
+    ,{"COLGROUP"}
+    ,{"COMMENT"}
+    ,{"DD"}
+    ,{"DFN"}
+    ,{"DIR"}
+    ,{"DIV"}
+    ,{"DL"}
+    ,{"DOCTYPE"}
+    ,{"DT"}
+    ,{"EM"}
+    ,{"EMBED"}
+    ,{"FIELDSET"}
+    ,{"FIG"}
+    ,{"FONT"}
+    ,{"FORM"}
+    ,{"FRAME"}
+    ,{"FRAMESET"}
+    ,{"H1"}
+    ,{"H2"}
+    ,{"H3"}
+    ,{"H4"}
+    ,{"H5"}
+    ,{"H6"}
+    ,{"HEAD"}
+    ,{"HR"}
+    ,{"HTML"}
+    ,{"I"}
+    ,{"IMAGE"}
+    ,{"IMG"}
+    ,{"INPUT"}
+    ,{"ISINDEX"}
+    ,{"KBD"}
+    ,{"L"}
+    ,{"LABEL"}
+    ,{"LI"}
+    ,{"LINK"}
+    ,{"LISTING"}
+    ,{"LIT"}
+    ,{"MAP"}
+    ,{"MARGIN"}
+    ,{"MARQUEE"}
+    ,{"MATH"}
+    ,{"MENU"}
+    ,{"META"}
+    ,{"NEXTID"}
+    ,{"NOBR"}
+    ,{"NOFRAMES"}
+    ,{"NOTE"}
+    ,{"OBJECT"}
+    ,{"OL"}
+    ,{"OPTION"}
+    ,{"OVER"}
+    ,{"P"}
+    ,{"PARAM"}
+    ,{"PERSON"}
+    ,{"PLAINTEXT"}
+    ,{"PRE"}
+    ,{"Q"}
+    ,{"QUOTE"}
+    ,{"REMOVED"}
+    ,{"RENDER"}
+    ,{"S"}
+    ,{"SAMP"}
+    ,{"SCRIPT"}
+    ,{"SELECT"}
+    ,{"SMALL"}
+    ,{"SPAN"}
+    ,{"STRIKE"}
+    ,{"STRONG"}
+    ,{"STYLE"}
+    ,{"SUB"}
+    ,{"SUP"}
+    ,{"TAB"}
+    ,{"TABLE"}
+    ,{"TBODY"}
+    ,{"TD"}
+    ,{"TEXTAREA"}
+    ,{"TEXTFLOW"}
+    ,{"TFOOT"}
+    ,{"TH"}
+    ,{"THEAD"}
+    ,{"TITLE"}
+    ,{"TR"}
+    ,{"TT"}
+    ,{"U"}
+    ,{"UL"}
+    ,{"VAR"}
+    ,{"WBR"}
+    ,{"XMP"}
+    ,{"XXX_NULL"}
+};
+
+/*
+ * We map attrs to their strings so we make sure 
+ * that input == output. This table *MUST* be kept up to 
+ * date with the HTMLAttr table in htmlDTD.goh.
+ */
+@chunk HTMLInputOutput htmlAttrIOMap[] = {
+	 {"XXX_INVALID"}
+	,{"ACTION"}
+	,{"ALIGN"}
+	,{"ALT"}
+	,{"AREA"}
+	,{"AT"}
+	,{"BACKGROUND"}
+	,{"BEHAVIOR"}
+	,{"BGCOLOR"}
+	,{"BORDER"}
+	,{"BORDERCOLOR"}
+	,{"BORDERCOLORDARK"}
+	,{"BORDERCOLORLIGHT"}
+	,{"CELLPADDING"}
+	,{"CELLSPACING"}
+	,{"CHECKED"}
+	,{"CLASSID"}
+        ,{"CLEAR"}
+	,{"CODEBASE"}
+	,{"CODETYPE"}
+	,{"COLOR"}
+	,{"COLS"}
+	,{"COLSPAN"}
+	,{"COMPACT"}
+	,{"CONTENT"}
+	,{"COORDS"}
+	,{"CONTROLS"}
+	,{"DATA"}
+	,{"DECLARE"}
+	,{"DIRECTION"}
+	,{"DISABLED"}
+	,{"DYNSRC"}
+	,{"EFFECT"}
+	,{"ERROR"}
+	,{"FACE"}
+	,{"FRAME"}
+	,{"HEIGHT"}
+	,{"HREF"}
+	,{"HSPACE"}
+	,{"HTTP_EQUIV"}
+	,{"ID"}
+	,{"IDREF"}
+	,{"INDEX"}
+	,{"ISMAP"}
+	,{"LANG"}
+	,{"LANGUAGE"}
+	,{"LOOP"}
+	,{"MAXLENGTH"}
+	,{"METHOD"}
+	,{"METHODS"}
+	,{"MIN"}
+	,{"MULTIPLE"}
+	,{"N"}
+	,{"NAME"}
+	,{"NOHREF"}
+	,{"NOSHADE"}
+	,{"NOWRAP"}
+        ,{"ONCLICK"}
+	,{"PLAIN"}
+	,{"PRINT"}
+	,{"REL"}
+	,{"REV"}
+	,{"ROLE"}
+	,{"ROWS"}
+	,{"ROWSPAN"}
+	,{"RULES"}
+	,{"SCROLLAMOUNT"}
+	,{"SCROLLDELAY"}
+	,{"SEETHRU"}
+	,{"SELECTED"}
+	,{"SHAPE"}
+	,{"SHAPES"}
+	,{"SIZE"}
+	,{"SRC"}
+	,{"STANDBY"}
+	,{"START"}
+	,{"STYLE"}
+	,{"TAG"}
+	,{"TARGET"}
+	,{"TITLE"}
+	,{"TYPE"}
+	,{"URL"}
+	,{"USEMAP"}
+	,{"VALIGN"}
+	,{"VALUE"}
+	,{"VALUETYPE"}
+	,{"VSPACE"}
+	,{"WIDTH"}
+	,{"WRAP"}
+	,{"XXX_NULL"}
+};
+
+@end TestHTMLResource;
+
+
+
+/***********************************************************************
+		Class Declaration
+***********************************************************************/
+
+@classdecl	HTMLClass;
+
+
+/***********************************************************************
+                Private Functions
+***********************************************************************/
+
+/***********************************************************************
+		Message Handlers
+***********************************************************************/
+
+
+
+/***********************************************************************
+ *		MSG_HT_STREAM_GET_TARGET for HTMLClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    We do not want anyone to know about our target
+ *                  as the target is not a stream class!
+ * PARAMETERS:	    
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	kkee	9/27/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method HTMLClass, MSG_HT_STREAM_GET_TARGET
+{
+    return NullOptr;
+}	/* End of MSG_HT_STREAM_GET_TARGET.	*/
+
+
+
+
+/***********************************************************************
+ *		MSG_HT_STREAM_ABORT for HTMLClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    We must make sure we don't abort the target.
+ * PARAMETERS:	    int (void)
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:        We need to send MSG_META_FINAL_OBJ_FREE instead of 
+ *                  MSG_META_OBJ_FREE to bypass MSG_META_OBJ_FLUSH_QUEUE 
+ *                  which loops back to thread browser:0 generating a 
+ *                  FatalError as the content thread would have exited.
+ *        
+ *                  You are guaranteed by the WWW Library that there will
+ *                  not be any messages sent to your content objects once 
+ *                  you've received MSG_HT_STREAM_ABORT. (Just make sure 
+ *                  you don't send messages to your object after sending
+ *                  MSG_META_FINAL_OBJ_FREE.)
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	kkee	9/15/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method HTMLClass, MSG_HT_STREAM_ABORT
+{
+    ObjIncInUseCount(OptrToHandle(oself));
+    @send, forceQueue oself::MSG_META_FINAL_OBJ_FREE();
+    return HT_OK;
+}	/* End of MSG_HT_STREAM_ABORT.	*/
+
+
+
+
+/***********************************************************************
+ *		MSG_HT_STREAM_PUT_BLOCK for HTMLClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    We get PCDATA here. Because of the confusing CDATA
+ *                  and RCDATA content models, we also get that here as
+ *                  they are parsed using PCDATA.
+ * PARAMETERS:	    int (byte *data, word len)
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:        
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	kkee	9/15/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method HTMLClass, MSG_HT_STREAM_PUT_BLOCK
+{
+    @call oself::MSG_HTML_PRINT_DATA(data, len);
+    return HT_OK;
+}	/* End of MSG_HT_STREAM_PUT_BLOCK.	*/
+
+
+
+
+/***********************************************************************
+ *		MSG_HT_STRUCTURED_PUT_START_ELEMENT for HTMLClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    Accepts a HTML start element.
+ * PARAMETERS:	    int (HTMLToken elementToken, MemHandle block,
+ *                       ChunkHandle chunk);
+ *                  - elementToken matches the tag list we've put in
+ *                    the DTD passed to our caller.
+ *                  - block and chunk contains an array of SGMLEntity
+ *                    as defined in sgml.goh. All chunks in SGMLEntity
+ *                    belong to the same block. 
+ * 
+ *                    The list is terminated by 
+ *                    SGMLEntity.SGMLE_token == 0; Therefore we must
+ *                    not use 0 as a valid token (which we map to  
+ *                    HTMLT_XXX_INVALID).
+ * 
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:       This is one big switch statement that recognizes all
+ *                 supported HTML elements.
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	kkee	10/ 2/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method HTMLClass, MSG_HT_STRUCTURED_PUT_START_ELEMENT
+{
+#ifdef ERROR_CHECK
+    if ((elementToken <= HTMLT_XXX_INVALID) ||
+	(elementToken >= HTMLT_XXX_NULL))
+	EC_ERROR(INVALID_HTML_ELEMENT_TOKEN);
+#endif
+
+    @call oself::MSG_HTML_PRINT_START_ELEMENT(elementToken, 
+					      block, chunk);
+    
+    return HT_OK;
+}	/* End of MSG_HT_STRUCTURED_PUT_START_ELEMENT.	*/
+
+
+
+/***********************************************************************
+ *		MSG_HT_STRUCTURED_PUT_END_ELEMENT for HTMLClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    Accepts the end of a HTML element.
+ * PARAMETERS:	    int (word elementToken);
+ *                  - element number matches the tag list we've put in 
+ *                    the DTD passed to our caller.
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:        
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	kkee	10/ 2/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method HTMLClass, MSG_HT_STRUCTURED_PUT_END_ELEMENT
+{
+
+    @call oself::MSG_HTML_PRINT_END_ELEMENT(elementToken);
+			
+    return HT_OK;
+}	/* End of MSG_HT_STRUCTURED_PUT_END_ELEMENT.	*/
+
+
+
+/***********************************************************************
+ *		MSG_HT_STREAM_FLUSH for HTMLClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    Push down buffered data.
+ * PARAMETERS:	    void (void)
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	kkee	9/27/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method HTMLClass, MSG_HT_STREAM_FLUSH
+{
+    /* No data buffered */
+    return HT_OK;
+}	/* End of MSG_HT_STREAM_FLUSH.	*/
+
+
+
+
+/***********************************************************************
+ *		MSG_HTML_PRINT_START_ELEMENT for HTMLClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    Print start element to screen.
+ * PARAMETERS:	    void (HTMLToken elementToken, MemHandle block,
+ *                       ChunkHandle chunk);
+ *                  - elementToken matches the tag list we've put in
+ *                    the DTD passed to our caller.
+ *                  - block and chunk contains an array of SGMLEntity
+ *                    as defined in sgml.goh. All chunks in SGMLEntity
+ *                    belong to the same block. 
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	kkee	10/17/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method HTMLClass, MSG_HTML_PRINT_START_ELEMENT
+{
+    char *cptr;
+    SGMLEntity *sptr;
+    HTMLInputOutput *elementPtr, *attrPtr;
+    Boolean hasAttrs = FALSE;
+    word index = 0;
+
+#ifdef ERROR_CHECK
+    if ((elementToken <= HTMLT_XXX_INVALID) ||
+	(elementToken >= HTMLT_XXX_NULL))
+	EC_ERROR(INVALID_HTML_ELEMENT_TOKEN);
+#endif
+
+    /* 
+     * Test by printing the element, its attrs, and attr values.
+     * We use reverse mapping from token value to string.
+     */
+    MemLock(OptrToHandle(@htmlElementIOMap));
+    MemLock(OptrToHandle(@htmlAttrIOMap));
+
+
+    MemLock(block);
+    sptr = (SGMLEntity *) LMemDerefHandles(block, chunk);
+    elementPtr = (HTMLInputOutput *) LMemDeref(@htmlElementIOMap);
+    attrPtr = (HTMLInputOutput *) LMemDeref(@htmlAttrIOMap);
+
+    /* Print the element string */
+#ifdef __DISPLAY__
+    @call GBTextView::
+	MSG_VIS_TEXT_APPEND_PTR("<", 1);
+#endif
+
+    /* Save the element */
+    @call @self->HTSI_target::
+	MSG_HT_STREAM_PUT_BLOCK((byte *)"<", 1);
+
+#ifdef __DISPLAY__
+    @call GBTextView::
+	MSG_VIS_TEXT_APPEND_PTR(
+		elementPtr[elementToken].HTMLIO_string, 
+		strlen(elementPtr[elementToken].HTMLIO_string));
+#endif
+
+    @call @self->HTSI_target::
+	MSG_HT_STREAM_PUT_BLOCK(
+		(byte *) elementPtr[elementToken].HTMLIO_string, 
+		strlen(elementPtr[elementToken].HTMLIO_string));
+
+#ifdef __DISPLAY__
+    @call GBTextView::
+	MSG_VIS_TEXT_APPEND_PTR(">\r\n", 3);
+#endif
+
+    if (sptr[index].SGMLE_token) {
+	hasAttrs = TRUE;
+	@call @self->HTSI_target::
+	    MSG_HT_STREAM_PUT_BLOCK((byte *)"\r\n   ", 5);
+    
+    } else
+	@call @self->HTSI_target::
+	    MSG_HT_STREAM_PUT_BLOCK((byte *)">\r\n", 3);
+
+    /* Print the element attrs and values */
+    while (sptr[index].SGMLE_token) {
+
+	/* Print the attr string */
+	@call @self->HTSI_target::
+	    MSG_HT_STREAM_PUT_BLOCK(
+		(byte *) attrPtr[sptr[index].SGMLE_token].HTMLIO_string,
+		strlen(attrPtr[sptr[index].SGMLE_token].HTMLIO_string));
+	
+	if (sptr[index].SGMLE_value) {
+
+	    /* Print the attr value */
+	    @call @self->HTSI_target::
+		MSG_HT_STREAM_PUT_BLOCK((byte *)"=", 1);
+	    
+	    cptr = (char *) LMemDerefHandles(block, 
+					     sptr[index].SGMLE_value);
+
+	    @call @self->HTSI_target::
+		MSG_HT_STREAM_PUT_BLOCK((byte *)cptr, strlen(cptr));
+
+	    @call @self->HTSI_target::
+		MSG_HT_STREAM_PUT_BLOCK((byte *)"  ", 2);
+	}
+
+	index += 1;
+    }
+
+    if (hasAttrs)
+	@call @self->HTSI_target::
+	    MSG_HT_STREAM_PUT_BLOCK((byte *)">\r\n", 3);
+
+    MemUnlock(block);
+    MemUnlock(OptrToHandle(@htmlElementIOMap));
+    MemUnlock(OptrToHandle(@htmlAttrIOMap));
+
+}	/* End of MSG_HTML_PRINT_START_ELEMENT.	*/
+
+
+
+
+/***********************************************************************
+ *		MSG_HTML_PRINT_END_ELEMENT for HTMLClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    Print end element to screen.
+ * PARAMETERS:	    void (word elementToken);
+ *                  - element number matches the tag list we've put in 
+ *                    the DTD passed to our caller.
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	kkee	10/17/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method HTMLClass, MSG_HTML_PRINT_END_ELEMENT
+{
+    HTMLInputOutput *elementPtr;
+
+    MemLock(OptrToHandle(@htmlElementIOMap));
+
+    elementPtr = (HTMLInputOutput *) LMemDeref(@htmlElementIOMap);
+
+    /* Print the element string */
+#ifdef __DISPLAY__
+    @call GBTextView::
+	MSG_VIS_TEXT_APPEND_PTR("</", 2);
+#endif
+
+    @call @self->HTSI_target::
+	MSG_HT_STREAM_PUT_BLOCK((byte *)"</", 2);
+
+#ifdef __DISPLAY__
+    @call GBTextView::
+	MSG_VIS_TEXT_APPEND_PTR(
+		elementPtr[elementToken].HTMLIO_string, 
+		strlen(elementPtr[elementToken].HTMLIO_string));
+#endif
+
+    @call @self->HTSI_target::
+	MSG_HT_STREAM_PUT_BLOCK(
+		(byte *) elementPtr[elementToken].HTMLIO_string, 
+		strlen(elementPtr[elementToken].HTMLIO_string));
+
+#ifdef __DISPLAY__
+    @call GBTextView::
+	MSG_VIS_TEXT_APPEND_PTR(">\r\n", 3);
+#endif
+
+    @call @self->HTSI_target::
+	MSG_HT_STREAM_PUT_BLOCK((byte *) ">\r\n", 3);
+
+    MemUnlock(OptrToHandle(@htmlElementIOMap));
+
+}	/* End of MSG_HTML_PRINT_END_ELEMENT.	*/
+
+
+
+
+
+/***********************************************************************
+ *		MSG_HTML_PRINT_DATA for HTMLClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    Print data to screen.
+ * PARAMETERS:	    void (byte *data, word len)
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	kkee	10/17/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method HTMLClass, MSG_HTML_PRINT_DATA
+{
+    /* Ignore empty data */
+    if (!data || !len) return;
+
+    @call @self->HTSI_target::MSG_HT_STREAM_PUT_BLOCK(data, len);
+
+}	/* End of MSG_HTML_PRINT_DATA.	*/

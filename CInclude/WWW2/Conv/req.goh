@@ -1,0 +1,806 @@
+/*---------------------------------------------------------------------------
+//
+//  Geoworks (R) application software and GEOS (R) operating system
+//  software copyright (C) 1990-1997 Geoworks.  All rights reserved.
+//  United States Patents 5327529, 5237651, and 5438662. U.K. Patents
+//  0375703 and 0631677.  German Patents P3854269.2-08 and
+//  69307728.1-08.  French Patents 0375703 and 0631677.  Other
+//  international patents pending.
+//
+//  This software is the confidential and proprietary information of
+//  Geoworks ("Confidential Information").  You shall not disclose
+//  such Confidential Information and shall use it only in accordance
+//  with the terms of the license agreement you entered into with
+//  Geoworks.
+//
+// FILE:        sched.h
+//
+// DESCRIPTION: Scheduler for running requests.
+//              //depot/liberty/project/ellery/main/library/www/html/req.h#14
+//
+//      $Id: req.goh,v 1.2 98/09/03 04:12:05 allen Exp $
+//
+//-------------------------------------------------------------------------*/
+
+@ifndef _HTML_REQ_H_
+@define _HTML_REQ_H_
+
+/*
+#include <toolkit/lisact.h>        // Action listener
+#include <kernel/sema4.h>
+#include <www/wwcore/wwlist.h>
+#include <www/wwcore/wwstream.h>
+#include <www/wwcore/wwstatus.h>
+#include <www/conv/html.h>
+#include "../wwcore/cmd.h"
+#include "reqmgr.h"
+
+class AppBase;                     // #include <ui/appbase.h>
+class RequestResponse;
+class HTTP;
+class HTResponse;
+*/
+
+@include "WWW2/WW2Core/ww2list.goh"
+@include "WWW2/WW2Core/wwstatus.goh"
+@include "WWW2/Conv/html.goh"
+#include <sem.h>
+#include <WWW2/WW2Core/cmd.h>
+
+    /*////////
+    //
+    // Return codes.
+    //
+    // [] REQUEST_OK
+    // [] REQUEST_OUT_OF_MEMORY
+    */
+typedef enum {
+      REQUEST_OK
+     ,REQUEST_OUT_OF_MEMORY
+} RequestResultCode;
+
+
+@if 0
+    NO AUTHENTICATION FOR NOW.  PORTED LATER!!!
+
+/***************************************************************************
+CLASS
+    Callback for authentication.    
+
+ KEYWORDS
+
+ CLASS TREE
+ <pre>
+  CommandArg
+    |
+    +--- AuthCommand
+ </pre>
+ ****************************************************************************/
+class AuthCommand : public CommandArg
+{
+ public:
+    AuthCommand(AppBase *appbase) : _appbase(appbase)
+    {PARAM_ASSERT(appbase);}
+    ~AuthCommand() {};
+
+    //////////
+    //
+    // Execute a command object that takes arguments. 
+    //
+    // Parameters_
+    //
+    // [in]  cmd    Command to be executed.
+    // [in]  argc   Number of arguments in argv.
+    // [in]  argv   Array of void pointers.
+    // [in]  argr   Number of arguments in argrv expected from callee.
+    // [out] argrv  Array of char pointers. If the return code is non-zero,
+    //              The pointers will be freed by caller of this routine via 
+    //              "delete []...".
+    //
+    // Return_value_ 0 if argrv[] data is provided, which can be NULL.
+    //               non-zero, argrv[] data is not provided.
+    //
+    // See_also_ Command
+    //
+    // Overrides_
+    //
+    // Status_ Functional
+    //
+    int Execute(int arg, const char *argv[], int argr, char *argrv[]);
+
+ private:
+    AppBase *_appbase;
+};
+
+
+/***************************************************************************
+CLASS
+    AuthListener
+
+    Decide whether <OK> or <CANCEL> was pressed during authentication.
+
+KEYWORDS
+    
+
+CLASS TREE
+<pre>
+   ActionListenerInterface
+      |
+      +--- AuthListener
+</pre>
+****************************************************************************/
+
+class AuthListener : public ActionListenerInterface 
+{
+ public:
+    AuthListener() : _ok(FALSE) {};
+    ~AuthListener() {};
+    Boolean IsOK() {return _ok;};
+    virtual void ActionPerformed(ActionEvent& event);
+
+ private:
+    Boolean _ok;
+};
+
+
+@endif
+
+
+/***************************************************************************
+CLASS
+    RequestResponse
+
+    The request response for receiving 
+
+KEYWORDS
+    
+
+CLASS TREE
+<pre>
+   RequestResponse
+</pre>
+****************************************************************************/
+@class RequestResponseClass, MetaClass;
+
+/* public: */
+/*    virtual ~RequestResponse() {}; */
+    
+    /*////////
+    //
+    // Request stream callback. This method is called from a request
+    // we've submitted. The request data is provided in the stream.
+    //
+    // Parameters_
+    //
+    // [in]  stream   Pointer to a wwstream for reading only. Does not
+    //                allow writing to it. Must NOT be deleted.
+    //
+    // Status_ Functional
+    */
+    @message /* virtual */ void AcceptStream(optr /* WWStream * */stream); /* = 0; */
+
+    /*////////
+    //
+    // Request error message callback. 
+    //
+    // Parameters_
+    //
+    // [in]  msg    The error message if we care to print it. This is
+    //              non-NULL.
+    //
+    // Status_ Functional
+    */
+    @message /* virtual */ void AcceptError(StatusInfo  msg); /*  {}; */
+
+    /*////////
+    //
+    // Terminate request callback. The request id is provided.
+    // The method must be thread safe.
+    //
+    // Status_ Functional
+    */
+    @message /* virtual */ void AcceptDone(); /*  {}; */
+
+/* protected: */
+    @message void RequestResponse(); /* {}; */
+
+@endc;
+
+typedef enum {
+    REQUEST_UNKNOWN,
+    REQUEST_GET,
+    REQUEST_POST
+} RequestType;
+
+typedef enum {
+    REQUEST_INT_OK,
+    REQUEST_INT_NOT_MODIFIED,
+    REQUEST_INT_RETRY,
+    REQUEST_INT_ABORT
+} RequestInternalCode;
+
+
+/***************************************************************************
+CLASS
+    Request command.
+
+    A request is a command object. It is created by HTRequestManager
+    and submitted to a command scheduler (see
+    CommandSchedulerClass in sched.h). The command scheduler deletes
+    the command after it has finished using it.
+
+    A request is executed by the scheduler via the
+    HTRequest::Run() method, preempted by the scheduler via the 
+    HTRequest::Preempt() method. Before the scheduler deletes the
+    requests, it calls the HTRequest::Done() method. After which,
+    the request is deleted.
+
+    A request serves as a callback to HTRequestManager. It calls HTRequestManager
+    back when there is a data object. However, if an error occurs 
+    with the request (e.g., data object cannot be loaded), it calls
+    HTRequestManager::AcceptError() method. Regardless of
+    whether AcceptStream() or AcceptError() was called, the request
+    will always call HTRequestManager::Done() before it is deleted.
+
+ KEYWORDS
+
+ CLASS TREE
+
+<pre>
+  Command
+    |
+    +--- HTRequest
+
+  WWListElement
+     |
+     +---HTRequest
+</pre>
+****************************************************************************/
+@if 0 // HTRequest is now a struct.
+@class HTRequestClass, WWListElementClass;
+
+/* public: */
+
+    /*////////
+    //
+    // Constructor.
+    //
+    // Parameters_
+    //
+    // [in]  reqManager
+    // [in]  target    The target for the response stream.
+    // [in]  status    For reporting status, NULL if status report is
+    //                 not desired.
+    //
+    // Status_ Functional
+    */
+    @message void HTRequest
+          (optr /* HTRequestManager * */ reqManager, 
+	   optr /* RequestResponse *  */ target, 
+	   optr /* WWStatus *  */ status /* = NULL */);
+
+    /*////////
+    //
+    // Destructor.
+    //
+    // Status_ Functional
+    //
+
+    ~HTRequest();
+
+    */
+
+     /*////////
+     //
+     // Initialize a Get request.
+     //
+     // Parameters_
+     //
+     // [in]  url     URL of data object to get.
+     // [in]  proxyName
+     // [in]  proxyPort
+     //
+     // Return_value_ REQUEST_OK
+     //               REQUEST_OUT_OF_MEMORY
+     //
+     // See_also_ InitializePost()
+     //
+     // Status_ Functional
+     */
+     @message RequestResultCode InitializeGet(const char *url,
+                                     const char *proxyName /* = NULL */,
+                                     dword proxyPort /* = 80 */,
+                                     LoadMode loadMode /* =
+                                     HTMLViewer::LOAD_ANY_VERSION */);
+
+     /*////////
+     //
+     // Initialize a Post request.
+     //
+     // Parameters_
+     //
+     // [in] url
+     // [in] buffer     
+     // [in] len
+     // [in] file
+     // [in] proxyName
+     // [in] proxyPort
+     //
+     //
+     // Return_value_ REQUEST_OK
+     //               REQUEST_OUT_OF_MEMORY
+     //
+     // See_also_ InitializeGet()
+     //
+     // Status_ Functional
+     */
+     @message RequestResultCode InitializePost(const char *url,
+					       const byte *buffer,
+					       const dword len,
+					       Boolean file /* = FALSE */,
+					       const char *proxyName /* = NULL */,
+					       dword proxyPort /* = 80 */);
+
+    /*////////
+    //
+    // Get the request target
+    //
+    // Parameters_
+    //
+    // Return_value_ target
+    //
+    // Status_ Functional
+    */
+    @message optr /* RequestResponse* */ GetTarget(); /*  const */
+    
+
+    /*////////
+    //
+    // Get url. Null if no url.
+    //
+    // Return_value_ const char* or NULL
+    //
+    // Status_ Functional
+    */
+    @message const char *GetStrURL(); /* const  */
+
+
+     /*////////
+     //
+     // Execute the request. Run to completion or until preempted by
+     // Preempt().
+     //
+     // Parameters_
+     //
+     // [out] 
+     // [in]  
+     //
+     // Return_value_ 
+     //
+     // See_also_ Preempt()
+     //
+     // Overrides_ Command::Execute()
+     //
+     // Status_ Functional
+     */
+     @message void Execute();
+
+     /*////////
+     //
+     // Preempt Execute() method.
+     //
+     // Parameters_
+     //
+     // [out] 
+     // [in]  
+     //
+     // Return_value_ 
+     //
+     // See_also_ 
+     //
+     // Overrides_ Command::Preempt()
+     //
+     // Status_ Functional
+     */
+     @message void Preempt();
+
+     /*////////
+     //
+     // This method is called to tell us that the request is about to
+     // be deleted. It must not be called while the object is still
+     // be used; i.e., Execute() or Preempt() is running.
+     //
+     // Parameters_
+     //
+     // [out] 
+     // [in]  
+     //
+     // Return_value_ 
+     //
+     // See_also_ 
+     //
+     // Overrides_ Command::Done()
+     //
+     // Status_ Functional
+     */
+     @message void Done();
+
+ /*===========================================================================
+ //
+ //                       W A R N I N G 
+ // 
+ // THE LIBERTY EXTERNAL API IS FOUND ABOVE THIS BARRIER. ANYTHING BELOW
+ // THIS NOTICE IS IMPLEMENTATION DEPENDENT AND SUBJECT TO CHANGE.
+ //
+ //
+ //=========================================================================*/
+
+/*  private: */
+    /*
+    // Don't let users call copy the object in any way.  These methods
+    // aren't actually defined since they should never be called, but
+    // declaring them private should catch anyone who tries to call
+    // them.
+    */
+/*
+    HTRequest(const HTRequest&);
+    const HTRequest& operator=(const HTRequest&);
+*/
+
+     /* Set stream and make it preemptable. */
+     @message void SetStreamPreemptable(optr /* WWStream * */ stream);
+
+     /* Delete stream synchronously.        */
+     @message void DeleteStream();
+
+#ifdef ERROR_CHECK
+     /* Remove stream without deleting it   */
+     @message optr /* WWStream* */ RemoveStream();
+#endif
+
+     /*
+     // Create the appropriate protocol based on URL scheme.
+     // Uses instance data _url and _stream.
+     //
+     // Parameters_
+     //
+     // [out] 
+     // [in]  
+     //
+     // Return_value_ Protocol stream or NULL.
+     //
+     // See_also_ 
+     //
+     // Overrides_
+     //
+     // Status_ Functional
+     */
+     @message optr /* WWStream * */ LaunchEmail();
+     @message optr /* WWStream * */ GetProtocol();
+     @message optr /* WWStream * */ GetCache();
+     @message optr /* WWStream * */ GetHTTP();
+     @message optr /* WWStream * */ GetFile();
+     @message optr /* WWStream * */ CacheHTTP
+              (optr /* HTTP * */ http, optr /* HTResponse * */ resp);
+     @message RequestInternalCode GenHTTPHeaders
+              (optr /* HTTP * */ http, Boolean endHeader);
+     @message RequestInternalCode GenHTTPPostData(optr /* HTTP * */ http);
+     @message RequestInternalCode ParseHTTPResponse
+              (optr /* HTTP * */ http, optr /* HTResponse * */ resp);
+     @message char* GetLastModifiedDate();
+     /* If URL has no scheme, default it to http:  */
+     @message char* DuplicateURL(const char* url);
+
+     @instance optr /* HTRequestManager * */ __reqManager;
+     @instance optr /* RequestResponse *  */ __target;
+     @instance optr /* WWStatus *         */ __status;
+
+     /* Get or Post request */
+     @instance RequestType                   __reqType;
+     /* Where to load data from  */
+     @instance LoadMode                      __loadMode;
+
+     /* Data common to both Get and Post */
+     @instance char *                        __url;
+     @instance char *                        __proxyName;
+     @instance dword                         __proxyPort;
+
+     /* Data for Post only  */
+     @instance byte *                        __postBuffer;
+     @instance dword                         __postLen;
+     @instance Boolean                       __postFile;
+
+     /* The response stream.  If nonNUL, it can be preempted. */
+     @instance optr /* WWStream * */         __stream;
+                                            
+                                /* This must be P() to change      */
+                                /* _stream. Initially it is P()    */
+                                /* by the constructor as value 0.  */
+     @instance SemaphoreHandle /* Semaphore */__preemptStream;
+                                /* Wait for Execute() to end.      */
+     @instance SemaphoreHandle /* Semaphore */__waitForExecute; 
+
+     /* Verify cache copy with server using GMT last-modified date. */
+     @instance char *                        __lastModified;
+
+     /* Authentication prompt for username and password             */
+/*     AuthCommand _authReq; */
+@endc;
+
+@endif // @if 0
+
+typedef struct {
+    Command                       __meta;
+    optr /* HTRequestManager * */ __reqManager;
+    optr /* RequestResponse *  */ __target;
+    optr /* WWStatus *         */ __status;
+
+    /* Get or Post request */
+    RequestType                   __reqType;
+    /* Where to load data from  */
+    LoadMode                      __loadMode;
+
+    /* Data common to both Get and Post */
+    char *                        __url;
+    char *                        __proxyName;
+    dword                         __proxyPort;
+
+    /* Data for Post only  */
+    byte *                        __postBuffer;
+    dword                         __postLen;
+    Boolean                       __postFile;
+
+    /* The response stream.  If nonNUL, it can be preempted. */
+    optr /* WWStream * */         __stream;
+                                            
+                                /* This must be P() to change      */
+                                /* _stream. Initially it is P()    */
+                                /* by the constructor as value 0.  */
+    SemaphoreHandle /* Semaphore */__preemptStream;
+                                /* Wait for Execute() to end.      */
+    SemaphoreHandle /* Semaphore */__waitForExecute; 
+
+    /* Verify cache copy with server using GMT last-modified date. */
+    char *                        __lastModified;
+    /* Authentication prompt for username and password             */
+/*     AuthCommand _authReq; */
+} HTRequest;
+
+    /*////////
+    //
+    // Constructor.
+    //
+    // Parameters_
+    //
+    // [in]  reqManager
+    // [in]  target    The target for the response stream.
+    // [in]  status    For reporting status, NULL if status report is
+    //                 not desired.
+    //
+    // Status_ Functional
+    */
+    void HTRequestHTRequest
+          (HTRequest *pself,
+           optr /* HTRequestManager * */ reqManager, 
+	   optr /* RequestResponse *  */ target, 
+	   optr /* WWStatus *  */ status /* = NULL */);
+
+    ////////
+    //
+    // Destructor.
+    //
+    // Status_ Functional
+    //
+
+    void HTRequestDestructor(
+	HTRequest *pself);
+
+
+     /*////////
+     //
+     // Initialize a Get request.
+     //
+     // Parameters_
+     //
+     // [in]  url     URL of data object to get.
+     // [in]  proxyName
+     // [in]  proxyPort
+     //
+     // Return_value_ REQUEST_OK
+     //               REQUEST_OUT_OF_MEMORY
+     //
+     // See_also_ InitializePost()
+     //
+     // Status_ Functional
+     */
+     RequestResultCode HTRequestInitializeGet(HTRequest *pself,
+				     const char *url,
+                                     const char *proxyName /* = NULL */,
+                                     dword proxyPort /* = 80 */,
+                                     LoadMode loadMode /* =
+                                     HTMLViewer::LOAD_ANY_VERSION */);
+
+     /*////////
+     //
+     // Initialize a Post request.
+     //
+     // Parameters_
+     //
+     // [in] url
+     // [in] buffer     
+     // [in] len
+     // [in] file
+     // [in] proxyName
+     // [in] proxyPort
+     //
+     //
+     // Return_value_ REQUEST_OK
+     //               REQUEST_OUT_OF_MEMORY
+     //
+     // See_also_ InitializeGet()
+     //
+     // Status_ Functional
+     */
+     RequestResultCode HTRequestInitializePost(HTRequest *pself,
+				               const char *url,
+					       const byte *buffer,
+					       const dword len,
+					       Boolean file /* = FALSE */,
+					       const char *proxyName /* = NULL */,
+					       dword proxyPort /* = 80 */);
+
+    /*////////
+    //
+    // Get the request target
+    //
+    // Parameters_
+    //
+    // Return_value_ target
+    //
+    // Status_ Functional
+    */
+    optr /* RequestResponse* */ HTRequestGetTarget(HTRequest *pself); /* const */
+    
+
+    /*////////
+    //
+    // Get url. Null if no url.
+    //
+    // Return_value_ const char* or NULL
+    //
+    // Status_ Functional
+    */
+    const char *HTRequestGetStrURL(HTRequest *pself); /* const  */
+
+
+     /*////////
+     //
+     // Execute the request. Run to completion or until preempted by
+     // Preempt().
+     //
+     // Parameters_
+     //
+     // [out] 
+     // [in]  
+     //
+     // Return_value_ 
+     //
+     // See_also_ Preempt()
+     //
+     // Overrides_ Command::Execute()
+     //
+     // Status_ Functional
+     */
+     void HTRequestExecute(HTRequest *pself);
+
+     /*////////
+     //
+     // Preempt Execute() method.
+     //
+     // Parameters_
+     //
+     // [out] 
+     // [in]  
+     //
+     // Return_value_ 
+     //
+     // See_also_ 
+     //
+     // Overrides_ Command::Preempt()
+     //
+     // Status_ Functional
+     */
+     void HTRequestPreempt(HTRequest *pself);
+
+     /*////////
+     //
+     // This method is called to tell us that the request is about to
+     // be deleted. It must not be called while the object is still
+     // be used; i.e., Execute() or Preempt() is running.
+     //
+     // Parameters_
+     //
+     // [out] 
+     // [in]  
+     //
+     // Return_value_ 
+     //
+     // See_also_ 
+     //
+     // Overrides_ Command::Done()
+     //
+     // Status_ Functional
+     */
+     void HTRequestDone(HTRequest *pself);
+
+ /*===========================================================================
+ //
+ //                       W A R N I N G 
+ // 
+ // THE LIBERTY EXTERNAL API IS FOUND ABOVE THIS BARRIER. ANYTHING BELOW
+ // THIS NOTICE IS IMPLEMENTATION DEPENDENT AND SUBJECT TO CHANGE.
+ //
+ //
+ //=========================================================================*/
+
+/*  private: */
+    /*
+    // Don't let users call copy the object in any way.  These methods
+    // aren't actually defined since they should never be called, but
+    // declaring them private should catch anyone who tries to call
+    // them.
+    */
+/*
+    HTRequest(const HTRequest&);
+    const HTRequest& operator=(const HTRequest&);
+*/
+
+     /* Set stream and make it preemptable. */
+     void HTRequestSetStreamPreemptable(HTRequest *pself,
+					optr /* WWStream * */ stream);
+
+     /* Delete stream synchronously.        */
+     void HTRequestDeleteStream(HTRequest *pself);
+
+#if ERROR_CHECK
+     /* Remove stream without deleting it   */
+     optr /* WWStream* */ HTRequestRemoveStream(HTRequest *pself);
+#endif
+
+     /*
+     // Create the appropriate protocol based on URL scheme.
+     // Uses instance data _url and _stream.
+     //
+     // Parameters_
+     //
+     // [out] 
+     // [in]  
+     //
+     // Return_value_ Protocol stream or NULL.
+     //
+     // See_also_ 
+     //
+     // Overrides_
+     //
+     // Status_ Functional
+     */
+     optr /* WWStream * */ HTRequestLaunchEmail(HTRequest *pself);
+     optr /* WWStream * */ HTRequestGetProtocol(HTRequest *pself);
+     optr /* WWStream * */ HTRequestGetCache(HTRequest *pself);
+     optr /* WWStream * */ HTRequestGetHTTP(HTRequest *pself);
+     optr /* WWStream * */ HTRequestGetFile(HTRequest *pself);
+     optr /* WWStream * */ HTRequestCacheHTTP(
+	      HTRequest *pself, optr /* HTTP * */ http,
+	      optr /* HTResponse * */ resp);
+     RequestInternalCode HTRequestGenHTTPHeaders(
+              HTRequest *pself, optr /* HTTP * */ http, Boolean endHeader);
+     RequestInternalCode HTRequestGenHTTPPostData(
+	      HTRequest *pself, optr /* HTTP * */ http);
+     RequestInternalCode HTRequestParseHTTPResponse(
+              HTRequest *pself, optr /* HTTP * */ http,
+              optr /* HTResponse * */ resp);
+     char* HTRequestGetLastModifiedDate(HTRequest *pself);
+     /* If URL has no scheme, default it to http:  */
+     char* HTRequestDuplicateURL(HTRequest *pself, const char* url);
+
+@endif //_HTML_REQ_H_

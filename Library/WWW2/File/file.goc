@@ -1,0 +1,374 @@
+/*---------------------------------------------------------------------------
+//
+//  Geoworks (R) application software and GEOS (R) operating system
+//  software copyright (C) 1990-1997 Geoworks.  All rights reserved.
+//  United States Patents 5327529, 5237651, and 5438662. U.K. Patents
+//  0375703 and 0631677.  German Patents P3854269.2-08 and
+//  69307728.1-08.  French Patents 0375703 and 0631677.  Other
+//  international patents pending.
+//
+//  This software is the confidential and proprietary information of
+//  Geoworks ("Confidential Information").  You shall not disclose
+//  such Confidential Information and shall use it only in accordance
+//  with the terms of the license agreement you entered into with
+//  Geoworks.
+//
+// PROJECT:     WWW
+// MODULE:      file protocol
+// FILE:        file.cpp
+//
+// AUTHOR:      Kok Kin Kee: Jan 13, 1998
+//
+// REVISION HISTORY:
+//      Name            Date            Description
+//      ----            ----            -----------
+//      kkee           1/13/98          Initial version
+//      kkee           6/4/98           Allow reuse of WWFile::Get()
+//
+// DESCRIPTION:
+//      File protocol.
+//
+//      $Id: file.goc,v 1.4 98/08/17 16:14:22 edwin Exp $
+//
+//-------------------------------------------------------------------------*/
+
+/*
+#include <system.h>
+#include <tstring.h>
+#include <fs/file.h>
+#include <www/wwcore/wwstring.h>
+#include <www/scheme/wwfile.h>
+#include <www/wwcore/wwuri.h>
+#include <www/wwcore/wwstatus.h>
+
+#ifdef _WIN32
+    #include <string.h>
+    #define bcopy(src, dest, size) memmove(dest, src, size)
+#else
+extern "C" {
+    void bcopy(...);
+}
+#endif
+*/
+
+@include <stdapp.goh>
+#include <Ansi/stdlib.h>
+@include <WWW2/Scheme/wwfile.goh>
+@include <WWW2/wwMacro.h>
+#include <WWW2/WW2Core/ww2Uri.h>
+@include <WWW2/WW2Core/wwstatus.goh>
+
+// WWStreamClass //
+#define _aborted (pself->__aborted)
+#define _ungetBuffer (pself->__ungetBuffer)
+#define _ungetBufferSize (pself->__ungetBufferSize)
+#define _ungetIndex (pself->__ungetIndex)
+#if ERROR_CHECK
+#define _initialized (pself->__initialized)
+#endif
+
+// WWFileClass
+#define _status (pself->__status)
+#define _file (pself->__file)
+#define _buffer (pself->__buffer)
+#define _bufferSize (pself->__bufferSize)
+#define _readIndex (pself->__readIndex)
+#define _bytesFilled (pself->__bytesFilled)
+
+@classdecl WWFileClass;
+
+/*---------------------------------------------------------------------------
+//		WWFile::WWFile()
+//---------------------------------------------------------------------------
+// 
+// SYNOPSIS: 	Default constructor.
+// SCOPE:	Public
+// RETURN:	Nothing
+// STRATEGY:	
+// 
+// REVISION HISTORY: 
+//	Name		Date		Description 
+//	----		----		----------- 
+//	kkee    	1/13/98 	Initial version 
+//	
+//-------------------------------------------------------------------------*/
+@if 0	/// No need for constructor since all default instance data are 0's.
+@method WWFileClass, WWFile /* () */ 
+{
+    _status = NULL;
+    _file = 0;
+    _buffer = NULL;
+}	/* End of WWFile::WWFile() */
+@endif
+
+
+/*---------------------------------------------------------------------------
+//		WWFile::~WWFile()
+//---------------------------------------------------------------------------
+// 
+// SYNOPSIS: 	Destructor
+// SCOPE:	Public
+// RETURN:	Nothing
+// STRATEGY:	
+// 
+// REVISION HISTORY: 
+//	Name		Date		Description 
+//	----		----		----------- 
+//	kkee    	1/13/98 	Initial version 
+//	
+//-------------------------------------------------------------------------*/
+@method WWFileClass, MSG_META_FINAL_OBJ_FREE /* ::~WWFile() */
+{
+    if (_file) {
+        FileClose(_file, FILE_NO_ERRORS);
+    }
+    MemFree(_buffer);
+    @callsuper();
+}	/* End of WWFile::~WWFile() */
+
+
+
+/*---------------------------------------------------------------------------
+//		WWFile::Initialize()
+//---------------------------------------------------------------------------
+// 
+// SYNOPSIS: 	There is no need for a _stream and its faster to do it
+//              everything in WWFile instead of relying on WWStream methods.
+// SCOPE:	Public
+// RETURN:      WWSTREAM_OK
+//              WWSTREAM_OUT_OF_MEMORY    Cannot allocate resource.
+// STRATEGY:	
+// 
+// REVISION HISTORY: 
+//	Name		Date		Description 
+//	----		----		----------- 
+//	kkee    	1/20/98 	Initial version 
+//	
+//-------------------------------------------------------------------------*/
+@method /* WWStreamResultCode */
+WWFileClass, Initialize /* (WWStatus *status, uint16 bufferSize, 
+		   uint16 ungetBufferSize) */
+{
+    PARAM_ASSERT(bufferSize != 0);
+
+    if (_aborted) {
+        return WWSTREAM_OUT_OF_MEMORY;
+    }
+    
+    ASSERTS(_initialized == FALSE,
+            "Memory leak: calling WWFile::Initialize() twice");
+    ASSERT(_buffer == NullHandle);
+
+    _status = status;
+
+    /* Create unget buffer */
+    if (ungetBufferSize) {
+        _ungetBufferSize = ungetBufferSize;
+
+	_ungetBuffer = (byte *) malloc(ungetBufferSize);
+        if (!_ungetBuffer) {
+            return WWSTREAM_OUT_OF_MEMORY;
+        }
+    }
+
+    // Create buffer.
+    _buffer = MemAlloc(bufferSize, HF_DYNAMIC, 0);
+    if(_buffer == NullHandle) {
+        EC_WARN("WWFile::Initialize() failed to init");
+	return WWSTREAM_OUT_OF_MEMORY;
+    }
+    _bufferSize = bufferSize;
+
+#if ERROR_CHECK      
+    _initialized = TRUE;
+#endif
+
+
+   return WWSTREAM_OK;
+}	/* End of WWFile::Initialize() */
+
+
+@method /* uint16 */
+WWFileClass, GetBufferSize /* () */
+{
+    ASSERTS(_initialized,
+            "WWFile::Initialize() was not called");
+    ASSERT(_buffer != NULL);
+    return _bufferSize;
+}
+
+
+/*---------------------------------------------------------------------------
+//		WWFile::Get()
+//---------------------------------------------------------------------------
+// 
+// SYNOPSIS: 	Get a file by its URL. This call opens the file for 
+//              reading using Read(), and ReadByte().
+// SCOPE:	Public
+// RETURN:	WWFILE_OK               Success.
+//              WWFILE_CANNOT_OPEN      Cannot open for reading.
+// STRATEGY:	
+// 
+// REVISION HISTORY: 
+//	Name		Date		Description 
+//	----		----		----------- 
+//	kkee    	1/13/98 	Initial version 
+//	
+//-------------------------------------------------------------------------*/
+@method /* WWFileResultCode */
+WWFileClass, FileGet /* (const char *url) */
+{
+    PARAM_ASSERT(url != NULL);
+    ASSERTS(_initialized, "WWStream::Initialize() was not called");
+    ASSERT(_buffer != NULL);
+
+    /* Reset instance data for opening a new file. */
+    _bytesFilled = 0;
+    _readIndex = 0;
+
+    if (_aborted) {
+        return WWFILE_CANNOT_OPEN;
+    }
+    
+    _file = WWFileURIOpen(url);
+    
+    if (!_file) {
+        return WWFILE_CANNOT_OPEN;
+    }
+    
+    if (_status) {
+	@send _status::Report(WWSTATUS_READING_FILE);
+    }
+    
+    /*
+    // Use the filesize as the default content-length.
+    */
+    @send self::SetMimeLength(FileSize(_file));
+
+    return WWFILE_OK;
+}	/* End of WWFile::Get() */
+
+
+/*---------------------------------------------------------------------------
+//		WWFile::Read()
+//---------------------------------------------------------------------------
+//
+// SYNOPSIS: 	Read data from a file stream.
+// SCOPE:	Public
+// RETURN:      WWSTREAM_OK             Success. numBytesRead returns
+//                                      <= numBytes and >= 1.
+//              WWSTREAM_EOF            All the requested data has been
+//                                      read. numBytesRead returns 0.
+//              WWSTREAM_ABORTED        Abort() was called. numBytesRead 
+//                                      returns 0.
+//              WWSTREAM_SPECIFIC_ERROR File access error.
+//                                      numBytesRead returns 0.
+// STRATEGY:	
+// 
+// REVISION HISTORY: 
+//	Name		Date		Description 
+//	----		----		----------- 
+//	kkee    	1/20/98 	Initial version 
+//	
+//-------------------------------------------------------------------------*/
+@method /* WWStreamResultCode  */
+WWFileClass, Read /* (uint8 *buffer, 
+             uint16 numBytes,
+             uint16 *numBytesRead, 
+             Boolean blocking, 
+             Timeout timeout) */
+{
+    PARAM_ASSERT(buffer != NULL);
+    PARAM_ASSERT(numBytes != 0);
+    PARAM_ASSERT(numBytesRead != NULL);
+    USE_IT(timeout);
+    USE_IT(blocking);
+
+    if (_aborted) {
+        return WWSTREAM_ABORTED;
+    }
+    
+    ASSERTS(_initialized, "WWFile::Initialize() was not called");
+    ASSERT(_buffer != NULL);
+
+    /*
+    // Check for ungotten data first
+    */
+    if (_ungetIndex) {  /* Faster to check here. */
+        @call self::ReadUngottenBytes(buffer, numBytes, numBytesRead);
+        return WWSTREAM_OK;
+    }
+
+    /*
+    // We ignore parameters blocking and timeout.
+    */
+    word availToRead = _bytesFilled - _readIndex;
+    byte *bufferPtr = MemLock(_buffer);
+    if (!availToRead) {
+	_bytesFilled = FileRead(_file, bufferPtr, _bufferSize, 0);
+        if (_bytesFilled == 0) {
+            *numBytesRead = 0;
+	    MemUnlock(_buffer);
+            return WWSTREAM_EOF;
+        } else if (_bytesFilled == 0xffff) {
+            // File access error
+            _bytesFilled = 0;
+            *numBytesRead = 0;
+	    MemUnlock(_buffer);
+            return WWSTREAM_SPECIFIC_ERROR;
+        }
+        availToRead = _bytesFilled;
+        _readIndex = 0;
+    }
+
+    if (numBytes < availToRead) {
+	memcpy(buffer, &bufferPtr[_readIndex], numBytes);
+        _readIndex += numBytes;
+        *numBytesRead = numBytes;
+    } else {
+	memcpy(buffer, &bufferPtr[_readIndex], availToRead);
+        _readIndex = 0;
+        _bytesFilled = 0;
+        *numBytesRead = availToRead;
+    }
+    MemUnlock(_buffer);
+    return WWSTREAM_OK;
+}	/* End of WWFile::Read() */
+
+
+@method /* WWStreamResultCode  */
+WWFileClass, Write /* (const uint8 *buffer,
+              uint16 numBytes,
+              uint16 *numBytesWritten,
+              Boolean endOfData,
+              Boolean blocking,
+              Timeout timeout)  */
+{
+    USE_IT(buffer);
+    USE_IT(numBytes);
+    USE_IT(numBytesWritten);
+    USE_IT(endOfData);
+    USE_IT(blocking);
+    USE_IT(timeout);
+    EC_FAIL("WWFile::Write() file stream not writable");
+    return WWSTREAM_SPECIFIC_ERROR;
+}
+
+
+
+@method /* WWStreamResultCode */
+WWFileClass, WriteByte /* (uint8 writeByte,
+                  Boolean endOfData,
+                  Boolean blocking,
+                  Timeout timeout) */
+{
+    USE_IT(writeByte);
+    USE_IT(endOfData);
+    USE_IT(blocking);
+    USE_IT(timeout);
+    EC_FAIL("WWFile::WriteByte() file stream not writable");
+    return WWSTREAM_SPECIFIC_ERROR;
+}
+
+
+

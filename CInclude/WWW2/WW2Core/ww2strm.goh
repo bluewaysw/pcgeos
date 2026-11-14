@@ -1,0 +1,738 @@
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Geoworks 1997.  All rights reserved.
+	GEOWORKS CONFIDENTIAL
+
+PROJECT:	WWW2 Library
+MODULE:		WW Stream Class
+FILE:		ww2strm.goh
+
+AUTHOR:		Kok Kin Kee
+
+ROUTINES:
+	Name			Description
+	----			-----------
+
+REVISION HISTORY:
+	Name		Date		Description
+	----		----		-----------
+	jlang		12/1/97   	Initial revision
+        kkee	        13/1/98         API changes
+
+DESCRIPTION:
+	WWStream class. 
+        A wwstream represents a data object with a MIME type.
+
+	$Id: ww2strm.goh,v 1.2 98/08/14 04:25:16 allen Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+@ifndef __WW_STREAM_H__
+@define __WW_STREAM_H__
+
+@include <stdapp.goh>
+#include <WWW2/wwCommon.h>
+
+/*
+#include <streams/stream.h>
+*/
+    /*////////
+    //
+    // Default WWStream buffer size.
+    */
+#define DEFAULT_WWSTREAM_SIZE 	    2048
+
+    /*////////
+    //
+    // Default WWStream unget buffer size.
+    */
+#define DEFAULT_WWSTREAM_UNGET_SIZE 10
+
+    /*////////
+    //
+    // WWStream return codes.
+    //
+    // [] WWSTREAM_OK             Success.
+    //
+    // [] WWSTREAM_EOF            All the requested data has been read.
+    //
+    // [] WWSTREAM_ABORTED        Abort() was called.
+    //
+    // [] WWSTREAM_OUT_OF_MEMORY  Not enough memory.
+    //
+    // [] WWSTREAM_NOT_AVAIL      Requested information about a stream not
+    //                            available.
+    //
+    // [] WWSTREAM_NOT_SEEKABLE   If the stream is inherently nonseekable.
+    //                            This happens when the stream is tied to 
+    //                            a server, say HTTP, that does not support
+    //                            byte ranges, or if there is not enough
+    //                            space to buffer stream data to allow
+    //                            random access.
+    //
+    // [] WWSTREAM_WOULD_BLOCK    For Read & Write: If blocking == FALSE 
+    //                            and no byte was read/written.
+    //
+    // [] WWSTREAM_TIMEOUT        For Read & Write: If blocking == TRUE 
+    //                            and the timeout expired before a byte was 
+    //                            read/written.
+    //
+    // [] WWSTREAM_SPECIFIC_ERROR This is a stream specific error. If client
+    //                            needs more information, call 
+    //                            SpecificError() to get a more detailed 
+    //                            error message.
+    */
+typedef enum {
+    WWSTREAM_OK,
+    WWSTREAM_EOF,
+    WWSTREAM_ABORTED,
+    WWSTREAM_OUT_OF_MEMORY,
+    WWSTREAM_NOT_AVAIL,
+    WWSTREAM_NOT_SEEKABLE,
+    WWSTREAM_WOULD_BLOCK,
+    WWSTREAM_TIMEOUT,
+    WWSTREAM_SPECIFIC_ERROR
+} WWStreamResultCode;
+
+
+    /*////////
+    //
+    // Request objects for ranges of data in a WWStream.
+    //
+    // [] offset    Offset from start of data, inclusively. Negative
+    //              means offset from end of data, inclusively. Offset
+    //              is NOT zero-based (i.e., 1, 2,.. and -1, -2, ...). 1
+    //              means the first byte and -2 means the last second byte.
+    //
+    // [] length    Amount of bytes, starting at and including the
+    //              byte at offset.
+    //
+    // [] next      Pointer to next WWByteRange. Set to NULL for last one.
+    */
+struct WWByteRange {
+    sdword   offset;
+    dword  length;
+    struct WWByteRange *next;
+};
+
+
+/***************************************************************************
+CLASS
+    WWStream
+
+    A WWStream represents a data object with a MIME type.
+
+OVERVIEW 
+
+    A WWStream represents a whole data object with a MIME type.
+
+    To use a WWStream, Initialize() must be called to initialize
+    buffers. A wwstream should not be reused after it is Abort()'d.
+
+    Writer and Reader of WWStream must synchronize themselves in deleting
+    a WWStream. Unlike Stream (streams/stream.h), WWStream does not have
+    methods OpenReader(), OpenWriter(), CloseReader(), and CloseWriter() 
+    to synchronize the deletion of a WWStream. Normally, when a WWStream 
+    is created, the creator notifies the other party of its existence. 
+    After the WWStream is used, the creator notifies the other party 
+    before deleting the WWStream.
+
+    All methods are blocking unless indicated otherwise. 
+
+    All methods are thread-safe and can be called from different threads.
+
+GENERAL USE
+
+    Example 1:
+    =========
+    Example code to illustrate how a WWStrean is used to transfer 26
+    lower case letters of the alphabet from a Writer to a Reader.
+    Notice we do very little error checking on the return codes
+    from WWStream.
+  
+    <pre>
+    void ReaderFunc(WWStream *wwstream) {
+        uint8 readByte = '\0';
+        while (wwstream->ReadByte(&readByte) != WWSTREAM_EOF) {
+	    cout << "Byte read = " << readByte << endl;
+        }
+    }
+
+    void WriterFunc(WWStream *wwstream) {
+        uint8 writeByte = 'a';
+	for (int i=0; i<26; i++) {
+	    if (i!=25) {
+   	        if (wwstream->WriteByte(writeByte) != WWSTREAM_OK) {
+                    cout << "Error in writing to wwstream" << endl;
+                }
+            } else {
+   	        if (wwstream->WriteByte(writeByte, TRUE) != WWSTREAM_OK) {
+                    cout << "Error in writing last byte" << endl;
+                }
+            }
+	    writeByte += 1;
+        }
+    }
+
+    int main() {
+        HTMLViewer html;
+        WWStream wwstream;
+
+        if (wwstream.Initialize() != WWSTREAM_OK) {
+	    cout << "Error in creating WWStream buffer" << endl;
+        }
+	
+	Thread *t1 = new Thread();
+	t1->Start((VoidFuncOneArg*)ReaderFunc, (void*)wwstream);
+	Thread *t2 = new Thread();
+	t2->Start((VoidFuncOneArg*)WriterFunc, (void*)wwstream);
+    }
+    </pre>
+
+    Example 2:
+    ==========
+    Example code to illustrate passing HTML data to a HTMLViewer for display.
+    See <include/www/conv/html.h> for HTMLViewer methods.
+
+    <pre>
+    int main() {
+        uint32 numBytesWritten;
+        HTMLViewer html;
+        WWStream *s = new WWStream();
+
+	s->Initialize();
+
+	// Inform HTML of a new stream.
+        html.NewStream(s);
+
+	// Write data to stream.
+	s->Write("<HTML> Hello! </HTML>", 21, &numBytesWritten, TRUE);
+
+	// Inform HTML we are about to delete stream.
+	html.DestroyStream(s);
+        
+	delete s;
+    }
+    </pre>
+
+KEYWORDS
+    
+    WWW
+
+CLASS TREE
+<pre>
+    WWStream
+</pre>
+****************************************************************************/
+
+@class WWStreamClass, MetaClass;
+
+/* public: */
+
+    /*////////
+    //
+    // Constructor.
+    //
+    // Parameters_
+    //
+    // Return_value_ 
+    //
+    // See_also_ 
+    //
+    // Overrides_
+    //
+    // Status_ Functional
+    */
+    @message void WWStream();
+
+    /*////////
+    //
+    // Destructor.
+    //
+    // Parameters_
+    //
+    // Return_value_ 
+    //
+    // See_also_ 
+    //
+    // Overrides_
+    //
+    // Status_ Functional
+    //
+
+    void ~WWStream();
+
+    */
+
+    /*////////
+    //
+    // Create storage buffer. It is illegal to call Initialize twice without
+    // without calling Abort() in between. This behavior is guaranteed by 
+    // EC code. This method must be called before any other methods can be
+    // used.
+    //
+    // Parameters_
+    //
+    // [in]  bufSize         FIFO buffer size. Must not be zero.
+    //
+    // Return_value_ WWSTREAM_OK
+    //               WWSTREAM_OUT_OF_MEMORY   Not enough memory or passed
+    //                                        bufSize is 0.
+    //
+    // See_also_ 
+    //
+    // Overrides_
+    //
+    // Status_ Functional
+    */
+    @message WWStreamResultCode InitializeStream(word bufferSize 
+					   /* = DEFAULT_WWSTREAM_SIZE */ ,
+                                           byte ungetBufferSize 
+					   /* = DEFAULT_WWSTREAM_UNGET_SIZE */);
+
+    /*////////
+    //
+    // Get buffer size.
+    //
+    // Parameters_
+    //
+    // Return_value_ 
+    //
+    // See_also_ 
+    //
+    // Overrides_
+    //
+    // Status_ Functional
+    */
+    @message word GetBufferSize();
+
+
+    /*////////
+    //
+    // Get unget buffer size.
+    //
+    // Parameters_
+    //
+    // Return_value_ Unget buffer size.
+    //
+    // See_also_ 
+    //
+    // Overrides_
+    //
+    // Status_ Functional
+    //
+    */
+    @message byte GetUngetBufferSize();
+
+
+    /*////////
+    //
+    // Set stream content-type. Will override previous SetMimeType().
+    //
+    // Parameters_
+    //
+    // [out] 
+    // [in] mimeType   MIME content-type of the data represented by the
+    //                 the stream.
+    //
+    // Return_value_ WWSTREAM_OK
+    //               WWSTREAM_OUT_OF_MEMORY
+    //
+    // See_also_ 
+    //
+    // Overrides_
+    //
+    // Status_ Functional
+    */
+    @message WWStreamResultCode SetMimeType(const char *mimeType);
+
+    /*////////
+    //
+    // Set stream content-length. Will override previos SetMimeLength().
+    //
+    // Parameters_
+    //
+    // [out] 
+    // [in]  length   MIME content-length of the data object represented
+    //                by the stream.
+    //
+    // Return_value_
+    //
+    // See_also_ 
+    //
+    // Overrides_
+    //
+    // Status_ Functional
+    //
+    */
+    @message void SetMimeLength(dword length);
+
+
+    /*////////
+    //
+    // Get MIME content-type.
+    //
+    // Parameters_
+    //
+    // [out] mimeType  Pointer to allocated string. Must be deleted
+    //                 using "delete [] mimeType". NULL if there is 
+    //                 no MIME type.
+    //
+    // Return_value_ WWSTREAM_OK
+    //               WWSTREAM_OUT_OF_MEMORY
+    //               WWSTREAM_NOT_AVAIL    SetMimeType() was not called.
+    //
+    // See_also_ 
+    //
+    // Overrides_
+    //
+    // Status_ Functional
+    */
+    @message WWStreamResultCode GetMimeType(char **mimeType);
+  
+    /*////////
+    //
+    // Get MIME content-length.
+    //
+    // Parameters_
+    //
+    // [out] length  Valid only if return value is TRUE.
+    // [in]  
+    //
+    // Return_value_ WWSTREAM_OK
+    //               WWSTREAM_NOT_AVAIL SetMimeLength() was not called.
+    //      
+    // See_also_ SetMimeLength()
+    //
+    // Overrides_
+    //
+    // Status_ Functional
+    //
+    */
+    @message WWStreamResultCode GetMimeLength(dword *length);
+
+
+    /*////////
+    //
+    // Read data from stream. 
+    //
+    // Parameters_
+    //
+    // [out] buffer         Buffer containing data.
+    // [out] numBytesRead   Number of bytes read in buffer.
+    // [in]  numBytes       Buffer size.
+    // [in]  blocking       TRUE for blocking and FALSE for non-blocking.
+    //                      If blocking, may optionally provide a timeout.
+    // [in]  timeout        Time in milliseconds to block for data.
+    //
+    // Return_value_ WWSTREAM_OK             Success. numBytesRead returns
+    //                                       <= numBytes and >= 1.
+    //               WWSTREAM_EOF            All the requested data has been
+    //                                       read. numBytesRead returns 0.
+    //               WWSTREAM_ABORTED        Abort() was called. No data was
+    //                                       read. numBytesRead returns 0.
+    //               WWSTREAM_WOULD_BLOCK    If blocking == FALSE and no 
+    //                                       data was read. numBytesRead 
+    //                                       returns 0.
+    //               WWSTREAM_TIMEOUT        If blocking == TRUE and timeout
+    //                                       expired before any data was 
+    //                                       read. numBytesRead returns 0.
+    //               WWSTREAM_SPECIFIC_ERROR Check SpecificError().
+    //                                       numBytesRead returns 0.
+    //
+    // See_also_ ReadByte()
+    //
+    // Overrides_
+    //
+    // Status_ Functional
+    */
+    @message WWStreamResultCode Read(byte *buffer, 
+				     word numBytes,
+				     word *numBytesRead,
+				     Boolean blocking /* = FALSE */,
+				     Timeout timeout /* = TIMEOUT_FOREVER */);
+
+    /*////////
+    //
+    // Read a byte from stream.
+    //
+    // Parameters_
+    //
+    // [out] readByte  Byte read.
+    // [in]  blocking  TRUE for blocking call and FALSE for non-blocking.
+    // [in]  timeout   Time in milliseconds to block for data.
+    //
+    // Return_value_ WWSTREAM_OK             Success.
+    //               WWSTREAM_EOF            All the requested data has been
+    //                                       read. No byte was read.
+    //               WWSTREAM_ABORTED        Abort() was called. No byte was 
+    //                                       read.
+    //               WWSTREAM_WOULD_BLOCK    If blocking == FALSE and no byte
+    //                                       was read.
+    //               WWSTREAM_TIMEOUT        If blocking == TRUE and timeout
+    //                                       expired and no byte was read.
+    //               WWSTREAM_SPECIFIC_ERROR Check SpecificError(). No
+    //                                       byte was read.
+    //
+    // See_also_ Read()
+    //
+    // Overrides_
+    //
+    // Status_ Functional
+    //
+    */
+    @message WWStreamResultCode ReadByte(byte *readByte,
+					Boolean blocking /* = FALSE */,
+					Timeout timeout /* =TIMEOUT_FOREVER */);
+
+
+    /*////////
+    //
+    // Unget a byte. The number of bytes allowed for ungetting is 
+    // specified in Initialize(). If you unget more than the unget
+    // buffer, it will EC crash. In non-EC, the byte will be ignored.
+    // The unget method uses the LIFO strategy.
+    //
+    // Parameters_
+    //
+    // [in]  b        Byte to unget.
+    //
+    // Return_value_ 
+    //
+    // See_also_ 
+    //
+    // Overrides_
+    //
+    // Status_ Functional
+    */
+    @message void UngetByte(byte b);
+
+
+    /*////////
+    //
+    // Write data to stream. 
+    //
+    // Parameters_
+    //
+    // [out] numBytesWritten  Number of bytes written. 
+    // [in]  buffer           Buffer containing data to write.
+    // [in]  endOfData        If TRUE, this is the last chunk of data.
+    //                        This is only effective if WWStream is 
+    //                        numBytesWritten equals numBytes after the call.
+    // [in]  numBytes         Number of bytes in buffer to write.
+    // [in]  blocking         TRUE for blocking call and FALSE for 
+    //                        non-blocking. If blocking, may optionally 
+    //                        provide a timeout.
+    // [in]  timeout          Timeout in milliseconds.
+    //
+    // Return_value_ WWSTREAM_OK               Success. numBytesWritten
+    //                                         >= 1.
+    //               WWSTREAM_ABORTED          Abort() was called.
+    //                                         numBytesWritten == 0.
+    //               WWSTREAM_WOULD_BLOCK      If blocking == FALSE, and 
+    //                                         there was no room to write 
+    //                                         any data. numBytesWritten 
+    //                                         == 0.
+    //               WWSTREAM_TIMEOUT          If blocking == TRUE, and 
+    //                                         there was no room to write
+    //                                         any data. numBytesWritten 
+    //                                         == 0.
+    //               WWSTREAM_SPECIFIC_ERROR   Check SpecificError().
+    //                                         numBytesWritten == 0.
+    //
+    // See_also_ Read(), ReadByte(), WriteByte()
+    //
+    // Overrides_
+    //
+    // Status_ Functional
+    */
+    @message WWStreamResultCode Write(const byte *buffer, 
+				       word numBytes,
+				       word *numBytesWritten, 
+				       Boolean endOfData /* = FALSE */,
+				       Boolean blocking /* = FALSE */,
+				       Timeout timeout /* = TIMEOUT_FOREVER */);
+
+    /*////////
+    //
+    // Write a byte.
+    //
+    // Parameters_
+    //
+    // [in]  writeByte        Byte to write.
+    // [in]  endOfData        If TRUE, this is the last byte.
+    //                        This is only effective if the byte was written.
+    // [in]  blocking         TRUE for blocking call and FALSE for 
+    //                        non-blocking.
+    //                        If blocking, may optionally provide a timeout.
+    // [in]  timeout          Timeout in milliseconds.
+    //
+    // Return_value_ WWSTREAM_OK               Success
+    //               WWSTREAM_ABORTED          Abort() was called. No data 
+    //                                         was written.
+    //               WWSTREAM_WOULD_BLOCK      If blocking == FALSE, and 
+    //                                         there was no room to write 
+    //                                         any data. numBytesWritten 
+    //                                         returns 0.
+    //               WWSTREAM_TIMEOUT          If blocking == TRUE, and 
+    //                                         there was no room to write 
+    //                                         any data. numBytesWritten 
+    //                                         returns 0.
+    //               WWSTREAM_SPECIFIC_ERROR   Check SpecificError().
+    //                                         numBytesWritten returns 0.
+    //
+    // See_also_ Read(), ReadByte(), Write()
+    //
+    // Overrides_
+    //
+    // Status_ Functional
+    //
+    */
+    @message WWStreamResultCode WriteByte(byte writeByte,
+					   Boolean endOfData /* = FALSE */,
+					   Boolean blocking /* = FALSE */,
+					   Timeout timeout /* =TIMEOUT_FOREVER */);
+
+
+    /*////////
+    //
+    // Abort a blocking call and stream. This method is normally called
+    // from a different thread that calls other WWStream methods to quickly 
+    // interrupt blocking Read(), ReadByte(),
+    // Write(), and WriteByte(). Derived classes should implement 
+    // this method to interrupt blocking calls.
+    //
+    // The abort method also deletes any unread data. An aborted WWStream 
+    // should not be reused.
+    //
+    // Parameters_
+    //
+    // Return_value_ 
+    //
+    // See_also_ 
+    //
+    // Overrides_
+    //
+    // Status_ Functional
+    */
+    @message void Abort();
+
+
+    /*////////
+    //
+    // WWStream specific error messages. Derived classes should implement
+    // this method to provide meaningful error messages to clarify error 
+    // code WWSTREAM_SPECIFIC_ERROR returned by Read(),
+    // ReadByte(), Write(), and WriteByte().
+    //
+    // Parameters_
+    //
+    // [out] errorMsg  Buffer allocated using new to contain stream
+    //                 specific error messages. Must be deleted by
+    //                 caller using "delete [] errorMsg".
+    //                 NULL if no error message available. Message should
+    //                 be as short as possible, suitable for display in
+    //                 a status dialog.
+    //
+    // Return_value_ 
+    //
+    // See_also_ Read(), ReadByte(), Write(), 
+    //           WWriteByte()
+    //
+    // Overrides_
+    //
+    // Status_ Functional
+    //
+    */
+    @message void SpecificError(TCHAR **errorMsg);
+
+
+
+/*===========================================================================
+//
+//                       W A R N I N G 
+// 
+// THE LIBERTY EXTERNAL API IS FOUND ABOVE THIS BARRIER. ANYTHING BELOW
+// THIS NOTICE IS IMPLEMENTATION DEPENDENT AND SUBJECT TO CHANGE.
+//
+//
+//=========================================================================*/
+
+/* protected: */
+
+    /*
+    // Don't let users call copy the object in any way.  These methods
+    // aren't actually defined since they should never be called, but
+    // declaring them private should catch anyone who tries to call
+    // them.
+    */
+/*
+    WWStream(const WWStream&);
+    const WWStream& operator=(const WWStream&);
+*/
+
+    /*
+    // Read ungotten bytes.
+    //
+    // Parameters_
+    //
+    // [in]  buffer         Buffer to put data.
+    // [in]  numBytes       Buffer size
+    // [out] numBytesRead   Number of bytes read in buffer.
+    //
+    // Return_value_ TRUE if numBytesRead returns > 0.
+    //               FALSE if numBytesRead returns == 0.
+    //
+    // See_also_ 
+    //
+    // Overrides_
+    //
+    // Status_ Functional
+    */
+    @message Boolean ReadUngottenBytes(byte *buffer, word numBytes, 
+                              word *numBytesRead);
+
+    /*
+    // Cleanup allocated memory and reset WWStream state to as if
+    // it was just created.
+    //
+    // Parameters_
+    //
+    // Return_value_ 
+    //
+    // See_also_ 
+    //
+    // Overrides_
+    //
+    // Status_ Functional
+    */
+    @message void Cleanup();
+
+    @instance Boolean __aborted;              /* Abort() was called.         */
+    @instance Boolean __endOfData;            /* All data has been read.     */
+    @instance char *__mimeType;               /* MIME type of wwstream data  */
+    @instance Boolean __hasContentLength;     /* Indicates if there is length*/
+    @instance dword __contentLength;          /* Content-length of data      */
+
+/*    @instance Stream *__stream;  */         /* FIFO stream */
+    /* WWByteRange *_rangeList;         // Ranges of data to read
+    // int32 _offset;                   // Offset of data to be read
+                                        // next. This is non-zero
+                                        // based and starts from 1 and
+                                        // -1.
+					*/
+    @instance byte *__ungetBuffer;
+    @instance byte __ungetBufferSize;
+    @instance byte __ungetIndex;        /* Points to next empty space */
+                                        /* in _ungetBufferSize        */
+
+#if ERROR_CHECK
+    @instance Boolean __initialized;
+#endif
+
+@endc;
+
+
+
+@endif /* #ifndef  _WW_STREAM_H_ */
+

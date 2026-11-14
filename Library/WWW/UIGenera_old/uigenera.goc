@@ -1,0 +1,1583 @@
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Geoworks 1996 -- All Rights Reserved
+
+PROJECT:	Penelope
+MODULE:		UI Generator for GeoBrowser
+FILE:		uigenerator.goc
+
+AUTHOR:		Edwin Yu, Apr 16, 1996
+
+ROUTINES:
+	Name			Description
+	----			-----------
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	EY	4/16/96   	Initial version.
+
+DESCRIPTION:
+	This file defines the UI Generator Library for the GBrowser 
+	application.  The UI Generator simply creates ui objects
+	dynamically and pases the objects to the Presentation Manager
+	(pmanager library) for rendering.
+
+	$Id: uigenera.goc,v 1.47.1.5 97/09/23 18:51:45 kkee Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+@include <WWW/HTCore/htobj.goh>
+@include <WWW/uigenera.goh>
+@include <WWW/pmanager.goh>
+@include "uifatals.goh"
+#include <Ansi/string.h>
+#include <Ansi/stdlib.h>        /* atoi defined */
+@include "uifact.goh"
+@include "utility.goh"
+
+@classdecl	HTGenHRClass;
+
+FatalErrors uigenerashmefatals; 
+Warnings uigenerashmewarnings;
+
+@extern method HTGenHRClass, MSG_UI_CALC_SIZE_POSITION;
+@extern method HTGenHRClass, MSG_UI_GET_ROW_POSITION;
+@extern method HTGenHRClass, MSG_UI_SET_NEW_POSITION;
+
+
+/***********************************************************************
+ *		UIGen_START_TITLE_Int for UIGeneratorClass
+ ***********************************************************************
+ * SYNOPSIS:	    Store the TITLE of the document in the PManager.
+ * PARAMETERS:	    none
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:	Process <TITLE>
+ *		<TITLE></TITLE> should be in the content of <HEAD>.
+ *		When this handler is called, if @self->UIG_target is
+ *		not empty, we know that we're not in the <HEAD> content.
+ *		Thus, we'll simply ignore this element.  If @self->UIG_
+ *		target is empty, it may or may not be in the <HEAD> 
+ *		content.  UI Generator assumes the parser will check 
+ *		validation of the elements, thus for this case we assume
+ *		it is in the <HEAD> content.
+ *
+ *		We store @PManager in the UIG_target to serve as an
+ *		indication that we're in the title mode.
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	EY	8/13/96   	Initial Revision
+ *
+ ***********************************************************************/
+ErrorCode UIGen_START_TITLE_Int()
+{
+  if (currentDoc->HTUI_target.obj || currentDoc->HTUI_target.class)
+	return UI_GEN_ERROR;
+
+  currentDoc->HTUI_target.class = (ClassStruct *)&PresentationManagerClass;
+  currentDoc->HTUI_target.obj = currentDoc->HTUI_pmanager;
+
+  return UI_GEN_NO_ERROR;
+}	/* End of UIGen_START_TITLE_Int.	*/
+
+
+/***********************************************************************
+ *		UIGen_END_TITLE_Int for UIGeneratorClass
+ ***********************************************************************
+ * SYNOPSIS:	    Done with the TITLE content.
+ * PARAMETERS:	    none
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:	Process </TITLE>
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	EY	8/13/96   	Initial Revision
+ *
+ ***********************************************************************/
+ErrorCode UIGen_END_TITLE_Int()
+{
+  /*
+   * If <TITLE></TITLE> was not in the <HEAD> content, we ignore the
+   * <TITLE> and this </TITLE> element.
+   */
+  if (currentDoc->HTUI_target.class != (ClassStruct *)&PresentationManagerClass)
+	return UI_GEN_ERROR;
+
+  currentDoc->HTUI_target.class = NULL;
+  currentDoc->HTUI_target.obj = NULL;
+
+  return UI_GEN_NO_ERROR;
+}	/* End of UIGen_END_TITLE_Int.	*/
+
+
+/***********************************************************************
+ *		UIGen_CREATE_BASE_Int for UIGeneratorClass
+ ***********************************************************************
+ * SYNOPSIS:	    Record the URL of the currentDocument, for the purpose of
+ *		    completing the partial URLs.
+ * PARAMETERS:	    (MemHandle block, SGMLEntity *entity)
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	EY	8/14/96   	Initial Revision
+ *
+ ***********************************************************************/
+ErrorCode UIGen_CREATE_BASE_Int
+		(MemHandle block, SGMLEntity *entity)
+{
+  char *value;
+  int index = 0;
+  for(index = 0; entity[index].SGMLE_token; index++) {
+    if (!entity[index].SGMLE_value)
+      continue;
+    value = (char *)LMemDerefHandles(block, entity[index].SGMLE_value);
+    switch(entity[index].SGMLE_token) {
+    case HTML_ATTR_HREF:
+      @call currentDoc->HTUI_pmanager::MSG_PM_SAVE_BASE(value);
+      break;
+    }
+  }
+
+  return UI_GEN_NO_ERROR;
+}	/* End of UIGen_CREATE_BASE_Int.	*/
+
+
+/***********************************************************************
+ *		UIGen_CREATE_HR_Int for UIGeneratorClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    Create a horizontal rule
+ * PARAMETERS:	    (MemHandle block, SGMLEntity *entity)
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	edwin	9/ 9/96   	Initial Revision
+ *
+ ***********************************************************************/
+ErrorCode UIGen_CREATE_HR_Int
+		(MemHandle block, SGMLEntity *entity)
+{
+  optr dummy, content;
+  int nextRow;
+
+  content = currentDoc->HTUI_pmContent;
+  /* 
+   *  Deal away the current target object.
+   */
+  if (currentDoc->HTUI_target.class == (ClassStruct *)&HTGenTCellClass ||
+      currentDoc->HTUI_target.class == (ClassStruct *)&HTGenTableClass ||
+      currentDoc->HTUI_target.class == (ClassStruct *)&HTGenFormClass) {
+    @call currentDoc->HTUI_pmanager::MSG_PM_TAKE_UNFINISHED_UI_OBJ \
+		(currentDoc->HTUI_target.obj);
+    content = currentDoc->HTUI_target.obj;
+  }
+  else if (currentDoc->HTUI_target.class == (ClassStruct *)&HTGenSelectClass ||
+	   currentDoc->HTUI_target.class == (ClassStruct *)&HTGenOuterSelectClass||
+	   currentDoc->HTUI_target.class == (ClassStruct *)&HTGenOptionClass) {
+    EC_ERROR(1);
+    return UI_GEN_ERROR;
+  }
+  else if (currentDoc->HTUI_target.obj) {
+    @call currentDoc->HTUI_pmanager::MSG_PM_TAKE_FINISHED_UI_OBJ \
+	(currentDoc->HTUI_target.obj);
+    content = UIGen_GET_CONTENT_Int();
+  }
+
+  /*
+   *  <HR> always starts at a new line!
+   */
+  @call content::MSG_GEN_HTML_CONTENT_START_NEW_ROW(0, &nextRow, NULL);
+
+  /*
+   * Now create an HR object and store it in target.obj.  Next, 
+   * process the passed attribute list.
+   */
+  dummy = UICreateObj(currentDoc, (ClassStruct *)&HTGenHRClass);
+
+  @call dummy::MSG_GEN_HR_PROCESS_ATTRIBUTE(block, entity, content);
+  /*
+   *  Done with the HR object
+   */
+  @call currentDoc->HTUI_pmanager::MSG_PM_TAKE_FINISHED_UI_OBJ(dummy);
+
+  /*
+   *  Objects following HR always start at a new line!
+   */
+  @call content::MSG_GEN_HTML_CONTENT_START_NEW_ROW(0, &nextRow, NULL);
+
+  @call currentDoc->HTUI_pmanager::MSG_PM_GET_RECV_OBJ_OPTR_AND_CLASS
+	(&(currentDoc->HTUI_target.obj), &(currentDoc->HTUI_target.class));
+  if (currentDoc->HTUI_target.obj == currentDoc->HTUI_pmanager) {
+	currentDoc->HTUI_target.obj = NULL;
+	currentDoc->HTUI_target.class = NULL;
+  }
+  return UI_GEN_NO_ERROR;
+}	/* End of UIGen_CREATE_HR_Int.	*/
+
+
+
+/***********************************************************************
+ *		UIGen_END_FORMAT_Int for UIGeneratorClass
+ ***********************************************************************
+ * SYNOPSIS:	    Pop a formatting token off the stack, and un-do the
+ *		    text format according to the type of the token
+ * PARAMETERS:	    none
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *		This method is called whenever the parser sees 
+ *		</..format elemet...>.  This method pops a token
+ *		off the stack, and according to the token type, un-do
+ *		the text format.  Thus, this method ignors whatever the
+ *		format element the parser actually sees.
+ *		Elements that can be handled:
+ *			</B>, </I>, </STRIKE>, </S>, </SUPERSCRIPT>,
+ *			</SUBSCRIPT>, </FONT>, </BIG>, </SMALL>
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	EY	5/ 1/96   	Initial Revision
+ *
+ ***********************************************************************/
+ErrorCode UIGen_END_FORMAT_Int()
+{
+  StyleType type;
+  WWFixed number;
+  optr	content;
+  int 	counter;
+
+  /*
+   * Pop the top format token off the stack.
+   */
+  content = UIGen_GET_CONTENT_Int();
+  type = @call content::MSG_GEN_HTML_CONTENT_REMOVE_CONTENT(&counter);
+  /*
+   * If the current target.obj is a text, stop bold face now.
+   */
+  if (currentDoc->HTUI_target.class == (ClassStruct *)&HTGenTextClass) {
+    switch (type) {
+      case STYLE_ANCHOR:
+	EC_WARNING_IF(counter != 0, UIG_UNBALANCED_ANCHORS);
+	if (currentDoc->HTUI_hrefToken != -1) {
+	  @call currentDoc->HTUI_target.obj::MSG_GEN_TEXT_CHANGE_SIMPLE_RENDERING
+					(ELEMENT_END, TS_UNDERLINE);
+	  @call currentDoc->HTUI_target.obj::MSG_GEN_TEXT_RECORD_HREF
+	                                (ELEMENT_END, currentDoc->HTUI_hrefToken);
+	  currentDoc->HTUI_hrefToken = -1;
+	  @call content::MSG_GEN_HTML_CONTENT_SET_HREF_TOKEN(-1);
+	}
+	break;
+      case STYLE_BOLD:
+	if (!counter)
+	  @call currentDoc->HTUI_target.obj::MSG_GEN_TEXT_CHANGE_SIMPLE_RENDERING
+					(ELEMENT_END, TS_BOLD);
+	break;
+      case STYLE_ITALIC:
+	if (!counter)
+	  @call currentDoc->HTUI_target.obj::MSG_GEN_TEXT_CHANGE_SIMPLE_RENDERING
+					(ELEMENT_END, TS_ITALIC);
+	break;
+      case STYLE_STRIKE:
+	if (!counter)
+	  @call currentDoc->HTUI_target.obj::MSG_GEN_TEXT_CHANGE_SIMPLE_RENDERING
+					(ELEMENT_END, TS_STRIKE_THRU);
+	break;
+      case STYLE_SUPERSCRIPT:
+	if (!counter)
+	  @call currentDoc->HTUI_target.obj::MSG_GEN_TEXT_CHANGE_SIMPLE_RENDERING
+					(ELEMENT_END, TS_SUPERSCRIPT);
+	break;
+      case STYLE_SUBSCRIPT:
+	if (!counter)
+	  @call currentDoc->HTUI_target.obj::MSG_GEN_TEXT_CHANGE_SIMPLE_RENDERING
+					(ELEMENT_END, TS_SUBSCRIPT);
+	break;
+      case STYLE_FW_FONT:
+	if (!counter)
+	  @send currentDoc->HTUI_target.obj::MSG_VIS_TEXT_SET_FONT_ID(
+				FID_DTC_URW_MONO,
+				TEXT_ADDRESS_PAST_END,
+				TEXT_ADDRESS_PAST_END);
+	break;
+      case STYLE_PRE:
+	UIGen_END_FORMAT_Int();
+	/*	AddSpaceSeparator(&(currentDoc->HTUI_target), 2, TRUE); */
+	AddNewLine(&(currentDoc->HTUI_target),2,currentDoc, content);
+	break;
+      case STYLE_BQ:
+/*	if (listIndex > 1)
+	  AddSpaceSeparator(&(currentDoc->HTUI_target), 1);
+*/
+      case STYLE_UL:
+      case STYLE_OL:
+      case STYLE_DL:
+	UIGen_END_LIST_Int();
+	break;
+      case STYLE_ALIGN:
+	UIGen_END_ALIGN_Int();
+	break;
+      case STYLE_HEADER:
+	UIGen_END_FORMAT_Int();	/* reset font */
+	UIGen_END_FORMAT_Int();	/* reset bold */
+	/*	AddSpaceSeparator(&(currentDoc->HTUI_target), 1, TRUE); */
+	AddNewLine(&(currentDoc->HTUI_target), 1, currentDoc, content);
+	UIGen_END_FORMAT_Int();	/* reset alignment */
+	break;
+      case STYLE_FONT:
+	number.WWF_int = @call content::MSG_GEN_HTML_CONTENT_POP_FONT_SIZE();
+	number.WWF_frac= 0;
+	@call currentDoc->HTUI_target.obj::MSG_VIS_TEXT_SET_POINT_SIZE
+		(number,TEXT_ADDRESS_PAST_END,TEXT_ADDRESS_PAST_END);
+	 break;
+      case STYLE_PARAGRAPH:
+/*	UIGen_END_FORMAT_Int(); */
+	/*	AddSpaceSeparator(&(currentDoc->HTUI_target), 1, FALSE); */
+	AddNewLine(&(currentDoc->HTUI_target), 1, currentDoc, content);
+	break;	
+      case STYLE_NOBR:
+	/*	AddSpaceSeparator(&(currentDoc->HTUI_target), 1, FALSE); */
+	AddNewLine(&(currentDoc->HTUI_target), 1, currentDoc, content);
+	UIGen_END_NOBR_Int();
+	break;	
+      default:
+	return UI_GEN_ERROR;
+    }
+  }
+  else {
+    /*
+     *  Current target object is not a text object.  We simply pop tokens
+     *  from the some stack(s).
+     */
+    switch (type) {
+      case STYLE_ANCHOR:
+	EC_WARNING_IF(counter != 0, UIG_UNBALANCED_ANCHORS);
+	if (currentDoc->HTUI_hrefToken != -1) {
+	  currentDoc->HTUI_hrefToken = -1;
+	  @call content::MSG_GEN_HTML_CONTENT_SET_HREF_TOKEN(-1);
+	}
+	break;
+      case STYLE_BQ:
+/*	if (listIndex > 1)
+	  AddSpaceSeparator(&(currentDoc->HTUI_target), 1);
+*/
+      case STYLE_UL:
+      case STYLE_OL:
+      case STYLE_DL:
+	UIGen_END_LIST_Int();
+	break;
+      case STYLE_HEADER:
+	UIGen_END_FORMAT_Int();	/* reset font */
+	UIGen_END_FORMAT_Int();	/* reset bold */
+	UIGen_END_FORMAT_Int();	/* reset alignment */
+	break;
+      case STYLE_ALIGN:
+	UIGen_END_ALIGN_Int();
+	break;
+      case STYLE_FONT:
+	@call content::MSG_GEN_HTML_CONTENT_POP_FONT_SIZE();
+	break;
+      case STYLE_PRE:
+	UIGen_END_FORMAT_Int();
+    }
+  }
+  return UI_GEN_NO_ERROR;
+}	/* End of UIGen_END_FORMAT_Int.	*/
+
+
+
+/***********************************************************************
+ *		UIGen_START_BLOCKQUOTE_Int for UIGeneratorClass
+ ***********************************************************************
+ * SYNOPSIS:	    Set apart quotations in text.
+ * PARAMETERS:	    none
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	EY	5/13/96   	Initial Revision
+ *
+ ***********************************************************************/
+ErrorCode UIGen_START_BLOCKQUOTE_Int()
+{
+  optr content;
+
+  /*
+   * Tell a HTML content object that we are now in the center mode.
+   * Push format token onto the format stack.
+   */
+  content = UIGen_GET_CONTENT_Int();
+  /*
+   * Push format token onto the format stack.
+   */
+  @call content::MSG_GEN_HTML_CONTENT_SET_CONTENT(STYLE_BQ);
+  /*
+   * Add a blank line
+   */
+  /*  AddSpaceSeparator(&(currentDoc->HTUI_target), 2, TRUE); */
+  AddNewLine(&(currentDoc->HTUI_target), 2, currentDoc, content);
+  /*
+   * Push the list group info
+   */
+  @call content::MSG_GEN_HTML_CONTENT_PUSH_LIST_GROUP(STYLE_DL, 0, 0);
+
+  if (currentDoc->HTUI_target.class == (ClassStruct *)&HTGenTextClass)
+    FormatSetTextBQ(currentDoc->HTUI_target.obj, content);
+
+  return UI_GEN_NO_ERROR;
+}	/* End of UIGen_START_BLOCKQUOTE_Int.	*/
+
+
+/***********************************************************************
+ *		UIGen_START_CENTER_Int for UIGeneratorClass
+ ***********************************************************************
+ * SYNOPSIS:	    Make the following text or ui objects to be centered.
+ * PARAMETERS:	    none
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	EY	5/14/96   	Initial Revision
+ *
+ ***********************************************************************/
+ErrorCode UIGen_START_CENTER_Int()
+{
+  optr content;
+
+  /*
+   * Tell a HTML content object that we are now in the center mode.
+   * Push format token onto the format stack.
+   */
+  content = UIGen_GET_CONTENT_Int();
+  @call content::MSG_GEN_HTML_CONTENT_SET_CONTENT(STYLE_ALIGN);
+  /*
+   * Push the align token to the align Stack.
+   */
+  @send content::MSG_GEN_HTML_CONTENT_PUSH_JUSTIFICATION(J_CENTER);
+  /*
+   * Add a line feed, to let the new alignment take effect.
+   */
+  AddNewLine(&(currentDoc->HTUI_target), 1, currentDoc, content);
+  /*
+   * If the current target.obj is a text, change the alignment now.
+   */
+  if (currentDoc->HTUI_target.class == (ClassStruct *)&HTGenTextClass)
+    @call content::MSG_GEN_HTML_CONTENT_SET_TEXT_ALIGNMENT
+	(currentDoc->HTUI_target.obj);
+
+  return UI_GEN_NO_ERROR;
+}	/* End of UIGen_START_CENTER_Int.	*/
+
+
+/***********************************************************************
+ *		UIGen_END_ALIGN_Int for UIGeneratorClass
+ ***********************************************************************
+ * SYNOPSIS:	    Reset to the previous alignment
+ * PARAMETERS:	    
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	EY	5/14/96   	Initial Revision
+ *
+ ***********************************************************************/
+ErrorCode UIGen_END_ALIGN_Int()
+{
+  optr content, tmp;
+  ClassStruct *class;
+   
+  /*
+   * Get a content object.
+   */
+  content = UIGen_GET_CONTENT_Int();
+  @call content::MSG_GEN_HTML_CONTENT_POP_JUSTIFICATION();
+
+  if (currentDoc->HTUI_target.class == (ClassStruct *)&HTGenTextClass) {
+    /*
+     *  We want the text object to have uniform alignment.  Thus, when
+     *  come to position the object, we know where the whole text object
+     *  should be aligned.
+     */
+    @call currentDoc->HTUI_pmanager::MSG_PM_TAKE_FINISHED_UI_OBJ(currentDoc->HTUI_target.obj);
+    @call currentDoc->HTUI_pmanager::MSG_PM_GET_RECV_OBJ_OPTR_AND_CLASS(&tmp, &class);
+    if (tmp == currentDoc->HTUI_pmanager) {
+      currentDoc->HTUI_target.obj = NULL;
+      currentDoc->HTUI_target.class = NULL;
+    }
+    else {
+      currentDoc->HTUI_target.class = class;
+      currentDoc->HTUI_target.obj = tmp;
+    }
+  }
+  /*
+   *  Any future new objects start at the new line.
+   */
+  AddNewLine(&(currentDoc->HTUI_target), 1, currentDoc, content);
+
+  return UI_GEN_NO_ERROR;
+}	/* End of UIGen_END_ALIGN_Int.	*/
+
+
+/***********************************************************************
+ *		UIGen_START_PARAGRAPH_Int for UIGeneratorClass
+ ***********************************************************************
+ * SYNOPSIS:	    Denotes a paragraph
+ * PARAMETERS:	    (MemHandle block, SGMLEntity *entity)
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	EY	5/16/96   	Initial Revision
+ *
+ ***********************************************************************/
+ErrorCode UIGen_START_PARAGRAPH_Int
+		(MemHandle block, SGMLEntity *entity)
+{
+  optr content, tmp;
+  ClassStruct *class;
+  StyleType groupType;
+  int level, i;
+  dword counter;
+  char displayType, tab[1] = { C_TAB };
+
+  /*
+   *  If the current object is special, <P> implies to finish it.
+   */
+  if (currentDoc->HTUI_target.class == (ClassStruct *)&HTGenOptionClass) {
+    /*
+     *  Done with the option object
+     */
+    @call currentDoc->HTUI_pmanager::MSG_PM_TAKE_FINISHED_UI_OBJ
+	(currentDoc->HTUI_target.obj);
+#if 0
+    UIGen_BROADCAST_RESIZE_POSITION_Int
+       (currentDoc->HTUI_target.obj);
+#endif
+    @call currentDoc->HTUI_pmanager::MSG_PM_GET_RECV_OBJ_OPTR_AND_CLASS(&tmp, &class);
+    EC_ERROR_IF(class != (ClassStruct *)&HTGenSelectClass,
+	UIG_UI_TREE_OPERATION_FAILS);
+    /*
+     *  Done the selection object.
+     */
+    @call tmp::MSG_GEN_SELECT_COMPLETE_SELECT_CONSTRUCT();
+    /*
+     *  End the GenOuterSelectClass.
+     */
+    @call currentDoc->HTUI_pmanager::MSG_PM_MARK_RECV_OBJECT_DONE
+		(&(currentDoc->HTUI_target.obj), &(currentDoc->HTUI_target.class));
+#if 0
+    UIGen_BROADCAST_RESIZE_POSITION_Int
+       (currentDoc->HTUI_target.obj);
+#endif
+  }
+  /*
+   *  Tell a HTML content object that we are starting a new paragraph.
+   *  Push format tokens onto the format stack.
+   *  Here we consider a new paragraph means the start of a new alignment
+   *  and a line break.
+   */
+  content = UIGen_GET_CONTENT_Int();
+  /*  start of a new alignment */
+/*  @call content::MSG_GEN_HTML_CONTENT_SET_CONTENT(STYLE_ALIGN); */
+  /*  we'll insert a line break after the paragraph is done */
+/*  @call content::MSG_GEN_HTML_CONTENT_SET_CONTENT(STYLE_PARAGRAPH); */
+  /*
+   *  Process the attributes
+  ProcessParagraphAttr(dataBlock, dataChunk, content);
+   */
+
+  @call content::MSG_GEN_HTML_CONTENT_GET_LIST_GROUP
+	(&groupType, &counter, &displayType, &level);
+  /*
+   * Add a line feed, to let the new alignment take effect.
+   */
+
+  if (level == -1)
+      AddNewLine(&(currentDoc->HTUI_target),2,currentDoc, content);
+  else
+      AddNewLine(&(currentDoc->HTUI_target),3,currentDoc, content);
+
+  /*
+   *  Indent if inside a list of something.
+   */
+
+  if (level > -1)
+      for(i = -1; i <= level; i++)
+	  @send currentDoc->HTUI_target.obj::MSG_VIS_TEXT_APPEND_PTR(tab, 1);
+  /*
+   * If the current target.obj is a text, change the alignment now.
+  if (currentDoc->HTUI_target.class == (ClassStruct *)&HTGenTextClass)
+    @call content::MSG_GEN_HTML_CONTENT_SET_TEXT_ALIGNMENT
+	(currentDoc->HTUI_target.obj);
+   */
+
+  return UI_GEN_NO_ERROR;
+}	/* End of UIGen_START_PARAGRAPH_Int.	*/
+
+
+/***********************************************************************
+ *		UIGen_START_DIV_Int for UIGeneratorClass
+ ***********************************************************************
+ * SYNOPSIS:	    denote a different kinds of containers, e.g.
+ *		    chapter, section, abstract, or appendix.
+ * PARAMETERS:	    
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	EY	5/22/96   	Initial Revision
+ *
+ ***********************************************************************/
+ErrorCode UIGen_START_DIV_Int
+		(MemHandle block, SGMLEntity *entity)
+{
+  optr content;
+  Justification just;
+
+  /*
+   * Tell a HTML content object that we are now in new align mode.
+   * Push format token onto the format stack.
+   */
+  content = UIGen_GET_CONTENT_Int();
+  @call content::MSG_GEN_HTML_CONTENT_SET_CONTENT(STYLE_ALIGN);
+  /*
+   * Push the align token to the align Stack.
+   */
+  just = ProcessDivParagraphAttr(block, entity);
+  @send content::MSG_GEN_HTML_CONTENT_PUSH_JUSTIFICATION(just);
+  /*
+   * Add a line feed, to let the new alignment take effect.
+   */
+  AddNewLine(&(currentDoc->HTUI_target), 1, currentDoc, content);
+  /*
+   * If the current target.obj is a text, change the alignment now.
+   */
+  if (currentDoc->HTUI_target.class == (ClassStruct *)&HTGenTextClass)
+    @call content::MSG_GEN_HTML_CONTENT_SET_TEXT_ALIGNMENT
+	(currentDoc->HTUI_target.obj);
+
+  return UI_GEN_NO_ERROR;
+}	/* End of UIGen_START_DIV_Int.	*/
+
+
+
+/***********************************************************************
+ *		UIGen_START_NOBR_Int for UIGeneratorClass
+ ***********************************************************************
+ * SYNOPSIS:	    
+ * PARAMETERS:	    
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	EY	5/20/96   	Initial Revision
+ *
+ ***********************************************************************/
+void UIGen_START_NOBR_Int()
+{
+  VisTextParaAttrAttributes new_attr;
+  optr content;
+
+  /*
+   * Tell a HTML content object that we are now in new nobreak mode.
+   * Push format token onto the format stack.
+   */
+  content = UIGen_GET_CONTENT_Int();
+  @call content::MSG_GEN_HTML_CONTENT_SET_BR(STYLE_NOBR);
+
+  /*
+   * Start a new line.
+   */
+  AddNewLine(&(currentDoc->HTUI_target), 1, currentDoc, content);
+
+  if (currentDoc->HTUI_target.class == (ClassStruct *)&HTGenTextClass) {
+      new_attr = VTPAA_DISABLE_WORD_WRAP;
+      @call currentDoc->HTUI_target.obj::MSG_VIS_TEXT_SET_PARA_ATTRIBUTES
+	  (0, new_attr, TEXT_ADDRESS_PAST_END, TEXT_ADDRESS_PAST_END);
+  }
+  return;
+}	/* End of UIGen_START_NOBR_Int.	*/
+
+
+/***********************************************************************
+ *		UIGen_END_NOBR_Int for UIGeneratorClass
+ ***********************************************************************
+ * SYNOPSIS:	    
+ * PARAMETERS:	    
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	EY	5/20/96   	Initial Revision
+ *
+ ***********************************************************************/
+void UIGen_END_NOBR_Int()
+{
+  VisTextParaAttrAttributes new_attr;
+  optr content;
+
+  /*
+   * Tell a HTML content object that we are now in no nobreak mode.
+   */
+  content = UIGen_GET_CONTENT_Int();
+  @call content::MSG_GEN_HTML_CONTENT_SET_BR(0);
+
+  if (currentDoc->HTUI_target.class == (ClassStruct *)&HTGenTextClass) {
+      new_attr = VTPAA_DISABLE_WORD_WRAP;
+      @call currentDoc->HTUI_target.obj::MSG_VIS_TEXT_SET_PARA_ATTRIBUTES
+	  (new_attr, 0, TEXT_ADDRESS_PAST_END, TEXT_ADDRESS_PAST_END);
+  }
+  return;
+}	/* End of UIGen_END_NOBR_Int.	*/
+
+
+/***********************************************************************
+ *		UIGen_ADD_BR_Int for UIGeneratorClass
+ ***********************************************************************
+ * SYNOPSIS:	    Add a line break
+ * PARAMETERS:	    none
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *		If the current target.obj is a text object, add C_CR.
+ *		if not, add a ui seperator.
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	EY	5/ 3/96   	Initial Revision
+ *
+ ***********************************************************************/
+ErrorCode UIGen_ADD_BR_Int()
+{
+  optr content;
+  StyleType groupType;
+  int level;
+  dword counter;
+  char displayType, tab[1] = { C_TAB };
+
+  content = UIGen_GET_CONTENT_Int();
+  AddNewLine(&(currentDoc->HTUI_target), 4, currentDoc, content);
+
+  @call content::MSG_GEN_HTML_CONTENT_GET_LIST_GROUP
+	(&groupType, &counter, &displayType, &level);
+  if (groupType != (StyleType)-1) {
+    if (currentDoc->HTUI_target.class == (ClassStruct *)&HTGenTextClass)
+	/*
+	 *  The problem with the text library is that the left margin
+	 *  doesn't work if there is a tab to the left of the left margin.
+	 */
+	while (level >= -1) {
+	  @call currentDoc->HTUI_target.obj::MSG_VIS_TEXT_APPEND_PTR(tab, 1);
+	  level--;
+	}
+    /*
+     *  If there is other object, HERE we should indent the object.
+     */
+  }
+  return UI_GEN_NO_ERROR;
+}	/* End of UIGen_ADD_BR_Int.	*/
+
+
+/***********************************************************************
+ *		UIGen_START_ANCHOR_Int for UIGeneratorClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    Mark the beginning of an anchor.
+ * PARAMETERS:	    (MemHandle block, SGMLEntity *entity)
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	edwin	10/ 2/96   	Initial Revision
+ *
+ ***********************************************************************/
+ErrorCode UIGen_START_ANCHOR_Int
+		(MemHandle block, SGMLEntity *entity)
+{
+  optr content;
+
+  /*
+   *  Tell a HTML content object, which will be parent of a
+   *  text object, to begin the anchor mode.
+   */
+  content = UIGen_GET_CONTENT_Int();
+  @call content::MSG_GEN_HTML_CONTENT_SET_CONTENT(STYLE_ANCHOR);
+  /*
+   *  Process the attribute list.
+   */
+  UIGen_PROCESS_A_ATTRIBUTE_Int(block, entity);
+  @call content::MSG_GEN_HTML_CONTENT_SET_HREF_TOKEN(currentDoc->HTUI_hrefToken);
+  /*
+   *  If the current target.obj is a text, do the italic now.
+   */
+  if (currentDoc->HTUI_target.class == (ClassStruct *)&HTGenTextClass) {
+    if (currentDoc->HTUI_hrefToken != -1) {
+      @call currentDoc->HTUI_target.obj::MSG_GEN_TEXT_CHANGE_SIMPLE_RENDERING
+	                           (ELEMENT_START, TS_UNDERLINE);
+      @call currentDoc->HTUI_target.obj::MSG_GEN_TEXT_RECORD_HREF
+                                   (ELEMENT_START, currentDoc->HTUI_hrefToken);
+    }
+  }
+
+  return UI_GEN_NO_ERROR;
+}	/* End of UIGen_START_ANCHOR_Int.	*/
+
+
+/***********************************************************************
+ *	UIGen_PROCESS_A_ATTRIBUTE_Int for UIGeneratorClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    Process the <A> attribute list.
+ * PARAMETERS:	    (MemHandle block, SGMLEntity *entity)
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:  Supported Attr: HREF, NAME
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	edwin	10/ 3/96   	Initial Revision
+ *
+ ***********************************************************************/
+void UIGen_PROCESS_A_ATTRIBUTE_Int
+		(MemHandle block, SGMLEntity *entity)
+{
+  char *value;
+  int	index, cnt, offset;
+  VisTextRange pos;
+  optr  obj;
+  ClassStruct *class;
+
+  for(index = 0; entity[index].SGMLE_token; index++) {
+    if (!entity[index].SGMLE_value)
+      continue;
+    value = (char *)LMemDerefHandles(block, entity[index].SGMLE_value);
+    switch(entity[index].SGMLE_token) {
+    case HTML_ATTR_HREF:    /* HREF */
+      EC_WARNING_IF(currentDoc->HTUI_hrefToken != -1, UIG_NESTED_ANCHORS);
+      /*
+       *  This <A> is a link to some destination.
+       *  Store a HREF token.
+       */
+      if (value[0])
+	  currentDoc->HTUI_hrefToken =
+	      @call currentDoc->HTUI_pmanager::MSG_PM_SAVE_HREF(value);
+      else
+	  currentDoc->HTUI_hrefToken =
+	      @call currentDoc->HTUI_pmanager::MSG_PM_SAVE_HREF(".");
+      break;
+    case HTML_ATTR_NAME:
+      /*
+       *  This <A> is a destination for some link(s).
+       */
+      if (!currentDoc->HTUI_target.obj) {
+	/*
+	 *  The current receiving object in ui-tree is PManager itself.
+	 */
+	cnt = @call currentDoc->HTUI_pmanager::MSG_GEN_COUNT_CHILDREN();
+	if (cnt == 0)  {            /* No objects in the ui-tree yet. */
+	  obj = currentDoc->HTUI_pmanager;
+	  offset = 0;
+	}
+	else {
+	  obj=@call currentDoc->HTUI_pmanager::MSG_GEN_FIND_CHILD_AT_POSITION(cnt-1);
+	  offset = -1;
+	}
+	/*  Doesn't matter what class it is because the end of this
+	 *  obect is the beginning of the <A NAME> position.
+	 */
+	class = NULL;
+      }
+      else if (currentDoc->HTUI_target.class == (ClassStruct *)&HTGenTCellClass ||
+	  currentDoc->HTUI_target.class == (ClassStruct *)&HTGenTableClass ||
+	  currentDoc->HTUI_target.class == (ClassStruct *)&HTGenFormClass ||
+	  currentDoc->HTUI_target.class == (ClassStruct *)&HTGenCaptionClass) {
+	cnt = @call currentDoc->HTUI_target.obj::MSG_GEN_COUNT_CHILDREN();
+	if (cnt == 0)  {/* No objects in the ui-tree yet. */
+	  obj = currentDoc->HTUI_target.obj;
+	  offset = 0;
+	}
+	else {
+	  obj=@call currentDoc->HTUI_target.obj::MSG_GEN_FIND_CHILD_AT_POSITION
+	    (cnt-1);
+	  offset = -1;
+	}
+	class = NULL;  /* Doesn't matter what class it is */
+      }
+      else {
+	/*
+	 *  Well, the <A NAME> is in the current object.
+	 */
+	obj = currentDoc->HTUI_target.obj;
+	offset = -1;  /* guessing to be at the end. */
+	class = currentDoc->HTUI_target.class;
+      }
+      if (class == (ClassStruct *)&HTGenTextClass) {
+	/* This <A NAME> refers to the a place in this text obj */
+	@call obj::MSG_VIS_TEXT_GET_SELECTION_RANGE(&pos);
+        offset = pos.VTR_start;
+	@call currentDoc->HTUI_pmanager::MSG_PM_SAVE_ANCHOR_NAME(value, obj, offset);
+      }
+      else {
+	/* This <A NAME> refers to the immediate object after obj
+	 * If offset = 0, display at the top of obj.
+	 * If offset =-1, display at the end of obj.
+	 */
+	EC_WARNING_IF(offset != 0 && offset != -1, UIG_WRONG_ASSUMPTION);
+	@call currentDoc->HTUI_pmanager::MSG_PM_SAVE_ANCHOR_NAME
+	    (value, obj, offset);
+      }
+      /*
+       *  If the value has a matching anchor in UIG_jumpToAnchor
+       */
+      if (currentDoc->HTUI_jumpToAnchor &&
+	strcasecmpHTMemHandle(currentDoc->HTUI_jumpToAnchor, value) == 0) {
+	@send currentDoc->HTUI_pmanager::MSG_PM_SET_ANCHOR(obj,offset);
+	HTMemFree(currentDoc->HTUI_jumpToAnchor);
+	currentDoc->HTUI_jumpToAnchor = 0;
+      }
+      break;
+    }
+  }
+
+  return;
+}	/* End of UIGen_PROCESS_A_ATTRIBUTE_Int.	*/
+
+
+/***********************************************************************
+ *		UIGen_END_HTML_Int for UIGeneratorClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    Finish up whatever objects that have not not append
+ *                  to the ui tree or have not been set usable.
+ * PARAMETERS:	    none
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	edwin	10/15/96   	Initial Revision
+ *
+ ***********************************************************************/
+void UIGen_END_HTML_Int()
+{
+  ClassStruct *class;
+  optr dummy;
+  int nextRow;
+  word width, height;
+  SizeAsDWord size;
+  optr parent;
+
+  /*
+   * Add whatever object in UIG_target to the leaf of the ui-tree, then
+   * travel up to the top of the tree and mark object usable along the
+   * way.
+   */
+  @call currentDoc->HTUI_pmanager::MSG_PM_TAKE_UNFINISHED_UI_OBJ
+      (currentDoc->HTUI_target.obj);
+  while (1) {
+    if(@call currentDoc->HTUI_pmanager::MSG_PM_MARK_RECV_OBJECT_DONE(&dummy, &class)
+       == PM_ERROR)
+	break;
+    if (class == NULL || dummy == NULL) {
+	/*
+	 *  Finish the last row information.
+	 */
+	@call currentDoc->HTUI_pmContent::MSG_GEN_HTML_CONTENT_START_NEW_ROW
+	    (0, &nextRow, NULL);
+	/*
+	 *  Sum up the row heights. The sum is the height of this PManager.
+	 */
+        @call currentDoc->HTUI_pmContent::MSG_GEN_HTML_CONTENT_GET_DIMENSION
+	    (&width, &height);
+	if (width < X_SCREEN_SIZE)
+	    width = X_SCREEN_SIZE;
+	parent = @call currentDoc->HTUI_pmanager::MSG_GEN_FIND_PARENT();
+	size = MAKE_SIZE_DWORD(width, height);
+	@call parent::MSG_HTML_CONTENT_SET_VIEW_DOC_BOUNDS(size);
+	/*
+	 *  The reason to add Y_SCREEN_SIZE is because the destination
+	 *  hyperlink we want to display may be at the end of the document.
+	 *  Thus, we'd like to increase the size of PManager so that
+	 *  when we intercept MSG_VIS_SET_SIZE for PManager, it will be
+	 *  ableo to bring the destination hyperlinke into the view.
+	 */
+	@call currentDoc->HTUI_pmanager::MSG_VIS_SET_SIZE(width, height+Y_SCREEN_SIZE);
+	@call parent::MSG_VIS_SET_SIZE(width, height);
+	currentDoc->HTUI_target.class = NULL;
+	currentDoc->HTUI_target.obj = NULL;
+	break;
+    }
+    else if (class == (ClassStruct *)&HTGenSelectClass)
+	@call dummy::MSG_GEN_SELECT_COMPLETE_SELECT_CONSTRUCT();
+  }
+  return;
+}	/* End of UIGen_END_HTML_Int.	*/
+
+
+
+/***********************************************************************
+ *		MSG_GEN_HR_PROCESS_ATTRIBUTE for HTGenHRClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    Process the attr list of <HR>
+ * PARAMETERS:	    (MemHandle block, SGMLEntity *entity, optr content)
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:  Supported Attributes:
+ *		SIZE = n, sets the height of the rule, in pixels.
+ *		WIDTH = n, sets the width of the rule, either in pixels
+ *			or as a percentage of window width.
+ *		NOSHADE, draws the rule without 3-D shading.
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	edwin	9/11/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method HTGenHRClass, MSG_GEN_HR_PROCESS_ATTRIBUTE
+{
+  char *value;
+  int	index, j;
+  Boolean percent = FALSE;
+  Justification just = J_CENTER;
+
+  for(index = 0; entity[index].SGMLE_token; index++) {
+    if (!entity[index].SGMLE_value)
+      continue;
+    value = (char *)LMemDerefHandles(block, entity[index].SGMLE_value);
+    switch(entity[index].SGMLE_token) {
+    case HTML_ATTR_SIZE:
+      j = atoi(value);
+      if (j < 0)
+	  j = 0;
+      @self->HTGHR_size = j;
+      break;
+    case HTML_ATTR_WIDTH:
+      for (j = 0, percent = FALSE; value[j] != NULL; j++)
+	if (value[j] == '%')
+	  percent = TRUE;
+      if (percent == FALSE)
+	@self->HTGHR_width = atoi(value);
+      else {
+	if ((j = atoi(value)) > 100)
+	    j = 100;
+	@self->HTGHR_width = -j;
+      }
+      break;
+    case HTML_ATTR_ALIGN:
+      if (strcasecmp(value, "left") == 0)
+	  just = J_LEFT;
+      else if (strcasecmp(value, "right") == 0)
+	  just = J_RIGHT;
+      break;
+    case HTML_ATTR_NOSHADE:
+      @self->HTGHR_noshade = TRUE;
+      break;
+    }
+  }
+  @self->HTGHR_align = just;
+  /*
+   *  Store the content object.
+   */
+  @self->HTGHR_content = content;
+  /*
+   *  Initially not in any row.
+   */
+  @self->HTGHR_pageRow = -1;
+  /*
+   *  Expand the size of HR to the width of its parent.
+   */
+  @send self::MSG_META_ADD_VAR_DATA(HINT_EXPAND_WIDTH_TO_FIT_PARENT,0,NULL);
+  return;
+}	/* End of MSG_GEN_HR_PROCESS_ATTRIBUTE.	*/
+
+
+
+/***********************************************************************
+ *		MSG_VIS_DRAW for HTGenHRClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    Intercept this message and draw <HR> according to
+ *		    its size.
+ * PARAMETERS:	    void (DrawFlags drawFlags, GStateHandle gstate)
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	edwin	9/11/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method HTGenHRClass, MSG_VIS_DRAW
+{
+  Rectangle	bounds;
+  int offset = 0, length, width, temp;
+
+  /*
+   *  Figure out the length to draw.
+   */
+  @call self::MSG_VIS_GET_BOUNDS(&bounds);
+  width = bounds.R_right - bounds.R_left;
+  if (@self->HTGHR_width > 0)
+    length = @self->HTGHR_width;
+  else { /* it's in width% or 0. */
+    if (width > (MARGIN+MARGIN))
+	temp = width-MARGIN-MARGIN;
+    else
+	temp = width;
+
+    if (@self->HTGHR_width < 0) {
+	length = @self->HTGHR_width = 
+	    (((float)(-@self->HTGHR_width)) / 100.00) * temp;
+    }
+    else
+	length = @self->HTGHR_width = temp;
+/*@call self::MSG_VIS_SET_SIZE(length,DWORD_HEIGHT(@self->HTGHR_guessSize));*/
+  }
+  /*
+   *  Figure out the alignment.
+   */
+  if (@self->HTGHR_align == J_CENTER)
+      offset = (width - length) / 2;
+  else if (@self->HTGHR_align == J_RIGHT)
+      offset = width - length;
+
+  GrSaveState(gstate);
+  GrSetLineColor(gstate, CF_INDEX, C_BLACK, 0, 0);
+  if (@self->HTGHR_noshade == TRUE)
+      GrFillRect(gstate, bounds.R_left + offset, bounds.R_top,
+		 bounds.R_left + offset + length, bounds.R_bottom-1);
+  else
+      GrDrawRect(gstate, bounds.R_left+offset, bounds.R_top,
+		 bounds.R_left+offset+length, bounds.R_bottom-1);
+
+  GrRestoreState(gstate);
+  return;
+}	/* End of MSG_VIS_DRAW.	*/
+
+
+/***********************************************************************
+ *		MSG_VIS_RECALC_SIZE for HTGenHRClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    Set the size of HR according to its SIZE attribute
+ * PARAMETERS:	    SizeAsDWord MSG_VIS_RECALC_SIZE(
+ *    	    	    	    	RecalcSizeArgs width, 
+ *				RecalcSizeArgs height)
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:	    
+ *
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	edwin   	5/20/97   	Initial Revision
+ *	
+ ***********************************************************************/
+@method HTGenHRClass, MSG_VIS_RECALC_SIZE
+{
+  height = 2 + @self->HTGHR_size;
+  if (@self->HTGHR_width > 0) {
+    return MAKE_SIZE_DWORD(@self->HTGHR_width+MARGIN+MARGIN, height);
+  }
+  else
+    return MAKE_SIZE_DWORD(1, height);
+}	/* End of MSG_VIS_RECALC_SIZE.	*/
+
+
+
+/***********************************************************************
+ *		MSG_VIS_POSITION_BRANCH for HTGenHRClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    Set its new X and Y position.
+ * PARAMETERS:	    (int xOrigin, int yOrigin)
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	edwin	11/ 3/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method HTGenHRClass, MSG_VIS_POSITION_BRANCH
+{
+  XYValueAsDWord xy = @call @genParent::MSG_VIS_GET_POSITION();
+  Rectangle	pbounds, bounds;
+  int width;
+
+@ifdef PRODUCT_RESPONDER
+    pself = ObjDerefGen(oself);
+@endif
+  xOrigin = DWORD_X(xy) + @self->HTGHR_xPos;
+  yOrigin = DWORD_Y(xy) + GetItsPotentialHeight
+      (@self->HTGHR_content, @self->HTGHR_pageRow, oself);
+
+  @callsuper();
+
+  @call @genParent::MSG_VIS_GET_BOUNDS(&pbounds);
+  width = pbounds.R_right - pbounds.R_left;
+  @call self::MSG_VIS_GET_BOUNDS(&bounds);
+  if ((bounds.R_right - bounds.R_left) < width)
+      @call self::MSG_VIS_SET_SIZE(width, bounds.R_bottom-bounds.R_top);
+  @self->HTGHR_guessSize=MAKE_SIZE_DWORD(width,bounds.R_bottom-bounds.R_top);
+
+  return;
+}	/* End of MSG_VIS_POSITION_BRANCH.	*/
+
+
+
+/***********************************************************************
+ *		MSG_UI_CALC_SIZE_POSITION for HTGenHRClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    Calculate its row number and X position.
+ * PARAMETERS:	    none
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	edwin	11/ 3/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method HTGenHRClass, MSG_UI_CALC_SIZE_POSITION
+{
+  int row, pos;
+  VisTextInstance * vself;
+  SizeAsDWord size;
+  /*
+   *  Clear the bits in the Vis part, because we don't need to rely on 
+   *  the slow system geometry handlers to figure the size and position.
+   *  I figure out the size and position myself.
+   */
+  vself = ObjDerefVis(oself);
+  vself->VI_optFlags = NULL;
+  /*
+   *  Ask the system to send MSG_VIS_POSITION_BRANCH instead of calling
+   *  a routine.
+   */
+  vself->VI_geoAttrs &= ~VGA_USE_VIS_SET_POSITION;
+  /*
+   *  Ask the text object's content object to figure out the size and
+   *  position of the HR object.
+   */
+  pos = UpdateItsPotentialPosition(oself, @self->HTGHR_content, &row, &size);
+
+@ifdef PRODUCT_RESPONDER
+    pself = ObjDerefGen(oself);
+@endif
+  @self->HTGHR_xPos = pos;
+  @self->HTGHR_pageRow = row;
+  @self->HTGHR_guessSize = size;
+
+  return;
+}	/* End of MSG_UI_CALC_SIZE_POSITION.	*/
+
+
+/***********************************************************************
+ *		MSG_SPEC_BUILD_BRANCH for HTGenHRClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    
+ * PARAMETERS:	    
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:	    
+ *
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	edwin   	5/27/97   	Initial Revision
+ *	
+ ***********************************************************************/
+@method HTGenHRClass, MSG_SPEC_BUILD_BRANCH
+{
+    @callsuper();
+    @call self::MSG_VIS_SET_SIZE(DWORD_WIDTH(@self->HTGHR_guessSize),
+				 DWORD_HEIGHT(@self->HTGHR_guessSize));
+    return;
+}	/* End of MSG_SPEC_BUILD_BRANCH.	*/
+
+
+/***********************************************************************
+ *		MSG_UI_GET_ROW_POSITION for HTGenHRClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    
+ * PARAMETERS:	    
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:	    
+ *
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	edwin   	5/21/97   	Initial Revision
+ *	
+ ***********************************************************************/
+@method HTGenHRClass, MSG_UI_GET_ROW_POSITION
+{
+    return @self->HTGHR_pageRow;
+}	/* End of MSG_UI_GET_ROW_POSITION.	*/
+
+
+/***********************************************************************
+ *		MSG_UI_SET_NEW_POSITION for HTGenHRClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    
+ * PARAMETERS:	    
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:	    
+ *
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	edwin   	6/ 4/97   	Initial Revision
+ *	
+ ***********************************************************************/
+@method HTGenHRClass, MSG_UI_SET_NEW_POSITION
+{
+  @self->HTGHR_pageRow = row;
+  @self->HTGHR_xPos = xPos; 
+  return;
+}	/* End of MSG_UI_SET_NEW_POSITION.	*/
+
+
+/***********************************************************************
+ *		MSG_GEN_PREPARE_FOR_DESTROY for HTGenHRClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    Prepare the object for HTObjDestroyAllWID. All we
+ *                  need to do is delete instance data. This message 
+ *                  replaces MSG_GEN_DESTROY as we won't be sending 
+ *                  MSG_GEN_DESTROY to objects. Instance data allocated
+ *                  using ...WID APIs (like HTListNewWID, HTMemAllocWID)
+ *                  need not freed to save time.
+ * PARAMETERS:	    void (void)
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:	    
+ *
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	kkee    	9/15/97   	Initial Revision
+ *	
+ ***********************************************************************/
+@extern method HTGenHRClass, MSG_GEN_PREPARE_FOR_DESTROY
+{
+    /* 
+     * If we delete something here, make sure to add to list in 
+     * PresentationManager::MSG_PM_OBJECT_INSTANTIATE.
+     */
+    return;
+}	/* End of MSG_GEN_PREPARE_FOR_DESTROY.	*/
+
+
+
+/***********************************************************************
+ *	UIGen_BROADCAST_RESIZE_POSITION_Int for UIGeneratorClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    Broadcast the MSG_VIS_RECALC_SIZE and 
+ *                  MSG_VIS_POSITION_BRANCH down the ui (sub)tree.
+ * PARAMETERS:	    (optr object)  object - parent of the (sub)tree.
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	edwin	11/26/96   	Initial Revision
+ *
+ ***********************************************************************/
+void UIGen_BROADCAST_RESIZE_POSITION_Int(optr object)
+{
+  optr content, changeObj = object, image = object, view;
+  SizeAsDWord newSize, objSize;
+  WindowHandle win;
+  Rectangle objBound;
+  RectDWord viewBound;
+  Boolean sizeChanged = FALSE;
+  word width, height;
+  int left, top;
+
+  if (!object) return;
+  @call image::MSG_VIS_GET_BOUNDS(&objBound);
+
+  while(1) {
+    if(@call object::MSG_META_IS_OBJECT_IN_CLASS(&HTGenHtmlContentClass)||
+       object == currentDoc->HTUI_pmanager) {
+      /*
+       *  Pass the parent object and the object that changes size to the
+       *  content Note, the parent object can be the content.
+       */
+      if (object == currentDoc->HTUI_pmanager) {
+	  content = @call object::MSG_PM_GET_CONTENT_OBJECT();
+	  @call content::MSG_GEN_HTML_CONTENT_GET_DIMENSION(&width, &height);
+	  if (width < X_SCREEN_SIZE)
+	      width = X_SCREEN_SIZE;
+          objSize = MAKE_SIZE_DWORD(width, height);
+          newSize = @call content::MSG_GEN_HTML_CONTENT_RECALC_POSITIONS
+	      (changeObj, object);
+	  @call changeObj::MSG_VIS_POSITION_BRANCH(0,0);
+      }
+      else {
+	  newSize = @call object::MSG_GEN_HTML_CONTENT_RECALC_POSITIONS
+	      (changeObj, object);
+	  @call changeObj::MSG_VIS_POSITION_BRANCH(0,0);
+	  objSize = @call object::MSG_VIS_GET_SIZE();
+      }
+      if (DWORD_HEIGHT(newSize) > DWORD_HEIGHT(objSize) ||
+	  DWORD_WIDTH(newSize) > DWORD_WIDTH(objSize)) {
+	/*
+	 *  Now the child expands to be bigger than the parent.  Thus,
+	 *  parent needs to expands as well.
+	 */
+	sizeChanged = TRUE;
+	if (object == currentDoc->HTUI_pmanager) {
+	  /*
+	   *  PManager can't have a width smaller than the screen width.
+	   *  Otherwise, the centered or right-aligned objects can't be
+	   *  interacted.
+	   */
+	  if (DWORD_WIDTH(newSize) < X_SCREEN_SIZE)
+	    newSize = MAKE_SIZE_DWORD(X_SCREEN_SIZE, DWORD_HEIGHT(newSize));
+	  @call object::MSG_VIS_SET_SIZE(DWORD_WIDTH(newSize),
+					 DWORD_HEIGHT(newSize));
+	  object = @call object::MSG_GEN_FIND_PARENT();
+	  @call object::MSG_VIS_SET_SIZE(DWORD_WIDTH(newSize),
+					 DWORD_HEIGHT(newSize));
+	  @call object::MSG_HTML_CONTENT_SET_VIEW_DOC_BOUNDS(newSize);
+	  break;
+        }
+	else if (@call object::MSG_META_IS_OBJECT_IN_CLASS(&HTGenTCellClass)){
+	  /*
+	   *  Now expand the parent(i.e. object) to properly contain the 
+	   *  changeObj.
+	   */
+	  changeObj = object;
+	  @call object::MSG_VIS_SET_SIZE(DWORD_WIDTH(newSize),
+					 DWORD_HEIGHT(newSize));
+	  object = @call object::MSG_GEN_FIND_PARENT();
+	  EC ( EC_ERROR_IF(!@call object::MSG_META_IS_OBJECT_IN_CLASS
+			   (&HTGenTableClass), 1); )
+	  @call object::MSG_GEN_TABLE_RECALC_POSITIONS(changeObj, newSize);
+	  changeObj = object;
+	  object = @call object::MSG_GEN_FIND_PARENT();
+	}
+	else {
+	  @call object::MSG_VIS_SET_SIZE(DWORD_WIDTH(newSize),
+					 DWORD_HEIGHT(newSize));
+	  /*
+	   *  IF object is a Table or a Form, we depends on 
+	   *  MSG_VIS_POSITION_BRANCH to resize to contain all children.
+	   */
+	  changeObj = object;
+	  object = @call object::MSG_GEN_FIND_PARENT();
+        }
+      }
+      else {
+	/*
+	 *  Ok, The size didn't change, but its children objects certainly
+	 *  have changed positions.
+	 *  Invalid that region of place.
+	 */
+	@send changeObj::MSG_VIS_MARK_INVALID(VOF_IMAGE_INVALID,
+					      VUM_DELAYED_VIA_UI_QUEUE);
+	break;
+      }
+    }
+    else {
+	changeObj = object;
+	object = @call object::MSG_GEN_FIND_PARENT();
+    }
+  }
+  /*
+   *  Invalid a portion of screen if needed.
+   */
+  win = @call currentDoc->HTUI_pmanager::MSG_VIS_QUERY_WINDOW();
+  if(win) {
+      view = @call object::MSG_VIS_VUP_FIND_OBJECT_OF_CLASS(&GenViewClass);
+      @call view::MSG_GEN_VIEW_GET_VISIBLE_RECT(&viewBound);
+      if (sizeChanged == TRUE &&
+	  objBound.R_top < viewBound.RD_bottom &&
+	  objBound.R_bottom > viewBound.RD_top &&
+	  objBound.R_left < viewBound.RD_right &&
+	  objBound.R_right > viewBound.RD_left) 
+	  /*
+	   *  Invalid the whole screen if the parent size changed as well.
+	   */
+	  WinInvalReg(win, 0, 0, 0, viewBound.RD_right - viewBound.RD_left,
+		viewBound.RD_bottom - viewBound.RD_top);
+      if (@call image::MSG_META_IS_OBJECT_IN_CLASS(&HTGenImageClass)) {
+	  /*
+	   *  Invalidate the image default icon.
+	   */
+	  left = objBound.R_left - viewBound.RD_left - 1;
+	  top = objBound.R_top - viewBound.RD_top - 1;
+	  if (left+30 > 0 && top+30 > 0) {
+	      if (left < 0)
+		  left = 0;
+	      if (top < 0)
+		  top = 0;
+	      WinInvalReg(win, 0, left, top, left+31, top+31);
+	  }
+      }
+  }
+  return;
+}	/* End of UIGen_BROADCAST_RESIZE_POSITION_Int.	*/
+
+

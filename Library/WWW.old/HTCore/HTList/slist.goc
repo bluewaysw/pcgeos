@@ -1,0 +1,376 @@
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Geoworks 1996 -- All Rights Reserved
+
+PROJECT:	Geos WWW Library.
+MODULE:		GeoBrowser
+FILE:		slist.goc
+
+AUTHOR:		Kok Kin Kee, Aug 21, 1996
+
+ROUTINES:
+	Name			Description
+	----			-----------
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	kkee	8/21/96   	Initial version.
+
+DESCRIPTION:
+	Synchronized request list. Designed for use with WWW Library.
+	Client should maintain their request list using SListClass.
+
+	Add and kill requests from your application process thread,
+	and delete requests from your "after" callbacks.
+
+
+	$Id: slist.goc,v 1.1 97/04/07 11:48:16 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+@include <WWW/HTCore/slist.goh>
+@include <WWW/HTCore/htstream.goh>
+@include "htfatals.goh"
+
+/* --------------------------------------------------------------------------
+ * 		CONSTANTS and DATA TYPES
+ * --------------------------------------------------------------------------*//*
+ * Data structure that SList use to maintain a client's requests.
+ */
+typedef struct {
+    HTRequestHandle SR_request;
+    Boolean         SR_killed;
+} SRequest;
+
+
+/* --------------------------------------------------------------------------
+ * 		CLASS DECLARATION
+ * --------------------------------------------------------------------------*/
+
+@classdecl	SListClass;
+
+
+/* --------------------------------------------------------------------------
+ * 		Public Methods
+ * --------------------------------------------------------------------------*/
+
+
+/***********************************************************************
+ *		MSG_META_INITIALIZE for SListClass
+ ***********************************************************************
+ * SYNOPSIS:	    Initialize an internal list.
+ * PARAMETERS:	    void (void)
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	kkee	8/21/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method SListClass, MSG_META_INITIALIZE
+{
+    @self->SLI_list = HTListNew();
+    @self->SLI_isKilling = ThreadAllocSem(1);
+
+    @callsuper();
+}	/* End of MSG_META_INITIALIZE.	*/
+
+
+
+/***********************************************************************
+ *		MSG_META_OBJ_FREE for SListClass
+ ***********************************************************************
+ * SYNOPSIS:	    Cleanup.
+ * PARAMETERS:	    void (void)
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	kkee	8/21/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method SListClass, MSG_META_OBJ_FREE
+{
+
+    if (ThreadPTimedSem(@self->SLI_isKilling, 1) == SE_TIMEOUT) {
+	/* Still killing. Retry later. */
+	@send,forceQueue oself::MSG_META_OBJ_FREE();
+	return;
+    }
+    
+EC( if (HTListGetCount(@self->SLI_list))                                )
+EC(     EC_WARNING(SLIST_NOT_COMPLETELY_DELETED);                       )
+
+    HTListDelete(@self->SLI_list);
+    ThreadFreeSem(@self->SLI_isKilling);
+    
+    @callsuper();
+}	/* End of MSG_META_OBJ_FREE.	*/
+
+
+
+
+/***********************************************************************
+ *		MSG_SLIST_ADD_REQUEST for SListClass
+ ***********************************************************************
+ * SYNOPSIS:	    Add a request.
+ * PARAMETERS:	    int (HTRequestHandle request)
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	kkee	8/21/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method SListClass, MSG_SLIST_ADD_REQUEST
+{
+    SRequest sReq;
+
+EC( ECCheckRequest(request);                                            )
+
+    sReq.SR_request = request;
+    sReq.SR_killed = FALSE;
+
+    HTListAppend(@self->SLI_list, (void *)&sReq, sizeof(SRequest));
+
+    return HT_OK;
+}	/* End of MSG_SLIST_ADD_REQUEST.	*/
+
+
+
+/***********************************************************************
+ *		MSG_SLIST_DELETE_REQUEST for SListClass
+ ***********************************************************************
+ * SYNOPSIS:	    Delete a request.
+ * PARAMETERS:	    int (request)
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	kkee	8/21/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method SListClass, MSG_SLIST_DELETE_REQUEST
+{
+    SRequest sReq;
+    word count, i, size, index;
+    Boolean found = FALSE;
+    
+EC( ECCheckRequest(request);                                            )
+
+    count = HTListGetCount(@self->SLI_list);
+    size = sizeof(SRequest);
+
+    for (i=0; i<count; i++) {
+	HTListGetItem(@self->SLI_list, i, (void *)&sReq, size);
+	if (sReq.SR_request == request) {
+	    index = i;
+	    found = TRUE;
+	    break;
+	}
+    }
+
+    if (found) {
+	HTListRemoveItem(@self->SLI_list, index, (void *)&sReq, size);
+	HTRequestDelete(request);
+
+    } else
+	return HT_NO;
+
+    return HT_OK;
+}	/* End of MSG_SLIST_DELETE_REQUEST.	*/
+
+
+
+
+/***********************************************************************
+ *		MSG_SLIST_KILL_REQUEST for SListClass
+ ***********************************************************************
+ * SYNOPSIS:	    Kill a request.
+ * PARAMETERS:	    int (HTRequestHandle request)
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	kkee	8/21/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method SListClass, MSG_SLIST_KILL_REQUEST
+{
+    SRequest sReq;
+    word count, i, size, index;
+    Boolean found = FALSE;
+    
+EC( ECCheckRequest(request);                                            )
+
+    count = HTListGetCount(@self->SLI_list);
+    size = sizeof(SRequest);
+
+    for (i=0; i<count; i++) {
+	HTListGetItem(@self->SLI_list, i, (void *)&sReq, size);
+	if (sReq.SR_request == request) {
+	    index = i;
+	    found = TRUE;
+	    break;
+	}
+    }
+
+    if (found) {
+	HTListRemoveItem(@self->SLI_list, index, (void *)&sReq, size);
+	if (!sReq.SR_killed) {
+	    HTRequestKill(request);
+	    sReq.SR_killed = TRUE;
+	}
+	HTListAppend(@self->SLI_list, (void *)&sReq, size);
+
+    } else
+	return HT_NO;
+
+    return HT_OK;
+}	/* End of MSG_SLIST_KILL_REQUEST.	*/
+
+
+
+
+/***********************************************************************
+ *		MSG_SLIST_KILL_ALL for SListClass
+ ***********************************************************************
+ * SYNOPSIS:	    Kill all requests.
+ * PARAMETERS:	    void (SemaphoreHandle isKilling)
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:        We loop as long as it takes until all requests have
+ *                  been killed or deleted.
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	kkee	8/21/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method SListClass, MSG_SLIST_KILL_ALL
+{
+
+    if (ThreadPTimedSem(@self->SLI_isKilling, 1) == SE_TIMEOUT) {
+	/* 
+	 * We were called to kill before and we are still not done
+	 * with the previous MSG_SLIST_KILL_ALL, so don't proceed
+	 * and just return. Note that its no use forceQueue ourself
+	 * the same message as we are already killing.
+	 */
+	return;
+    }
+    
+    @self->SLI_ackSemaphore = sem;
+
+    @send,forceQueue oself::MSG_SLIST_ACK();
+
+    @send,forceQueue oself::MSG_SLIST_KILL_ALL_LOW();
+}	/* End of MSG_SLIST_KILL_ALL.	*/
+
+
+
+
+/***********************************************************************
+ *		MSG_SLIST_KILL_ALL_LOW for SListClass
+ ***********************************************************************
+ * SYNOPSIS:	    Internally kill all requests by looping in the 
+ *                  queue.
+ * PARAMETERS:	    
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	kkee	8/21/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method SListClass, MSG_SLIST_KILL_ALL_LOW
+{
+    SRequest sReq;
+    word count, i, size;
+    Boolean found = FALSE;
+    
+    /* 
+     * Find a live request to kill. Note that we can't go into a loop 
+     * and kill all requests here as the client may want to send 
+     * MSG_SLIST_DELETE_REQUEST to delete requests that were killed
+     * internally by the WWW Library (and we do not want to kill an 
+     * internally killed request).
+     */
+    count = HTListGetCount(@self->SLI_list);
+    size = sizeof(SRequest);
+
+    for (i=0; i<count; i++) {
+	HTListGetItem(@self->SLI_list, i, (void *)&sReq, size);
+	if (!sReq.SR_killed) {
+	    found = TRUE;
+	    break;
+	}
+    }
+
+    if (found) {
+	@send,forceQueue oself::MSG_SLIST_KILL_REQUEST(sReq.SR_request);
+	@send,forceQueue oself::MSG_SLIST_KILL_ALL_LOW();
+
+    } else 
+	/* 
+	 * All requests are dead! Do we want them deleted before 
+	 * we release the semaphore? No, let the client take care of it.
+         * Maybe we need a all deleted semaphore or something, but 
+ 	 * use isKilling for killing, not for deleting all requests.
+	 */
+	ThreadVSem(@self->SLI_isKilling);
+	
+}	/* End of MSG_SLIST_KILL_ALL_LOW.	*/
+
+
+
+
+/***********************************************************************
+ *		MSG_SLIST_ACK for SListClass
+ ***********************************************************************
+ * SYNOPSIS:	    Ack to client when we are done killing all requests.
+ * PARAMETERS:	    void (void)
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	kkee	8/21/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method SListClass, MSG_SLIST_ACK
+{
+    if (ThreadPTimedSem(@self->SLI_isKilling, 1) == SE_TIMEOUT) {
+	/* Still killing... Retry later. */
+	@send,forceQueue oself::MSG_SLIST_ACK();
+	return;
+    }
+
+    /* Done with killing all requests */
+    ThreadVSem(@self->SLI_ackSemaphore);
+
+    /* We've grabbed it, so now release it. */
+    ThreadVSem(@self->SLI_isKilling);
+}	/* End of MSG_SLIST_ACK.	*/

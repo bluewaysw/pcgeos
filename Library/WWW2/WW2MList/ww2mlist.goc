@@ -1,0 +1,987 @@
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Geoworks 1996 -- All Rights Reserved
+
+PROJECT:	Geos WWW2 Library
+MODULE:		Movable list.
+FILE:		ww2mlist.goc
+
+AUTHOR:		Kok Kin Kee: Feb 02, 1998
+
+ROUTINES:
+	Name			Description
+	----			-----------
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	kkee    2/02/98  	Initial version
+
+DESCRIPTION:
+	Movable list. This is platform dependent code that should be 
+        ported for platforms that support movable memory. For Liberty,
+        this is implemented using <data/varray.h>
+
+	$Id: ww2mlist.goc,v 1.2 98/07/29 19:08:14 edwin Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+@include <WWW2/WW2Core/ww2mlist.goh>
+@include <WWW2/WW2Core/wwutils.goh>
+@include <chunkarr.h>
+#include <Ansi/string.h>		/* memcpy(), memcmp() */
+#include <ec.h>
+#include <WWW2/ww2mem.h>
+
+@include "wwfatals.goh"
+
+/* ---------------------------------------------------------------------
+ * 		PRIVATE DATA
+ * --------------------------------------------------------------------*/
+
+/* 
+ * We create a chunkarray in a block if it less than 6K. We append to a 
+ * list if its block size is less than 8K.
+ */
+#define DESIRED_HTLIST_PER_BLOCK         10
+#define DESIRED_HTLISTNEW_BLOCK_SIZE     6000
+#define DESIRED_HTLISTAPPEND_BLOCK_SIZE  8000
+
+#define HTMID_END 10020
+
+/*
+ * Information about a block for creating chunkarrays.
+ */
+typedef struct {
+    MemHandle HTB_mh;
+    word HTB_id;               /* for APIs ending with ...WID, 0 for no ID */
+    word HTB_numOfArrays;      /* number of chunkarrays in this block */
+} HTListBlock;
+
+/*
+ * HTList header information. Lists in the same block can not grow
+ * bigger than DESIRED_HTLISTAPPEND_BLOCK_SIZE.
+ */
+typedef struct {
+    ChunkArrayHeader  HTLH_carray;  /* Original header info */
+    /* Extra information follows here */
+    WWListHandle HTLH_next; /* NULL if last HTList */
+} HTListHeader;
+
+/*
+ * Library won't compile unless there is a dgroup, this dummy does 
+ * the job! :)
+ */
+byte htListDummy;
+
+@start HTListData, data;
+
+/*
+ * List of memory blocks for creating chunkarrays.
+ */
+@chunk WWListHandle htlistMemoryBlocks = NULL;
+
+@end   HTListData;
+
+
+/* ---------------------------------------------------------------------
+ * 		PRIVATE FUNCTIONS
+ * --------------------------------------------------------------------*/
+
+static WWListHandle _pascal HTListNewLow (word id, word itemSize);
+static word _pascal HTListID (MemHandle mh);
+
+
+#if ERROR_CHECK
+/***********************************************************************
+ *		ECCheckHTListBlocks
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Check the consistency of htlistMemoryBlocks, which must
+ *              not be locked.
+ * CALLED BY:	
+ * RETURN:	Nothing
+ *	
+ * STRATEGY:	
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	kkee    	9/11/97   	Initial Revision
+ *	
+ ***********************************************************************/
+static void _pascal
+ECCheckHTListBlocks (void)
+{
+    WWListHandle *lptr;
+    HTListBlock *bptr;
+    word count, i, size;
+    MemHandle mh = OptrToHandle(@htlistMemoryBlocks);
+	
+    MemPLock(mh);
+
+    lptr = (WWListHandle *) LMemDeref(@htlistMemoryBlocks);
+    count = ChunkArrayGetCount(*lptr);
+
+    for (i=0; i<count; i++) {
+	bptr = (HTListBlock *) ChunkArrayElementToPtr(*lptr, i, &size);
+	ECCheckMemHandle(bptr->HTB_mh);
+	if (bptr->HTB_id && (bptr->HTB_id >= HTMID_END)) {
+	    EC_ERROR(INVALID_ID_FOR_HTLIST);        
+	}
+    }
+
+    MemUnlockV(mh);
+}	/* End of ECCheckHTListBlocks.	*/
+#endif
+
+
+
+/***********************************************************************
+ *		HTListNewLow
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Create a two types of HTList for an id.
+ * CALLED BY:	HTListNew, HTListNewWID
+ * RETURN:	
+ *	
+ * STRATEGY:	
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	kkee    	9/10/97   	Initial Revision
+ *	
+ ***********************************************************************/
+static WWListHandle _pascal
+HTListNewLow (word id, word itemSize)
+{
+    WWListHandle *lptr, list = NullOptr;
+    HTListBlock *bptr;
+    ChunkHandle chunk;
+    word count, i, size;
+    MemHandle mh = OptrToHandle(@htlistMemoryBlocks);
+	
+#if ERROR_CHECK
+    if (id >= HTMID_END)
+	EC_ERROR(INVALID_ID_FOR_HTLIST);        
+#endif
+
+    MemPLock(mh);
+
+    lptr = (WWListHandle *) LMemDeref(@htlistMemoryBlocks);
+    if (!(*lptr)) {
+	/* 
+	 * Create a list for maintaining memory blocks.
+	 * lptr invalidated!
+	 */
+	chunk = ChunkArrayCreate(mh, 0, 0, 0);
+	lptr = (WWListHandle *) LMemDeref(@htlistMemoryBlocks);
+	*lptr = ConstructOptr(mh, chunk); /* save it */
+    }
+
+    /*
+     * Search the list of blocks to create a chunkarray.
+     */
+    count = ChunkArrayGetCount(*lptr);
+
+    for (i=0; i<count; i++) {
+	bptr = (HTListBlock *) ChunkArrayElementToPtr(*lptr, i, &size);
+
+	if ((bptr->HTB_id == id) &&
+	    (bptr->HTB_numOfArrays < DESIRED_HTLIST_PER_BLOCK) &&
+	    (MemGetInfo(bptr->HTB_mh, MGIT_SIZE) < 
+	     DESIRED_HTLISTNEW_BLOCK_SIZE)) {
+
+	    MemThreadGrab(bptr->HTB_mh);
+	    chunk = ChunkArrayCreate(bptr->HTB_mh, itemSize, 
+				     sizeof(HTListHeader), 0);
+	    MemThreadRelease(bptr->HTB_mh);
+
+	    if (chunk) {
+		/* 
+		 * Update the HTListBlock.
+		 */
+		bptr->HTB_numOfArrays += 1;
+		list = ConstructOptr(bptr->HTB_mh, chunk);
+	    }
+	    break;
+	}
+    }
+
+    /* 
+     * If we did not find a block that fits, create one.
+     */
+    if (!list) {
+	MemHandle nmh = MemAllocLMem(LMEM_TYPE_GENERAL, 0);
+	if (nmh) {
+	    /*
+	     * We need to make the Library own the block as it is
+	     * shared by all other Library clients.
+	     */
+	    HandleModifyOwner(nmh, GeodeGetCodeProcessHandle());
+	    MemModifyFlags(nmh, HF_SHARABLE, 0);
+
+	    MemThreadGrab(nmh);
+	    chunk = ChunkArrayCreate(nmh, itemSize, sizeof(HTListHeader), 0);
+	    
+	    /* Update the list of memory blocks */
+	    bptr = ChunkArrayAppend(*lptr, sizeof(HTListBlock));
+	    bptr->HTB_mh = nmh;
+	    bptr->HTB_id = id;
+	    bptr->HTB_numOfArrays = 1;
+
+	    list = ConstructOptr(nmh, chunk);
+
+EC(         ECCheckChunkArray(list);                                  )
+
+	    MemThreadRelease(nmh);
+	}
+    }
+
+    MemUnlockV(mh);
+
+EC( ECCheckHTListBlocks();                                             )	
+
+    return list;
+}	/* End of HTListNewLow.	*/
+
+
+/***********************************************************************
+ *		HTListID
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Get the ID of a HTList block handle.
+ * CALLED BY:	HTListAppend
+ * RETURN:	id or 0 for no ID.
+ *	
+ * STRATEGY:	
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	kkee    	9/10/97   	Initial Revision
+ *	
+ ***********************************************************************/
+static word _pascal
+HTListID (MemHandle han)
+{
+    WWListHandle *lptr;
+    HTListBlock *bptr;
+    word ret = 0;
+    word count, i, size;
+    MemHandle mh = OptrToHandle(@htlistMemoryBlocks);
+	
+    MemPLock(mh);
+
+    lptr = (WWListHandle *) LMemDeref(@htlistMemoryBlocks);
+    count = ChunkArrayGetCount(*lptr);
+
+    for (i=0; i<count; i++) {
+	bptr = (HTListBlock *) ChunkArrayElementToPtr(*lptr, i, &size);
+	if (bptr->HTB_mh == han) {
+	    ret = bptr->HTB_id;
+	    break;
+	}
+    }
+
+    MemUnlockV(mh);
+    return ret;
+}	/* End of HTListID.	*/
+
+
+
+/* ---------------------------------------------------------------------
+ * 		PUBLIC FUNCTIONS
+ * --------------------------------------------------------------------*/
+
+
+
+/***********************************************************************
+ *		ECCHECKHTLIST
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Check that a HTList is valid.
+ * CALLED BY:	Client.
+ * RETURN:	
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	kkee	10/ 1/96   	Initial Revision
+ *
+ ***********************************************************************/
+void _far _pascal
+ECCHECKHTLIST (WWListHandle list)
+{
+#if ERROR_CHECK
+    MemHandle mh = OptrToHandle(list);
+
+    if (!list) return;
+
+    MemThreadGrab(mh);
+    ECLMemExists(list);
+    MemThreadRelease(mh);
+
+#endif
+}	/* End of ECCHECKHTLIST.	*/
+
+
+
+/*---------------------------------------------------------------------------
+//		WWListNew()
+//---------------------------------------------------------------------------
+// 
+// SYNOPSIS:    Create a new WWListHandle. 	
+// SCOPE:	Public
+// RETURN:	WWListHandle or NULL if not enough memory.
+// STRATEGY:	
+// 
+// REVISION HISTORY: 
+//	Name		Date		Description 
+//	----		----		----------- 
+//	kkee    	2/02/98 	Initial version 
+//	
+//-------------------------------------------------------------------------*/
+WWListHandle _far _pascal
+WWListNew(word itemSize)
+{
+    return HTListNewLow(0, itemSize);  /* No id */
+}	/* End of WWListNew() */
+
+
+/*---------------------------------------------------------------------------
+//		WWListDelete()
+//---------------------------------------------------------------------------
+// 
+// SYNOPSIS: 	Delete a WWListHandle.
+// SCOPE:	Public
+// RETURN:	Nothing
+// STRATEGY:	
+// 
+// REVISION HISTORY: 
+//	Name		Date		Description 
+//	----		----		----------- 
+//	kkee    	2/02/98 	Initial version 
+//	
+//-------------------------------------------------------------------------*/
+void _far _pascal
+WWListDelete(WWListHandle list)
+{
+    WWListHandle blockList;
+    HTListBlock *bptr;
+    word count, i, size;
+    MemHandle mh, fmh = OptrToHandle(list);
+    HTListHeader *header;
+    WWListHandle next;
+
+    /* 
+     * First, free the chunkarray itself.
+     */
+    if (list == NULL) return;
+    
+    MemThreadGrab(fmh);
+EC( ECCheckChunkArray(list);                                            )
+
+    header = (HTListHeader *) LMemDeref(list);
+    next = header->HTLH_next;
+
+    ChunkArrayDeleteRange(list, 0, header->HTLH_carray.CAH_count);
+    LMemFree(list);
+
+    MemThreadRelease(fmh);
+
+    /* 
+     * Second, we may need to free the block as well.
+     */
+    mh = OptrToHandle(@htlistMemoryBlocks);
+    MemPLock(mh);
+
+    blockList = *(WWListHandle *) LMemDeref(@htlistMemoryBlocks);
+    count = ChunkArrayGetCount(blockList);
+
+    for (i=0; i<count; i++) {
+	bptr = (HTListBlock *) ChunkArrayElementToPtr(blockList, i, &size);
+	if (bptr->HTB_mh == fmh) {
+	    bptr->HTB_numOfArrays -= 1;
+	    if (!bptr->HTB_numOfArrays) {
+		MemFree(fmh);
+		ChunkArrayDelete(blockList, bptr);
+	    }
+	    break;
+	}
+    }
+    
+    MemUnlockV(mh);
+
+EC( ECCheckHTListBlocks();                                             )	
+
+    if (next) WWListDelete(next);
+}	/* End of WWListDelete() */
+
+
+
+/*---------------------------------------------------------------------------
+//		WWListDeleteAllItems()
+//---------------------------------------------------------------------------
+// 
+// SYNOPSIS: 	Delete all items. It is illegal to have any locks on list
+// SCOPE:	Public
+// RETURN:	Nothing
+// STRATEGY:	
+// 
+// REVISION HISTORY: 
+//	Name		Date		Description 
+//	----		----		----------- 
+//	kkee    	2/02/98 	Initial version 
+//	
+//-------------------------------------------------------------------------*/
+void _far _pascal
+WWListDeleteAllItems(WWListHandle list)
+{
+    MemHandle mh = OptrToHandle(list);
+    HTListHeader *header;
+    WWListHandle next;
+
+    if (list == NULL) return;
+    
+    MemThreadGrab(mh);
+EC( ECCheckChunkArray(list);                                            )
+
+    /* All the items */
+    header = (HTListHeader *) LMemDeref(list);
+    next = header->HTLH_next;
+    header->HTLH_next = 0;  /* Delete it later */
+    ChunkArrayDeleteRange(list, 0, header->HTLH_carray.CAH_count);
+
+    MemThreadRelease(mh);
+
+    if (next) WWListDelete(next);  /* Delete the rest */
+}	/* End of WWListDeleteAllItems() */
+
+
+
+/*---------------------------------------------------------------------------
+//		WWListDeleteRange()
+//---------------------------------------------------------------------------
+// 
+// SYNOPSIS: 	Delete a range of items. It is illegal to have any
+//              locks on the list.
+// SCOPE:	Public
+// RETURN:	Nothing
+// STRATEGY:	
+// 
+// REVISION HISTORY: 
+//	Name		Date		Description 
+//	----		----		----------- 
+//	kkee    	2/02/98 	Initial version 
+//	
+//-------------------------------------------------------------------------*/
+void _far _pascal
+WWListDeleteRange(WWListHandle list, word x, word y)
+{
+
+#define min(a,b) ((a)>(b) ? (b):(a))
+
+    MemHandle mh = OptrToHandle(list);
+    HTListHeader *header;
+    WWListHandle next;
+    word x1, y1;   /* Current range to delete */
+    word x2, y2;   /* Range to delete for header->HTLH_next */
+    word count;
+
+    if (list == NULL) return;
+    
+    MemThreadGrab(mh);
+EC( ECCheckChunkArray(list);                                            )
+
+    header = (HTListHeader *) LMemDeref(list);
+    count = header->HTLH_carray.CAH_count;
+
+EC( if ((count<(x+y)) && !(header->HTLH_next))                          )
+EC(     EC_ERROR(HTLIST_INDEX_OUT_OF_RANGE);                            )
+
+/* 
+ *    x1 = (count>x) ? x:0;
+ *    y1 = (count>x) ? min(count-x,y):0;
+ *    x2 = (x>count) ? (x-count):0;
+ *    y2 = y-y1;
+ */
+    if (count > x) {
+	x1 = x; 
+	y1 = min(count-x, y);
+	x2 = 0;
+    } else {
+	x1 = 0;
+	y1 = 0;
+	x2 = x-count;
+    }
+    y2 = y-y1;
+
+    if (y1) ChunkArrayDeleteRange(list, x1, y1);
+    next = header->HTLH_next;
+
+    MemThreadRelease(mh);
+
+    if (next && y2) WWListDeleteRange(next, x2, y2);
+}	/* End of WWListDeleteRange() */
+
+
+
+/*---------------------------------------------------------------------------
+//		WWListAppend()
+//---------------------------------------------------------------------------
+// 
+// SYNOPSIS: 	Append an item to list. It is illegal to have any
+//              locks on the list.
+// SCOPE:	Public
+// RETURN:	TRUE if append, FALSE if not enough memory.
+// STRATEGY:	
+// 
+// REVISION HISTORY: 
+//	Name		Date		Description 
+//	----		----		----------- 
+//	kkee    	2/02/98 	Initial version 
+//	
+//-------------------------------------------------------------------------*/
+Boolean _far _pascal
+WWListAppend(WWListHandle list, const void *item, word *index)
+{
+    void *element, *tmp;	
+    MemHandle mh = OptrToHandle(list);
+    HTListHeader *header;
+    WWListHandle nlist;
+    word elementSize;
+
+    /* Append to the last HTList in list */
+    MemThreadGrab(mh);
+EC( ECCheckChunkArray(list);                                            )
+
+    header = (HTListHeader *) LMemDeref(list);
+    *index = header->HTLH_carray.CAH_count;
+    while (header->HTLH_next) {
+	list = header->HTLH_next;
+	MemThreadRelease(mh);
+	mh = OptrToHandle(list);
+	MemThreadGrab(mh);
+	header = (HTListHeader *) LMemDeref(list);
+	*index += header->HTLH_carray.CAH_count;
+    }
+
+    tmp = ChunkArrayElementToPtr(list, *index, &elementSize);
+
+    if (MemGetInfo(mh, MGIT_SIZE) < DESIRED_HTLISTAPPEND_BLOCK_SIZE) {
+	element = ChunkArrayAppend(list, 0);
+	memcpy(element, item, elementSize);
+	MemThreadRelease(mh);
+    } else {
+	/* Create a new HTList to extend the current list */
+	word id;
+	MemThreadRelease(mh);
+	id = HTListID(mh); /* Can't lock mh calling this API */
+	nlist = (id==0) ? WWListNew(elementSize) : WWListNew(elementSize); /* HTListNewWID(id); */
+	MemThreadGrab(mh);
+	header = (HTListHeader *) LMemDeref(list);
+	header->HTLH_next = nlist;
+	MemThreadRelease(mh);
+
+	/* Append new item to nlist */
+	mh = OptrToHandle(nlist);
+	MemThreadGrab(mh);
+	element = ChunkArrayAppend(nlist, 0);
+	memcpy(element, item, elementSize);
+	MemThreadRelease(mh);
+    }
+    return TRUE;
+}	/* End of WWListAppend() */
+
+
+
+/*---------------------------------------------------------------------------
+//		WWListReplaceItem()
+//---------------------------------------------------------------------------
+// 
+// SYNOPSIS: 	Replace an item. It is illegal to have any locks on
+//              the list.
+// SCOPE:	Public
+// RETURN:	TRUE is replaced, FALSE if not enough memory.
+// STRATEGY:	
+// 
+// REVISION HISTORY: 
+//	Name		Date		Description 
+//	----		----		----------- 
+//	kkee    	2/02/98 	Initial version 
+//	
+//-------------------------------------------------------------------------*/
+void _far _pascal
+WWListReplaceItem(WWListHandle list, word index, const void *item)
+{
+    void *element, *newElement;
+    word elementSize;	
+    MemHandle mh = OptrToHandle(list);
+    HTListHeader *header;
+
+    do {
+	MemThreadGrab(mh);
+EC(     ECCheckChunkArray(list);                                        )
+
+	header = (HTListHeader *) LMemDeref(list);
+	if (index < header->HTLH_carray.CAH_count) {
+	    break;
+	} else {
+	    list = header->HTLH_next;
+	    index -= header->HTLH_carray.CAH_count;
+	    MemThreadRelease(mh);
+	}
+	mh = OptrToHandle(list);
+    } while (list);
+
+EC( if (!list)                                                          )
+EC(	EC_ERROR(HTLIST_INDEX_OUT_OF_RANGE);                            )
+
+    element = ChunkArrayElementToPtr(list, index, &elementSize);
+/*
+EC( if (size && (elementSize != size))                                  )
+EC( 	EC_WARNING(HTLIST_REPLACE_ITEM_NOT_THE_SAME_SIZE);              )
+*/
+    newElement = ChunkArrayInsertAt(list, element, 0);
+    memcpy(newElement, item, elementSize);
+
+    /* Remove old item */
+    ChunkArrayDeleteRange(list, index+1, 1);
+
+    MemThreadRelease(mh);
+
+}	/* End of WWListReplaceItem() */
+
+
+/*---------------------------------------------------------------------------
+//		WWListFindItem()
+//---------------------------------------------------------------------------
+// 
+// SYNOPSIS: 	Find an item. 
+// SCOPE:	Public
+// RETURN:	TRUE if found, else FALSE.
+// STRATEGY:	
+// 
+// REVISION HISTORY: 
+//	Name		Date		Description 
+//	----		----		----------- 
+//	kkee    	2/02/98 	Initial version 
+//	
+//-------------------------------------------------------------------------*/
+Boolean _far _pascal
+WWListFindItem(WWListHandle list, const void *item, word *index)
+{
+    void *element;
+    word count, len, offset=0;
+    int i, found = -1;
+    HTListHeader *header;
+    MemHandle mh = OptrToHandle(list);
+
+    while (list) {
+	MemThreadGrab(mh);
+EC(     ECCheckChunkArray(list);                                           )
+
+	header = (HTListHeader *) LMemDeref(list);
+	count = header->HTLH_carray.CAH_count;
+	for (i=0; i<count; i++) {
+	    element = ChunkArrayElementToPtr(list, i, &len);
+	    if (!memcmp(item, element, len)) {
+		found = i;
+		MemThreadRelease(mh);
+		break;
+	    }
+	}
+	if (found == -1) {
+	    /* Not found, search next list */
+	    list = header->HTLH_next;
+	    offset += count;
+	    MemThreadRelease(mh);
+	    mh = OptrToHandle(list);
+	} else {
+	    break;
+	}
+    }
+
+    if (found != -1) {
+	*index = found+offset;
+	return TRUE;
+    }
+    return FALSE;
+}	/* End of WWListFindItem() */
+
+
+
+/*---------------------------------------------------------------------------
+//		WWListGetItem()
+//---------------------------------------------------------------------------
+// 
+// SYNOPSIS: 	Copy an item. 
+// SCOPE:	Public
+// RETURN:	Nothing
+// STRATEGY:	
+// 
+// REVISION HISTORY: 
+//	Name		Date		Description 
+//	----		----		----------- 
+//	kkee    	2/02/98 	Initial version 
+//	
+//-------------------------------------------------------------------------*/
+void _far _pascal
+WWListGetItem(WWListHandle list, word index, void *item)
+{
+    void *element;
+    word elementSize;
+    MemHandle mh = OptrToHandle(list);
+    HTListHeader *header;
+
+    while (list) {
+	MemThreadGrab(mh);
+EC(     ECCheckChunkArray(list);                                        )
+        
+        header = (HTListHeader *) LMemDeref(list);
+	if (index < header->HTLH_carray.CAH_count) {
+	    /* Found in this list */
+	    element = ChunkArrayElementToPtr(list, index, &elementSize);
+/*
+EC(         if (elementSize > size)                                     )
+EC( 	    EC_WARNING(HTLIST_ELEMENT_SIZE_EXCEEDS_PASSED_IN_SIZE);     )
+*/
+            item = memcpy(item, element, elementSize);
+	    MemThreadRelease(mh);
+	    break;
+	} else {
+	    list = header->HTLH_next;
+	    index -= header->HTLH_carray.CAH_count;
+	    MemThreadRelease(mh);
+	    mh = OptrToHandle(list);
+	}
+    }
+
+EC( if (!list)                                                          )
+EC(	EC_ERROR(HTLIST_INDEX_OUT_OF_RANGE);                            )
+
+}	/* End of WWListGetItem() */
+
+
+/*---------------------------------------------------------------------------
+//		WWListGetItemSize()
+//---------------------------------------------------------------------------
+// 
+// SYNOPSIS: 	Get size of an item.
+// SCOPE:	Public
+// RETURN:	Size of item.
+// STRATEGY:	
+// 
+// REVISION HISTORY: 
+//	Name		Date		Description 
+//	----		----		----------- 
+//	kkee    	2/02/98 	Initial version 
+//	
+//-------------------------------------------------------------------------*/
+word _far _pascal
+WWListGetItemSize(WWListHandle list)
+{
+    word size = 0;
+    MemHandle mh = OptrToHandle(list);
+    HTListHeader *header;
+    word index;
+
+    while (list) {
+	MemThreadGrab(mh);
+EC(     ECCheckChunkArray(list);                                        )
+
+        index = 0;
+
+        header = (HTListHeader *) LMemDeref(list);
+	if (index < header->HTLH_carray.CAH_count) {
+	    /* Found in this list */
+	    ChunkArrayElementToPtr(list, index, &size);
+	    MemThreadRelease(mh);
+	    break;
+	} else {
+	    list = header->HTLH_next;
+	    index -= header->HTLH_carray.CAH_count;
+	    MemThreadRelease(mh);
+	    mh = OptrToHandle(list);
+	}
+    }
+
+EC( if (!list)                                                          )
+EC(	EC_ERROR(HTLIST_INDEX_OUT_OF_RANGE);                            )
+
+    return size;
+}	/* End of WWListGetItemSize() */
+
+
+/*---------------------------------------------------------------------------
+//		WWListRemoveItem()
+//---------------------------------------------------------------------------
+// 
+// SYNOPSIS: 	Remove an item. It is illegal to have any locks on the
+//              list.
+// SCOPE:	Public
+// RETURN:	Nothing
+// STRATEGY:	
+// 
+// REVISION HISTORY: 
+//	Name		Date		Description 
+//	----		----		----------- 
+//	kkee    	2/02/98 	Initial version 
+//	
+//-------------------------------------------------------------------------*/
+void _far _pascal
+WWListRemoveItem(WWListHandle list, word index, void *item)
+{
+    void *element;
+    word elementSize;
+    MemHandle mh = OptrToHandle(list);
+    HTListHeader *header;
+
+    while (list) {
+	MemThreadGrab(mh);
+EC(     ECCheckChunkArray(list);                                        )
+
+        header = (HTListHeader *) LMemDeref(list);
+	if (index < header->HTLH_carray.CAH_count) {
+	    /* Found in this list */
+	    element = ChunkArrayElementToPtr(list, index, &elementSize);
+/*
+EC(         if (elementSize > size)                                     )
+EC(             EC_WARNING(HTLIST_ELEMENT_SIZE_EXCEEDS_PASSED_IN_SIZE); )
+*/
+            if (item) item = memcpy(item, element, elementSize);
+	    ChunkArrayDelete(list, element);
+	    MemThreadRelease(mh);
+	    break;
+	} else {
+	    list = header->HTLH_next;
+	    index -= header->HTLH_carray.CAH_count;
+	    MemThreadRelease(mh);
+	    mh = OptrToHandle(list);
+	}
+    }
+
+EC( if (!list)                                                          )
+EC(     EC_ERROR(HTLIST_INDEX_OUT_OF_RANGE);                            )
+
+}	/* End of WWListRemoveItem() */
+
+
+
+/*---------------------------------------------------------------------------
+//		WWListLockItem()
+//---------------------------------------------------------------------------
+// 
+// SYNOPSIS: 	Lock an item.
+// SCOPE:	Public
+// RETURN:	Pointer to locked item.
+// STRATEGY:	
+// 
+// REVISION HISTORY: 
+//	Name		Date		Description 
+//	----		----		----------- 
+//	kkee    	2/02/98 	Initial version 
+//	
+//-------------------------------------------------------------------------*/
+void* _far _pascal
+WWListLockItem(WWListHandle list, word index)
+{
+    void _far *element = NULL;
+    word elementSize;
+    HTListHeader *header;
+    MemHandle mh;
+
+    mh = OptrToHandle(list);
+
+    while (list) {
+	MemThreadGrab(mh);
+EC(     ECCheckChunkArray(list);                                        )
+        
+        header = (HTListHeader *) LMemDeref(list);
+	if (index < header->HTLH_carray.CAH_count) {
+	    /* Found in this list */
+	    element = ChunkArrayElementToPtr(list, index, &elementSize);
+	    break;
+	} else {
+	    list = header->HTLH_next;
+	    index -= header->HTLH_carray.CAH_count;
+	    MemThreadRelease(mh);
+	    mh = OptrToHandle(list);
+	}
+    }
+
+EC( if (!list)                                                          )
+EC(	EC_ERROR(HTLIST_INDEX_OUT_OF_RANGE);                            )
+
+    return element;
+}	/* End of WWListLockItem() */
+
+
+/*---------------------------------------------------------------------------
+//		WWListUnlockItem()
+//---------------------------------------------------------------------------
+// 
+// SYNOPSIS: 	Unlock an item. It is illegal to unlock an item not
+//              already locked.
+// SCOPE:	Public
+// RETURN:	Nothing
+// STRATEGY:	
+// 
+// REVISION HISTORY: 
+//	Name		Date		Description 
+//	----		----		----------- 
+//	kkee    	2/04/98 	Initial version 
+//	
+//-------------------------------------------------------------------------*/
+void _far _pascal
+WWListUnlockItem(WWListHandle list, word index)
+{
+    EC_ERROR(1);
+    return;
+}	/* End of WWListUnlockItem() */
+
+
+
+/*---------------------------------------------------------------------------
+//		WWListGetCount()
+//---------------------------------------------------------------------------
+// 
+// SYNOPSIS: 	Get number of items in list.
+// SCOPE:	Public
+// RETURN:	Number of items in list.
+// STRATEGY:	
+// 
+// REVISION HISTORY: 
+//	Name		Date		Description 
+//	----		----		----------- 
+//	kkee    	2/02/98 	Initial version 
+//	
+//-------------------------------------------------------------------------*/
+word _far _pascal
+WWListGetCount(WWListHandle list)
+{
+    word count = 0;
+    MemHandle mh = OptrToHandle(list);
+    HTListHeader *header;
+
+    if (list == NULL) return 0;
+
+    while (list) {
+	MemThreadGrab(mh);
+EC(     ECCheckChunkArray(list);                                        )
+    
+        header = (HTListHeader *) LMemDeref(list);
+        count += header->HTLH_carray.CAH_count;
+
+	list = header->HTLH_next;
+	MemThreadRelease(mh);
+	mh = OptrToHandle(list);
+    }
+
+    return count;
+}	/* End of WWListGetCount() */

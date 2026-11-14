@@ -1,0 +1,156 @@
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Geoworks 1997.  All rights reserved.
+	GEOWORKS CONFIDENTIAL
+
+PROJECT:	
+MODULE:		
+FILE:		memutils.goh
+
+AUTHOR:		Kok Kin Kee, Mar 12, 1997
+
+ROUTINES:
+	Name			Description
+	----			-----------
+
+REVISION HISTORY:
+	Name		Date		Description
+	----		----		-----------
+	kkee    	3/12/97   	Initial version.
+
+DESCRIPTION:
+
+	
+
+	$Id: memutils.goh,v 1.1 97/04/04 15:56:20 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+/***********************************************************************
+ *
+ *      Copyright (c) STNC Enterprises Ltd. 1996 -- All Rights Reserved
+ *
+ * PROJECT:			Tungsten
+ * MODULE:			Memory Utility functions and leakage checks.
+ * FILE:				memutils.goh
+ *
+ * AUTHOR:  Bill Godfrey, <bgodfrey@stnc.com>
+ *
+ ***********************************************************************/
+
+#ifndef INCLUDED_MEMUTIL_GOH
+#define INCLUDED_MEMUTIL_GOH
+
+@include <stdapp.goh>
+
+#include <mtools/mtypes.h>
+#include <mtools/htcache.h>
+#include <ansi/stdlib.h>
+#include <ansi/string.h>
+#include <mtools/dspatch.h>
+
+		/**** Simple memory allocation. ****/
+
+/* Allocates memory and returns HTHANDLE to memory or NULL for out of memory. */
+//#define ht_alloc(n) htcache_alloc(CACHE_TYPE_MISC,n,0)
+extern HTHANDLE ht_alloc(uint32 n);
+
+/* Locks memory for use, returning void pointer. */
+//#define ht_lock(h) htcache_lock(h,CACHE_ACCESS_NONE)
+extern void *ht_lock(HTHANDLE h);
+
+/* Unlocks memory previously locked. */
+//#define ht_unlock(h) htcache_unlock(h)
+extern void ht_unlock(HTHANDLE h);
+
+/* Frees memory. Remember to unlock it first. */
+//#define ht_free(h) htcache_free(h)
+extern void ht_free(HTHANDLE h);
+
+/* Debug utility. Resets the allocation counter. */
+extern void ht_reset(void);
+
+/* Debug utility. Returns the current allocation count. */
+extern short ht_getalloccount(void);
+
+/* Debug utility. Scan for leakages and report. */
+extern void ht_checkleak(void);
+
+/* Resizes a memory block and returns its new handle, having copied the old memory contents. */
+	/* Will only work for strings. */
+extern HTHANDLE ht_realloc(HTHANDLE h, size_t newsize);
+
+
+		/**** De-reference macros. ****/
+
+/* Shortcuts to lock and dereference an HTHANDLE to a string. */
+#define ht_string(h) ((char*)ht_lock(h))
+
+/* Generic deref h and typecast to t */
+#define htl(t,h) ((t*)ht_lock(h));
+
+/* Template:
+		#define ht_xxx(h) ((type*)htlock(h))
+
+	Use:
+		ht_xxx(h)->blah
+	Eg:
+		curr->rtext translates to...
+			ht_str(ht_SmtpResp(curr)->rtext)
+*/
+
+		/**** Helpful bits. ****/
+
+/* As strlen, but leaves it unlocked. */
+extern size_t ht_strlen(HTHANDLE s);
+
+
+		/**** Global memory functions replacements. ****/
+
+#define ht_MemHandle HTHANDLE
+#define ht_MemAlloc(n,z1,z2) ht_alloc(n)
+#define ht_MemLock(n) ht_lock(n)
+#define ht_MemUnlock(n) ht_unlock(n)
+#define ht_MemFree(n) { ht_unlock(n); ht_free(n); }
+
+
+		/**** stdlib.h replacement functions. ****/
+
+/* malloc */
+extern void* b_alloc(size_t n);
+
+/* Extract handle from pointer */
+extern HTHANDLE b_gethandle(void *p);
+
+/* free */
+extern void b_free(void *p);
+
+/* realloc */
+extern void* b_realloc(void* b, size_t n);
+
+
+		/**** My bug fix for stdlib.h/realloc ****/
+
+/* realloc */
+extern void* ralloc(void *blk, size_t n);
+#undef realloc
+#define realloc(b,n) ralloc(b,n)
+
+
+		/**** Misc. utilities. ****/
+
+/* Fill a memory block with the stated character. */
+//extern void fillchar(void *p, size_t n, char c);
+#define fillchar(p,n,c) memset(p,c,n)
+
+/* As fillchar, but for an unlocked ht block. */
+#define ht_fillchar(h,n,c)		{ fillchar(ht_lock(h),n,c); ht_unlock(h); }
+
+/* Converts an integer to a string, like itoa. */
+extern char *btoa(short n);
+
+/* isspace8bit will allow for negative values. */
+#define isspace8bit(c) (((c >= 0x09) && (c <= 0x0D)) || (c == 0x20))
+
+#endif
+
+

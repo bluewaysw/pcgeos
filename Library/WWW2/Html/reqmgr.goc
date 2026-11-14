@@ -1,0 +1,736 @@
+/*---------------------------------------------------------------------------
+//                
+//	Copyright (C) Geoworks 1998.  All rights reserved.
+//	GEOWORKS CONFIDENTIAL
+//
+// PROJECT:	Geos-SC WWW Library
+// MODULE:	Request manager
+// FILE:	reqmgr.cpp
+//
+// AUTHOR:	Kok Kin Kee: Jul 16, 1998
+//
+// REVISION HISTORY:
+//	Name		Date		Description
+//	----		----		-----------
+//	kkee    	7/16/98  	Initial version
+//
+// DESCRIPTION:
+//
+//	Request manager. All requests should be submitted through the 
+//      request manager.
+//      //depot/liberty/project/ellery/980805/library/www/html/reqmgr.cpp#1
+//
+//	$Id: reqmgr.goc,v 1.5 98/09/03 03:53:17 allen Exp $
+//
+//-------------------------------------------------------------------------*/
+
+/*
+#include <system.h>
+#include <kernel/msgqueue.h>    // MessageQueue
+#include <kernel/thread.h>      // Thread
+#include "reqmgr.h"
+#include "sched.h"
+#include <www/conv/html.h>
+#include <www/wwcore/wwliter.h>
+#include <jstring.h>
+#include <tstring.h>
+#include "req.h"
+
+extern "C" {
+#include <string.h>   // strlen
+#include <stdio.h>    // sprintf
+}
+
+*/
+
+@include <Ansi/stdio.h>
+@include <Ansi/stdlib.h>
+@include <Ansi/string.h>
+@include "WWW2/Conv/req.goh"
+@include "WWW2/Conv/reqmgr.goh"
+@include "WWW2/Conv/sched.goh"
+@include "WWW2/wwMacro.h"
+
+#define REQ_MGR_THREAD_STACK_SIZE 1024   /* No ui stuff, 1K is enough. */
+
+
+@classdecl ServerClass;
+@classdecl HTRequestManagerClass;
+
+#define _flexframe (pself->__flexframe)
+#define _viewer    (pself->__viewer)
+#define _proxyName (pself->__proxyName)
+#define _proxyPort (pself->__proxyPort)
+#define _loadImage (pself->__loadImage)
+#define _serverThread (pself->__serverThread)
+#define _scheduler (pself->__scheduler)
+#define _pendingRequest (pself->__pendingRequest)
+#define _stopping (pself->__stopping)
+#define _sem (pself->__sem)
+#define _numRequest (pself->__numRequest)
+#define _appHandle (pself->__appHandle)
+
+#if 0
+static void RunServerThread(MessageQueue *q);
+
+/*---------------------------------------------------------------------------
+//		RunServerThread
+//---------------------------------------------------------------------------
+// 
+// SYNOPSIS: 	Start running the server thread
+// SCOPE:	Public
+// RETURN:	Nothing
+// STRATEGY:	
+// 
+// REVISION HISTORY: 
+//	Name		Date		Description 
+//	----		----		----------- 
+//	edwin   	5/6/98  	Initial version 
+//	
+//------------------------------------------------------------------------*/
+static void RunServerThread(MessageQueue *q)
+{
+    PARAM_ASSERT(q);
+    q->Attach();
+}
+#endif
+
+/*---------------------------------------------------------------------------
+//		ServerClass, ServerSubmit
+//---------------------------------------------------------------------------
+// 
+// SYNOPSIS: 	Submit a new request. If failed to submit, remove it from
+//              the list and delete it.
+// SCOPE:	Public
+// RETURN:	Nothing
+// STRATEGY:	
+// 
+// REVISION HISTORY: 
+//	Name		Date		Description 
+//	----		----		----------- 
+//	edwin    	5/6/98  	Initial version 
+//  kkee        6/19/98     Changed to use reqManager.
+//	
+//-------------------------------------------------------------------------*/
+@method /* void */ 
+ServerClass, ServerSubmit /* (CommandScheduler *scheduler, HTRequest *req,
+                         HTRequestManager* reqMgr) */
+{
+    PARAM_ASSERT(scheduler);
+    PARAM_ASSERT(req);
+    PARAM_ASSERT(reqMgr);
+
+    /* submit new request. */
+    if (@call scheduler::Submit((Command *) req) != CS_OK) {
+        @call reqMgr::DecNumRequest();
+        optr /* RequestResponse * */ target = HTRequestGetTarget(req);
+        if (target) {
+            @call target::AcceptDone();
+        }
+	req->__meta.Destructor((Command *) req);
+	free(req);
+    } 
+}
+
+
+/*---------------------------------------------------------------------------
+//		ServerClass, ServerStop()
+//---------------------------------------------------------------------------
+// 
+// SYNOPSIS: 	Kill all pending requests.
+// SCOPE:	Public
+// RETURN:	Nothing
+// STRATEGY:	
+// 
+// REVISION HISTORY: 
+//	Name		Date		Description 
+//	----		----		----------- 
+//	kkee    	5/11/98 	Initial version 
+//	
+//-------------------------------------------------------------------------*/
+@method /* static void */
+ServerClass, ServerStop 
+    /* (CommandScheduler *scheduler, HTRequestManager *reqMgr) */
+{
+    PARAM_ASSERT(scheduler);
+    PARAM_ASSERT(reqMgr);
+    
+    @call scheduler::KillAll();
+    @call reqMgr::SetStopping(FALSE);
+    /* Run pending request if there is one. */
+    @call reqMgr::SubmitPendingRequest();
+}	/* End of ServerStop() */
+
+
+
+@method HTRequestManagerClass, HTRequestManager
+{
+    PARAM_ASSERT(appHandle);
+    PARAM_ASSERT(flexframe);
+    PARAM_ASSERT(viewer);
+
+    _appHandle = appHandle;
+/*    _appbase = appbase; */
+    _flexframe = flexframe;
+    _viewer = viewer;
+    _proxyName = 0;
+    _proxyPort = 80;
+    _loadImage = TRUE;
+    _serverThread = 0;
+    _scheduler = 0;
+    _pendingRequest = 0;
+    _stopping = FALSE;
+    _sem = ThreadAllocSem(1);;
+    _numRequest = 0;
+}
+
+/*---------------------------------------------------------------------------
+//		HTRequestManager::~HTRequestManager()
+//---------------------------------------------------------------------------
+// 
+// SYNOPSIS: 	Remove scheduler and pending request.
+// SCOPE:	
+// RETURN:	
+// STRATEGY:	
+// 
+// REVISION HISTORY: 
+//	Name		Date		Description 
+//	----		----		----------- 
+//	kkee    	6/19/98 	Initial version 
+//	
+//-------------------------------------------------------------------------*/
+@method HTRequestManagerClass, MSG_META_FINAL_OBJ_FREE /* ::~HTRequestManager() */
+{
+    @call _scheduler::MSG_META_OBJ_FREE();
+    _pendingRequest->__meta.Destructor((Command *) _pendingRequest);
+    free(_pendingRequest);
+    _scheduler = NULL;
+    _pendingRequest = NULL;
+    @send, forceQueue ConstructOptr(_serverThread,0)::MSG_META_DETACH
+	(0,(optr)0);
+    _serverThread = NULL;
+    /* Can't delete _serverThread */
+}	/* End of HTRequestManager::~HTRequestManager() */
+
+
+/*---------------------------------------------------------------------------
+//		HTRequestManager::Initialize()
+//---------------------------------------------------------------------------
+// 
+// SYNOPSIS: 	Initialize a server thread to interact with scheduler.
+// SCOPE:	Public
+// RETURN:	TRUE if ok, FALSE otherwise.
+// STRATEGY:	
+// 
+// REVISION HISTORY: 
+//	Name		Date		Description 
+//	----		----		----------- 
+//	kkee    	6/19/98 	Initial version 
+//	
+//-------------------------------------------------------------------------*/
+@method /* Boolean */
+HTRequestManagerClass, ReqMgrInitialize /* () */
+{
+    _scheduler = ObjInstantiate(HandleOf(oself), &CommandSchedulerClass);
+    if (!_scheduler || @call _scheduler::SchedInitialize(5) != CS_OK) {
+        return FALSE;
+    }
+    @call _scheduler::CommandScheduler();
+
+#if 0
+    _serverThread = new Thread();
+    MessageQueue *q = new MessageQueue();
+
+    if (!_serverThread || !q) {
+        delete q;
+        return FALSE;
+    }
+
+    _serverThread->SetMessageQueue(q);
+    if (_serverThread->Start((VoidFuncOneArg*)RunServerThread,
+                             (void *)q) == FAILURE) {
+        delete q;
+        return FALSE;
+    }   
+#endif
+
+    @call _appHandle::MSG_PROCESS_CREATE_EVENT_THREAD
+	(&_serverThread, &ServerClass, REQ_MGR_THREAD_STACK_SIZE);
+
+    if (!_serverThread) {
+        return FALSE;
+    }
+
+    return TRUE;
+}	/* End of HTRequestManager::Initialize() */
+
+
+/*---------------------------------------------------------------------------
+//		HTRequestManager::SetProxy()
+//---------------------------------------------------------------------------
+// 
+// SYNOPSIS: 	Set the proxy preference. 
+// SCOPE:	Public
+// RETURN:	Nothing
+// STRATEGY:	
+// 
+// REVISION HISTORY: 
+//	Name		Date		Description 
+//	----		----		----------- 
+//	kkee    	5/16/98 	Initial version 
+//	
+//-------------------------------------------------------------------------*/
+@method /* void */
+HTRequestManagerClass, ReqMgrSetProxy /* (const char *name, uint32 port) */
+{
+    if (_proxyName) {
+        free(_proxyName);
+        _proxyName = 0;  /* Reset */
+    }
+    if (name) { 
+        _proxyName = (char *)malloc(sizeof(char)*(strlen(name)+1));
+        if (!_proxyName) {
+            /* 
+	     * Chances of this happening is very slim, and does not
+             * matter if we fail to set proxy.
+	     */
+            return;
+        }       
+        strcpy(_proxyName, name);
+    }
+    _proxyPort = port;
+}	/* End of HTRequestManager::SetProxy() */
+
+
+@method /* void */
+HTRequestManagerClass, ReqMgrSetLoadImage /* (Boolean flag) */
+{
+    _loadImage = flag;
+}
+
+
+@method /* Boolean  */
+HTRequestManagerClass, GetLoadImage /* () const */
+{
+    return _loadImage;
+}
+
+
+@method /* HTMLViewer* */
+HTRequestManagerClass, GetViewer
+{
+    return _viewer;
+}
+
+
+/*---------------------------------------------------------------------------
+//		HTRequestManager::GetURL()
+//---------------------------------------------------------------------------
+// 
+// SYNOPSIS: 	Get a URL.
+// SCOPE:	Public
+// RETURN:	TRUE                Background processing started. 
+//          FALSE               Out of memory
+//
+// STRATEGY:	
+// 
+// REVISION HISTORY: 
+//	Name		Date		Description 
+//	----		----		----------- 
+//	kkee    	1/20/98 	Initial version 
+//	
+//-------------------------------------------------------------------------*/
+@method /* Boolean */
+HTRequestManagerClass, ReqMgrGetURL /* (const char *url,
+                      HTMLViewer::LoadMode loadMode,
+                      RequestResponse *target) */
+{       
+    if (!target) {
+        /*
+	 *  Default target to viewer, so stop all pending requests.
+         *  Stop all active and pending request. 
+	 */
+        @call self::StopAllRequests();
+    }
+
+    /* We only want status for the main request */
+    HTRequest *req = malloc(sizeof(HTRequest));
+    if (!req) {
+        return FALSE;
+    }
+    HTRequestHTRequest(req, oself /* this */, target, 
+			 (target == NULL ? _viewer : NULL));
+
+    if (HTRequestInitializeGet(req, url, _proxyName, _proxyPort, loadMode) 
+        != REQUEST_OK) {
+	req->__meta.Destructor((Command *) req);
+        free(req);
+        return FALSE;
+    }
+    
+    if (!@call self::SubmitRequest(req)) {
+	req->__meta.Destructor((Command *) req);
+        free(req);
+        return FALSE;
+    }
+
+    return TRUE;
+}	/* End of HTRequestManager::GetURL() */
+
+
+@method /* Boolean  */
+HTRequestManagerClass, GetURLNotify /* (const char *url,
+				       HTMLViewer::LoadMode loadMode,
+				       RequestResponse *target) */
+{
+    if (@call self::ReqMgrGetURL(url, loadMode, target)) {
+        @call _viewer::NewURL(url);
+        return TRUE;
+    }
+    return FALSE;
+}
+
+
+/*---------------------------------------------------------------------------
+//		HTRequestManager::PostURL()
+//---------------------------------------------------------------------------
+// 
+// SYNOPSIS: 	Post a URL.
+// SCOPE:	Public
+// RETURN:	HTMLV_OK                Background processing started. 
+//          HTMLV_OUT_OF_MEMORY
+//
+// STRATEGY:	
+// 
+// REVISION HISTORY: 
+//	Name		Date		Description 
+//	----		----		----------- 
+//	kkee    	4/21/98 	Initial version 
+//	
+//-------------------------------------------------------------------------*/
+@method /* Boolean */
+HTRequestManagerClass, ReqMgrPostURL /* (const char *url,
+                    const uint8 *buffer,
+                    const uint32 len,
+                    Boolean file) */
+{
+    PARAM_ASSERT(url);
+    PARAM_ASSERT(buffer);
+    PARAM_ASSERT(len>0);
+    PARAM_ASSERT(file==FALSE);
+
+    /* Stop all active and pending request. */
+    @call self::StopAllRequests();
+
+    HTRequest *req = malloc(sizeof(HTRequest));
+
+    if (!req) {
+        return FALSE;
+    }
+
+    HTRequestHTRequest(req, oself /* this */, NULL, _viewer);
+    
+    if (HTRequestInitializePost(req, url, buffer, len, file,
+        _proxyName, _proxyPort) != REQUEST_OK) {
+	req->__meta.Destructor((Command *) req);
+        free(req);
+        return FALSE;
+
+    }
+
+    if (!@call self::SubmitRequest(req)) {
+	req->__meta.Destructor((Command *) req);
+        free(req);
+        return FALSE;
+    }
+
+    return TRUE;
+}	/* End of HTRequestManager::PostURL() */
+
+
+
+/*---------------------------------------------------------------------------
+//		HTRequestManager::SubmitRequest()
+//---------------------------------------------------------------------------
+// 
+// SYNOPSIS: 	Submit a request
+// SCOPE:	Private
+// RETURN:	TRUE if submitted, FALSE if out of memory.
+// STRATEGY:	
+// 
+// REVISION HISTORY: 
+//	Name		Date		Description 
+//	----		----		----------- 
+//	kkee    	6/19/98 	Initial version 
+//	
+//-------------------------------------------------------------------------*/
+@method /* Boolean */
+HTRequestManagerClass, SubmitRequest /* (HTRequest *req) */
+{
+    PARAM_ASSERT(req);
+
+    ThreadPSem(_sem);
+    
+    if (_stopping) {
+        if (_pendingRequest) {
+	    _pendingRequest->__meta.Destructor((Command *) _pendingRequest);
+            free(_pendingRequest);
+            _pendingRequest = NULL;
+        }
+        /* Only allow main request to be pending while stopping. */
+        if (!HTRequestGetTarget(req)) {
+            _pendingRequest = req;
+        } else {
+	    _pendingRequest->__meta.Destructor((Command *) _pendingRequest);
+            free(_pendingRequest);
+        }
+        ThreadVSem(_sem);
+        return TRUE;
+    }
+
+    _numRequest++;
+
+    Boolean ret = TRUE;
+#if 0
+    if ((_serverThread->GetMessageQueue())->QueuedFunctionCall
+            ((QueuedFunction)ServerSubmit, 
+	         (MessageArg)_scheduler, 
+	         (MessageArg)req,
+             (MessageArg)this) == FAILURE) {
+
+        ASSERT(_numRequest>0);
+        _numRequest--;
+        ret = FALSE;
+    } 
+#endif
+
+    @send, forceQueue ConstructOptr(_serverThread,0)::ServerSubmit(_scheduler,req,oself);
+
+    ThreadVSem(_sem);
+
+    return ret;
+}	/* End of HTRequestManager::SubmitRequest() */
+
+
+/*---------------------------------------------------------------------------
+//		HTRequestManager::SubmitPendingRequest()
+//---------------------------------------------------------------------------
+// 
+// SYNOPSIS: 	Submit pending request if there is one.
+// SCOPE:	Public
+// RETURN:	Nothing
+// STRATEGY:	
+// 
+// REVISION HISTORY: 
+//	Name		Date		Description 
+//	----		----		----------- 
+//	kkee    	7/16/98 	Initial version 
+//	
+//-------------------------------------------------------------------------*/
+@method /* void */
+HTRequestManagerClass, SubmitPendingRequest /* () */
+{
+    ThreadPSem(_sem);
+    HTRequest *req = _pendingRequest;
+    _pendingRequest = NULL;
+    ThreadVSem(_sem);
+    
+    if (req) {
+        /* Only main request should be pending, if any. */
+        ASSERT(HTRequestGetTarget(req) == NULL);
+        if (!@call self::SubmitRequest(req)) {
+	    req->__meta.Destructor((Command *) req);
+	    free(req);
+        }
+    }
+}	/* End of HTRequestManager::SubmitPendingRequest() */
+
+
+/*---------------------------------------------------------------------------
+//		HTRequestManager::StopAllRequests()
+//---------------------------------------------------------------------------
+// 
+// SYNOPSIS: 	Stop all submitted requests.
+// SCOPE:	Public
+// RETURN:	Nothing
+// STRATEGY:	
+// 
+// REVISION HISTORY: 
+//	Name		Date		Description 
+//	----		----		----------- 
+//	kkee    	6/19/98 	Initial version 
+//	
+//-------------------------------------------------------------------------*/
+@method /* void */
+HTRequestManagerClass, StopAllRequests /* () */
+{
+    @call self::SetStopping(TRUE);
+
+#if 0
+    if ((_serverThread->GetMessageQueue())->QueuedFunctionCall
+        ((QueuedFunction)ServerStop,
+         (MessageArg) _scheduler,
+         (MessageArg) this) == FAILURE) {
+
+        SetStopping(FALSE);
+    }
+#endif
+
+    @send, forceQueue ConstructOptr(_serverThread,0)::ServerStop(_scheduler,oself);
+
+}	/* End of HTRequestManager::StopAllRequests() */
+
+
+/*---------------------------------------------------------------------------
+//		HTRequestManager::AcceptStream()
+//---------------------------------------------------------------------------
+// 
+// SYNOPSIS: 	
+// SCOPE:	
+// RETURN:	
+// STRATEGY:	
+// 
+// REVISION HISTORY: 
+//	Name		Date		Description 
+//	----		----		----------- 
+//	kkee    	7/21/98 	Initial version 
+//	
+//-------------------------------------------------------------------------*/
+@method /* void */
+HTRequestManagerClass, ReqMgrAcceptStream /* (WWStream *stream, HTRequest *request) */
+{
+    optr /* RequestResponse * */ target = HTRequestGetTarget(request);
+    if (!target) {
+	/*
+	 * Set this thread to be of a high priority so we
+	 * process html data first before images and other 
+	 * objects.
+	 */
+#if 0
+        uint8 oldPriority = 
+            Thread::GetCurrentThread()->SetBasePriority(HIGH_PRIORITY);
+#endif
+	ThreadModify(0, PRIORITY_HIGH, TMF_BASE_PRIO);
+
+        @call _viewer::ViewerAcceptStream(stream, request);
+
+#if 0
+        Thread::GetCurrentThread()->SetBasePriority(oldPriority);
+#endif
+	ThreadModify(0, PRIORITY_STANDARD, TMF_BASE_PRIO);
+
+    } else {
+        @call target::AcceptStream(stream);
+    }
+}	/* End of HTRequestManager::AcceptStream() */
+
+
+/*---------------------------------------------------------------------------
+//		HTRequestManager::AcceptError()
+//---------------------------------------------------------------------------
+// 
+// SYNOPSIS: 	
+// SCOPE:	
+// RETURN:	
+// STRATEGY:	
+// 
+// REVISION HISTORY: 
+//	Name		Date		Description 
+//	----		----		----------- 
+//	kkee    	7/21/98 	Initial version 
+//	
+//-------------------------------------------------------------------------*/
+@method /* void */
+HTRequestManagerClass, ReqMgrAcceptError /* (HTRequest * request, WWStatus::StatusInfo msg) */
+{
+    /* Only report errors for the main request. */
+    if (!HTRequestGetTarget(request)) {
+        @call _viewer::Report(msg);
+    }
+}	/* End of HTRequestManager::AcceptError() */
+
+
+/*---------------------------------------------------------------------------
+//		HTRequestManager::AcceptDone()
+//---------------------------------------------------------------------------
+// 
+// SYNOPSIS: 	
+// SCOPE:	
+// RETURN:	
+// STRATEGY:	
+// 
+// REVISION HISTORY: 
+//	Name		Date		Description 
+//	----		----		----------- 
+//	kkee    	7/21/98 	Initial version 
+//	
+//-------------------------------------------------------------------------*/
+@method /* void */
+HTRequestManagerClass, ReqMgrAcceptDone /* (HTRequest *request) */
+{
+    optr /* RequestResponse * */ target = HTRequestGetTarget(request);
+    if (!target) {
+        @call _viewer::ViewerAcceptDone(request);
+    } else {
+        @call target::AcceptDone();
+    }
+    @call self::DecNumRequest();
+
+    /* Report number of requests remaining */
+    ThreadPSem(_sem);
+    if (_numRequest) {
+        char num[10];
+        sprintf(num, "%d", _numRequest);
+        static TCHAR msg[32];
+        Jstrcpy(msg, num);
+        Tstrcat(msg, _TEXT(" items remaining"));
+        @call _viewer::ReportTCHAR(msg);
+    }
+    ThreadVSem(_sem);
+}	/* End of HTRequestManager::AcceptDone() */
+
+
+@method /* void */
+HTRequestManagerClass, SetStopping /* (Boolean flag) */
+{
+    ThreadPSem(_sem);
+    _stopping = flag;
+    ThreadVSem(_sem);
+}
+
+@method /* Boolean  */
+HTRequestManagerClass, IsStopping /* () */
+{
+    ThreadPSem(_sem);
+    Boolean ret = _stopping;
+    ThreadVSem(_sem);
+    return ret;
+}
+
+@method /* void */
+HTRequestManagerClass, IncNumRequest /* () */
+{
+    ThreadPSem(_sem);
+    _numRequest++;
+    ThreadVSem(_sem);
+}
+
+@method /* void */
+HTRequestManagerClass, DecNumRequest /* () */
+{
+    ThreadPSem(_sem);
+    ASSERT(_numRequest>0);
+    _numRequest--;
+    ThreadVSem(_sem);
+    if (!_numRequest) {
+        @call _viewer::Report(WWSTATUS_DONE);
+    }
+}
+
+@method /* word */
+HTRequestManagerClass, GetNumRequest /* () */
+{
+    return _numRequest;
+}
+
+

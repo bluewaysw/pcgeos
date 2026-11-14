@@ -1,0 +1,246 @@
+/*---------------------------------------------------------------------------
+//
+//  Geoworks (R) application software and GEOS (R) operating system
+//  software copyright (C) 1990-1997 Geoworks.  All rights reserved.
+//  United States Patents 5327529, 5237651, and 5438662. U.K. Patents
+//  0375703 and 0631677.  German Patents P3854269.2-08 and
+//  69307728.1-08.  French Patents 0375703 and 0631677.  Other
+//  international patents pending.
+//
+//  This software is the confidential and proprietary information of
+//  Geoworks ("Confidential Information").  You shall not disclose
+//  such Confidential Information and shall use it only in accordance
+//  with the terms of the license agreement you entered into with
+//  Geoworks.
+//
+// FILE:        sched.h
+//
+// DESCRIPTION: Scheduler for running commands.
+//    //depot/liberty/project/ellery/980805/library/www/sched/sched.h#1
+//
+//      $Id: sched.goh,v 1.3 98/09/03 04:08:53 allen Exp $
+//
+//-------------------------------------------------------------------------*/
+
+@ifndef _HTML_SCHED_H_
+@define _HTML_SCHED_H_
+
+@include <WWW2/WW2Core/ww2list.goh>
+@include <WWW2/WW2Core/ww2liter.goh>
+#include <WWW2/WW2Core/cmd.h>
+@include <WWW2/cmds.goh>
+
+/*
+class Semaphore;          // #include <kernel/sema4.h>
+class Thread;             // #include <kernel/thread.h>
+class SchedulerCommand;   // #include "cmds.h"
+
+*/
+
+@include <stdapp.goh>
+
+    /*////////
+    //
+    // Command scheduler return codes.
+    //
+    // [] CS_OK
+    // [] CS_OUT_OF_MEMORY
+    */
+typedef enum {
+    CS_OK,
+    CS_OUT_OF_MEMORY
+} CmdSchedResultCode ;
+
+
+
+/***************************************************************************
+CLASS
+    CommandScheduler
+
+KEYWORDS
+    
+
+CLASS TREE
+<pre>
+    CommandScheduler
+</pre>
+****************************************************************************/
+@class CommandSchedulerClass, MetaClass;
+
+/* public: */
+
+    @message void CommandScheduler();
+
+    /*
+
+    ~CommandScheduler();
+
+     */
+    
+    /*////////
+    //
+    // Allocate threads and initialize internal stuff.
+    //
+    // Parameters_
+    //
+    // [out] 
+    // [in]  numThreads      Number of threads to service commands.
+    //                       Minimum 1.
+    //
+    // Return_value_ CS_OK
+    //               CS_OUT_OF_MEMORY
+    //
+    // See_also_ 
+    //
+    // Overrides_
+    //
+    // Status_ Functional
+    */
+    @message CmdSchedResultCode SchedInitialize(byte numThreads /* = 3 */);
+    
+    /*////////
+    //
+    // Submit a cmd. This is a nonblocking call. The cmd will be
+    // deleted by the scheduler after is has finished executing.
+    //
+    // Parameters_
+    //
+    // [out] 
+    // [in]  cmd      Command to submit
+    //
+    // Return_value_ 
+    //
+    // See_also_ 
+    //
+    // Overrides_
+    //
+    // Status_ Functional
+    */
+    @message CmdSchedResultCode Submit(Command *cmd);
+
+    /*////////
+    //
+    // Stop and kill all submitted commands.
+    //
+    // Parameters_
+    //
+    // Return_value_ 
+    //
+    // See_also_ 
+    //
+    // Overrides_
+    //
+    // Status_ Functional
+    */
+    @message void KillAll();
+    
+/*===========================================================================
+//
+//                       W A R N I N G 
+// 
+// THE LIBERTY EXTERNAL API IS FOUND ABOVE THIS BARRIER. ANYTHING BELOW
+// THIS NOTICE IS IMPLEMENTATION DEPENDENT AND SUBJECT TO CHANGE.
+//
+//
+//=========================================================================*/
+/* private: */
+    /*
+    // Don't let users call copy the object in any way.  These methods
+    // aren't actually defined since they should never be called, but
+    // declaring them private should catch anyone who tries to call
+    // them.
+    */
+/*
+    CommandScheduler(const CommandScheduler&);
+    const CommandScheduler& operator=(const CommandScheduler&);
+
+    friend class SchedulerCommand;
+*/    
+    /*
+    // Restore scheduler state to that when it was first created.
+    //
+    // Parameters_
+    //
+    // Return_value_ 
+    //
+    // See_also_ 
+    //
+    // Overrides_
+    //
+    // Status_ Functional
+    */
+    @message void SchedCleanup();
+
+    /*
+    // Kill all active threads. Active threads are those that have 
+    // successfully executed Thread::Run() method which must not be
+    // deleted directly. All other threads must be deleted manually.
+    //
+    // Parameters_
+    //
+    // Return_value_ 
+    //
+    // See_also_ 
+    //
+    // Overrides_
+    //
+    // Status_ Functional
+    */
+    @message void KillThreads();
+
+    /*
+    // Init instance data when object is first created.
+    //
+    // Parameters_
+    //
+    // Return_value_ 
+    //
+    // See_also_ 
+    //
+    // Overrides_
+    //
+    // Status_ Functional
+    */
+    @message void Init();
+
+    /*
+    // Run the scheduler. This method is executed by multiple
+    // scheduler threads to service commands simultaneously.
+    //
+    // Parameters_
+    //
+    // Return_value_ 
+    //
+    // See_also_ 
+    //
+    // Overrides_
+    //
+    // Status_ Functional
+    */
+    @message void Run();
+
+    @instance SchedulerCommand *__cmd; /* For Thread::Start() to  */
+                                            /* callback which executes Run(). */
+
+    @instance optr /* WWList */ __queue;  /* FIFO list of CommandElement */
+                                          /* waiting to be serviced by _thread. */
+    @instance optr /* WWList */ __active; /* FIFO list of CommandElement */
+                                          /* being serviced by _thread. */
+    @instance SemaphoreHandle /* Semaphore * */ __mutex; /* Exclusive access to _queue & _servicing. */
+    @instance SemaphoreHandle /* Semaphore * */ __count; /* Count CommandElements in _queue. */
+    @instance optr /* WWListIterator */ __iterator;      /* Iterates _active */
+
+    @instance byte __numThreads;
+@if 0	// not used
+    @instance void * /* Thread ** */   __thread;  /* Array of thread pointers */
+@endif
+    @instance Boolean                  __aborted; /* Telling threads to exit, else */
+                                                  /* they will loop or block forever. */
+    @instance SemaphoreHandle /* Semaphore * */ __exited; /* Wait for threads to exit */
+    @instance Boolean                  __killing;
+    @instance SemaphoreHandle /* Semaphore * */ __waitTillNoActive;
+
+@endc;
+
+
+@endif // _HTML_SCHED_H_

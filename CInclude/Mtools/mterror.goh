@@ -1,0 +1,191 @@
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Geoworks 1997.  All rights reserved.
+	GEOWORKS CONFIDENTIAL
+
+PROJECT:	
+MODULE:		
+FILE:		mterror.goh
+
+AUTHOR:		Kok Kin Kee, Mar 12, 1997
+
+ROUTINES:
+	Name			Description
+	----			-----------
+
+REVISION HISTORY:
+	Name		Date		Description
+	----		----		-----------
+	kkee    	3/12/97   	Initial version.
+
+DESCRIPTION:
+
+	
+
+	$Id: mterror.goh,v 1.1 97/04/04 15:56:14 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+/***********************************************************************
+ *
+ *      Copyright (c) STNC Enterprises Ltd. 1996 -- All Rights Reserved
+ *
+ * PROJECT:   Tungsten
+ * MODULE:    Error codes.
+ * FILE:      mtools.goh
+ *
+ * AUTHOR:  Bill Godfrey, <bgodfrey@stnc.com>
+ *
+ ***********************************************************************/
+
+#ifndef INCLUDED_MTERROR_GOH
+#define INCLUDED_MTERROR_GOH
+
+			/***** Socket layer errors. *****/
+
+#include <geos.h>
+@include <socket.goh>
+
+			/***** Ifile layer errors. *****/
+
+typedef enum {
+	/* Socket Errors. */
+	IFILE_OKAY = SE_NORMAL,
+	IFILE_CANNOT_RESOLVE = 101,
+	IFILE_CANNOT_CREATE_SOCKET = 102,
+	IFILE_CRLF_PROBLEM = 103				/* CRLF was not where it should have been. */
+} IfileError;
+
+			/***** SMTP layer errors. *****/
+
+typedef enum {
+	SMTP_OKAY = IFILE_OKAY,				/* No Error. */
+	SMTP_TIMED_OUT = SE_TIMED_OUT,	/* Time out, come back later. */
+	SMTP_NO_HANDSHAKE = 151,   		/* Could not Handshake. */
+	SMTP_SERVER_CLOSED = 152,			/* Server temporarily down. Response 421. */
+	SMTP_NOT_A_SERVER = SE_CONNECTION_REFUSED, 	/* Server refuses connection or responds with 521. (RFC 1846) */
+	SMTP_UNKNOWN_RESPONSE = 154,   	/* Protocol error. Response not recognised. */
+	SMTP_FILE_ERROR = 155       		/* File system error. */
+} SmtpError;	/* other error codes from ifile and socket lib. */
+
+			/***** POP3 layer errors. *****/
+
+typedef enum {
+	P3_OKAY = SE_NORMAL, 			/* No error. */
+	P3_TIMED_OUT = SE_TIMED_OUT, 	/* Response delay. */
+	P3_LOGIN_FAILED = 201,			/* Login failure. */
+	P3_SERVER_CLOSED = SMTP_SERVER_CLOSED,	/* Opening line reports -ERR. */
+	P3_SERVER_INACTIVE = P3_SERVER_CLOSED,	/* Ditto */
+	P3_FILE_ERROR = SMTP_FILE_ERROR			/* Generic file error. */
+} P3Error;
+
+			/***** IMAP4 layer errors. *****/
+
+typedef enum {
+	I4_FILE_ERROR=SMTP_FILE_ERROR,		/* Generic file error. */
+	I4_LOGIN_FAILED=P3_LOGIN_FAILED,		/* Login error. */
+	I4_SERVER_INACTIVE=SMTP_SERVER_CLOSED, /* Server resports inactivity (BYE/NO). */
+	I4_OKAY = SE_NORMAL  	/* All is well. */
+} I4Error;
+
+			/***** Message library errors. *****/
+
+typedef enum {
+	ME_OKAY =0,										/* No error */
+	ME_OUT_OF_MEMORY=SE_OUT_OF_MEMORY,		/* Out of memory. */
+	ME_END_OF_LIST=211,		/* End of list item. */
+	ME_START_OF_LIST=212,    /* Returned by UnlockPrev */
+	ME_FILE_ERROR=SMTP_FILE_ERROR,			/* File system error. */
+	ME_DISK_FULL=218,			/* Out of space. */
+	ME_NO_BODY=214,				/* Cannot find message body. */
+	ME_ARG_NOT_FOUND=215,    /* Mime Arg not found. */
+	ME_NO_HEADER=216,			/* Specified header not loaded. */
+	ME_DONT_APPEND=217,		/* Returned by Mime_CheckAttachRef to signal not to call Message_AppendLine. */
+
+	/* Obsolete error codes. */
+
+	ENOMEM = ME_OUT_OF_MEMORY,
+	EBAD_ARG = ME_ARG_NOT_FOUND,
+	MESSAGE_ERROR_NO_MESSAGE = ME_NO_HEADER
+} Message_Error;
+
+			/***** Attach library error codes and data. *****/
+
+#define CODEC_IDLE 0
+#define CODEC_BUSY 1001
+#define CODEC_FINISHED 1002
+#define CODEC_UNKNOWN (-1)
+#define CODEC_FILE_ERROR 		SMTP_FILE_ERROR
+#define CODEC_MALLOC_ERROR 	SE_OUT_OF_MEMORY
+#define CODEC_DISK_FULL_ERROR ME_DISK_FULL
+#define CODEC_ERROR 1255
+#define UUDECODE 1010
+#define UUENCODE 1011
+#define B64DECODE 1020
+#define B64ENCODE 1021
+#define QPDECODE 1030
+#define QPENCODE 1031
+
+#define CODEC_ERR(x) ((x == CODEC_ERROR) || (x == CODEC_FILE_ERROR) || (x == CODEC_MALLOC_ERROR) || (x == CODEC_UNKNOWN) || (x == CODEC_DISK_FULL_ERROR))
+
+			/***** Out/In bound layer errors. *****/
+
+/*     Note that the Mailin/Mailout functions may also return any of      *
+***    the above error codes as well.                                    ***
+ *                                                                        */
+
+#define ERR_OKAY (0)						/* No Error */
+#define ERR_LOGIN_FAILED (P3_LOGIN_FAILED)			/* Authentication failure */
+#define ERR_INVALID_MAILBOX (-2)		/* Mailbox not available */
+#define ERR_END_OF_LIST (-3)			/* End of list reached. */
+#define ERR_OUT_OF_RANGE (-4)			/* Invalid message id */
+#define ERR_MESSAGE_TOO_LARGE (-5)		/* Message too large for server */
+#define ERR_ALL_BAD_RECIPIENTS (-6)		/* All recipients failed */
+#define ERR_SOME_BAD_RECIPIENTS (-7)	/* Some bad recipients */
+#define ERR_UNKONWN_UID (-8)				/* UID cannot be resolved. */
+#define ERR_UNKNOWN_RESPONSE (SMTP_UNKNOWN_RESPONSE)	/* Unknown response. */
+#define ERR_NO_RECIPIENTS (-9)			/* No To:, Cc: or Bcc: lines. */
+#define ERR_NO_SENDER (-10)				/* No From: line. */
+#define ERR_NOT_IMPLEMENTED (-11)		/* Requested command is not implemented on this server. */
+
+	/* Socket errors. */
+#define ERR_HOST_NOT_RESOLVED (IFILE_CANNOT_RESOLVE)		/* Mail host DNS record not found. */
+#define ERR_HOST_NOT_ACTIVE (SE_CONNECTION_REFUSED)		/* Host not accepting connections. */
+#define ERR_DELAYED_RESPONSE (SE_TIMED_OUT)     /* Response delay. */
+#define ERR_NETWORK_ERROR (-54)			/* Generic Socket error. Obsolete. */
+#define ERR_SERVER_CLOSED (SMTP_SERVER_CLOSED)			/* Server reporting inactivity */
+
+	/* Internal error codes. */
+#define ERR_NOT_OPEN (-101)			/* INBOX/OUTBOX not opened */
+#define ERR_INVALID_PROTOCOL (-102)		/* Protocol code not valid */
+#define ERR_OUT_OF_MEMORY (SE_OUT_OF_MEMORY)		/* Out of memory */
+#define ERR_FILE_NOT_OPEN (-104)		/* Message file not opened */
+#define ERR_FILE_ERROR (SMTP_FILE_ERROR)			/* Generic message file error */
+#define ERR_IN_MULTIPART (-106)		/* Interrupting a multi-part operation. */
+#define ERR_DISK_FULL (ME_DISK_FULL)				/* Disk full */
+
+			/***** Other useful bits of data. *****/
+
+/* Protocol identifiers */
+#define INB_PROTOCOL_POP3 (103)		/* Use POP3 */
+#define INB_PROTOCOL_IMAP4 (114)		/* Use IMAP4 */
+#define OUTB_PROTOCOL_SMTP (201)		/* Use SMTP only */
+#define OUTB_PROTOCOL_ESMTP (202)		/* Attempt to use ESMTP */
+
+	/* Flags */
+#define FLAG_ALL_MSGS (0xFF)			/* Count all messages. */
+#define FLAG_ANSWERED (0x01)			/* Message has been replied to. */
+#define FLAG_FLAGGED (0x02)			/* Flagged for some reason. */
+#define FLAG_DELETED (0x04)			/* About to be deleted. */
+#define FLAG_SEEN (0x08)			/* Seen by client. Not new. */
+#define FLAG_DRAFT (0x10)			/* Draft message. */
+
+			/**** Useful macros. *****/
+
+/* Don't close a socket and free memory for these errors. */
+
+#define NON_FATAL(e) ((e==0)||(e==SE_TIMED_OUT)||((e >= 211)&&(e<=217))||((e>=-11)&&(e<=-2)))
+#define FATAL(e) (!(NON_FATAL(e)))
+
+
+#endif
+

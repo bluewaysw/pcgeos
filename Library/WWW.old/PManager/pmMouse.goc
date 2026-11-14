@@ -1,0 +1,514 @@
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Geoworks 1996 -- All Rights Reserved
+
+PROJECT:	Penelope
+MODULE:		Mouse module for Presentation Manager (PManager)
+FILE:		pmMouse.goc
+
+AUTHOR:		Edwin Yu, July 22, 1996
+
+ROUTINES:
+	Name			Description
+	----			-----------
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	EY	7/22/96   	Initial version.
+
+DESCRIPTION:
+	This files handle mouse events on the ui tree.
+
+	$Id: pmMouse.goc,v 1.1 97/04/07 11:49:23 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+@include <stdapp.goh>
+@include <WWW/pmanager.goh>
+@include <WWW/uigenera.goh>
+
+sword xPos = 0;		/* X mouse coordinate of starting click */
+sword yPos = 0;		/* Y mouse coordinate of starting click */
+optr startObj = NULL;	/* the object which is initially clicked on */
+optr endObj = NULL;	/* the object on which the mouse is released */
+
+optr FindUIObjectUnderMouse(optr parent, int xPos, int yPos);
+void PManagerSelectionBroadcast(optr object, sword x, sword y);
+void PMBroadcastObjectSelection(optr object, sword x, sword y);
+Boolean IsInSelectionRange(Rectangle bound, sword x, sword y);
+void PManagerCopyBroadcast (optr textObj, optr object);
+
+
+
+/***********************************************************************
+ *		MSG_META_START_SELECT for HTMLContentClass
+ ***********************************************************************
+ * SYNOPSIS:	    Record info at the initial mouse selection point.
+ * PARAMETERS:	    void MSG_UI_BUTTON(MouseReturnParams *retVal,
+ *			      sword xPosition, sword yPosition,
+ *			      word inputState)
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	EY	7/17/96   	Initial Revision
+ *
+ ***********************************************************************/
+@extern method HTMLContentClass, MSG_META_START_SELECT
+{
+  optr child = NULL;
+
+  @callsuper();
+
+  /*
+   * Is there any ui object being clicked on?
+   */
+  child = FindUIObjectUnderMouse(oself, xPosition, yPosition);
+  if (child && child != oself) {
+    /* 
+     * Yes, one ui object is found under the mouse click.
+     * Record the starting click position and the object.
+     */
+    xPos = xPosition;
+    yPos = yPosition;
+    if (endObj)
+
+    startObj = endObj = child;	/* the starting object is also the  */
+				/* current ending object */
+  }
+  else {
+    /*
+     * No object is found under the mouse.
+     */
+    xPos = yPos = 0;
+    startObj = endObj = NULL;
+  }
+
+  return;
+}	/* End of MSG_META_START_SELECT.	*/
+
+
+/***********************************************************************
+ *		MSG_META_END_SELECT for HTMLContentClass
+ ***********************************************************************
+ * SYNOPSIS:	    Record info at the ending mouse selection point.
+ * PARAMETERS:	    void MSG_UI_BUTTON(MouseReturnParams *retVal,
+ *			      sword xPosition, sword yPosition,
+ *			      word inputState)
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	EY	7/22/96   	Initial Revision
+ *
+ ***********************************************************************/
+@extern method HTMLContentClass, MSG_META_END_SELECT
+{
+  optr child = NULL;
+
+  @callsuper();
+
+  /*
+   * Is there any ui object being clicked on?
+   */
+  child = FindUIObjectUnderMouse(oself, xPosition, yPosition);
+  if (child && child != oself)
+    endObj = child;  /* Yes. Record the ending object of the selection */
+
+  return;
+}
+
+
+/***********************************************************************
+ *		MSG_META_MOUSE_PTR for HTMLContentClass
+ ***********************************************************************
+ * SYNOPSIS:	    Update the selection range of the ui objects
+ * PARAMETERS:	    (word xPosition, word yPosition, word inputState)
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	EY	7/21/96   	Initial Revision
+ *
+ ***********************************************************************/
+@extern method HTMLContentClass, MSG_META_MOUSE_PTR
+{
+  optr uiObj = NULL;
+  MouseReturnParams retVal;
+  Rectangle bound;
+  sword tmpX, tmpY;
+
+  @callsuper();
+
+  /*
+   * If the selection mouse click is not pressed, return.
+   */
+  if (!(GET_BUTTON_INFO(inputState) & BI_PRESS))
+    return;
+
+  uiObj = FindUIObjectUnderMouse(oself, xPosition, yPosition);
+  if (uiObj && oself != uiObj && uiObj != endObj) {
+    /*
+     * The mouse has moved to a new object.
+     */
+    @call endObj::MSG_VIS_GET_BOUNDS(&bound);
+    if (IsInSelectionRange(bound, xPosition, yPosition) == TRUE)
+	@call endObj::MSG_META_END_SELECT
+		(&retVal, xPosition, yPosition, inputState);
+    endObj = uiObj;
+    if (uiObj == startObj) {
+	/*
+	 * This new object is the one the mouse initially clicked
+	 * on, so restore the initial starting position.
+	 */
+	tmpX = xPos;	/* (xPos, yPos) is the position at */
+	tmpY = yPos;	/* which mouse initiall pressed.   */
+    }
+    else {
+	/*
+	 * This new object is first time the mouse come across.
+	 * Figure the correct starting selection position for this new
+	 * object.
+	 */
+	@call uiObj::MSG_VIS_GET_BOUNDS(&bound);
+	if (yPosition <= yPos && xPosition < bound.R_right) {
+		/*
+		 * The starting selection position is the right edge
+		 * of this new object.
+		 */
+		tmpX = bound.R_right;
+		tmpY = bound.R_bottom;
+	}
+	else { 	/* (yPosition > yPos) */
+		/*
+		 * The starting selection position is the left edge
+		 * of this new object.
+		 */
+		tmpX = bound.R_left;
+		tmpY = bound.R_top;
+	}
+    }
+    @call uiObj::MSG_META_START_SELECT(&retVal, tmpX, tmpY, inputState);
+
+    if (retVal.flags == MRF_PROCESSED) {
+	/*
+	 * Draw the selection on the new object.
+	 */
+	@call self::MSG_META_DRAG_SELECT
+		(&retVal, xPosition, yPosition, inputState);
+	@call self::MSG_META_MOUSE_PTR(xPosition, yPosition, inputState);
+    }
+  }
+  else if (!uiObj || uiObj == oself)	/* no object is under the mouse */
+    endObj = NULL;
+  /*
+   * Broadcast the selection range down the ui tree.  Ui objects in the
+   * selection range will be selected(hilited).
+   */
+  PManagerSelectionBroadcast(oself, xPosition, yPosition);
+  return;
+}
+
+
+/***********************************************************************
+ *		FindUIObjectUnderMouse
+ ***********************************************************************
+ * SYNOPSIS:	Find the ui object (at the leaf level of the ui tree)
+ *		under the passed mouse position.
+ * CALLED BY:	(optr parent, int xPos, int yPos)
+ *		parent - the object under which the children will be
+ *			 checked.
+ *		(xPos, yPos) - mouse position.
+ * RETURN:	optr - object under the mouse if found.
+ *			If no object found, NULL is returned.
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	EY	7/19/96   	Initial Revision
+ *
+ ***********************************************************************/
+optr
+FindUIObjectUnderMouse (optr parent, int xPos, int yPos)
+{
+  int i;
+  optr child;
+  Rectangle bound;
+  /*
+   * Get the first child.
+   */
+  child = @call parent::MSG_GEN_FIND_CHILD_AT_POSITION(0);
+  /*
+   * base case
+   */
+  if (child == NULL)
+	return parent;
+  /*
+   * Loop through the child list to find ui under the mouse point.
+   */
+  for (i=0; child != NULL;
+       i++, child = @call parent::MSG_GEN_FIND_CHILD_AT_POSITION(i)) {
+    @call child::MSG_VIS_GET_BOUNDS(&bound);
+    if (bound.R_left < xPos && bound.R_right > xPos &&
+	bound.R_top < yPos  && bound.R_bottom > yPos) {
+	return FindUIObjectUnderMouse(child, xPos, yPos);
+    }
+  }
+  if (child == NULL)
+	return NULL;
+}	/* End of FindUIObjectUnderMouse.	*/
+
+
+/***********************************************************************
+ *		PManagerSelectionBroadcast
+ ***********************************************************************
+ * SYNOPSIS:	Broadcast the mouse selection range down the ui tree
+ *		and decide whether ui object (at leaf level) should be
+ *		fully selected or fully not selected.
+ * CALLED BY:	
+ * RETURN:	void.
+ * SIDE EFFECTS:
+ *		Ui object that is either initially clicked on or
+ *		currently under the mouse position is not affected.
+ * STRATEGY:
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	EY	7/24/96   	Initial Revision
+ *
+ ***********************************************************************/
+void
+PManagerSelectionBroadcast (optr object, sword x, sword y)
+{
+  int i;
+  optr child;
+
+  if (object == NULL)
+    return;
+  /*
+   * Get the first child.
+   */
+  child = @call object::MSG_GEN_FIND_CHILD_AT_POSITION(0);
+  if (child == NULL) {
+    /*
+     * Tell the object to change its selection.
+     */
+    PMBroadcastObjectSelection(object, x, y);
+  }
+  else {
+    /*
+     * Loop through the child list to find ui under the mouse point.
+     * 
+     * HERE IS WHERE OPTIMIZATION SHOULD BE DONE TO MINIMIZE THE LOOP!!!
+     */
+    for (i=0; child != NULL;
+       i++, (child = @call object::MSG_GEN_FIND_CHILD_AT_POSITION(i))) {
+      PManagerSelectionBroadcast(child, x, y);
+    }
+  }
+  return;
+}	/* End of PManagerSelectionBroadcast.	*/
+
+
+/***********************************************************************
+ *		PMBroadcastObjectSelection
+ ***********************************************************************
+ * SYNOPSIS:	Tell the object to change its hilite.
+ * CALLED BY:	PManagerSelectionBroadcast
+ * RETURN:	void (object, x, y)
+ *			(x,y) is the current mouse position.
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:	If the object is in the selection range, hilite itself.
+ *		If the object is outside the selection ragne, unlite
+ *		itself.
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	EY	7/25/96   	Initial Revision
+ *
+ ***********************************************************************/
+void
+PMBroadcastObjectSelection (optr object, sword x, sword y)
+{
+  Rectangle bound;
+
+  @call object::MSG_VIS_GET_BOUNDS(&bound);
+  /*
+   * Assume the selecting downward.
+   */
+  if (object != endObj && yPos < bound.R_top && 
+      (y > bound.R_bottom || (x > bound.R_right && y >= bound.R_top))) {
+    /*
+     * the object is completely inside the the selection range.
+     */
+    @call object::MSG_META_ADD_VAR_DATA(TEMP_VIS_TEXT_SYS_TARGET, 0, NULL);
+    @call object::MSG_META_UIG_SELECT_ALL();
+    @call object::MSG_META_DELETE_VAR_DATA(TEMP_VIS_TEXT_SYS_TARGET);
+  }
+  else if (object != startObj && object != endObj) {
+    /*
+     * the object is completely outside the the selection range.
+     */
+    @call object::MSG_META_ADD_VAR_DATA(TEMP_VIS_TEXT_SYS_TARGET, 0, NULL);
+    @call object::MSG_META_UIG_SELECT_NONE();
+    @call object::MSG_META_DELETE_VAR_DATA(TEMP_VIS_TEXT_SYS_TARGET);
+  }
+  return;
+}	/* End of PMBroadcastObjectSelection.	*/
+
+
+
+
+/***********************************************************************
+ *		IsInSelectionRange
+ ***********************************************************************
+ * SYNOPSIS:	Is the passed (x,y) in the passed bound/
+ * CALLED BY:	
+ * RETURN:	Boolean (Rectangle bound, sword x, sword y)
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	EY	7/26/96   	Initial Revision
+ *
+ ***********************************************************************/
+Boolean
+IsInSelectionRange(Rectangle bound, sword x, sword y)
+{
+  if (yPos < bound.R_top && 
+      (y > bound.R_bottom || (x > bound.R_right && y >= bound.R_top)))
+	return TRUE;
+  else
+	return FALSE;
+}	/* End of IsInSelectionRange.	*/
+
+
+
+/***********************************************************************
+ *	MSG_PM_COPY_SELECTED_OBJECT for PresentationManagerClass
+ ***********************************************************************
+ * SYNOPSIS:	    Copy the objects in the selected range into the 
+ *		    clipboard.
+ * PARAMETERS:	    
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	EY	7/29/96   	Initial Revision
+ *
+ ***********************************************************************/
+@extern method PresentationManagerClass, MSG_PM_COPY_SELECTED_OBJECTS
+{
+  VMFileHandle    transferFile;
+  VMBlockHandle   transferItem;
+  optr textObj;
+  TransferBlockID id;
+  /*
+   * Create a temporary text object to build CIF_TEXT data block
+   */
+  transferFile = ClipboardGetClipboardFile();
+  textObj = TextAllocClipboardObject(transferFile, 0, 0);
+  PManagerCopyBroadcast(textObj, oself);
+  /*
+   * Tell the text object that we are done with it. It will destroy
+   * itself after it has converted all its text into a transfer item with
+   * just one format: MANUFACTURER_ID_GEOWORKS::CIF_TEXT. It returns us
+   * the VM block handle of the item.
+   */
+  transferItem = TextFinishWithClipboardObject(textObj,
+				TCO_RETURN_TRANSFER_ITEM,
+				 HandleToOptr(GeodeGetProcessHandle()),
+				"Web Browser App");
+  id = BlockIDFromFileAndBlock(transferFile, transferItem);
+  /*
+   * Then place it as the designated item, returning the success or
+   * failure of ClipboardRegisterItem.
+   */
+  ClipboardRegisterItem(id, TIF_NORMAL);
+
+  return;
+}	/* End of MSG_PM_COPY_SELECTED_OBJECT.	*/
+
+
+
+/***********************************************************************
+ *		PManagerCopyBroadcast
+ ***********************************************************************
+ * SYNOPSIS:	Broadcast down the ui tree to tell the objects to copy
+ *		itself to the passed textObj if they're in the selected
+ *		ragne.
+ * CALLED BY:	
+ * RETURN:	void (optr textObj, optr object)
+ *		textObj - place to store the copied content.
+ *		object -  used to traverse down the ui tree.  If it's
+ *			  a leaf object, its content will be copied.
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	EY	7/29/96   	Initial Revision
+ *
+ ***********************************************************************/
+void
+PManagerCopyBroadcast (optr textObj, optr object)
+{
+  int i, len;
+  optr child;
+  MemHandle buffer;
+
+  EC_ERROR_IF(object == NULL, 0);
+  /*
+   * Get the first child.
+   */
+  child = @call object::MSG_GEN_FIND_CHILD_AT_POSITION(0);
+  if (child == NULL) {
+    /*
+     * Tell the object to copy its selection range.
+     */
+    if (@call object::MSG_META_IS_OBJECT_IN_CLASS(&GenTextClass)) {
+      buffer = @call object::MSG_VIS_TEXT_GET_ALL_BLOCK(0);
+      @call textObj::MSG_VIS_TEXT_APPEND_BLOCK(buffer, 0);
+      MemFree(buffer);
+    }
+  }
+  else {
+    /*
+     * Loop through the child list to find ui under the mouse point.
+     * 
+     * HERE IS WHERE OPTIMIZATION SHOULD BE DONE TO MINIMIZE THE LOOP!!!
+     */
+    for (i=0; child != NULL;
+       i++, (child = @call object::MSG_GEN_FIND_CHILD_AT_POSITION(i))) {
+      PManagerCopyBroadcast(textObj, child);
+    }
+  }
+  return;
+}
+
+
+

@@ -1,0 +1,302 @@
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Geoworks 1997.  All rights reserved.
+	GEOWORKS CONFIDENTIAL
+
+PROJECT:	
+MODULE:		
+FILE:		htconv.goc
+
+AUTHOR:		Mingzhe Zhu, Feb  2, 1997
+
+ROUTINES:
+	Name			Description
+	----			-----------
+
+REVISION HISTORY:
+	Name		Date		Description
+	----		----		-----------
+	mzhu    	2/ 2/97   	Initial version.
+
+DESCRIPTION:
+
+	the methods defined for all image converters.
+
+	$Id: htconv.goc,v 1.1 97/04/07 11:50:05 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+@include <stdapp.goh>
+#include <sem.h>
+@include <WWW/htconv.goh>
+@include <WWW/uigenera.goh>
+#include <Ansi/string.h>		/* memcpy(), memcmp() */
+
+/***********************************************************************
+		Class Declaration
+***********************************************************************/
+
+@classdecl	HTConverterClass;
+
+/***********************************************************************
+		Message Handlers
+***********************************************************************/
+
+
+/***********************************************************************
+ *		MSG_HT_STREAM_PUT_BLOCK for HTJPEGClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    JPEG data handler.
+ * PARAMETERS:	    int (const byte *data, word len)
+ * SIDE EFFECTS:    Nothing
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	mzhu	11/26/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method HTConverterClass, MSG_HT_STREAM_PUT_BLOCK
+{
+    HTConverterStruct *htConverterData;
+    char *buf;
+
+    if(!len) return HT_OK;
+
+    htConverterData = MemLock(@self->struct_handle);
+
+    ThreadPSem(htConverterData->done_sem);
+    if(htConverterData->done) {
+    	ThreadVSem(htConverterData->done_sem);
+	MemUnlock(@self->struct_handle);
+	return HT_NO;
+    }
+    ThreadVSem(htConverterData->done_sem);
+
+    ThreadPSem(htConverterData->buffer_empty);
+
+    buf = MemPLock(htConverterData->buffer_handle);
+
+    htConverterData->buffer_size = len;
+    memcpy(buf, data, len);
+
+    MemUnlockV(htConverterData->buffer_handle);
+
+    ThreadVSem(htConverterData->buffer_full);
+
+    MemUnlock(@self->struct_handle);
+
+    /* try to do this here */
+    @send, forceQueue, checkDuplicate, checkLastOnly
+	@self->HTSI_target::MSG_GEN_IMAGE_ADD_ONE_LINE(1);
+
+    return HT_OK;
+
+}	/* End of MSG_HT_STREAM_PUT_BLOCK.	*/
+
+
+
+
+/***********************************************************************
+ *		MSG_HT_STREAM_ABORT for HTConverterClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    Cleanup and free.
+ * PARAMETERS:	    void (void)
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:        We are guaranteed by the Web Library that we won't
+ *                  be getting any messages after is one.
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	mzhu	11/27/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method HTConverterClass, MSG_HT_STREAM_ABORT
+{
+    HTConverterStruct *htConverterData;
+
+    htConverterData = MemLock(@self->struct_handle);
+
+    /* tell the converter to stop */
+    ThreadPSem(htConverterData->done_sem);
+    htConverterData->done = TRUE;    
+    ThreadVSem(htConverterData->done_sem);
+
+    htConverterData->buffer_size = 0;
+    ThreadVSem(htConverterData->buffer_full);
+
+    /* waiting for the converter to quit */
+    ThreadPSem(htConverterData->converter_exit);
+
+    /* clean up */
+    MemFree(htConverterData->buffer_handle);
+    
+    ThreadFreeSem(htConverterData->buffer_empty);
+    ThreadFreeSem(htConverterData->buffer_full);
+    ThreadFreeSem(htConverterData->done_sem);
+    ThreadFreeSem(htConverterData->converter_exit);
+
+    MemFree(@self->struct_handle);    
+
+    @send, forceQueue, checkDuplicate, checkLastOnly
+	@self->HTSI_target::MSG_GEN_IMAGE_ADD_ONE_LINE(1);
+
+    /* We don't want to abort target when we call super */
+    @self->HTSI_target = NullOptr;
+    return @callsuper();
+}	/* End of MSG_HT_STREAM_ABORT.	*/
+
+
+/***********************************************************************
+ *		MSG_HT_STREAM_SET_TARGET for HTConverterClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    Set the target object and initilize the shared data.
+ * PARAMETERS:	    optr target
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:	    
+ *
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	mzhu    	2/ 3/97   	Initial Revision
+ *	
+ ***********************************************************************/
+@method HTConverterClass, MSG_HT_STREAM_SET_TARGET
+{
+    HTConverterStruct *htConverterData;
+
+    @callsuper();
+
+    @self->struct_handle = MemAlloc(sizeof(HTConverterStruct), 
+				HF_SHARABLE | HF_SWAPABLE, 
+				HAF_ZERO_INIT);
+
+    ECCheckMemHandle(@self->struct_handle);
+
+    htConverterData = MemLock(@self->struct_handle);
+
+    htConverterData->buffer_handle = MemAlloc(512, 
+		HF_SHARABLE | HF_SWAPABLE, HAF_ZERO_INIT);
+   
+    htConverterData->buffer_empty = ThreadAllocSem(1);
+    htConverterData->buffer_full = ThreadAllocSem(1);
+    htConverterData->done_sem = ThreadAllocSem(1);
+    htConverterData->converter_exit = ThreadAllocSem(1);
+
+    htConverterData->done = FALSE;
+    htConverterData->htobject = oself;
+
+    if(@call @self->HTSI_target::MSG_META_GET_CLASS() 
+	!= (ClassStruct*)&HTGenImageClass) {
+	@self->HTSI_target = @call @self->HTSI_target::
+		MSG_UI_GENERATOR_CREATE_SINGLE_IMAGE();
+    }
+
+    MemUnlock(@self->struct_handle);
+
+    /* initialize the two semaphores */
+    ThreadPSem(htConverterData->buffer_full);
+    ThreadPSem(htConverterData->converter_exit);
+}
+
+
+/***********************************************************************
+ *		MSG_HTC_SET_UIGENERATOR for HTConverterClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    Set the uigenerator.
+ * PARAMETERS:	    optr uigenerator
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:	    
+ *
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	mzhu    	2/ 3/97   	Initial Revision
+ *	
+ ***********************************************************************/
+@method HTConverterClass, MSG_HTC_SET_UIGENERATOR 
+{
+    @self->HTC_uigenerator = uigenerator;
+}	/* End of MSG_HTC_SET_UIGENERATOR.	*/
+
+
+/***********************************************************************
+ *		MSG_HTC_SET_TARGET_SIZE for HTConverterClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    Set the image size.
+ * PARAMETERS:	    word width, word height
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:	    
+ *
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	mzhu    	2/ 3/97   	Initial Revision
+ *	
+ ***********************************************************************/
+@method HTConverterClass, MSG_HTC_SET_TARGET_SIZE
+{
+    @send @self->HTSI_target::MSG_GEN_IMAGE_SET_BOUNDS(width, height);
+}	/* End of MSG_HTC_SET_TARGET_SIZE.	*/
+
+
+/***********************************************************************
+ *		MSG_HTC_SET_TARGET_BITMAP for HTConverterClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    Set the image object's bitmap.
+ * PARAMETERS:	    VMFileHandle vmFile, VMFileBlock bitmap
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:	    
+ *
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	mzhu    	2/ 3/97   	Initial Revision
+ *	
+ ***********************************************************************/
+@method HTConverterClass, MSG_HTC_SET_TARGET_BITMAP
+{
+    @send @self->HTSI_target::MSG_GEN_IMAGE_SET_BITMAP(vmFile, bitmap);
+}	/* End of MSG_HTC_SET_TARGET_BITMAP.	*/
+
+
+/***********************************************************************
+ *		MSG_HTC_CALL_RESIZE for HTConverterClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    Tell the uigenerator to resize the vis tree.
+ * PARAMETERS:	    nothing
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:	    
+ *
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	mzhu    	2/ 3/97   	Initial Revision
+ *	
+ ***********************************************************************/
+@method HTConverterClass, MSG_HTC_CALL_RESIZE
+{
+    @call @self->HTSI_target::MSG_VIS_MARK_INVALID(VOF_GEOMETRY_INVALID,
+						   VUM_DELAYED_VIA_UI_QUEUE);
+    @send @self->HTC_uigenerator::
+	MSG_UI_GENERATOR_BROADCAST_RESIZE_POSITION(@self->HTSI_target);
+}	/* End of MSG_HTC_CALL_RESIZE.	*/
+
+
+
+

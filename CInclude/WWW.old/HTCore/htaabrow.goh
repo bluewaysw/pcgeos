@@ -1,0 +1,130 @@
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Geoworks 1996.  All rights reserved.
+	GEOWORKS CONFIDENTIAL
+
+PROJECT:	Geos WWW Library
+MODULE:		htaabrow
+FILE:		htaabrow.goh
+
+AUTHOR:		Kok Kin Kee, Nov 27, 1996
+
+ROUTINES:
+	Name			Description
+	----			-----------
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	kkee	11/27/96   	Initial version.
+
+DESCRIPTION:
+
+	Access Authorization (AA) for browser client.
+
+	$Id: htaabrow.goh,v 1.1 97/04/04 15:55:05 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+@ifndef __HT_AABROW_GOH__
+@define __HT_AABROW_GOH__
+
+@include <stdapp.goh>
+@include <WWW/HTCore/htlist.goh>
+#include <WWW/htmem.h>
+@include <WWW/HTCore/htreq.goh>
+@include <WWW/HTCore/htreqMan.goh>
+@include <WWW/HTCore/htaautil.goh>
+@include <WWW/HTCore/htassoc.goh>
+
+/*
+** HTAAServer contains all the information about one server that 
+** requires use of access authorization by browser client.
+*/
+typedef struct {
+    HTMemHandle    HTAA_hostname;
+    int            HTAA_portnumber;
+    HTListHandle   HTAA_setups;      /* List of protection setups on
+					this server. This is a list of
+					HTMemHandles and each is a 
+					HTAASetup */
+} HTAAServer;
+
+
+/*
+** HTAASetup contains information about a server's protected tree of
+** documents (also called protection space). The main item in the
+** structure is HTAA_template.
+*/
+typedef struct {
+    HTMemHandle   HTAA_server;          /* Deref into HTAAServer*. The 
+					   host serving this tree. */
+    HTMemHandle   HTAA_template;        /* Deref into char* */
+    HTMemHandle   HTAA_realm;		/* Deref into HTAARealm* */
+} HTAASetup;
+
+
+/*
+** HTAARealm contains information about usernames and passwords in 
+** Basic and PubKey authentication schemes.
+*/
+typedef struct {
+    HTMemHandle  HTAA_realmname;       /* Password domain name */
+    HTMemHandle  HTAA_username;        /* Username in that domain */
+    HTMemHandle  HTAA_password;        /* Corresponding password */
+} HTAARealm;
+
+
+/*
+**  Routines for browser side recording of AA information
+**  -----------------------------------------------------
+**
+**  Most of the browser-side AA is done by the following two functions
+**  (which are called from file HTTP.goc).
+**  
+**  HTAAComposeAuth() compose the "Authorization:" line contents,
+**  provided that if the AA package thinks that the given document is 
+**  protected. Otherwise this function returns NULL. This function also 
+**  calls the functions HTPrompt(), HTPromptPassword(), and HTConfirm() to
+**  get the username, password, and some confirmation from the user.
+**
+**  HTAARetryWithAuth() determines whether to retry the request
+**  with AA or with a new AA (in case username or password was misspelt).
+*/
+
+/* Used by HTTP.GOC, client must *not* use this directyly. */
+extern Boolean _far _pascal 
+    HTAAComposeAuth(HTRequest *req);
+
+/* 
+ * Client supply Basic authorization before servicing request. Info
+ * provided is not cached (since we don't know what realm in the 
+ * server to cache for). I'll figure out a way to cache this later.
+ * -kkee
+ */
+extern Boolean _far _pascal 
+    HTAASetBasicUserIDPassword(HTRequestHandle request, 
+			       const char *userid,
+			       const char *password);
+
+/* 
+ * Client should call this after receiving HT_UNAUTHORIZED from the 
+ * Library in "after" request callback. Info provided here is cached.
+ * THIS NOT IMPLEMENTED YET!
+ * -kkee.
+ */
+extern Boolean _far _pascal
+    HTAARetryWithAuth(HTRequest *req);
+
+#ifdef __HIGHC__
+pragma Alias(HTAAComposeAuth, "HTAACOMPOSEAUTH");
+pragma Alias(HTAASetBasicUserIDPassword, "HTAASETBASICUSERIDPASSWORD");
+#endif
+
+@endif
+
+
+
+
+
+

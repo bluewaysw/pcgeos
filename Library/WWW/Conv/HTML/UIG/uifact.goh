@@ -1,0 +1,241 @@
+/***********************************************************************
+ *
+ *	Copyright (c) Geoworks 1997.  All rights reserved.
+ *	GEOWORKS CONFIDENTIAL
+ *
+ * PROJECT:	  WWW UI Generation
+ * MODULE:	  factory
+ * FILE:	  uifact.h
+ *
+ * AUTHOR:  	  Kok Kin Kee: Sep 18, 1997
+ *
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	kkee    	9/18/97   	Initial version
+ *
+ * DESCRIPTION:
+ *
+ *	UIFactory for the creation of objects and deletion of objects.
+ *
+ *	$Id: uifact.goh,v 1.1.2.20 98/01/09 19:14:45 mzhu Exp $
+ *
+ ***********************************************************************/
+@ifndef _UIFACT_GOH_
+@define _UIFACT_GOH_
+
+@include <stdapp.goh>
+@include <WWW/HTCore/htlist.goh>
+#include <WWW/htmem.h>
+#include <sem.h>
+
+
+typedef struct {
+	optr obj;
+	ClassStruct *class;
+} ObjInfo;
+
+
+/* -----------------------------------------------------------------------
+ * 		UI doc is bound to an anchor object as anchor object
+ *              contains the persistent URL that refers to the UI doc.
+ * ----------------------------------------------------------------------*/
+typedef struct {
+    ThreadHandle  HTUI_threadID;
+    HTAnchorHandle HTUI_anchor;           /* memCache anchor */
+    word          HTUI_memID;             /* Memory and object usage id */
+    SemaphoreHandle HTUI_waitToFree;      /* Sync to free objList */
+    optr          HTUI_genView;           /* Top level view, belongs to client,
+					     cannot be destroyed */
+    PointDWord    HTUI_viewOrigin;         /* current View Origin */
+@ifdef BROTHER_KERNEL
+    ColorQuad	  HTUI_backgroundColor;     /* storage of color */
+@endif
+    optr          HTUI_genContent;        /* genContent & its children are new
+					     for each new document and destroyed
+					     using HTObjDestroyAllWID */
+    optr          HTUI_pmanager;
+    optr          HTUI_pmContent;         /* pmananger content model */
+    HTMemHandle   HTUI_currentMap;        /* The current map if nonzero */
+    HTListHandle  HTUI_areaMaps;
+    HTListHandle  HTUI_objList;           /* Objects that would receive 
+					     MSG_GEN_PREPARE_FOR_DESTROY before the
+					     object blocks are freed */
+    /*
+     *  HTUI_hrefToken keep track of the href token of the current
+     *  <A>....</A> content. -1 means currently there is no <A>...</A> content.
+     */
+    int           HTUI_hrefToken; 
+    /*
+     * HTUI_target points to the current object that is
+     * being created and modified before being sent to
+     * the presentation manager for rendering.
+     */
+    ObjInfo	  HTUI_target;
+    /*
+     * Misc current document information. 
+     */
+    HTMemHandle   HTUI_baseURL;
+    HTMemHandle   HTUI_title;
+
+    /*
+     * For sharing bitmap inside one page.
+     */
+    HTListHandle  HTUI_imageList;
+
+    /*
+     * Form list
+     */
+    HTListHandle  HTUI_formList;
+
+    /*
+     * For refreshing 
+     */
+    word          HTUI_refreshTime;
+    HTMemHandle   HTUI_newURL;
+
+    /*
+     * VM file to store image bitmaps. We don't want to use the clipboard 
+     * anymore, since its header can grow too big.
+     */
+    char          HTUI_vmFileName[32];
+    VMFileHandle  HTUI_vmFileHandle;
+
+    /*
+     * all the instance data of PManager
+     */
+
+    /*
+     * PM_recvObj stores the optr of an object which take any 
+     * incoming new objects as its children.
+     */
+    optr PM_recvObj;
+    /*
+     * PM_recvObjBackup keeps a copy of the recvObj before
+     * entering the <CAPTION> mode.
+     */
+    optr PM_recvObjBackup;
+    /*
+     *  PM_anchor stores the list of HREFs in all <A>'s on a
+     *  web page.
+     */
+    HTListHandle	PM_hrefs;
+    /*
+     *  PM_anchor stores the the NAMEs in all <A>'s.
+     *  PM_nameElment store information about each NAME.
+     *    PM_anchor and PM_nameElment has one-to-one relation.
+     *    That means, the first elment in PM_anchor contains the
+     *    NAME value for the first element in PM_nameElement.
+	 */
+    HTListHandle	PM_anchorName;
+    HTListHandle	PM_nameElement;
+    /*
+     *  PM_anchorList is a list of object optr that have hyperlink.
+     */
+    HTListHandle	PM_anchorList;
+    /*
+     *  PM_linkUnderMouse stores the current hyperlink url under
+     *  the mouse.
+     */
+    MemHandle	PM_linkUnderMouse;
+    /*
+     *  Record the ismap information;
+     */
+    int	        PM_x;
+    int	        PM_y;
+    HTMemHandle	PM_src;
+    /*
+     *  Is the autoload image option on?
+     *  Load the image while building a Image object?
+     *  0 - FALSE;
+     *  non-zero - TRUE;
+     */
+    Boolean	PM_loadImage;
+    /*
+     *  focalObj stores the current object that has hyperlink in
+     *  the visible screen region.  The hyperlink's bound is stored
+     *  in PM_drawBound.  When there is no link in focus, i.e 
+     *  focalObj = NULL, then PM_referenceObj stores the last
+     *  object that has hyperlink in focus.  The purpose is to 
+     *  know where in the ui tree to resume the search process.
+     *  PM_focalObjIndex is index into PM_anchorList.
+     */
+    optr          PM_focalObj;
+    word	  PM_focalObjIndex;
+    RectDWord	  PM_drawBound;
+    Rectangle	  PM_drawbox;
+    optr          PM_referenceObj;
+   
+    /*
+     * this two probably can be removed later.
+     */
+    optr          PM_focalImage;
+    word          PM_focalLink;
+    /*
+     *   PM_anchorObj store the anchor point that the PManager should
+     *   bring up while loading the document.  This is the hyperlink
+     *   destination of the previous document, i.e. <A href=url#name>
+     *   PM_anchorOffset store the offset into the anhorObj to be
+     *   displayed.
+     */
+    optr          PM_anchorObj;
+    int		  PM_anchorOffset;
+} HTUIDoc;
+
+typedef struct {
+    HTMemHandle     UIM_currentDocHandle;
+    HTUIDoc*        UIM_currentDoc;
+    GeodeHandle     UIM_client;
+    word            UIM_message;
+    optr            UIM_view;
+    SemaphoreHandle UIM_access;
+    dword           UIM_memoryAllocated;
+    word            UIM_memID;
+    HTListHandle    UIM_cacheList;
+    HTMemHandle     UIM_delayFreeDoc;
+    /*
+     *  UIM_jumpToAnchor stores the NAME of a <A> that user just
+     *  clicked.  When the new page is loaded, the specified anchor
+     *  point will be brought into the view.
+     */
+    HTMemHandle	    UIM_jumpToAnchor;
+
+    HTListHandle    UIM_formQuery;
+} UIManager;
+
+typedef struct {
+    HTMemHandle  HTF_action;       /* action value, cgi url */
+    HTMethod     HTF_method;       /* GET, POST or else*/
+    HTListHandle HTF_itemList;     /* all the objects belong to this form */
+    HTListHandle HTF_nameList;     /* all the name used for the objects */
+} HTMLForm;
+
+typedef struct {
+    optr         HTFI_object;      /* the real object */
+    FormElementType  HTFI_type;        /* type */
+    int          HTFI_nameId;      /* name id in the name list */
+    HTMemHandle  HTFI_value;       /* initial value */
+    Boolean      HTFI_checked;     /* for radio and checkbox */
+} HTMLFormItem;
+
+/* The current document being built */
+extern UIManager uiMgr;
+extern HTUIDoc *currentDoc;
+
+optr _far _pascal UICreateObj (ClassStruct *objClass);
+
+void _far _pascal UIDocAddMemory (dword len);
+
+optr FinishCurrentObjectInForm (ObjInfo *target);
+
+void _far _pascal HTML_FORM_RESET(int formId);
+void _far _pascal HTML_FORM_SUBMIT(int formId, optr oself);
+void _far _pascal HTML_FORM_SET_EXCLUSIVE_SELECTION(int formId,
+					       int nameId,
+					       optr selectedObj);
+
+@endif /* _UIFACT_GOH_ */
+
+
+
+

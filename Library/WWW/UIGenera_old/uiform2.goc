@@ -1,0 +1,2265 @@
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Geoworks 1996 -- All Rights Reserved
+
+PROJECT:	Penelope
+MODULE:		ui form module
+FILE:		uiform.goc
+
+AUTHOR:		Edwin Yu, June 20, 1996
+
+ROUTINES:
+	Name			Description
+	----			-----------
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	edwin	6/21/97   	Initial version.
+
+DESCRIPTION:
+	This file defines message handlers to create form objects.
+
+	$Id: uiform2.goc,v 1.7.1.12 97/09/25 16:21:31 mzhu Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+@include <WWW/uigenera.goh>
+@include <WWW/pmanager.goh>
+@include <WWW/HTCore/htobj.goh>   /* HTObjInstantiateForThread */
+@include "uifatals.goh"
+#include <Ansi/string.h>
+#include <Ansi/stdlib.h>        /* atoi defined */
+@include "uifact.goh"
+@include "utility.goh"
+
+extern optr FinishCurrentObjectInForm (optr pmObj, ObjInfo *target);
+void AddInputToForm(optr form, optr inputObj);
+
+
+/***********************************************************************
+ *		UIGen_START_FORM_Int for UIGeneratorClass
+ ***********************************************************************
+ * SYNOPSIS:	Create a ui object representing a fill-out form.
+ *		Information about the form fields are expected to 
+ *		be known as more incoming HTML elements are processed.
+ *		    
+ * PARAMETERS:	    (MemHandle block, SGMLEntity *entity)
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *	Supported Attr:	ACTION, METHOD
+ *
+ * INPUT, SELECT and TEXTAREA are only allowed within FORM elements.
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	EY	4/18/96   	Initial Revision
+ *
+ ***********************************************************************/
+ErrorCode UIGen_START_FORM_Int
+		(MemHandle block, SGMLEntity *entity)
+{
+  optr obj, content;
+  int nextRow;
+
+  /* 
+   *  If there is some object in UIG_target, insert it to the ui tree.
+   */
+  if ((currentDoc->HTUI_target.class == (ClassStruct *)&HTGenTableClass) ||
+      (currentDoc->HTUI_target.class == (ClassStruct *)&HTGenTCellClass) ) {
+    @call currentDoc->HTUI_pmanager::MSG_PM_TAKE_UNFINISHED_UI_OBJ
+	(currentDoc->HTUI_target.obj);
+    content = currentDoc->HTUI_target.obj;
+  }
+  else if (currentDoc->HTUI_target.obj) {
+    @call currentDoc->HTUI_pmanager::MSG_PM_TAKE_FINISHED_UI_OBJ
+	(currentDoc->HTUI_target.obj);
+    content = UIGen_GET_CONTENT_Int();
+  }
+  else
+    content = currentDoc->HTUI_pmContent;
+
+  /*
+   *  Form always starts at a new line!
+   */
+  @call content::MSG_GEN_HTML_CONTENT_START_NEW_ROW(0, &nextRow, NULL);
+
+  /*
+   * Now create a form object and store it in target.obj.  Next, process
+   * the passed attribute list.
+   */
+  obj = UICreateObj(currentDoc, &HTGenFormClass);
+  currentDoc->HTUI_target.obj = obj; 
+  currentDoc->HTUI_target.class = (ClassStruct *)&HTGenFormClass;
+
+  /*
+   *  Process attributes
+   */
+  @call currentDoc->HTUI_target.obj::MSG_GEN_FORM_PROCESS_ATTRIBUTE
+     (block, entity, content);
+
+  return UI_GEN_NO_ERROR;
+}	/* End of UIGen_START_FORM_Int.	*/
+
+
+/***********************************************************************
+ *		UIGen_END_FORM_Int for UIGeneratorClass
+ ***********************************************************************
+ * SYNOPSIS:	    Tell the presentation manager that the form object
+ *		    is ready to be displayed.
+ * PARAMETERS:	    none
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	EY	4/18/96   	Initial Revision
+ *
+ ***********************************************************************/
+ErrorCode UIGen_END_FORM_Int()
+{
+  optr content;
+  int nextRow;
+
+  /* 
+   * If there is some object in target.obj, we can assume the object 
+   * is done.  Thus, give the object to the presentation manager for
+   * rendering.
+   */
+  if (currentDoc->HTUI_target.obj)
+	@call currentDoc->HTUI_pmanager::MSG_PM_TAKE_UNFINISHED_UI_OBJ \
+				(currentDoc->HTUI_target.obj);
+
+  if (currentDoc->HTUI_target.class != (ClassStruct *)&HTGenFormClass) {
+    while (1) {
+      @call currentDoc->HTUI_pmanager::MSG_PM_MARK_RECV_OBJECT_DONE
+		(&(currentDoc->HTUI_target.obj), &(currentDoc->HTUI_target.class));
+      EC_ERROR_IF(currentDoc->HTUI_target.class == NULL || 
+		currentDoc->HTUI_target.obj == NULL,
+		UIG_INVALID_OPERATION_ON_UI_TREE);
+      if (currentDoc->HTUI_target.class == (ClassStruct *)&HTGenSelectClass)
+	@call currentDoc->HTUI_target.obj::
+		MSG_GEN_SELECT_COMPLETE_SELECT_CONSTRUCT();
+      else if (currentDoc->HTUI_target.class == 
+				(ClassStruct *)&HTGenMultiLineSelectClass)
+	@call currentDoc->HTUI_target.obj::
+		MSG_HTGMLS_COMPLETE_SELECT_CONSTRUCT();
+      
+      if (currentDoc->HTUI_target.class == (ClassStruct *)&HTGenFormClass)
+	  break;
+    }
+  }
+  EC_ERROR_IF(currentDoc->HTUI_target.class != (ClassStruct *)&HTGenFormClass,
+	UIG_INVALID_OPERATION_ON_UI_TREE);
+  /*
+   * Tell the receiving object(which must be a HTGenForm object) in 
+   * the ui tree that there are no more children for it.  So the 
+   * presentation manager can mark it usable and display it.
+   */
+  @call currentDoc->HTUI_pmanager::MSG_PM_MARK_RECV_OBJECT_DONE
+	(&(currentDoc->HTUI_target.obj), &(currentDoc->HTUI_target.class));
+
+  /*
+   *  Objects following form always start at a new line!
+   */
+  content = UIGen_GET_CONTENT_Int();
+  @call content::MSG_GEN_HTML_CONTENT_START_NEW_ROW(0, &nextRow, NULL);
+
+  return UI_GEN_NO_ERROR;
+}	/* End of UIGen_END_FORM_Int.	*/
+
+/*
+ * #####################################################################
+ *   I REALLY hate this, putting the following message handlers in this
+ *   file rathter than uiform.goc.  HighC compiler gives me stupid error
+ *   if I put the handlers in uiform.goc:
+ *   error: uiform.eobj: procedure not defined with PROCEDURE definition
+ *   error: uiform.eobj: block start not in procedure
+ *   error: uiform.eobj: cannot end non-existent current scope
+ * #####################################################################
+ */
+
+/***********************************************************************
+ *		MSG_UI_GET_ROW_POSITION for HTGenFormTriggerClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    
+ * PARAMETERS:	    
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:	    
+ *
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	edwin   	6/17/97   	Initial Revision
+ *	
+ ***********************************************************************/
+@extern method HTGenFormTriggerClass, MSG_UI_GET_ROW_POSITION
+{
+  return @self->HTGFT_pageRow;
+}	/* End of MSG_UI_GET_ROW_POSITION.	*/
+
+
+/***********************************************************************
+ *		MSG_UI_SET_NEW_POSITION for HTGenFormTriggerClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    
+ * PARAMETERS:	    
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:	    
+ *
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	edwin   	6/ 4/97   	Initial Revision
+ *	
+ ***********************************************************************/
+@extern method HTGenFormTriggerClass, MSG_UI_SET_NEW_POSITION
+{
+  @self->HTGFT_pageRow = row;
+  @self->HTGFT_xPos = xPos;
+  return;
+}	/* End of MSG_UI_SET_NEW_POSITION.	*/
+
+/***********************************************************************
+ *		MSG_SPEC_BUILD_BRANCH for HTGenFormTriggerClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    
+ * PARAMETERS:	    
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:	    
+ *
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	edwin   	6/11/97   	Initial Revision
+ *	
+ ***********************************************************************/
+@extern method HTGenFormTriggerClass, MSG_SPEC_BUILD_BRANCH
+{
+  @callsuper();
+  if (@self->HTGFT_guessSize)
+    @call self::MSG_VIS_SET_SIZE(DWORD_WIDTH(@self->HTGFT_guessSize),
+				 DWORD_HEIGHT(@self->HTGFT_guessSize));
+  return;
+}	/* End of MSG_SPEC_BUILD_BRANCH.	*/
+
+
+
+/***********************************************************************
+ *	UIGen_START_SELECT_Int for UIGeneratorClass
+ ***********************************************************************
+ * SYNOPSIS:	    Create a HTGenSelect object and process the 
+ *		    attribute list.
+ * PARAMETERS:	    (MemHandle block, SGMLEntity *entity)
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	EY	4/18/96   	Initial Revision
+ *
+ ***********************************************************************/
+ErrorCode UIGen_START_SELECT_Int
+		(MemHandle block, SGMLEntity *entity)
+{
+  char *value;
+  int	index, size = 0;
+  Boolean multiLine = FALSE;
+  optr obj, content;
+
+  /*
+   *  Finish and append whatever ui object in the target to the ui tree.
+   *  Return the form object that contains that ui object.
+   */
+  content=FinishCurrentObjectInForm(currentDoc->HTUI_pmanager, &(currentDoc->HTUI_target));
+
+  /* 
+   * Go to get the attributes first. Use the size to determine which 
+   * kind selection object to create, either HTGenSelectClass or
+   * HTGenMultiLineSelectClass.
+   */
+
+  for(index = 0; entity[index].SGMLE_token; index++) {
+    if(entity[index].SGMLE_token == HTML_ATTR_MULTIPLE) {
+	multiLine = TRUE;
+	break;
+    } else if (!entity[index].SGMLE_value)
+      continue;
+
+    value = (char *)LMemDerefHandles(block, entity[index].SGMLE_value);
+    if(entity[index].SGMLE_token == HTML_ATTR_SIZE) {
+      size = atoi(value);
+      if (size >= 4) {
+	  multiLine = TRUE;
+          break;
+      }
+    }
+  }
+
+  /*
+   *  Now create a select object and store it in target.obj.
+   *  Then, process the passed attribute list.
+   */
+  if(!multiLine) {
+      /*
+       *  Create a dummy container for the HTGenSelectClass.  This container
+       *  is used to get the size of the GenItemGroup customized in the
+       *  penelope SPUI.
+       */
+      obj = UICreateObj(currentDoc, (ClassStruct *)&HTGenOuterSelectClass);
+      @call obj::MSG_GEN_OUTER_SELECT_STORE_CONTENT(content);
+      currentDoc->HTUI_target.obj = obj;
+      @call currentDoc->HTUI_pmanager::MSG_PM_TAKE_UNFINISHED_UI_OBJ
+	 (currentDoc->HTUI_target.obj);
+      /*
+       *  Add the outer select object to the list of focusable objects
+       */
+      @call currentDoc->HTUI_pmanager::MSG_PM_RECORD_ANCHOR_OBJECT(obj);
+      /*
+       *  Make the object to be able to grab focus exclusive.???
+      @call obj::MSG_GEN_SET_ATTRS(GA_TARGETABLE,0);
+       */
+      obj = UICreateObj(currentDoc, (ClassStruct *)&HTGenSelectClass);
+
+      currentDoc->HTUI_target.obj = obj;
+      currentDoc->HTUI_target.class = (ClassStruct *)&HTGenSelectClass;
+      @call currentDoc->HTUI_target.obj::MSG_GEN_SELECT_PROCESS_ATTRIBUTE
+          (block, entity);
+
+      @call currentDoc->HTUI_target.obj::MSG_META_ADD_VAR_DATA
+	  (HINT_ORIENT_CHILDREN_HORIZONTALLY, 0, NULL);
+
+      @call currentDoc->HTUI_target.obj::MSG_GEN_ITEM_GROUP_SET_NONE_SELECTED
+	  (FALSE);
+  } else {
+      obj = UICreateObj(currentDoc, (ClassStruct *)&HTGenMultiLineSelectClass);
+      @call obj::MSG_HTGMLS_STORE_CONTENT(content);
+
+      currentDoc->HTUI_target.obj = obj;
+      currentDoc->HTUI_target.class = (ClassStruct *)&HTGenMultiLineSelectClass;
+      @call currentDoc->HTUI_target.obj::MSG_HTGMLS_PROCESS_ATTRIBUTE
+          (block, entity);
+      /*
+       *  Add the Checkbox/Radio object to the list of focusable objects
+       */
+      @call currentDoc->HTUI_pmanager::MSG_PM_RECORD_ANCHOR_OBJECT(obj);
+  }
+
+
+  return UI_GEN_NO_ERROR;
+}	/* End of UIGen_START_SELECT_Int.	*/
+
+
+/***********************************************************************
+ *		UIGen_END_SELECT_Int for UIGeneratorClass
+ ***********************************************************************
+ * SYNOPSIS:	    Tell the presentation manager that the HTGenSelect
+ *		    object is done.
+ * PARAMETERS:	    none
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	EY	4/18/96   	Initial Revision
+ *
+ ***********************************************************************/
+ErrorCode UIGen_END_SELECT_Int()
+{
+  optr select;
+  ClassStruct *class;
+
+  /* 
+   * If there is some object in target.obj (likely, it can be a 
+   * HTGenOption object), we can assume the object is done.  Thus, give
+   * the object to the presentation manager for rendering.
+   */
+  if (currentDoc->HTUI_target.obj &&
+      currentDoc->HTUI_target.class == (ClassStruct *)&HTGenOptionClass) {
+	@call currentDoc->HTUI_pmanager::MSG_PM_TAKE_FINISHED_UI_OBJ \
+				(currentDoc->HTUI_target.obj);
+  } else if(currentDoc->HTUI_target.obj && (
+     currentDoc->HTUI_target.class==(ClassStruct*)&HTGenMultiLineSelectClass ||
+     currentDoc->HTUI_target.class==(ClassStruct*)&HTGenSelectClass)) {
+	@call currentDoc->HTUI_pmanager::MSG_PM_TAKE_UNFINISHED_UI_OBJ \
+				(currentDoc->HTUI_target.obj);
+  }
+
+  @call currentDoc->HTUI_pmanager::MSG_PM_GET_RECV_OBJ_OPTR_AND_CLASS
+	(&select, &class);
+  EC_ERROR_IF(class != (ClassStruct *)&HTGenSelectClass &&
+	class != (ClassStruct *)&HTGenMultiLineSelectClass,
+	UIG_UI_TREE_OPERATION_FAILS);
+  /*
+   * Finalize the select object, like setting it exclusive or 
+   * non-exclusive.
+   */
+  if(class == (ClassStruct *)&HTGenSelectClass) {
+      @send select::MSG_GEN_SELECT_COMPLETE_SELECT_CONSTRUCT();
+      @call currentDoc->HTUI_pmanager::MSG_PM_MARK_RECV_OBJECT_DONE
+	 (&(currentDoc->HTUI_target.obj), &(currentDoc->HTUI_target.class));
+  }
+  else 
+      @send select::MSG_HTGMLS_COMPLETE_SELECT_CONSTRUCT();
+  /*
+   * Tell the receiving object(which must be a HTGenSelect object) in 
+   * the ui tree that there are no more children for it.  So the 
+   * presentation manager can mark it usable and display it.
+   */
+  EC_ERROR_IF(!((@call currentDoc->HTUI_target.obj::MSG_META_IS_OBJECT_IN_CLASS
+		 (&HTGenOuterSelectClass) ||
+		 (@call currentDoc->HTUI_target.obj::MSG_META_IS_OBJECT_IN_CLASS
+		 (&HTGenMultiLineSelectClass)))), 1);
+  @call currentDoc->HTUI_pmanager::MSG_PM_MARK_RECV_OBJECT_DONE
+	(&(currentDoc->HTUI_target.obj), &(currentDoc->HTUI_target.class));
+
+  return UI_GEN_NO_ERROR;
+}	/* End of UIGen_END_SELECT_Int.	*/
+
+
+
+
+/***********************************************************************
+ *	UIGen_CREATE_OPTION_Int for UIGeneratorClass
+ ***********************************************************************
+ * SYNOPSIS:	    Create HTGenOption object and process the attribute
+ *		    list.
+ * PARAMETERS:	    (MemHandle block, SGMLEntity *entity)
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	EY	4/18/96   	Initial Revision
+ *
+ ***********************************************************************/
+ErrorCode UIGen_CREATE_OPTION_Int
+		(MemHandle block, SGMLEntity *entity)
+{
+  optr select;
+  ClassStruct *class;
+  int id;
+  char *value = NULL;
+  int	index = 0;
+  Boolean selected = FALSE;
+  optr obj;
+
+  if (currentDoc->HTUI_target.obj && 
+      currentDoc->HTUI_target.class == (ClassStruct *)&HTGenMultiLineSelectClass){
+
+      for(index = 0; entity[index].SGMLE_token; index++) {
+          switch(entity[index].SGMLE_token) {
+          case HTML_ATTR_VALUE:
+              if (entity[index].SGMLE_value) 
+                  value = (char *)LMemDerefHandles(block, 
+				entity[index].SGMLE_value);
+              break;
+          case HTML_ATTR_SELECTED:
+              selected = TRUE;
+              break;
+          }
+      }
+
+      @call (currentDoc->HTUI_target.obj)::MSG_HTGMLS_ADD_OPTION_VALUE(
+			value, selected);
+
+      return UI_GEN_NO_ERROR;
+  }
+
+  /*
+   * add any existing ui object in target.obj to the ui tree.
+   */
+  if (currentDoc->HTUI_target.obj && 
+      currentDoc->HTUI_target.class == (ClassStruct *)&HTGenOptionClass)
+	@call currentDoc->HTUI_pmanager::MSG_PM_TAKE_FINISHED_UI_OBJ
+				(currentDoc->HTUI_target.obj);
+  else if (currentDoc->HTUI_target.obj) 
+	@call currentDoc->HTUI_pmanager::MSG_PM_TAKE_UNFINISHED_UI_OBJ \
+				(currentDoc->HTUI_target.obj);
+
+  @call currentDoc->HTUI_pmanager::MSG_PM_GET_RECV_OBJ_OPTR_AND_CLASS \
+	(&select, &class);
+  EC_ERROR_IF(class != (ClassStruct *)&HTGenSelectClass,
+	UIG_UI_TREE_OPERATION_FAILS);
+
+    obj = UICreateObj(currentDoc, (ClassStruct *)&HTGenOptionClass);
+  /*
+   * Now create a option object and store it in target.obj.  Then
+   * process the passed attribute list.
+   */
+  currentDoc->HTUI_target.obj = obj;
+  currentDoc->HTUI_target.class = (ClassStruct *)&HTGenOptionClass;
+
+  /*
+   * Assign a unique id to the option object.
+   */
+  id = @call select::MSG_GEN_SELECT_GET_AND_INCREMENT_OPTION_ID();
+  @call currentDoc->HTUI_target.obj::MSG_GEN_ITEM_SET_IDENTIFIER(id);
+  /*
+   * Process attributes
+   */
+  @call currentDoc->HTUI_target.obj::MSG_GEN_OPTION_PROCESS_ATTRIBUTE
+	(block, entity, select);
+
+  @call currentDoc->HTUI_target.obj::MSG_META_ADD_VAR_DATA
+	(HINT_EXPAND_WIDTH_TO_FIT_PARENT, 0, NULL);
+
+  return UI_GEN_NO_ERROR;
+}	/* End of UIGen_CREATE_OPTION_Int.	*/
+
+
+/***********************************************************************
+ *		UIGen_CREATE_INPUT_Int for UIGeneratorClass
+ ***********************************************************************
+ * SYNOPSIS:	    Define user input field as part of the contents
+ *		    in a FORM element.
+ * PARAMETERS:	    (MemHandle block, SGMLEntity *entity)
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:	Supported Attr: TYPE = TEXT | PASSWORD | CHECKBOX | 
+ *				       RADIO | SUBMIT | RESET | HIDDEN |
+ *				       IMAGE.
+ *				NAME, VALUE, SRC, CHECKED, SIZE, 
+ *				MAXLENGTH.
+ *
+ * INPUT elements are not containers and so the end tag is forbidden. 
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	EY	4/18/96   	Initial Revision
+ *	sean	7/25/97		Switch order or when set single-line
+ *				text attribute.  Fixes 68542.
+ *
+ ***********************************************************************/
+optr UIGen_CREATE_INPUT_Int
+		(MemHandle block, SGMLEntity *entity)
+{
+  char *value, *cptr = NULL;
+  int index, maxLen = 0, size = 13;	/* default SIZE attribute value */
+  Boolean checked = FALSE;
+  InputType Itype = INPUT_TEXT;		/* default input type */
+  CompSizeHintArgs sizeArgs;
+  optr container, dummy, image = NULL;
+  ChunkHandle tmpChunk;
+  HTMemHandle tmpOptr=NULL, nameOptr=NULL, valueOptr=NULL, srcOptr=NULL;
+  WWFixed number;
+  VisMonikerWithText *moniker;
+  ClassStruct *class;
+
+  if (currentDoc->HTUI_target.obj == NULL) {
+    EC_WARNING(UIG_WRONG_ASSUMPTION);
+    return NULL;
+  }
+  /*
+   *  Finish whatever ui object in the target and append it to the ui tree.
+   *  Travel up the ui tree and return the first container object(which
+   *  can be a form object, or a HTGenTCell object) that is encountered.
+   */
+  container=FinishCurrentObjectInForm(currentDoc->HTUI_pmanager,&(currentDoc->HTUI_target));
+
+  /*
+   *  This FOR loop processes the attribute list, collecting attribute
+   *  values that will be needed later on.
+   */
+  for(index = 0; entity[index].SGMLE_token; index++) {
+    if (!entity[index].SGMLE_value) {
+      if (entity[index].SGMLE_token == HTML_ATTR_CHECKED)
+	checked = TRUE;
+      continue;
+    }
+    value = (char *)LMemDerefHandles(block, entity[index].SGMLE_value);
+    switch(entity[index].SGMLE_token) {
+    case HTML_ATTR_NAME:
+    case HTML_ATTR_VALUE:
+    case HTML_ATTR_SRC:
+      /* 
+       *  Allocate a chunk to store the NAME, VALUE or SRC data.
+       */
+      tmpOptr = HTStrAllocCopyWID(0, value);
+      /*
+       * Decide which type(NAME/VALUE/SRC) of chunk we're creating.
+       */
+      if (entity[index].SGMLE_token == HTML_ATTR_NAME)	/* type = NAME */
+	nameOptr  = tmpOptr;
+      else if (entity[index].SGMLE_token==HTML_ATTR_VALUE)/* type = VALUE */
+	valueOptr = tmpOptr;
+      else				                /* type = SRC */
+	srcOptr = tmpOptr;
+      break;
+    case HTML_ATTR_CHECKED:
+      checked = TRUE;
+      break;
+    case HTML_ATTR_SIZE:
+      size = atoi(value);
+      if (size > 70)
+	  size = 70;
+      else if (size <= 2)
+	  size = 3;
+      break;
+    case HTML_ATTR_MAXLENGTH:
+      maxLen = atoi(value);
+      break;
+    case HTML_ATTR_TYPE:
+      if (strcasecmp("text", value) == 0)
+	Itype = INPUT_TEXT;
+      else if (strcasecmp("password", value) == 0)
+	Itype = INPUT_PASSWORD;
+      else if (strcasecmp("checkbox", value) == 0)
+	Itype = INPUT_CHECKBOX;
+      else if (strcasecmp("radio", value) == 0)
+	Itype = INPUT_RADIO;
+      else if (strcasecmp("submit", value) == 0)
+	Itype = INPUT_SUBMIT;
+      else if (strcasecmp("reset", value) == 0)
+	Itype = INPUT_RESET;
+      else if (strcasecmp("hidden", value) == 0)
+	Itype = INPUT_HIDDEN;
+      else if (strcasecmp("image", value) == 0)
+	Itype = INPUT_IMAGE;
+      else if (strcasecmp("button", value) == 0) {
+	currentDoc->HTUI_target.obj = container;
+	currentDoc->HTUI_target.class=@call container::MSG_META_GET_CLASS();
+	EC_WARNING(UIG_BUTTON_NOT_SUPPORTED);
+	return NULL;
+      }
+EC(   else if (strcasecmp("file", value) == 0)
+	/*	Itype = INPUT_FILE;				*/
+	EC_WARNING(UIG_FILE_NOT_SUPPORTED); )
+      break;
+    }
+  }
+
+  switch (Itype) {
+    case INPUT_TEXT:
+    case INPUT_PASSWORD:
+	/*
+	 * Create a text input feild(text object) for user input.
+	 */
+	dummy = UICreateObj(currentDoc, (ClassStruct *)&HTGenFormTextClass);
+	/*
+	 * Single-line text attribute must be set first.  Fixes 68542.
+         * Sean 7/25/97.
+	 */
+	@call dummy::MSG_GEN_TEXT_SET_ATTRS(GTA_SINGLE_LINE_TEXT, 0); 
+
+	/*
+	 * Store the attributes data.
+	 */
+	if (valueOptr != NULL) {
+	  /*
+	   *  The default VALUE for TYPE=TEXT is displayed right away.
+	   */
+	  cptr = (char *)HTMemLock(valueOptr);
+	  @call dummy::MSG_VIS_TEXT_APPEND_PTR(cptr, 0);
+	  HTMemUnlock(valueOptr);
+	}
+	@call dummy::MSG_GEN_FORM_TEXT_INITIALIZE(nameOptr,valueOptr,container);
+	/*
+	 * Set width of the object.
+	 */
+	sizeArgs.CSHA_width = SST_AVG_CHAR_WIDTHS | size;
+	sizeArgs.CSHA_height = 0;
+	sizeArgs.CSHA_count = 1;
+	EC_ERROR_IF(size < 0, UIG_ERROR_NEGATIVE_WIDTH);
+	@call dummy::MSG_META_ADD_VAR_DATA
+		(HINT_FIXED_SIZE, sizeof(sizeArgs), &sizeArgs);
+	/*
+	 *  Set MAXLENGTH if it is specified.
+	 */
+	if (maxLen > 0 && maxLen < 1000)	/* 1000 is a protection */
+	  @call dummy::MSG_VIS_TEXT_SET_MAX_LENGTH(maxLen);
+	/*
+	 *  If it's a password type, set the BISON font size 13 so that
+	 *  '*' is displayed for every char input.
+	 */
+	if (Itype == INPUT_PASSWORD) {
+	  @send dummy::MSG_VIS_TEXT_SET_FONT_ID(
+				FID_BISON,
+				TEXT_ADDRESS_PAST_END,
+				TEXT_ADDRESS_PAST_END);	
+	  number.WWF_int = 13;
+	  number.WWF_frac = 0;
+	  @call dummy::MSG_VIS_TEXT_SET_POINT_SIZE
+		(number,TEXT_ADDRESS_PAST_END,TEXT_ADDRESS_PAST_END);
+	}
+	/*
+	 *  Add the FORM TEXT object to the list of focusable objects
+	 */
+	@call currentDoc->HTUI_pmanager::MSG_PM_RECORD_ANCHOR_OBJECT(dummy);
+	break;
+    case INPUT_HIDDEN:
+	/*
+	 *  Create a text object for user input.
+	 */
+	dummy = UICreateObj(currentDoc, (ClassStruct *)&HTGenFormHiddenClass);
+	/*
+	 *  Store NAME and VALUE attributes.
+	 */
+	@call dummy::MSG_GEN_FORM_HIDDEN_INITIALIZE(nameOptr, valueOptr);
+	break;
+    case INPUT_CHECKBOX:
+    case INPUT_RADIO:
+      /*
+       *  Create a Input object(GenItemGroup).
+       */
+      dummy = UICreateObj(currentDoc, (ClassStruct *)&HTGenInputClass);
+      @call currentDoc->HTUI_pmanager::MSG_PM_TAKE_UNFINISHED_UI_OBJ(dummy);
+      /*
+       *  Initialize the Input object.
+       */
+      @call dummy::MSG_GEN_ITEM_GROUP_SET_NONE_SELECTED(FALSE);
+      @call dummy::MSG_GEN_INPUT_STORE_DATA(nameOptr, valueOptr, 
+					    Itype, checked, container);
+      /* 
+       *  Add the INPUT object to the linked list under the FORM object.
+       */
+      AddInputToForm(container, dummy);
+      /*
+       *  Add the Checkbox/Radio object to the list of focusable objects
+       */
+      @call currentDoc->HTUI_pmanager::MSG_PM_RECORD_ANCHOR_OBJECT(dummy);
+      /*
+       * Insert the Input(ItemGroup) to the ui tree.
+       */
+      @call currentDoc->HTUI_pmanager::MSG_PM_TAKE_UNFINISHED_UI_OBJ(dummy);
+      /*
+       * Create a genItem object 
+       */
+      dummy = UICreateObj(currentDoc, (ClassStruct *)&GenItemClass);
+      @call dummy::MSG_GEN_ITEM_SET_IDENTIFIER(0);
+
+      @call currentDoc->HTUI_pmanager::MSG_PM_TAKE_FINISHED_UI_OBJ(dummy);
+      @call currentDoc->HTUI_pmanager::MSG_PM_MARK_RECV_OBJECT_DONE(&dummy, &class);
+      currentDoc->HTUI_target.obj = dummy;
+      currentDoc->HTUI_target.class = class;
+      break;
+    case INPUT_RESET:
+    case INPUT_SUBMIT:
+	/*
+	 * Create a text object for user input.
+	 */
+	dummy = UICreateObj(currentDoc, (ClassStruct *)&HTGenFormTriggerClass);
+	@call dummy::MSG_GEN_FORM_TRIGGER_INITIALIZE(nameOptr,Itype,container);
+	/*
+	 *  Set up the the vis Moniker on the trigger.
+	 */
+	if (valueOptr) {
+	  /*
+	   *  Create a visMoniker, and copy the text moniker.
+	   */
+	  ObjLockObjBlock(HandleOf(dummy));
+	  cptr = (char *)HTMemLock(valueOptr);
+	  tmpChunk = LMemAlloc(HandleOf(dummy), 
+			strlen(cptr) + 1 + sizeof(VisMonikerWithText));
+	  moniker = LMemDerefHandles(HandleOf(dummy), tmpChunk);
+	  moniker->VMWT_common.VM_type = 0;
+	  moniker->VMWT_common.VM_width= 0;
+	  moniker->VMWT_mnemonicOffset = -1;
+	  strcpy((char *)moniker + VMWT_text, cptr);
+	  HTMemUnlock(valueOptr);
+	  HTMemFree(valueOptr);
+
+	  @call dummy::MSG_GEN_REPLACE_VIS_MONIKER_OPTR
+		(ConstructOptr(HandleOf(dummy),tmpChunk), VUM_NOW);
+	  LMemFreeHandles(HandleOf(dummy), tmpChunk);
+	  MemUnlock(HandleOf(dummy));
+	}
+	else if (Itype == INPUT_SUBMIT)
+	  @call dummy::MSG_GEN_REPLACE_VIS_MONIKER_TEXT
+		("Submit", VUM_DELAYED_VIA_UI_QUEUE);
+	else
+	  @call dummy::MSG_GEN_REPLACE_VIS_MONIKER_TEXT
+		("Reset", VUM_DELAYED_VIA_APP_QUEUE);
+	/*
+	 *  Set the RESET action message and destination
+	 */
+	if (Itype == INPUT_RESET) {
+	  @call dummy::MSG_GEN_TRIGGER_SET_ACTION_MSG(MSG_GEN_FORM_RESET);
+	  while(!@call container::MSG_META_IS_OBJECT_IN_CLASS
+	        (&HTGenFormClass)) {
+	    container = @call container::MSG_GEN_FIND_PARENT();
+	  }
+	  @call dummy::MSG_GEN_TRIGGER_SET_DESTINATION(container);
+	}
+	else
+	  @call dummy::MSG_META_SET_OBJ_BLOCK_OUTPUT(currentDoc->HTUI_pmanager);
+	/*
+	 *  Add the Reset/Submit object to the list of focusable objects
+	 */
+	@call currentDoc->HTUI_pmanager::MSG_PM_RECORD_ANCHOR_OBJECT(dummy);
+        break;
+    case INPUT_IMAGE:
+	image = dummy = UICreateObj(currentDoc, (ClassStruct *)&HTGenImageClass);
+	@call dummy::MSG_GEN_IMAGE_REQUEST(srcOptr);
+	@call dummy::MSG_GEN_IMAGE_MARK_INPUT(container, nameOptr);
+	/*
+	 *  Add the image object to the list of focusable objects
+	 */
+	@call currentDoc->HTUI_pmanager::MSG_PM_RECORD_ANCHOR_OBJECT(dummy);
+	break;
+  }
+  if (Itype != INPUT_CHECKBOX && Itype != INPUT_RADIO) {
+    /*
+     *  Done with the new object.  CHECKBOX and RADIO will get its
+     *  visMoniker later.
+     */
+    @call currentDoc->HTUI_pmanager::MSG_PM_TAKE_FINISHED_UI_OBJ(dummy);
+    @call currentDoc->HTUI_pmanager::MSG_PM_GET_RECV_OBJ_OPTR_AND_CLASS \
+		(&(currentDoc->HTUI_target.obj), &(currentDoc->HTUI_target.class));
+  }
+    
+  return image;
+}	/* End of UIGen_CREATE_INPUT_Int.	*/
+
+
+
+/***********************************************************************
+ *	UIGen_START_TEXTAREA_Int for UIGeneratorClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    Creates a multiple-line text entry control in
+ *		    which the user can enter and edit text. 
+ * PARAMETERS:	    (MemHandle block, SGMLEntity *entity)
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:	Supported Attr: COLS, NAME, ROWS
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	edwin	8/28/96   	Initial Revision
+ *
+ ***********************************************************************/
+ErrorCode UIGen_START_TEXTAREA_Int
+		(MemHandle block, SGMLEntity *entity)
+{
+  optr obj, content;
+
+  /*
+   *  Finish and append whatever ui object in the target to the ui tree.
+   *  Travel up the tree and return the first container object(which
+   *  can be a form object, or a HTGenTCell object) encountered.
+   */
+  content=FinishCurrentObjectInForm(currentDoc->HTUI_pmanager,&(currentDoc->HTUI_target));
+  /*
+   * Now create a select object and store it in target.obj.  
+   * Then process the passed attribute list.
+   */
+  obj = UICreateObj(currentDoc, (ClassStruct *)&TextAreaClass);
+  
+  currentDoc->HTUI_target.obj = obj;
+  currentDoc->HTUI_target.class = (ClassStruct *)&TextAreaClass; 
+  @call currentDoc->HTUI_target.obj::MSG_TEXT_AREA_PROCESS_ATTRIBUTE
+	(block, entity, content);
+  /*
+   *  Add the text area object to the list of focusable objects
+   */
+  @call currentDoc->HTUI_pmanager::MSG_PM_RECORD_ANCHOR_OBJECT(obj);
+
+  return UI_GEN_NO_ERROR;
+}	/* End of UIGen_START_TEXTAREA_Int.	*/
+
+
+
+/***********************************************************************
+ *	UIGen_END_TEXTAREA_Int for UIGeneratorClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    Finish up the <TEXTAREA> object.
+ * PARAMETERS:	    none
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	edwin	8/28/96   	Initial Revision
+ *
+ ***********************************************************************/
+ErrorCode UIGen_END_TEXTAREA_Int()
+{
+  HTMemHandle tmpOptr;
+  int	len;
+  char	*cptr;
+
+  /* 
+   *  If there is some object in target.obj (It must be a GenFormText
+   *  object), now we can mark it done.  Thus, pass the object to the 
+   *  presentation manager for rendering.
+   */
+  if (currentDoc->HTUI_target.obj) {
+    EC_ERROR_IF(currentDoc->HTUI_target.class != 
+	(ClassStruct *)&TextAreaClass, UIG_UI_TREE_OPERATION_FAILS);
+    /*
+     *  If there is some text between <TEXTAREA> and </TEXTAREA>, 
+     *  store a copy of the text in the HTGFT_value.  This copy is used
+     *  to restore the TEXTAREA back to its initial state when the RESET
+     *  trigger is pressed.
+     */
+    if((len = @call currentDoc->HTUI_target.obj::MSG_VIS_TEXT_GET_TEXT_SIZE())>0){
+      tmpOptr = HTMemAllocWID(0, sizeof(char)* (len + 1));
+      cptr = (char *)HTMemLock(tmpOptr);
+      @call currentDoc->HTUI_target.obj::MSG_VIS_TEXT_GET_ALL_PTR(cptr);
+      @call currentDoc->HTUI_target.obj::MSG_GEN_FORM_TEXT_INITIALIZE(0,tmpOptr,NULL);
+      HTMemUnlock(tmpOptr);
+    }
+
+    @call currentDoc->HTUI_pmanager::MSG_PM_TAKE_FINISHED_UI_OBJ(currentDoc->HTUI_target.obj);
+
+    @call currentDoc->HTUI_target.obj::MSG_TEXT_AREA_FINISH();
+    
+    @call currentDoc->HTUI_pmanager::MSG_PM_GET_RECV_OBJ_OPTR_AND_CLASS
+	(&currentDoc->HTUI_target.obj, &currentDoc->HTUI_target.class);
+    EC_ERROR_IF
+	(currentDoc->HTUI_target.class != (ClassStruct *)&HTGenFormClass &&
+	 currentDoc->HTUI_target.class != (ClassStruct *)&HTGenTCellClass, 
+	 UIG_UI_TREE_OPERATION_FAILS);
+    return UI_GEN_NO_ERROR;
+  }
+  else
+    return UI_GEN_ERROR;
+}	/* End of UIGen_END_TEXTAREA_Int.	*/
+
+
+
+
+/***********************************************************************
+ *		AddInputToForm
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Add the input object to the linked list under the form.
+ * CALLED BY:	(optr form, optr inputObj)
+ * RETURN:	void 
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	edwin	1/ 9/97   	Initial Revision
+ *
+ ***********************************************************************/
+void
+AddInputToForm (optr form, optr inputObj)
+{
+  while(!@call form::MSG_META_IS_OBJECT_IN_CLASS(&HTGenFormClass)) {
+    form = @call form::MSG_GEN_FIND_PARENT();
+    if (@call form::MSG_META_IS_OBJECT_IN_CLASS(&PresentationManagerClass)){
+      EC_WARNING(UIG_INVALID_OPERATION);
+      return;
+    }
+  }
+  @send inputObj::MSG_GEN_ITEM_GROUP_SET_DESTINATION(form);
+  @call form::MSG_GEN_FORM_ADD_INPUT(inputObj);
+  return;
+}	/* End of AddInputToForm.	*/
+
+
+/***********************************************************************
+  Code for TextAreaClass and TextAreaTextClass
+***********************************************************************/
+@classdecl	TextAreaClass; 
+@classdecl	TextAreaTextClass; 
+
+/***********************************************************************
+ *	MSG_TEXT_AREA_PROCESS_ATTRIBUTE for TextAreaClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    Process the <TEXTAREA> attribute list.
+ * PARAMETERS:	    (MemHandle block, SGMLEntity *entity, optr content)
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:	Attributes processed:  NAME, COLS, ROWS.
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	edwin	8/28/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method TextAreaClass, MSG_TEXT_AREA_PROCESS_ATTRIBUTE
+{
+  char *value;
+  int	index, cols = 12, rows = 1;
+  word br;
+
+  @self->TAI_content = content;
+  for(index = 0; entity[index].SGMLE_token; index++) {
+    if (!entity[index].SGMLE_value)
+      continue;
+    value = (char *)LMemDerefHandles(block, entity[index].SGMLE_value);
+    switch(entity[index].SGMLE_token) {
+    case HTML_ATTR_NAME:
+@ifdef PRODUCT_RESPONDER
+    pself = ObjDerefGen(oself);
+@endif
+      @self->TAI_name = HTStrAllocCopyWID(0, value);
+      break;
+    case HTML_ATTR_COLS:
+      cols = atoi(value);
+      if (cols > 75)
+	  cols = 75;
+      else if (cols <= 0)
+	  cols = 12;     /* get back to default */
+      break;
+    case HTML_ATTR_ROWS:
+      rows = atoi(value);
+      if (rows > 50)
+	  rows = 50;
+      else if (rows <= 0)
+	  rows = 1;     /* get back to default */
+      break;
+    }
+  }
+
+  @self->TAI_width = cols * 6;  /* char width */
+  @self->TAI_length = rows * 17 + 2; /* line of text */
+
+  /*
+   *  Make the object to be able to grab focus exclusive.
+   */
+  @call self::MSG_GEN_SET_ATTRS(GA_TARGETABLE,0);
+
+  @call self::MSG_META_ADD_VAR_DATA(HINT_DRAW_IN_BOX, 0, NULL);
+@ifdef TRUNK
+    @call self::MSG_META_ADD_VAR_DATA(HINT_DRAW_STYLE_3D_LOWERED, 0, NULL);
+@endif
+
+    @self->TAI_align = @call content::MSG_GEN_HTML_CONTENT_GET_JUSTIFICATION
+	(&br);
+  @self->TAI_noBr = br;
+
+  /* 
+   * create the text object 
+   */
+  @self->TAI_textObj = UICreateObj(currentDoc, (ClassStruct *)&TextAreaTextClass);
+
+  /*
+   *  Let TAB to switch to different object, instead of inserting a tab.
+   */
+  @call @self->TAI_textObj::MSG_GEN_TEXT_SET_ATTRS
+      (GTA_USE_TAB_FOR_NAVIGATION, 0);
+  @call @self->TAI_textObj::MSG_GEN_SET_ATTRS
+      (GA_TARGETABLE, 0);
+  @call @self->TAI_textObj::MSG_META_ADD_VAR_DATA
+      (HINT_NO_BORDERS_ON_MONIKERS, 0, NULL);
+
+  @call @self->TAI_textObj::MSG_TAT_SET_ROWS(rows);
+  @call @self->TAI_textObj::MSG_TAT_SET_COLUMNS(cols);
+
+  @call @self->TAI_textObj::MSG_META_ADD_VAR_DATA
+      (HINT_TEXT_WHITE_WASH_COLOR, 0, NULL);
+
+@ifdef TRUNK
+    @call @self->TAI_textObj::MSG_META_ADD_VAR_DATA(
+			HINT_DRAW_STYLE_FLAT, 0, NULL);
+@endif
+
+    @call @self->TAI_textObj::MSG_META_ADD_VAR_DATA(
+			HINT_TEXT_NO_FRAME, 0, NULL);
+
+  @call self::MSG_GEN_ADD_CHILD(@self->TAI_textObj, CCF_MARK_DIRTY);
+
+  return;
+}	/* End of MSG_TEXT_AREA_PROCESS_ATTRIBUTE.	*/
+
+
+/***********************************************************************
+ *		MSG_TEXT_AREA_FINISH for TextAreaClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    Copy the text to the text object and set it usable.
+ * PARAMETERS:	    
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:	    
+ *
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	mzhu    	8/ 8/97   	Initial Revision
+ *	
+ ***********************************************************************/
+@method TextAreaClass, MSG_TEXT_AREA_FINISH
+{
+    char *ptr;
+
+    @call @self->TAI_textObj::MSG_GEN_SET_USABLE(VUM_NOW);
+
+    if(@self->TAI_text) {
+	ptr = HTMemLock(@self->TAI_text);
+	@call @self->TAI_textObj::MSG_VIS_TEXT_APPEND_PTR(ptr, 0);
+	HTMemUnlock(@self->TAI_text);
+    } else 
+	@call @self->TAI_textObj::MSG_VIS_TEXT_APPEND_PTR("", 0);
+
+}	/* End of MSG_TEXT_AREA_FINISH.	*/
+
+
+/***********************************************************************
+ *		MSG_TEXT_AREA_SET_FOCUS for TextAreaClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    
+ * PARAMETERS:	    
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:	    
+ *
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	edwin   	8/25/97   	Initial Revision
+ *	
+ ***********************************************************************/
+@method TextAreaClass, MSG_TEXT_AREA_SET_FOCUS
+{
+    @self->TAI_focalBound = *rect;
+}	/* End of MSG_TEXT_AREA_SET_FOCUS.	*/
+
+
+/***********************************************************************
+ *		MSG_TEXT_AREA_CLEAR_FOCUS for TextAreaClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    
+ * PARAMETERS:	    
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:	    
+ *
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	edwin   	8/25/97   	Initial Revision
+ *	
+ ***********************************************************************/
+@method TextAreaClass, MSG_TEXT_AREA_CLEAR_FOCUS
+{
+    @self->TAI_focalBound.RD_left = @self->TAI_focalBound.RD_right = 0;
+}	/* End of MSG_TEXT_AREA_CLEAR_FOCUS.	*/
+
+
+/***********************************************************************
+ *		MSG_TEXT_AREA_APPEND_TEXT_PTR for TextAreaClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    Store the initial text.
+ * PARAMETERS:	    
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:	    
+ *
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	mzhu    	8/ 8/97   	Initial Revision
+ *	
+ ***********************************************************************/
+@method TextAreaClass, MSG_TEXT_AREA_APPEND_TEXT_PTR
+{
+    char *cptr;
+    int length = len;
+
+    if(!length) length = strlen(text);
+    cptr = HTMemAllocAndLockWID(0, &(@self->TAI_text), length+1);
+
+    strncpy(cptr, text, length);
+
+    *(cptr + length) = 0;
+    
+    HTMemUnlock(@self->TAI_text);
+
+}	/* End of MSG_TEXT_AREA_APPEND_TEXT_PTR.	*/
+
+
+/***********************************************************************
+ *		MSG_TEXT_AREA_SUBMIT for TextAreaClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    When user press submit button, copy the current text
+ *                  from the text object to the query list.
+ * PARAMETERS:	    (HTListHandle query)
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:	    
+ *
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	mzhu    	8/ 8/97   	Initial Revision
+ *	
+ ***********************************************************************/
+@method TextAreaClass, MSG_TEXT_AREA_SUBMIT
+{
+    int len;
+    HTMemHandle temp;
+    char *value;
+
+    if(@self->TAI_name) {
+	len = @call @self->TAI_textObj::MSG_VIS_TEXT_GET_TEXT_SIZE();
+	if (len <= 0) return;
+	/*
+	 *  Append the "name".
+	 */
+	temp = HTStrHTMemAllocCopyWID(0, @self->TAI_name);
+	HTListAppend(query, &temp, sizeof(HTMemHandle));
+	/*
+	 *  Append the value
+	 */
+	value = (char *) HTMemAllocAndLockWID(0, &temp, sizeof(char) * (len+1));
+	@call @self->TAI_textObj::MSG_VIS_TEXT_GET_ALL_PTR(value);
+	HTMemUnlock(temp);
+	HTListAppend(query, &temp, sizeof(HTMemHandle));
+    }
+    return;
+
+}	/* End of MSG_TEXT_AREA_SUBMIT.	*/
+
+
+/***********************************************************************
+ *		MSG_TEXT_AREA_RESET for TextAreaClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    When user press reset button, reset the text object
+ *                  to use the initial text.
+ * PARAMETERS:	    
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:	    
+ *
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	mzhu    	8/ 8/97   	Initial Revision
+ *	
+ ***********************************************************************/
+@method TextAreaClass, MSG_GEN_RESET
+{
+    char *ptr;
+
+    @call @self->TAI_textObj::MSG_GEN_RESET();
+
+    if(@self->TAI_text) {
+	ptr = HTMemLock(@self->TAI_text);
+	@call @self->TAI_textObj::MSG_VIS_TEXT_REPLACE_ALL_PTR(ptr, 0);
+	HTMemUnlock(@self->TAI_text);
+    } else 
+	@call @self->TAI_textObj::MSG_VIS_TEXT_REPLACE_ALL_PTR("", 0);
+}	/* End of MSG_TEXT_AREA_RESET.	*/
+
+
+/***********************************************************************
+ *		MSG_VIS_RECALC_SIZE for TextAreaClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    Since the GenInteration doesn't take fixed size,
+ *                  so we return our own size to overwrite the system
+ *                  size for our TextArea.
+ * PARAMETERS:	    
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:	    
+ *
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	mzhu    	8/ 8/97   	Initial Revision
+ *	
+ ***********************************************************************/
+@method TextAreaClass, MSG_VIS_RECALC_SIZE
+{
+  VisCompInstance * vself;
+  SizeAsDWord size;
+
+@ifdef PRODUCT_RESPONDER
+    pself = ObjDerefGen(oself);
+@endif
+    /* 
+     * use our own size 
+     */
+    size = MAKE_SIZE_DWORD(@self->TAI_width, @self->TAI_length);
+
+  /*
+   *  Tell the Geometry Manager to send a messaeg instead of caling a
+   *  a routine.
+   */
+  vself = ObjDerefVis(oself);
+  vself->VI_geoAttrs &= ~VGA_USE_VIS_SET_POSITION;
+
+  @call @self->TAI_textObj::MSG_TAT_SET_SIZE(DWORD_WIDTH(size), 
+					     DWORD_HEIGHT(size)-2);
+
+  return size;
+}	/* End of MSG_VIS_RECALC_SIZE.	*/
+
+/***********************************************************************
+ *		MSG_VIS_POSITION_BRANCH for TextAreaClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    
+ * PARAMETERS:	    
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:	    
+ *
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	mzhu    	8/ 8/97   	Initial Revision
+ *	
+ ***********************************************************************/
+@method TextAreaClass, MSG_VIS_POSITION_BRANCH
+{
+  XYValueAsDWord xy = @call @genParent::MSG_VIS_GET_POSITION();
+  word lineWidth, pWidth;
+
+@ifdef PRODUCT_RESPONDER
+    pself = ObjDerefGen(oself);
+@endif
+
+    if(@self->TAI_align == J_LEFT) {
+	xOrigin = DWORD_X(xy) + @self->TAI_xPos;
+    } else {
+	lineWidth = @call @self->TAI_content::
+	    MSG_GEN_HTML_CONTENT_GET_ROW_WIDTH(@self->TAI_pageRow);
+	pWidth = DWORD_WIDTH(@call @genParent::MSG_VIS_GET_SIZE());
+	if(@self->TAI_align == J_RIGHT) {
+	    xOrigin = DWORD_X(xy) + 
+		(pWidth - lineWidth + @self->TAI_xPos);
+	} else {
+	    xOrigin = DWORD_X(xy) + 
+		(((pWidth - lineWidth)/2) + @self->TAI_xPos);
+	}
+    }
+	
+    yOrigin = DWORD_Y(xy) + 
+	GetItsPotentialHeight(@self->TAI_content, @self->TAI_pageRow, oself)
+	- 1;
+
+  @call @self->TAI_textObj::MSG_TAT_SET_POSITION(xOrigin, yOrigin);
+
+  @callsuper();
+
+  return;
+}	/* End of MSG_VIS_POSITION_BRANCH.	*/
+
+
+/***********************************************************************
+ *		MSG_UI_GET_ROW_POSITION for TextAreaClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    
+ * PARAMETERS:	    
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:	    
+ *
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	mzhu    	8/ 8/97   	Initial Revision
+ *	
+ ***********************************************************************/
+@method TextAreaClass, MSG_UI_GET_ROW_POSITION
+{
+    return @self->TAI_pageRow;
+}	/* End of MSG_UI_GET_ROW_POSITION.	*/
+
+
+/***********************************************************************
+ *		MSG_UI_SET_NEW_POSITION for TextAreaClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    
+ * PARAMETERS:	    
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:	    
+ *
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	mzhu    	8/ 8/97   	Initial Revision
+ *	
+ ***********************************************************************/
+@method TextAreaClass, MSG_UI_SET_NEW_POSITION
+{
+    @self->TAI_pageRow = row;
+    @self->TAI_xPos = xPos;
+}	/* End of MSG_UI_SET_NEW_POSITION.	*/
+
+
+/***********************************************************************
+ *		MSG_UI_CALC_SIZE_POSITION for TextAreaClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    
+ * PARAMETERS:	    
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:	    
+ *
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	mzhu    	8/ 8/97   	Initial Revision
+ *	
+ ***********************************************************************/
+@method TextAreaClass, MSG_UI_CALC_SIZE_POSITION
+{
+  int row, pos;
+  SizeAsDWord size;
+  /*
+   *  Ask the text object's content object to figure out the size and
+   *  position of the text object.
+   */
+  pos = UpdateItsPotentialPosition(oself,@self->TAI_content,&row,&size);
+
+  /*
+   *  Store the returned x position in the returned row number.
+   */
+@ifdef PRODUCT_RESPONDER
+    pself = ObjDerefGen(oself);
+@endif
+  @self->TAI_xPos = pos; 
+  @self->TAI_pageRow = row;
+  @self->TAI_guessSize = size;
+
+  return;
+}	/* End of MSG_UI_CALC_SIZE_POSITION.	*/
+
+
+/***********************************************************************
+ *		MSG_SPEC_BUILD_BRANCH for TextAreaClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    
+ * PARAMETERS:	    
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:	    
+ *
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	mzhu    	8/ 8/97   	Initial Revision
+ *	
+ ***********************************************************************/
+@method TextAreaClass, MSG_SPEC_BUILD_BRANCH
+{
+  @callsuper();
+
+  if (@self->TAI_guessSize)
+      @call self::MSG_VIS_SET_SIZE(DWORD_WIDTH(@self->TAI_guessSize),
+				   DWORD_HEIGHT(@self->TAI_guessSize));
+
+  return;
+}	/* End of MSG_SPEC_BUILD_BRANCH.	*/
+
+
+/***********************************************************************
+ *		MSG_GEN_DESTROY for TextAreaClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    Clean up itself.
+ * PARAMETERS:	    
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:	    
+ *
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	mzhu    	8/ 8/97   	Initial Revision
+ *	
+ ***********************************************************************/
+@method TextAreaClass, MSG_GEN_DESTROY
+{
+    if(@self->TAI_text) 
+	HTMemFree(@self->TAI_text);
+
+    @callsuper();
+}	/* End of MSG_GEN_DESTROY.	*/
+
+
+
+/***********************************************************************
+ *		MSG_GEN_PREPARE_FOR_DESTROY for TextAreaClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    Prepare the object for HTObjDestroyAllWID. All we
+ *                  need to do is delete instance data. This message 
+ *                  replaces MSG_GEN_DESTROY as we won't be sending 
+ *                  MSG_GEN_DESTROY to objects. Instance data allocated
+ *                  using ...WID APIs (like HTListNewWID, HTMemAllocWID)
+ *                  need not freed to save time.
+ * PARAMETERS:	    void (void)
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:	    
+ *
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	kkee    	9/16/97   	Initial Revision
+ *	
+ ***********************************************************************/
+@method TextAreaClass, MSG_GEN_PREPARE_FOR_DESTROY
+{
+    /*
+     * This is allocated by HTMemAllocWID.
+     *
+     * if(@self->TAI_text)
+     *   HTMemFree(@self->TAI_text);
+     */
+    /* 
+     * If we delete something here, make sure to add to list in 
+     * UICreateObj.
+     */
+    return;
+}	/* End of MSG_GEN_PREPARE_FOR_DESTROY.	*/
+
+
+
+/***********************************************************************
+ *		MSG_VIS_DRAW for TextAreaClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    
+ * PARAMETERS:	    
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:	    
+ *
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	edwin   	8/25/97   	Initial Revision
+ *	
+ ***********************************************************************/
+@method TextAreaClass, MSG_VIS_DRAW
+{
+  @callsuper();
+  if (@self->TAI_focalBound.RD_right != @self->TAI_focalBound.RD_left) {
+      RedrawFocus (gstate, &@self->TAI_focalBound);
+  }
+    return;
+}	/* End of MSG_VIS_DRAW.	*/
+
+
+/***********************************************************************
+ *		MSG_META_START_SELECT for TextAreaClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    
+ * PARAMETERS:	    
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:	    
+ *
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	edwin   	8/ 25/97   	Initial Revision
+ *	
+ ***********************************************************************/
+@method TextAreaClass, MSG_META_START_SELECT
+{
+  EventHandle msg;
+  Rectangle box, rect;
+
+  @call self::MSG_VIS_GET_BOUNDS(&rect);
+  rect.R_left -= 2;
+  rect.R_top -= 2;
+  rect.R_right += 1;
+  rect.R_bottom += 1;
+  box.R_right = box.R_left = box.R_top = box.R_bottom = 0;
+  msg = @record PresentationManagerClass::MSG_PM_GRAB_NEW_FOCUS
+      (oself, rect, box, &HTGenTextClass, &HTGenImageClass, &HTGenInputClass);
+  @send oself::MSG_VIS_VUP_SEND_TO_OBJECT_OF_CLASS(msg);
+  @callsuper();
+  return;
+}	/* End of MSG_META_START_SELECT.	*/
+
+/***********************************************************************
+ *		MSG_META_GRAB_FOCUS_EXCL for TextAreaClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    
+ * PARAMETERS:	    
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:	    
+ *
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	edwin   	8/26/97   	Initial Revision
+ *	
+ ***********************************************************************/
+@method TextAreaClass, MSG_META_GRAB_FOCUS_EXCL, MSG_META_GRAB_TARGET_EXCL
+{
+    /*
+     *  Assuming TextArea has only one child.
+     */
+    if (message == MSG_META_GRAB_FOCUS_EXCL)
+	@send @genChildren::MSG_META_GRAB_FOCUS_EXCL();
+    else
+	@send @genChildren::MSG_META_GRAB_TARGET_EXCL();
+    return;
+}	/* End of MSG_META_GRAB_FOCUS_EXCL.	*/
+
+
+
+/***********************************************************************
+ *		MSG_VIS_MARK_INVALID for TextAreaTextClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    
+ * PARAMETERS:	    
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:	    
+ *
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	mzhu    	8/ 8/97   	Initial Revision
+ *	
+ ***********************************************************************/
+@method TextAreaTextClass, MSG_VIS_MARK_INVALID
+{
+    VisCompInstance * vself;
+
+    @callsuper();
+
+    vself = ObjDerefVis(oself);
+    vself->VI_optFlags &= ~(VOF_GEOMETRY_INVALID | VOF_WINDOW_INVALID);
+/*    @send self::MSG_VIS_UPDATE_GEOMETRY(); */
+
+    return;
+}	/* End of MSG_VIS_MARK_INVALID.	*/
+
+
+/***********************************************************************
+ *		MSG_SPEC_BUILD_BRANCH for TextAreaTextClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    This message has three purposes, 
+ *                    1. set the size
+ *                    2. set some flags
+ *                    3. set notification
+ * PARAMETERS:	    
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:	    
+ *
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	mzhu    	8/11/97   	Initial Revision
+ *	
+ ***********************************************************************/
+@method TextAreaTextClass, MSG_SPEC_BUILD_BRANCH
+{
+  VisCompInstance * vself;
+  word t = 0;
+
+  @callsuper();
+
+  /*
+   * set the reasonable size
+   */
+  @self->TATI_height = @call self::MSG_VIS_TEXT_CALC_HEIGHT
+      (@self->TATI_width, FALSE);
+
+  if(@self->TATI_height < @self->TATI_length) 
+      @self->TATI_height = @self->TATI_length + 2;
+
+  @call self::MSG_VIS_SET_SIZE(@self->TATI_width, @self->TATI_height+1); 
+
+
+  vself = ObjDerefVis(oself);
+  vself->VI_geoAttrs &= ~VGA_USE_VIS_SET_POSITION;
+
+  vself->VI_optFlags &= ~(VOF_GEOMETRY_INVALID | VOF_WINDOW_INVALID);
+/*  @call self::MSG_VIS_NOTIFY_GEOMETRY_VALID();*/
+
+  /*
+   * declare that we want to get all the notificatioin happened for 
+   * this text object
+   */
+  @call self::MSG_META_ADD_VAR_DATA(ATTR_VIS_TEXT_NOTIFY_CURSOR_POSITION,
+		sizeof(word), &t);
+
+  @self->TATI_origin.P_x = @self->TATI_origin.P_y = 0;
+
+  return;
+}	/* End of MSG_SPEC_BUILD_BRANCH.	*/
+
+
+
+/***********************************************************************
+ *		MSG_VIS_DRAW for TextAreaTextClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    We don't want to draw the text out of the textarea,
+ *                  so we intercept this message and set the clipRect.
+ * PARAMETERS:	    
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:	    
+ *
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	mzhu    	8/11/97   	Initial Revision
+ *	
+ ***********************************************************************/
+@method TextAreaTextClass, MSG_VIS_DRAW
+{
+    VisCompInstance * vself;
+    vself = ObjDerefVis(oself);
+    vself->VI_optFlags &= ~(VOF_GEOMETRY_INVALID | VOF_WINDOW_INVALID);
+
+    GrSaveState(gstate); 
+
+    GrSetWinClipRect(gstate, PCT_REPLACE,
+		  @self->TATI_x, @self->TATI_y + 1, 
+		  @self->TATI_x + @self->TATI_width, 
+		  @self->TATI_y + @self->TATI_length);
+
+    @callsuper();
+
+    GrRestoreState(gstate);
+}	/* End of MSG_VIS_DRAW.	*/
+
+
+/***********************************************************************
+ *		MSG_GEN_RESET for TextAreaTextClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    Reset the position and size when user reset it.
+ * PARAMETERS:	    
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:	    
+ *
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	mzhu    	8/22/97   	Initial Revision
+ *	
+ ***********************************************************************/
+@method TextAreaTextClass, MSG_GEN_RESET
+{
+    @self->TATI_firstChar.P_x = @self->TATI_firstChar.P_y = 0;
+    @self->TATI_origin.P_x = @self->TATI_origin.P_y = 0;
+
+    @self->TATI_height = @call self::MSG_VIS_TEXT_CALC_HEIGHT
+      (@self->TATI_width, FALSE);
+
+    if(@self->TATI_height < @self->TATI_length) 
+	@self->TATI_height = @self->TATI_length;
+
+    @call self::MSG_VIS_SET_SIZE(@self->TATI_width, @self->TATI_height+1); 
+
+    @call self::MSG_VIS_SET_POSITION
+	(@self->TATI_origin.P_x, @self->TATI_origin.P_y);
+    @call self::MSG_VIS_POSITION_BRANCH(0,0);
+
+    @call self::MSG_VIS_ADD_RECT_TO_UPDATE_REGION
+	(0, VARF_NOT_IF_ALREADY_INVALID, 
+	 @self->TATI_y + @self->TATI_length,
+	 @self->TATI_x + @self->TATI_width - 1, 
+	 @self->TATI_y + 1, @self->TATI_x + 1);
+
+    return;
+}	/* End of MSG_GEN_RESET.	*/
+
+
+/***********************************************************************
+ *		MSG_TAT_INITIALIZE for TextAreaTextClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    
+ * PARAMETERS:	    
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:	    
+ *
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	mzhu    	8/22/97   	Initial Revision
+ *	
+ ***********************************************************************/
+@method TextAreaTextClass, MSG_TAT_INITIALIZE
+{
+    VisTextGetLineInfoReturnValues retValue;
+    VisTextGetLineInfoParameters vtglip;
+    LineInfo lineInfo;
+
+    @self->TATI_firstChar.P_x = @self->TATI_firstChar.P_y = 0;
+
+    vtglip.VTGLIP_buffer = &lineInfo;
+    vtglip.VTGLIP_bsize = sizeof(LineInfo);
+    vtglip.VTGLIP_line = 0;
+    @call self::MSG_VIS_TEXT_GET_LINE_INFO
+	(&retValue, &vtglip);
+    @self->TATI_lineHeight = lineInfo.LI_hgt.WBF_int;
+}	/* End of MSG_TAT_INITIALIZE.	*/
+
+
+/***********************************************************************
+ *		MSG_VIS_TEXT_GENERATE_NOTIFY for TextAreaTextClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    The main field for us to simulate the scrolling here.
+ *                  We want to keep the cursor always inside the textarea,
+ *                  so whenever the cursor position changed, we check if 
+ *                  it's still inside the area. If so, return. If not, we
+ *                  reposition the text object to keep the cursor still
+ *                  visable. 
+ *                  After that, we need to transform the gstate which is
+ *                  used by the system to draw the cursor and new chars.
+ * PARAMETERS:	    
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:	    
+ *
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	mzhu    	8/22/97   	Initial Revision
+ *	
+ ***********************************************************************/
+@method TextAreaTextClass, MSG_VIS_TEXT_GENERATE_NOTIFY
+{
+    VisTextInstance * vself;
+    int line;
+    TransMatrix tm;
+
+    /* 
+     * check if it's a cursor notification, and if we get some thing to
+     * display.
+     */
+    if((params->VTGNP_notificationTypes & VTNF_CURSOR_POSITION)
+       && (@call self::MSG_VIS_TEXT_GET_TEXT_SIZE())>0) {
+
+	vself = ObjDerefVis(oself);
+
+	if(!vself->VTI_cursorPos.P_x && !vself->VTI_cursorPos.P_y
+	   || !vself->VTI_gstate)   return;
+
+	if(!@self->TATI_lineHeight) @call self::MSG_TAT_INITIALIZE();
+
+	if( vself->VTI_selectStart == vself->VTI_selectEnd) {
+	    if(!@self->TATI_lastGState) {
+		line = vself->VTI_cursorPos.P_y / @self->TATI_lineHeight;
+		if(line >= @self->TATI_firstChar.P_y + @self->TATI_rows){
+		    vself->VTI_cursorPos.P_x = 0;
+		    vself->VTI_cursorPos.P_y = 1;
+		}
+
+		@self->TATI_lastGState = vself->VTI_gstate;
+
+		GrGetTransform(vself->VTI_gstate, &tm);
+		@self->TATI_lastTMe32 = tm.TM_e32.DWF_int;
+		GrSetTransform(vself->VTI_gstate, &tm);
+
+		return;
+
+	    } else if(@self->TATI_lastGState != vself->VTI_gstate) {
+		@self->TATI_lastGState = vself->VTI_gstate;
+		
+		@call self::MSG_VIS_TEXT_FLASH_CURSOR_OFF();
+
+		GrGetTransform(vself->VTI_gstate, &tm);
+		tm.TM_e32.DWF_int = @self->TATI_lastTMe32;
+		GrSetTransform(vself->VTI_gstate, &tm);
+
+		@call self::MSG_VIS_TEXT_FLASH_CURSOR_ON();
+
+		return;
+	    }
+
+
+	    line = vself->VTI_cursorPos.P_y / @self->TATI_lineHeight;
+
+	} else {
+	    line = @call self::MSG_VIS_TEXT_GET_LINE_FROM_OFFSET
+		(vself->VTI_lastOffset);
+	}
+
+	@call self::MSG_TAT_DISPLAY_POSITION(line);
+    }
+}	/* End of MSG_VIS_TEXT_GENERATE_NOTIFY.	*/
+
+
+/***********************************************************************
+ *		MSG_TAT_DISPLAY_POSITION for TextAreaTextClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    
+ * PARAMETERS:	    
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:	    
+ *
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	mzhu    	8/27/97   	Initial Revision
+ *	
+ ***********************************************************************/
+@method TextAreaTextClass, MSG_TAT_DISPLAY_POSITION
+{
+    VisTextInstance * vself;
+    TransMatrix tm;
+
+    if(line >= @self->TATI_firstChar.P_y + @self->TATI_rows)
+	@self->TATI_firstChar.P_y = line - @self->TATI_rows + 1;
+    else if(line < @self->TATI_firstChar.P_y) 
+	@self->TATI_firstChar.P_y = line;
+    else 
+	return;
+
+    @self->TATI_origin.P_y = @self->TATI_y - 
+	@self->TATI_firstChar.P_y * @self->TATI_lineHeight;
+
+    @call self::MSG_VIS_SET_POSITION
+	(@self->TATI_origin.P_x, @self->TATI_origin.P_y);
+    @call self::MSG_VIS_POSITION_BRANCH(0,0);
+
+    @call self::MSG_VIS_ADD_RECT_TO_UPDATE_REGION
+	(0, VARF_NOT_IF_ALREADY_INVALID, 
+	 @self->TATI_y + @self->TATI_length, 
+	 @self->TATI_x + @self->TATI_width - 1, 
+	 @self->TATI_y + 1, @self->TATI_x + 1);
+
+    vself = ObjDerefVis(oself);
+
+    GrGetTransform(vself->VTI_gstate, &tm);
+    tm.TM_e32.DWF_int = @self->TATI_origin.P_y - 1;
+    GrSetTransform(vself->VTI_gstate, &tm);
+    @self->TATI_lastTMe32 = tm.TM_e32.DWF_int;
+}	/* End of MSG_TAT_DISPLAY_POSITION.	*/
+
+
+
+/***********************************************************************
+ *		MSG_META_LARGE_PTR for TextAreaTextClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    
+ * PARAMETERS:	    
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:	    
+ *
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	mzhu    	8/27/97   	Initial Revision
+ *	
+ ***********************************************************************/
+@method TextAreaTextClass, MSG_META_LARGE_PTR
+{
+    word yPosition, line;
+
+    yPosition = (word)largeMouseDataStruct->LMD_location.PDF_y.DWF_int;
+
+    if(yPosition < @self->TATI_origin.P_y + @self->TATI_height - 5 &&
+       yPosition > @self->TATI_origin.P_y + 5) {
+
+	if(!@self->TATI_lineHeight) @call self::MSG_TAT_INITIALIZE();
+	line = (yPosition - @self->TATI_origin.P_y)/ @self->TATI_lineHeight;
+
+	@call self::MSG_TAT_DISPLAY_POSITION(line);
+    }
+
+    @callsuper();
+    
+}	/* End of MSG_META_LARGE_PTR.	*/
+
+
+/***********************************************************************
+ *		MSG_META_KBD_CHAR for TextAreaTextClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    set the clip rect for the VTI_gstate before callsuper.
+ * PARAMETERS:	    
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:	    
+ *
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	mzhu    	8/22/97   	Initial Revision
+ *	
+ ***********************************************************************/
+@method TextAreaTextClass, MSG_META_KBD_CHAR
+{
+    VisTextInstance * vself;
+
+    vself = ObjDerefVis(oself);
+    if(vself->VTI_gstate) 
+	GrSetWinClipRect(vself->VTI_gstate, PCT_REPLACE,
+			 @self->TATI_x + 1, @self->TATI_y + 1, 
+			 @self->TATI_x + @self->TATI_width - 1, 
+			 @self->TATI_y + @self->TATI_length);
+
+    if( !(flags & CF_RELEASE) &&
+	    (((flags >> 8) & SS_LCTRL) 
+	    || ((flags >> 8) & SS_RCTRL) ))  {
+	/* 
+ 	 * Short cut keys
+	 */
+	if(character == ((VC_ISANSI << 8) | 'A') ||
+	   character == ((VC_ISANSI << 8) | 'a')) {
+	    /*
+	     * Select all
+	     */
+	    @send self::MSG_VIS_TEXT_SELECT_ALL();
+	    return;
+
+	} else if(character == ((VC_ISANSI << 8) | 'C') ||
+	    character == ((VC_ISANSI << 8) | 'c')) {
+	    /*
+	     * Copy to clipboard
+	     */
+	    @send self::MSG_META_CLIPBOARD_COPY();
+	    return;
+
+	} else if(character == ((VC_ISANSI << 8) | 'V') ||
+	    character == ((VC_ISANSI << 8) | 'v')) {
+	    /* 
+	     * Paste 
+	     */
+	    @send self::MSG_META_CLIPBOARD_PASTE();
+	    return;
+
+	} else if(character == ((VC_ISANSI << 8) | 'X') ||
+	    character == ((VC_ISANSI << 8) | 'x')) {
+	    /* 
+	     * Cut
+	     */
+	    @send self::MSG_META_CLIPBOARD_CUT();
+	    return;
+	}
+    }
+
+    @callsuper();
+}	/* End of MSG_META_KBD_CHAR.	*/
+
+
+
+/***********************************************************************
+ *		MSG_VIS_TEXT_HEIGHT_NOTIFY for TextAreaTextClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    if the height changed, we need to change the size
+ *                  as well.
+ * PARAMETERS:	    
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:	    
+ *
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	mzhu    	8/22/97   	Initial Revision
+ *	
+ ***********************************************************************/
+@method TextAreaTextClass, MSG_VIS_TEXT_HEIGHT_NOTIFY
+{
+    if(newHeight != @self->TATI_height && newHeight > @self->TATI_length) { 
+	@self->TATI_height = newHeight;
+	@call self::MSG_VIS_SET_SIZE(@self->TATI_width, @self->TATI_height+1); 
+    }
+
+    @call self::MSG_VIS_INVALIDATE(); 
+    @callsuper(); 
+}	/* End of MSG_VIS_TEXT_HEIGHT_NOTIFY.	*/
+
+
+/***********************************************************************
+ *		MSG_VIS_POSITION_BRANCH for TextAreaTextClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    Use our own position.
+ * PARAMETERS:	    
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:	    
+ *
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	mzhu    	8/22/97   	Initial Revision
+ *	
+ ***********************************************************************/
+@method TextAreaTextClass, MSG_VIS_POSITION_BRANCH
+{
+    xOrigin = @self->TATI_origin.P_x;
+    yOrigin = @self->TATI_origin.P_y - 2;
+
+    @callsuper();
+
+    return;
+}	/* End of MSG_VIS_POSITION_BRANCH.	*/
+
+
+
+/***********************************************************************
+ *		MSG_TAT_SET_SIZE for TextAreaTextClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    
+ * PARAMETERS:	    
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:	    
+ *
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	mzhu    	8/11/97   	Initial Revision
+ *	
+ ***********************************************************************/
+@method TextAreaTextClass, MSG_TAT_SET_SIZE
+{
+    @self->TATI_width = width;
+    @self->TATI_length = length;
+}	/* End of MSG_TAT_SET_SIZE.	*/
+
+@method TextAreaTextClass, MSG_TAT_SET_POSITION
+{
+    @self->TATI_x = x;
+    @self->TATI_y = y;
+    @self->TATI_origin.P_x = x;
+    @self->TATI_origin.P_y = y;
+}
+
+@method TextAreaTextClass, MSG_TAT_SET_ROWS
+{
+    @self->TATI_rows = rows;
+}
+
+@method TextAreaTextClass, MSG_TAT_SET_COLUMNS
+{
+    @self->TATI_columns = columns;
+}
+
+
+/***********************************************************************
+ *		MSG_GEN_PREPARE_FOR_DESTROY for TextAreaTextClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    Prepare the object for HTObjDestroyAllWID. All we
+ *                  need to do is delete instance data. This message 
+ *                  replaces MSG_GEN_DESTROY as we won't be sending 
+ *                  MSG_GEN_DESTROY to objects. Instance data allocated
+ *                  using ...WID APIs (like HTListNewWID, HTMemAllocWID)
+ *                  need not freed to save time.
+ * PARAMETERS:	    void (void)
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:	    
+ *
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	kkee    	9/16/97   	Initial Revision
+ *	
+ ***********************************************************************/
+@method TextAreaTextClass, MSG_GEN_PREPARE_FOR_DESTROY
+{
+    VisTextInstance * vself;
+    /*
+     * This is not allocated by TextAreaText, but by its superclass.
+     * I have to find out all such handles and memory leaks and delete
+     * them.... or send MSG_GEN_DESTROY to it.
+     * 
+     * if (@self->TATI_lastGState) 
+     *  GrDestroyState(@self->TATI_lastGState);
+     */
+    /* 
+     * If we delete something here, make sure to add to list in 
+     * UICreateObj.
+     */
+    vself = ObjDerefVis(oself);
+    if (vself->VTI_gstate)
+	GrDestroyState(vself->VTI_gstate);
+    return;
+}	/* End of MSG_GEN_PREPARE_FOR_DESTROY.	*/
+
+
+
+
+
+/***********************************************************************
+ *		MSG_GEN_PREPARE_FOR_DESTROY for HTGenFormTextClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    Prepare the object for HTObjDestroyAllWID. All we
+ *                  need to do is delete instance data. This message 
+ *                  replaces MSG_GEN_DESTROY as we won't be sending 
+ *                  MSG_GEN_DESTROY to objects. Instance data allocated
+ *                  using ...WID APIs (like HTListNewWID, HTMemAllocWID)
+ *                  need not freed to save time.
+ * PARAMETERS:	    void (void)
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:	    
+ *
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	kkee    	9/15/97   	Initial Revision
+ *	
+ ***********************************************************************/
+@extern method HTGenFormTextClass, MSG_GEN_PREPARE_FOR_DESTROY
+{
+    /* 
+     * These are allocated using HTMemAllocWID and deleted using
+     * HTMemFreeAllWID.
+     *
+     * if (@self->HTGFT_name)
+     * HTMemFree(@self->HTGFT_name);
+     * if (@self->HTGFT_value)
+     * HTMemFree(@self->HTGFT_value);
+     */
+    /* 
+     * If we delete something here, make sure to add to list in 
+     * UICreateObj.
+     */
+    VisTextInstance *vself;
+    vself = ObjDerefVis(oself);
+    if (vself->VTI_gstate)
+      GrDestroyState(vself->VTI_gstate);
+    return;
+}	/* End of MSG_GEN_PREPARE_FOR_DESTROY.	*/
+
+

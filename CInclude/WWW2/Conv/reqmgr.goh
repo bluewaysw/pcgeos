@@ -1,0 +1,395 @@
+/***********************************************************************
+ *
+ *	Copyright (c) Geoworks 1998.  All rights reserved.
+ *	GEOWORKS CONFIDENTIAL
+ *
+ * PROJECT:	  Geos-SC WWW Library
+ * MODULE:	  Request Manager
+ * FILE:	  reqmgr.h
+ *
+ * AUTHOR:  	  Kok Kin Kee: Jul 16, 1998
+ *
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	kkee    	7/16/98		Initial version
+ *
+ * DESCRIPTION:
+ *
+ *	Request manager. Request must be submitted through the 
+ *      request manager.
+ *      //depot/liberty/project/ellery/980805/library/www/html/reqmgr.h#1
+ *
+ * 	$Id: reqmgr.goh,v 1.3 98/09/03 04:15:40 allen Exp $
+ *
+ ***********************************************************************/
+@ifndef _REQMGR_H_
+@define _REQMGR_H_
+
+/*
+#include <kernel/sema4.h>
+#include <www/conv/html.h>
+#include <www/wwcore/wwstatus.h>
+#include <www/wwcore/wwslist.h>
+#include "sched.h"
+#include "req.h"
+
+class AppBase;           // #include <ui/appbase.h>
+class FlexFrame;         // #include <toolkit/frame.h>
+class HTRequest;         // #include "req.h"
+class RequestResponse;
+*/
+
+@include "WWW2/Conv/html.goh"
+@include <stdapp.goh>
+@include <WWW2/Conv/req.goh>
+
+/*
+ *  Server thread to avoid blocking on uithread when we issue
+ *  and stop requests.
+ */
+@class ServerClass, ProcessClass;
+ @message void ServerStop(optr /* CommandScheduler * */ scheduler, 
+			  optr /* HTRequestManager * */ reqMgr);
+ @message void ServerSubmit(optr /* CommandScheduler * */ scheduler, 
+			    HTRequest *req,
+			    optr /* HTRequestManager * */ reqMgr);
+@endc;
+
+/***************************************************************************
+CLASS
+    HTRequestManager
+
+    To sychronize request submission and termination. Request manager
+    is the only module that deals directly with the Command Scheduler.
+
+KEYWORDS
+    
+
+CLASS TREE
+<pre>
+    HTRequestManager
+</pre>
+****************************************************************************/
+@class HTRequestManagerClass, MetaClass;
+
+/* public: */
+
+    @message void HTRequestManager(optr appHandle, optr /* AppBase * */appbase,
+				   optr /* FlexFrame * */ flexframe, 
+				   optr /* HTMLViewer * */viewer);
+        
+    /* ~HTRequestManager(); */
+
+    /*////////
+    //
+    // Must initialize before use, else EC-crash.
+    //
+    // Status_ Functional
+    */
+    @message Boolean ReqMgrInitialize();
+
+    /*////////
+    //
+    // Set the proxy preference. This may be called many times to
+    // reset or clear the proxy. You must call SetProxy() before
+    // making GetURL() or PostURL() calls for the proxy to be 
+    // effective.
+    //
+    // Parameters_
+    //
+    // [in]  name   Must be a null terminated string.
+    //              e.g., www.proxy.com OR 128.698.321.000. Pass 0
+    //              to clear the proxy setting. 
+    // [in]  port   e.g., 8080. Defaults to 80.
+    //
+    // Status_ Functional
+    */
+    @message void ReqMgrSetProxy(const char *name, dword port /* = 80 */);
+
+    /*////////
+    //
+    // Set load image option. 
+    //
+    // Parameters_
+    //
+    // [in]  flag   TRUE to load images in subsequent requests.
+    //              FALSE to not load images in subsequent requests.
+    //
+    // See_also_ GetLoadImage()
+    //
+    // Status_ Functional
+    */
+    @message void ReqMgrSetLoadImage(Boolean flag);
+
+    /*////////
+    //
+    // Get load image option. 
+    //
+    // See_also_ SetLoadImage()
+    //
+    // Return_value_ TRUE if load image is enabled, 
+    //               FALSE if not.
+    //
+    // Status_ Functional
+    */
+    @message Boolean GetLoadImage();
+
+    /*////////
+    //
+    // Get appbase.
+    //
+    // Return_value_ AppBase
+    //
+    // Status_ Functional
+    //
+
+    AppBase* GetAppBase() const {return _appbase;}
+
+    */
+
+    /*////////
+    //
+    // Get viewer
+    //
+    // Return_value_ viewer
+    //
+    // Status_ Functional
+    */
+    @message optr /* HTMLViewer* */ GetViewer();
+
+    /*////////
+    //
+    // Get flexframe.
+    //
+    // Return_value_ Flexframe
+    //
+    // Status_ Functional
+    //
+
+    FlexFrame* GetFlexFrame() const {return _flexframe;}
+
+    */
+
+    /*////////
+    //
+    // Get URL.
+    //
+    // Parameters_
+    // 
+    // [in]  url
+    // [in]  loadMode
+    // [in]  target            For receiving response stream.
+    //
+    // Return_value_ TRUE if ok, FALSE if out of memory.
+    //
+    // See_also_ PostURL()
+    //
+    // Status_ Functional
+    */
+    @message Boolean ReqMgrGetURL(const char *url,
+                      LoadMode loadMode  /* =
+                      HTMLViewer::LOAD_ANY_VERSION */,
+                      optr /* RequestResponse * */ target /* = NULL */);
+
+    /* Get URL and notify the viewer. */
+    @message Boolean GetURLNotify(const char *url,
+				 LoadMode loadMode 
+				 /* = HTMLViewer::LOAD_ANY_VERSION */,
+				 optr /* RequestResponse * */ target 
+				 /* = NULL */);
+
+    /*////////
+    //
+    // Get URL.
+    //
+    // Parameters_
+    // 
+    // [in]  url          Valid url as per RFC1738. If the URL has no
+    //                    scheme, the default scheme is http://.
+    // [in]  buffer       Form data to send. Must be encoded for 
+    //                    content-type application/x-www-form-urlencoded.
+    //                    Or path to local temporary filename.
+    // [in]  len          Length of the buffer.
+    // [in]  file         Whether to post a file. Values:
+    //                    * TRUE: Post the file whose path is specified 
+    //                      in buffer, then delete the file. 
+    //                      This is not implemented.
+    //                    * FALSE: Post the raw data in buffer.
+    //
+    // Return_value_ TRUE if ok, FALSE if out of memory.
+    //
+    // See_also_ PostURL()
+    //
+    // Status_ Functional
+    */
+    @message Boolean ReqMgrPostURL(const char *url,
+                    const byte *buffer,
+                    const dword len,
+                    Boolean file /* = FALSE */);
+
+    /* Post URL and notify viewer. */
+    /*
+    Boolean PostURLNotify(const char *url,
+                    const uint8 *buffer,
+                    const uint32 len,
+                    Boolean file = FALSE);
+     */
+
+    /*////////
+    //
+    // Stop all requests that have been submitted. For each request
+    // that finish either normally or stopped, must call RequestDone().
+    //
+    // Status_ Functional
+    */
+    @message void StopAllRequests();
+
+    /*////////
+    //
+    // Get number of active and pending requests.
+    //
+    // Return_value_ number of active and pending requests.
+    //
+    // Status_ Functional
+    */
+    @message word GetNumRequest();
+
+/*===========================================================================
+//
+//                       W A R N I N G 
+// 
+// THE LIBERTY EXTERNAL API IS FOUND ABOVE THIS BARRIER. ANYTHING BELOW
+// THIS NOTICE IS IMPLEMENTATION DEPENDENT AND SUBJECT TO CHANGE.
+//
+//
+//=========================================================================*/
+/*  public: */
+    /*
+     * Public methods to the ServerThread only, do not use!
+     */
+    @message void IncNumRequest();
+    @message void DecNumRequest();
+    @message void SetStopping(Boolean flag);
+    @message Boolean IsStopping();
+    @message void SubmitPendingRequest();
+
+/* private: */
+/*  friend class HTRequest; */
+
+    /*
+    // Don't let users call copy the object in any way.  These methods
+    // aren't actually defined since they should never be called, but
+    // declaring them private should catch anyone who tries to call
+    // them.
+    */
+/*
+    HTRequestManager(const HTRequestManager&);
+    const HTRequestManager& operator=(const HTRequestManager&);
+*/
+    /*
+    // Submit a request. 
+    //
+    // Parameters_
+    // 
+    // [in]  req    Request to submit.
+    //
+    // Return_value_ TRUE if ok, FALSE if out of memory.
+    //
+    // Status_ Functional
+    */
+    @message Boolean SubmitRequest(HTRequest *req);
+
+    /*
+    // Request stream callback. This method is called from a request
+    // we've submitted. The request data is provided in the stream.
+    //
+    // Parameters_
+    //
+    // [in]  stream   Pointer to a wwstream for reading only.
+    // [in]  id       The request that created this stream.
+    //
+    // Return_value_ 
+    //
+    // See_also_ 
+    //
+    // Status_ Functional
+    */
+    @message void ReqMgrAcceptStream(optr /* WWStream * */ stream, 
+				     HTRequest *request);
+
+    /*
+    // Request error message callback. This method is called when a 
+    // submitted request cannot be completed. That is, we are not
+    // getting AcceptStream() for request we've made. The request is 
+    // identified by its id.
+    //
+    // Parameters_
+    //
+    // [in]  request The request that failed. It will be deleted by 
+    //               scheduler and so we can't delete it.
+    // [in]  msg    The error message if we care to print it. This is
+    //              non-NULL.
+    //
+    // Return_value_ 
+    //
+    // See_also_ 
+    //
+    // Status_ Functional
+    */
+    @message void ReqMgrAcceptError(HTRequest *request, 
+			      StatusInfo msg);
+
+    /*
+    // Terminate request callback. The request id is provided.
+    // The method must be thread safe. The request will be deleted
+    // when the call returns.
+    //
+    // Parameters_
+    //
+    // [in]  id  Request of an id submitted earlier.
+    //
+    // Return_value_ 
+    //
+    // See_also_ 
+    //
+    // Status_ Functional
+    */
+    @message void ReqMgrAcceptDone(HTRequest *request);
+
+/* private: */
+    /* System UI objects and preferences */
+    /* AppBase *_appbase; */
+    @instance optr                    __appHandle;
+    @instance optr /* FlexFrame * */  __flexframe;
+
+    @instance optr /* HTMLViewer * */ __viewer;
+
+    /* Proxy setting */
+    @instance char *  __proxyName;  /* Null for no proxy */
+    @instance dword   __proxyPort;
+
+    @instance Boolean __loadImage;
+
+    /*  Thread that tells any UI Thread that is currently loading 
+    //  a web or images to stop.  We don't ask the UI Thread to kill
+    //  itself becaues of deadlock possibility.  Thus, we create 
+    //  the serverThread here to tell the ui thread to stop.
+    */
+    @instance ThreadHandle /* Thread * */  __serverThread;
+    @instance optr /* CommandScheduler* */ __scheduler;  /* For running multiple requests */
+
+    // Pending main request and client
+    @instance HTRequest *                 __pendingRequest;
+   
+    @instance Boolean                     __stopping;
+
+    @instance SemaphoreHandle             __sem;
+    @instance word                        __numRequest;
+
+@endc;
+
+
+@endif /* _REQMGR_H_ */
+
+
