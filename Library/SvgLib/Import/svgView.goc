@@ -1,0 +1,271 @@
+/***********************************************************************
+ * svgView.goc - viewBox / viewport / preserveAspectRatio mapping
+ ***********************************************************************/
+@include <stdapp.goh>
+
+#include <Ansi/string.h>
+#include <Ansi/stdlib.h>
+#include <Ansi/stdio.h>
+#include <Ansi/ctype.h>
+#include <file.h>
+#include <system.h>
+#include <graphics.h>
+#include <gstring.h>
+#include "Import/svg.h"
+#include "Import/dbglog.h"
+
+void SvgViewReset(SvgImportContext *contextP)
+{
+    contextP->viewInitialized = FALSE;
+}
+
+static void SvgViewComputePar(SvgImportContext *contextP, const char *parStr)
+{
+    const char *s;
+    char buf[64];
+    word n;
+
+    contextP->preserveNone = FALSE;
+    contextP->preserveSlice = FALSE;
+    contextP->preserveX = SVG_PAR_ALIGN_MID;
+    contextP->preserveY = SVG_PAR_ALIGN_MID;
+
+    if (!parStr || !*parStr) {
+        return; /* default already xMidYMid meet */
+    }
+
+    n = 0; s = parStr;
+    while (*s && n < (sizeof(buf)-1)) {
+        char c = *s++;
+        if (c >= 'A' && c <= 'Z') c = (char)(c + ('a' - 'A'));
+        buf[n++] = c;
+    }
+    buf[n] = 0;
+
+    if (!strncmp(buf, "none", 4)) {
+        contextP->preserveNone = TRUE;
+        return;
+    }
+
+    if      (!strncmp(buf, "xminymin", 8)) { contextP->preserveX = SVG_PAR_ALIGN_MIN; contextP->preserveY = SVG_PAR_ALIGN_MIN; s = parStr + 8; }
+    else if (!strncmp(buf, "xmidymin", 8)) { contextP->preserveX = SVG_PAR_ALIGN_MID; contextP->preserveY = SVG_PAR_ALIGN_MIN; s = parStr + 8; }
+    else if (!strncmp(buf, "xmaxymin", 8)) { contextP->preserveX = SVG_PAR_ALIGN_MAX; contextP->preserveY = SVG_PAR_ALIGN_MIN; s = parStr + 8; }
+    else if (!strncmp(buf, "xminymid", 8)) { contextP->preserveX = SVG_PAR_ALIGN_MIN; contextP->preserveY = SVG_PAR_ALIGN_MID; s = parStr + 8; }
+    else if (!strncmp(buf, "xmidymid", 8)) { contextP->preserveX = SVG_PAR_ALIGN_MID; contextP->preserveY = SVG_PAR_ALIGN_MID; s = parStr + 8; }
+    else if (!strncmp(buf, "xmaxymid", 8)) { contextP->preserveX = SVG_PAR_ALIGN_MAX; contextP->preserveY = SVG_PAR_ALIGN_MID; s = parStr + 8; }
+    else if (!strncmp(buf, "xminymax", 8)) { contextP->preserveX = SVG_PAR_ALIGN_MIN; contextP->preserveY = SVG_PAR_ALIGN_MAX; s = parStr + 8; }
+    else if (!strncmp(buf, "xmidymax", 8)) { contextP->preserveX = SVG_PAR_ALIGN_MID; contextP->preserveY = SVG_PAR_ALIGN_MAX; s = parStr + 8; }
+    else if (!strncmp(buf, "xmaxymax", 8)) { contextP->preserveX = SVG_PAR_ALIGN_MAX; contextP->preserveY = SVG_PAR_ALIGN_MAX; s = parStr + 8; }
+    else {
+        s = parStr; /* keep defaults if unknown */
+    }
+
+    while (*s && isspace(*s)) s++;
+    if (!strncmp(s, "slice", 5)) contextP->preserveSlice = TRUE;
+}
+
+Boolean SvgViewInitFromSvgTag(SvgImportContext *contextP, const char *tag)
+{
+    char *vb;
+    char *wb;
+    char *hb;
+    char *par;
+    const char *s;
+    const char *numberStart;
+    WWFixedAsDWord rawSx, rawSy, uni, leftoverX, leftoverY;
+    sdword w0, h0;
+    word   reduce;
+    sword  worldW, worldH;
+
+    if (contextP->viewInitialized) return TRUE;
+    vb = contextP->work1;
+    wb = contextP->work2;
+    hb = contextP->work3;
+    par = contextP->work4;
+
+    contextP->viewMinX = 0; contextP->viewMinY = 0; contextP->viewWidth = 0; contextP->viewHeight = 0;
+    contextP->viewportWidth = 0; contextP->viewportHeight = 0;
+    contextP->scaleX = WWFIXED_ONE; contextP->scaleY = WWFIXED_ONE;
+    contextP->addX = 0; contextP->addY = 0;
+    contextP->inversePowerOfTwo = WWFIXED_ONE;
+
+    par[0] = 0;
+    if (SvgParserGetAttrBounded(tag, "preserveAspectRatio", par,
+                                sizeof(contextP->work4))) {
+        SvgViewComputePar(contextP, par);
+    } else {
+        SvgViewComputePar(contextP, "");
+    }
+
+    if (SvgParserGetAttrBounded(tag, "width", wb,
+                                sizeof(contextP->work2))) {
+        if (SvgUtilParseWWFixed16_16(wb, &contextP->viewportWidth) == wb)
+            return FALSE;
+    }
+    if (SvgParserGetAttrBounded(tag, "height", hb,
+                                sizeof(contextP->work3))) {
+        if (SvgUtilParseWWFixed16_16(hb, &contextP->viewportHeight) == hb)
+            return FALSE;
+    }
+
+    if (SvgParserGetAttrBounded(tag, "viewBox", vb,
+                                sizeof(contextP->work1))) {
+        s = vb;
+        numberStart = s;
+        s = SvgUtilParseWWFixed16_16(s, &contextP->viewMinX);
+        if (s == numberStart) return FALSE;
+        s = SvgParserSkipWS(s); numberStart = s;
+        s = SvgUtilParseWWFixed16_16(s, &contextP->viewMinY);
+        if (s == numberStart) return FALSE;
+        s = SvgParserSkipWS(s); numberStart = s;
+        s = SvgUtilParseWWFixed16_16(s, &contextP->viewWidth);
+        if (s == numberStart) return FALSE;
+        s = SvgParserSkipWS(s); numberStart = s;
+        s = SvgUtilParseWWFixed16_16(s, &contextP->viewHeight);
+        if (s == numberStart) return FALSE;
+    }
+    if ((sdword)contextP->viewWidth <= 0 || (sdword)contextP->viewHeight <= 0) {
+        if ((sdword)contextP->viewportWidth <= 0) contextP->viewportWidth = SvgGeomMakeWWFixedFromInt(100);
+        if ((sdword)contextP->viewportHeight <= 0) contextP->viewportHeight = SvgGeomMakeWWFixedFromInt(100);
+        contextP->viewMinX = 0; contextP->viewMinY = 0;
+        contextP->viewWidth = contextP->viewportWidth; contextP->viewHeight = contextP->viewportHeight;
+    }
+
+    if ((sdword)contextP->viewportWidth == 0) contextP->viewportWidth = contextP->viewWidth;
+    if ((sdword)contextP->viewportHeight == 0) contextP->viewportHeight = contextP->viewHeight;
+
+    rawSx = GrSDivWWFixed(contextP->viewportWidth, contextP->viewWidth);
+    rawSy = GrSDivWWFixed(contextP->viewportHeight, contextP->viewHeight);
+
+    if (contextP->preserveNone) {
+        contextP->scaleX = rawSx;
+        contextP->scaleY = rawSy;
+        contextP->addX = 0;
+        contextP->addY = 0;
+    } else {
+        uni = contextP->preserveSlice ? ((rawSx > rawSy) ? rawSx : rawSy)
+                         : ((rawSx < rawSy) ? rawSx : rawSy);
+        contextP->scaleX = uni;
+        contextP->scaleY = uni;
+
+        leftoverX = contextP->viewportWidth - GrMulWWFixed(contextP->viewWidth, uni);
+        leftoverY = contextP->viewportHeight - GrMulWWFixed(contextP->viewHeight, uni);
+
+        contextP->addX = (contextP->preserveX == SVG_PAR_ALIGN_MIN) ? 0
+              : (contextP->preserveX == SVG_PAR_ALIGN_MID) ? GrSDivWWFixed(leftoverX, MakeWWFixed(2))
+                                               : leftoverX;
+        contextP->addY = (contextP->preserveY == SVG_PAR_ALIGN_MIN) ? 0
+              : (contextP->preserveY == SVG_PAR_ALIGN_MID) ? GrSDivWWFixed(leftoverY, MakeWWFixed(2))
+                                               : leftoverY;
+    }
+
+    w0 = ((sdword)contextP->viewportWidth) >> 16;  if (w0 <= 0) w0 = 1;
+    h0 = ((sdword)contextP->viewportHeight) >> 16;  if (h0 <= 0) h0 = 1;
+
+    reduce = 1;
+    while ((w0 / (sdword)reduce) > 1024 || (h0 / (sdword)reduce) > 1024) {
+        reduce <<= 1;
+    }
+    contextP->inversePowerOfTwo = (reduce > 1) ? GrSDivWWFixed(MakeWWFixed(1), MakeWWFixed(reduce))
+                             : WWFIXED_ONE;
+
+    worldW = (sword)(w0 / (sdword)reduce);
+    worldH = (sword)(h0 / (sdword)reduce);
+    if (worldW < 1) worldW = 1;
+    if (worldH < 1) worldH = 1;
+    contextP->outputWidth = (word)worldW;
+    contextP->outputHeight = (word)worldH;
+
+    LOGF(("[VIEW]", "vb=(%ld,%ld %ldx%ld) vp=%ldx%ld par:%s slice:%s",
+            (sdword)contextP->viewMinX,(sdword)contextP->viewMinY,(sdword)contextP->viewWidth,(sdword)contextP->viewHeight,
+            (sdword)contextP->viewportWidth,(sdword)contextP->viewportHeight,
+            contextP->preserveNone?"none":"align", contextP->preserveSlice?"true":"false"));
+
+    LOGF(("[VIEW]", "scaleX=%ld scaleY=%ld addX=%ld addY=%ld invPow2=%ld",
+            (sdword)contextP->scaleX,(sdword)contextP->scaleY,(sdword)contextP->addX,(sdword)contextP->addY,(sdword)contextP->inversePowerOfTwo));
+
+    SvgRendererInitViewport(contextP, worldW, worldH);
+
+    contextP->viewInitialized = TRUE;
+    return TRUE;
+}
+
+void SvgViewInitDefault(SvgImportContext *contextP)
+{
+    if (contextP->viewInitialized) return;
+
+    contextP->viewMinX = 0; contextP->viewMinY = 0;
+    contextP->viewWidth = SvgGeomMakeWWFixedFromInt(1024);
+    contextP->viewHeight = SvgGeomMakeWWFixedFromInt(1024);
+    contextP->viewportWidth = contextP->viewWidth; contextP->viewportHeight = contextP->viewHeight;
+
+    contextP->scaleX = WWFIXED_ONE;
+    contextP->scaleY = WWFIXED_ONE;
+    contextP->addX   = 0;
+    contextP->addY   = 0;
+    contextP->inversePowerOfTwo= WWFIXED_ONE;
+    contextP->outputWidth = 1024;
+    contextP->outputHeight = 1024;
+
+    LOGF(("[VIEW]", "vb=(%ld,%ld %ldx%ld) vp=%ldx%ld par:%s slice:%s",
+            (sdword)contextP->viewMinX,(sdword)contextP->viewMinY,(sdword)contextP->viewWidth,(sdword)contextP->viewHeight,
+            (sdword)contextP->viewportWidth,(sdword)contextP->viewportHeight,
+            contextP->preserveNone?"none":"align", contextP->preserveSlice?"true":"false"));
+
+    LOGF(("[VIEW]", "scaleX=%ld scaleY=%ld addX=%ld addY=%ld invPow2=%ld",
+            (sdword)contextP->scaleX,(sdword)contextP->scaleY,(sdword)contextP->addX,(sdword)contextP->addY,(sdword)contextP->inversePowerOfTwo));
+
+    SvgRendererInitViewport(contextP, 1024, 1024);
+    contextP->viewInitialized = TRUE;
+}
+
+/* mappers: viewBox space -> world space (sword) */
+sword SvgViewMapPosX_F(SvgImportContext *contextP, WWFixedAsDWord fx)
+{
+    WWFixedAsDWord v;
+    v  = fx - contextP->viewMinX;
+    v  = GrMulWWFixed(v, contextP->scaleX);
+    v += contextP->addX;
+    v  = GrMulWWFixed(v, contextP->inversePowerOfTwo);
+    return SvgGeomWWFixedToSWordRound(v);
+}
+
+sword SvgViewMapPosY_F(SvgImportContext *contextP, WWFixedAsDWord fy)
+{
+    WWFixedAsDWord v;
+    v  = fy - contextP->viewMinY;
+    v  = GrMulWWFixed(v, contextP->scaleY);
+    v += contextP->addY;
+    v  = GrMulWWFixed(v, contextP->inversePowerOfTwo);
+    return SvgGeomWWFixedToSWordRound(v);
+}
+
+/* Return the viewBox->world affine as SVG-style 2x3:
+   [ a c e ]
+   [ b d f ]
+   s.t. x' = a*x + c*y + e; y' = b*x + d*y + f
+*/
+void SvgViewGetMatrix(SvgImportContext *contextP,
+                      WWFixedAsDWord *a, WWFixedAsDWord *b,
+                      WWFixedAsDWord *c, WWFixedAsDWord *d,
+                      WWFixedAsDWord *e, WWFixedAsDWord *f)
+{
+    WWFixedAsDWord aa, bb, cc, dd, ee, ff;
+    WWFixedAsDWord sxW, syW;
+    WWFixedAsDWord offX, offY;
+
+    /* scale in world units */
+    sxW = GrMulWWFixed(contextP->scaleX, contextP->inversePowerOfTwo);
+    syW = GrMulWWFixed(contextP->scaleY, contextP->inversePowerOfTwo);
+
+    /* offsets in world units: (+g_add?) then subtract min, then reduce */
+    offX = GrMulWWFixed(GrSubWWFixed(contextP->addX, GrMulWWFixed(contextP->viewMinX, contextP->scaleX)), contextP->inversePowerOfTwo);
+    offY = GrMulWWFixed(GrSubWWFixed(contextP->addY, GrMulWWFixed(contextP->viewMinY, contextP->scaleY)), contextP->inversePowerOfTwo);
+
+    aa = sxW;  bb = 0;    cc = 0;    dd = syW;
+    ee = offX; ff = offY;
+
+    *a = aa; *b = bb; *c = cc; *d = dd; *e = ee; *f = ff;
+
+    LOGF(("[VIEW] matrix", "VM a=%ld b=%ld c=%ld d=%ld e=%ld f=%ld", (sdword)*a,(sdword)*b,(sdword)*c,(sdword)*d,(sdword)*e,(sdword)*f));
+}

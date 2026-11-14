@@ -789,14 +789,18 @@ Boolean ICopyRaster(
     byte *p_maskFrom ;
     byte *p_maskTo ;
     word i ;
+    word x, left, count ;
+    byte mask ;
+    Boolean opaque ;
     InternalGetPixelCommand _near *getPixel ;
     InternalSetPixelCommand _near *setPixel ;
     Boolean isEverTransparent = FALSE ;
 
     if ((fromFormat == BMF_8BIT) && (toFormat == BMF_8BIT))  {
-        /* Special fast copy */
+        /* Plain 8-bit rows need neither mask handling nor conversion. */
         memcpy(p_rasterTo+toX, p_rasterFrom+fromX, width) ;
     } else {
+        /* Select the pixel reader by depth, ignoring bitmap metadata. */
         switch (fromFormat & BMT_FORMAT)  {
             case BMF_8BIT:
                 getPixel = IGetPixel8 ;
@@ -811,6 +815,7 @@ Boolean ICopyRaster(
                 getPixel = NULL ;
         }
 
+        /* A row's mask precedes its pixels and covers the full row width. */
         if (fromFormat & BMT_MASK)  {
             p_maskFrom = p_rasterFrom ;
             p_rasterFrom += (fromWidth+7)>>3 ;
@@ -818,6 +823,7 @@ Boolean ICopyRaster(
             p_maskFrom = NULL ;
         }
 
+        /* Select the writer independently to support depth conversion. */
         switch (toFormat & BMT_FORMAT)  {
             case BMF_8BIT:
                 setPixel = ISetPixel8 ;
@@ -832,6 +838,7 @@ Boolean ICopyRaster(
                 setPixel = NULL ;
         }
 
+        /* Split the destination mask from its pixel data as well. */
         if (toFormat & BMT_MASK)  {
             p_maskTo = p_rasterTo ;
             p_rasterTo += (toWidth+7)>>3 ;
@@ -839,10 +846,61 @@ Boolean ICopyRaster(
             p_maskTo = NULL ;
         }
 
+        /*
+         * Bulk-copy 8-bit pixels when the entire source range is opaque.
+         * Check opacity before changing any destination pixels or mask bits.
+         */
+        if (((fromFormat & BMT_FORMAT) == BMF_8BIT) &&
+                ((toFormat & BMT_FORMAT) == BMF_8BIT)) {
+            opaque = TRUE;
+            if (p_maskFrom) {
+                /* Check only copied bits; ignore neighboring and padding bits. */
+                x = fromX;
+                left = width;
+                while (left) {
+                    count = 8 - (x & 7);
+                    if (count > left)
+                        count = left;
+                    /* Mask bits run from the most significant bit to the least. */
+                    mask = (byte)((0xffU >> (x & 7)) &
+                                  (0xffU << (8 - (x & 7) - count)));
+                    if ((p_maskFrom[x >> 3] & mask) != mask) {
+                        opaque = FALSE;
+                        break;
+                    }
+                    x += count;
+                    left -= count;
+                }
+            }
+            if (opaque) {
+                memcpy(p_rasterTo + toX, p_rasterFrom + fromX, width);
+                if (p_maskTo) {
+                    /* Mark copied pixels opaque, preserving other mask bits. */
+                    x = toX;
+                    left = width;
+                    while (left) {
+                        count = 8 - (x & 7);
+                        if (count > left)
+                            count = left;
+                        mask = (byte)((0xffU >> (x & 7)) &
+                                      (0xffU << (8 - (x & 7) - count)));
+                        p_maskTo[x >> 3] |= mask;
+                        x += count;
+                        left -= count;
+                    }
+                }
+                return FALSE; /* No transparency in the copied range. */
+            }
+        }
+
+        /* Convert other depths or composite ranges containing transparency. */
         if ((getPixel) && (setPixel))  {
             if (p_maskFrom)  {
                 if (p_maskTo)  {
-                    /* Mask on the from, and a mask on the to */
+                    /*
+                     * Transparent source pixels keep the existing canvas.
+                     * Report transparency where both mask bits are clear.
+                     */
                     for (i=0; i<width; i++)  {
                         if (IIsBitSet(p_maskFrom, fromX))  {
                             setPixel(
@@ -858,7 +916,7 @@ Boolean ICopyRaster(
                         toX++ ;
                     }
                 } else {
-                    /* Mask on the from, but no mask on the to */
+                    /* Copy opaque source pixels; report transparent ones. */
                     for (i=0; i<width; i++)  {
                         if (IIsBitSet(p_maskFrom, fromX))  {
                             setPixel(
@@ -873,7 +931,7 @@ Boolean ICopyRaster(
                 }
             } else {
                 if (p_maskTo)  {
-                    /* No mask on the from, but a mask on the to */
+                    /* The source is opaque: copy pixels and set canvas mask bits. */
                     for (i=0; i<width; i++)  {
                         setPixel(
                             p_rasterTo,
@@ -883,7 +941,7 @@ Boolean ICopyRaster(
                         toX++ ;
                     }
                 } else {
-                    /* No mask on the from, no mask on the to */
+                    /* Copy or convert packed pixels with no mask handling. */
                     for (i=0; i<width; i++)  {
                         setPixel(
                             p_rasterTo,
@@ -1042,7 +1100,7 @@ void IDrawBitmapInBitmap(
     word sizeFrom, sizeTo ;
     dword retFrom, retTo;
 
-    /* Get the sizes of the bitmaps */
+    /* Copy the headers while locked; their VM blocks may page out later. */
     *p_isEverTransparent = FALSE ;
     p_bitmap = (((byte *)VMLock(fromFile, fromBitmap, &mem)) +
                    sizeof(HugeArrayDirectory)) ;
@@ -1060,6 +1118,7 @@ void IDrawBitmapInBitmap(
     if (width > (sword)fromHeader.B_width)
         width = fromHeader.B_width ;
     if (offsetX < 0)  {
+        /* Skip source columns clipped by the left edge of the canvas. */
         insetX = -offsetX ;
         width -= insetX ;
         offsetX = 0 ;
@@ -1070,6 +1129,7 @@ void IDrawBitmapInBitmap(
         if (height > (sword)fromHeader.B_height)
             height = fromHeader.B_height ;
         if (offsetY < 0)  {
+            /* Start the source walk below rows clipped by the top edge. */
             insetY = -offsetY ;
             height -= insetY ;
             offsetY = 0 ;
@@ -1077,28 +1137,29 @@ void IDrawBitmapInBitmap(
 
         /* Only process if there is something to draw */
         if (height > 0)  {
-            /* Do up to 8 bit to 8 bit drawing */
+            /* ICopyRaster supports packed 1-, 4-, and 8-bit pixel rows. */
             if (((fromHeader.B_type & BMT_FORMAT) <= BMF_8BIT) &&
                     ((toHeader.B_type & BMT_FORMAT) <= BMF_8BIT))  {
-                /* Do it line by line */
-                while (height)  {
-                    /* Lock in the rasters */
-                    p_lineFrom = p_lineTo = NULL ;
-                    retFrom = HugeArrayLock(
-                        fromFile,
-                        fromBitmap,
-                        insetY,
-                        (void**)&p_lineFrom,
-                        &sizeFrom) ;
-                    retTo = HugeArrayLock(
-                        toFile,
-                        toBitmap,
-                        offsetY,
-                        (void**)&p_lineTo,
-                        &sizeTo) ;
-                    if (HAL_COUNT(retFrom) && HAL_COUNT(retTo))  {
-                        /* Copy over the data (without regard to mask) */
-                        /* Note if we ever found a single transparent pixel */
+                /*
+                 * Lock each starting row once. HugeArrayNext walks within a
+                 * locked block and transfers the lock at block boundaries.
+                 */
+                p_lineFrom = p_lineTo = NULL ;
+                retFrom = HugeArrayLock(
+                    fromFile,
+                    fromBitmap,
+                    insetY,
+                    (void**)&p_lineFrom,
+                    &sizeFrom) ;
+                retTo = HugeArrayLock(
+                    toFile,
+                    toBitmap,
+                    offsetY,
+                    (void**)&p_lineTo,
+                    &sizeTo) ;
+                if (HAL_COUNT(retFrom) && HAL_COUNT(retTo)) {
+                    while (height) {
+                        /* Composite this row and accumulate any transparency. */
                         if (ICopyRaster(
                                 toHeader.B_type,
                                 p_lineTo, offsetX,
@@ -1109,23 +1170,25 @@ void IDrawBitmapInBitmap(
                                 width) == TRUE)
                             *p_isEverTransparent = TRUE ;
 
-                        /* Done with this raster */
-                        HugeArrayDirty(p_lineFrom) ;
+                        /* Only the destination changed. Dirty it before
+                         * advancing, which may unlock its current block. */
                         HugeArrayDirty(p_lineTo) ;
-                        HugeArrayUnlock(p_lineFrom) ;
-                        HugeArrayUnlock(p_lineTo) ;
-                    } else {
-                        /* Release the maybe locked items */
-                        if (p_lineFrom)
-                            HugeArrayUnlock(p_lineFrom) ;
-                        if (p_lineTo)
-                            HugeArrayUnlock(p_lineTo) ;
-                        break ;
+                        if (--height == 0)
+                            break;
+
+                        /* Next updates each pointer and row size. At array
+                         * end it returns zero but leaves the last row locked. */
+                        if (!HugeArrayNext((void**)&p_lineFrom, &sizeFrom) ||
+                                !HugeArrayNext((void**)&p_lineTo, &sizeTo))
+                            break;
                     }
-                    height-- ;
-                    offsetY++ ;
-                    insetY++ ;
                 }
+                /* Only successful initial locks own blocks. After Next, the
+                 * latest pointer identifies the block we must release. */
+                if (HAL_COUNT(retFrom))
+                    HugeArrayUnlock(p_lineFrom) ;
+                if (HAL_COUNT(retTo))
+                    HugeArrayUnlock(p_lineTo) ;
             }
         }
     }

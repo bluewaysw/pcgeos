@@ -156,8 +156,10 @@
     /* TT_New_Outline() API, while it isn't for those returned by        */
     /* TT_Get_Glyph_Outline().                                           */
 
+#ifndef __GEOS__
     TT_Bool          owner;      /* The outline owns the coordinates, */
                                  /* flags and contours array it uses. */
+#endif
 
     /* The following flags are set automatically by                      */
     /* TT_Get_Glyph_Outline().  Their meaning is the following:          */
@@ -215,22 +217,6 @@
   };
 
   typedef struct TT_Glyph_Metrics_  TT_Glyph_Metrics;
-
-
-  /* A structure used to return instance metrics. */
-
-  struct  TT_Instance_Metrics_
-  {
-    TT_F26Dot6  pointSize;     /* char. size in points (1pt = 1/72 inch) */
-
-    TT_UShort   x_ppem;        /* horizontal pixels per EM square */
-    TT_UShort   y_ppem;        /* vertical pixels per EM square   */
-
-    TT_UShort   x_resolution;  /* device horizontal resolution in dpi */
-    TT_UShort   y_resolution;  /* device vertical resolution in dpi   */
-  };
-
-  typedef struct TT_Instance_Metrics_  TT_Instance_Metrics;
 
 
   /* Flow constants:                                             */
@@ -464,8 +450,10 @@
 #endif
 
     TT_Short   sTypoAscender;
+#ifdef TT_CONFIG_OPTION_SUPPORT_OPTIONAL_FIELDS    
     TT_Short   sTypoDescender;
     TT_Short   sTypoLineGap;
+#endif
     TT_UShort  usWinAscent;
     TT_UShort  usWinDescent;
 
@@ -494,7 +482,7 @@
     TT_FWord  underlineThickness;
 #endif
 
-    TT_ULong  isFixedPitch;
+    TT_Short  isFixedPitch;
     
 #ifdef TT_CONFIG_OPTION_SUPPORT_OPTIONAL_FIELDS
     TT_ULong  minMemType42;
@@ -538,16 +526,18 @@
   {
     TT_UShort  num_Glyphs;      /* number of glyphs in face              */
     TT_UShort  max_Points;      /* maximum number of points in a glyph   */
+#ifdef TT_CONFIG_OPTION_SUPPORT_OPTIONAL_FIELDS 
     TT_UShort  max_Contours;    /* maximum number of contours in a glyph */
-
+#endif
     TT_UShort  num_CharMaps;    /* number of charmaps in the face     */
     TT_UShort  num_Names;       /* number of name records in the face */
 
     TT_Header*             header;        /* TrueType header table          */
     TT_Horizontal_Header*  horizontal;    /* TrueType horizontal header     */
     TT_OS2*                os2;           /* TrueType OS/2 table            */
+#ifdef TT_CONFIG_OPTION_SUPPORT_OPTIONAL_FIELDS    
     TT_Postscript*         postscript;    /* TrueType Postscript table      */
-
+#endif
 #ifdef TT_CONFIG_OPTION_PROCESS_HDMX
     TT_Hdmx*               hdmx;          /* TrueType hor. dev. metr. table */
 #endif
@@ -693,13 +683,6 @@
                                                       TT_UShort    resolution );
   
 
-  /* Close a given instance object, destroying all associated data. */
-
-  EXPORT_DEF
-  void  TT_Done_Instance( TT_Instance  instance );
-
-
-
   /* ----------------------- glyph management ----------------------- */
 
   /* Create a new glyph object related to the given `face'. */
@@ -707,12 +690,6 @@
   EXPORT_DEF
   TT_Error  TT_New_Glyph( TT_Face    face,
                           TT_Glyph*  glyph );
-
-
-  /* Discard (and destroy) a given glyph object. */
-
-  EXPORT_DEF
-  void  TT_Done_Glyph( TT_Glyph  glyph );
 
 
 #define TTLOAD_SCALE_GLYPH                    1
@@ -756,8 +733,7 @@
   /* it.  The client application should _not_ change the pointers.       */
 
   EXPORT_DEF
-  void  TT_Get_Glyph_Outline( TT_Glyph     glyph,
-                              TT_Outline*  outline );
+  TT_Outline*  TT_Get_Glyph_Outline( TT_Glyph     glyph );
 
 
   /* Copy the glyph metrics into `metrics'. */
@@ -778,16 +754,16 @@
   /* Allocate a new outline.  Reserve space for `numPoints' and */
   /* `numContours'.                                             */
 
-  EXPORT_DEF
+  /*EXPORT_DEF
   TT_Error  TT_New_Outline( TT_UShort    numPoints,
                             TT_Short     numContours,
-                            TT_Outline*  outline );
+                            TT_Outline*  outline );*/
 
 
   /* Release an outline. */
 
-  EXPORT_DEF
-  void      TT_Done_Outline( TT_Outline*  outline );
+  /*EXPORT_DEF
+  void      TT_Done_Outline( TT_Outline*  outline );*/
 
 
   /* Render an outline into a bitmap. */

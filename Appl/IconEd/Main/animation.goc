@@ -1,0 +1,480 @@
+/**************************************************************************
+ *
+ * PROJECT:	Icon Editor	(GOC Version)
+ * FILE:	animation.goc
+ *
+ *		This project is inspired by the Icon Editor by Steve Yegge, 1992 - 1994
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	RainerB 7/18/2025	Initial revision
+ *
+ *
+ * DESCRIPTION:	This file implements animated icon preview
+ *		To keep things simple, many aspects haven't been optimized.
+ *		For example, screen-gstates are created and destroyed for every frame,
+ *		the background color is read from the UI for every frame
+ *		and the bitmap size is also read over and over again
+ *		instead of being cached.
+ *		But we buffer the bitmap GState handles, because the sequence
+ *		GrEditBitmap() .. GrDestroyState() kills handles. I don't know why.
+ *
+ * CONCEPT:	To make a flicker free animation we draw the icon bitmap to a
+ *		true color bitmap first. Only mono icons needs an extra handling.
+ *		This is done by MSG_DB_VIEWER_ANIMATION_UPDATE_BUFFER_BITMAP.
+ *		As next step we draw the true color bitmap directly to the screen.
+ *		Please note that the AnimationView itself is not involved in the animation.
+ *		A timer is set up to draw the next frame.
+ *		- MSG_DB_VIEWER_ANIMATION_TIMER_NEXT_FRAME -- timer handler
+ *		- MSG_DB_VIEWER_ANIMATION_SINGLE_STEP -- calculate next frame and draw it
+ *		  This message calls MSG_OC_BITMAP_UPDATED which creates it's own gstate
+ *		  to draw the imgae directly to the screen.
+ *
+ **************************************************************************/
+
+
+/*  Standard include files */
+@include <stdapp.goh>
+@include <Ansi/stdlib.h>
+@include <Ansi/stdio.h>
+@include <Ansi/string.h>
+
+@include "iconed.goh"
+@include "UI/appui.goh"
+
+
+extern GlobalStruct global;
+
+/*--------------------- Local Headers ---------------------
+ ---------------------------------------------------------------------------*/
+
+Boolean AnimationFindBitmapSize(VMFileHandle vmFile, int iSet, int *width, int *height);
+void AnimationFillBufferBitmap(GStateHandle gs, int width, int height);
+void AnimationUpdateFPSValue(void);
+void AnimationUpdateReplybarUI(int animationState);
+
+
+/*===========================================================================
+
+ ===========================================================================*/
+
+/*--------------------- MSG_DB_VIEWER_ANIMATION_OPEN_DIALOG ---------------------
+ *  Purpose:	Open dialog box for animation test.
+ *  Context:
+ *  Strategy:	See code
+ *  Parameters:
+ *  Return:
+ ---------------------------------------------------------------------------*/
+@extern method IconDBViewerClass, MSG_DB_VIEWER_ANIMATION_OPEN_DIALOG {
+int width, height;
+Boolean monoFound;
+int scale;
+
+    /*
+     * do some savety checks
+     */
+    if (pself->DBVI_currentISet == NO_CURRENT_ISET) return;
+    if (pself->DBVI_currentIcon == NO_CURRENT_ICON) return;
+    if (pself->DBVI_vmFile == 0) return;
+
+    /*
+     * initialize animation structure and UI
+     */
+    memset(&(pself->DBVI_animation), 0, sizeof(ISetAnimationStruct));
+    pself->DBVI_animation.numFrames = IdGetEntryCount(pself->DBVI_vmFile, pself->DBVI_currentISet);
+    pself->DBVI_animation.animState = ANIM_STATE_STOP;
+
+    AnimationUpdateFPSValue();
+    @call AnimateCurrentFrameValue::MSG_GEN_VALUE_SET_INTEGER_VALUE(0, FALSE);
+    AnimationUpdateReplybarUI(ANIM_STATE_STOP);
+
+
+    /*
+     * Create a unmasked true color buffer bitmap
+     * This makes things simple and works for all icons - but not for mono icons
+     * So, we must create an extra bitmap as 'mono-buffer'
+     */
+    scale = @call AnimationScaleChooser::MSG_GEN_ITEM_GROUP_GET_SELECTION();
+    monoFound = AnimationFindBitmapSize(pself->DBVI_vmFile, pself->DBVI_currentISet, &width, &height);
+    pself->DBVI_animation.bufferBmp = BTCreateOffscreenBitmap(global.tempFile, BMF_24BIT, scale*width, scale*height, NULL);
+    pself->DBVI_animation.bufferGS = GrEditBitmap(global.tempFile, pself->DBVI_animation.bufferBmp, NULL);
+    GrApplyScale(pself->DBVI_animation.bufferGS, MakeWWFixed(scale), MakeWWFixed(scale));
+
+    if ( monoFound ) {
+   	/* create a 256 color bitmap for extra buffering monochrome icons */
+    	pself->DBVI_animation.monoBuffer = BTCreateOffscreenBitmap(global.tempFile, BMF_8BIT, width, height, NULL);
+    	pself->DBVI_animation.monoGS = GrEditBitmap(global.tempFile, pself->DBVI_animation.monoBuffer, NULL);
+    }
+
+    /*
+     * Display first image and assign pself->DBVI_animation.bufferBmp to the AnimationContent object
+     */
+    @call oself::MSG_DB_VIEWER_ANIMATION_UPDATE_BUFFER_BITMAP();
+    @call AnimationContent::MSG_OC_REPLACE_BITMAP(pself->DBVI_animation.bufferBmp);
+
+    /*
+     * open dialog box. Remember state for a GEOS restart
+     */
+    pself->DBVI_flags |= DBVF_RESTORE_ANIMATION;
+    @send AnimatISetDialog::MSG_GEN_INTERACTION_INITIATE();
+}
+
+/*--------------------- AnimationFindBitmapSize ---------------------
+ *  Purpose:	Calculate required size for buffer-bitmap
+ *  Context:
+ *  Strategy:	loop over all icons and return largest dimensions
+ *  Parameters:
+ *  Return:	TRUE if we have at leaset on monochrome icon. Drawing of monochrome
+ *		     icons to a true color bitmap must handled differently
+ *		FALSE: no monochrome icon found
+ ---------------------------------------------------------------------------*/
+Boolean AnimationFindBitmapSize(VMFileHandle vmFile, int iSet, int *width, int *height) {
+int n, count, w, h, wMax, hMax, bmFormat;
+VMBlockHandle bmp;
+Boolean monoFound = FALSE;
+
+    count = IdGetEntryCount(vmFile, iSet);
+    wMax = 0;
+    hMax = 0;
+
+    for ( n = 0; n < count; n++ ) {
+    	bmp = IdGetEntryBitmap(vmFile, iSet, n);
+    	bmFormat = BTGetMoreBitmapInfos(vmFile, bmp, &w, &h, 0);
+    	if ( (bmFormat & BMT_FORMAT) == BMF_MONO ) monoFound = TRUE;
+    	if ( w > wMax ) wMax = w;
+    	if ( h > hMax ) hMax = h;
+    }
+
+    *width = wMax;
+    *height = hMax;
+    return monoFound;
+}
+
+/*--------------------- AnimationFillBufferBitmap ---------------------
+ *  Purpose:	Fill a bitmap with the background color
+ *  Context:
+ *  Strategy:	Read background color from UI and clean bitmap with this color
+ *  Parameters: gs: GState that refers the bitmap
+ *		width, height: bitmap size;
+ *  Return:	-
+ ---------------------------------------------------------------------------*/
+void AnimationFillBufferBitmap(GStateHandle gs, int width, int height) {
+int color;
+
+    GrSaveState(gs);
+    color = @call AnimationColorChooser::MSG_GEN_ITEM_GROUP_GET_SELECTION();
+    GrSetAreaColor(gs, CF_INDEX, color, 0, 0);
+    GrFillRect(gs, 0, 0, width, height);
+    GrRestoreState(gs);
+}
+
+/*--------------------- AnimationUpdateReplybarUI ---------------------
+ *  Purpose:	Depending on the animation state, the UI must be updated
+ *  Context:
+ *  Strategy:	- disable all triggers
+ *		- enable triggers depenigng on the current state
+ *  Parameters: animationState: ANIM_STATE_~ Value
+ *
+ *  Return:	-
+ ---------------------------------------------------------------------------*/
+void AnimationUpdateReplybarUI(int animationState) {
+
+
+    @send AnimateRunTrigger::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+    @send AnimateGoLeftTrigger::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+    @send AnimateGoRightTrigger::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+    @send AnimateStopTrigger::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+    @send AnimationScaleChooser::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+
+
+    switch (animationState) {
+    case ANIM_STATE_STOP:
+	@send AnimateRunTrigger::MSG_GEN_SET_ENABLED(VUM_NOW);
+	@send AnimateGoLeftTrigger::MSG_GEN_SET_ENABLED(VUM_NOW);
+	@send AnimateGoRightTrigger::MSG_GEN_SET_ENABLED(VUM_NOW);
+	@send AnimationScaleChooser::MSG_GEN_SET_ENABLED(VUM_NOW);
+    	break;
+    case ANIM_STATE_RUN:
+	@send AnimateStopTrigger::MSG_GEN_SET_ENABLED(VUM_NOW);
+    	break;
+    case ANIM_STATE_NEED_RESTART:
+	@send AnimateStopTrigger::MSG_GEN_SET_ENABLED(VUM_NOW);
+    	break;
+    EC(default: ProgError("Invaild animationSatte in AnimationUpdateReplybarUI"); )
+    }
+}
+
+
+
+/*--------------------- MSG_DB_VIEWER_ANIMATION_CLOSE_DIALOG ---------------------
+ *  Purpose:	Clean up after the animation doalg box has been closed.
+ *  Context:
+ *  Strategy:
+ 	- free AnimationContent's bitmap
+ 	- stop animation timer
+ 	- reset "dialog must be re-initialized on restart" information
+ 	- free buffer bitmaps
+ *  Parameters:	-
+ *  Return:	-
+ ---------------------------------------------------------------------------*/
+@extern method IconDBViewerClass, MSG_DB_VIEWER_ANIMATION_CLOSE_DIALOG {
+
+    @call AnimationContent::MSG_OC_REPLACE_BITMAP(0);
+    @call oself::MSG_DB_VIEWER_ANIMATION_STOP_TIMER();
+    pself->DBVI_flags &= ~DBVF_RESTORE_ANIMATION;
+
+    if (pself->DBVI_animation.bufferBmp) {
+    	HugeArrayDestroy(global.tempFile, pself->DBVI_animation.bufferBmp);
+    	GrDestroyState(pself->DBVI_animation.bufferGS);
+    }
+
+    if (pself->DBVI_animation.monoBuffer) {
+    	HugeArrayDestroy(global.tempFile, pself->DBVI_animation.monoBuffer);
+    	GrDestroyState(pself->DBVI_animation.monoGS);
+    }
+
+    pself->DBVI_animation.bufferBmp = 0;
+    pself->DBVI_animation.monoBuffer = 0;
+}
+
+/*--------------------- MSG_DB_VIEWER_ANIMATION_SPEED_CHANGED ---------------------
+ *  Purpose:	The user has changed the speed slider in the dialog box
+ *  Context:
+ *  Strategy:	- update UI for new speed
+ *		- Set the timer handler that he should restart the animation on
+ *		  next timer tick. This handler will read the new timer value from UI.
+ *		- Update UI (for savety)
+ *  Parameters:	GEN_VALUE_APPLY_MSG
+ *		void (WWFixedAsDWord value, GenValueStateFlagsAsWord stateFlags);
+ *  Return:	-
+ ---------------------------------------------------------------------------*/
+@extern method IconDBViewerClass, MSG_DB_VIEWER_ANIMATION_SPEED_CHANGED {
+
+    AnimationUpdateFPSValue();
+
+    if ( pself->DBVI_animation.animState != ANIM_STATE_RUN) return;
+    pself->DBVI_animation.animState = ANIM_STATE_NEED_RESTART;
+    AnimationUpdateReplybarUI(ANIM_STATE_NEED_RESTART);
+
+
+}
+/*--------------------- AnimationUpdateFPSValue ---------------------
+ *  Purpose:	Calculate 'frames per secon' from 'tics per frame' value
+ *		and dsiplay UI
+ *  Context:
+ *  Strategy:
+ *  Parameters:	-
+ *  Return:	-
+ ---------------------------------------------------------------------------*/
+void AnimationUpdateFPSValue(void)  {
+WWFixedAsDWord	fps;
+int tics;
+
+    tics = @call AnimationTimerSlider::MSG_GEN_VALUE_GET_INTEGER_VALUE();
+    @call AnimationTimerSlider::MSG_GEN_VALUE_SET_INTEGER_VALUE(tics, FALSE);
+    fps = GrSDivWWFixed(MakeWWFixed(60), MakeWWFixed(tics));
+    @call AnimationFramesPerSec::MSG_GEN_VALUE_SET_VALUE(fps, FALSE);
+
+}
+
+
+/*--------------------- MSG_DB_VIEWER_ANIMATION_COLOR_CHANGED ---------------------
+ *  Purpose:	The user has choosen an new background color
+ *  Context:
+ *  Strategy:	- update view background color
+ *		- update buffer bitmap and redraw it
+ *  Parameters: GEN_ITEM_GROUP_APPLY_MSG (
+ *			word selection, word numSelections, GenItemGroupStateFlags stateFlags);
+ *  Return:
+ ---------------------------------------------------------------------------*/
+@extern method IconDBViewerClass, MSG_DB_VIEWER_ANIMATION_COLOR_CHANGED {
+
+    @send AnimationView::MSG_GEN_VIEW_SET_COLOR (selection, CF_INDEX, 0);
+    @call oself::MSG_DB_VIEWER_ANIMATION_UPDATE_BUFFER_BITMAP();
+    @call AnimationContent::MSG_OC_BITMAP_UPDATED(0);	/* still use current bmp */
+}
+
+/*--------------------- MSG_DB_VIEWER_ANIMATION_SCALE_CHANGED ---------------------
+ *  Purpose:	Set a new scalr factor for the animation
+ *  Context:	This is only available if the animation is NOT running.
+ *  Strategy:	- destroy current bitmaps (CLOSE_DIALOG does this, but does not colse the dialog)
+ *		- rebuild all bitmaps (OPEN_DIALOG does this)
+ *		  Side effect: the display switches to the first frame.
+ *  Parameters: GEN_ITEM_GROUP_APPLY_MSG (
+ *			word selection, word numSelections, GenItemGroupStateFlags stateFlags);
+ *  Return:	-
+ ---------------------------------------------------------------------------*/
+@extern method IconDBViewerClass, MSG_DB_VIEWER_ANIMATION_SCALE_CHANGED {
+
+    /*
+     * Clean up and reinitialize dialog box
+     */
+    @call oself::MSG_DB_VIEWER_ANIMATION_CLOSE_DIALOG();
+    @call oself::MSG_DB_VIEWER_ANIMATION_OPEN_DIALOG();
+}
+
+/*--------------------- MSG_DB_VIEWER_ANIMATION_ENTER_FRAME ---------------------
+ *  Purpose:	Go to a frame, specified by the AnimateCurrentFrameValue object
+ *  Context:
+ *  Strategy:
+ *  Parameters:	GEN_VALUE_APPLY_MSG
+ *		void (WWFixedAsDWord value, GenValueStateFlagsAsWord stateFlags);
+ *  Return:	-
+ ---------------------------------------------------------------------------*/
+@extern method IconDBViewerClass, MSG_DB_VIEWER_ANIMATION_ENTER_FRAME {
+int frame;
+
+    frame = (value + 0x8000) >> 16;	/* round value */
+    pself->DBVI_animation.curFrame = frame;
+    @call oself::MSG_DB_VIEWER_ANIMATION_SINGLE_STEP(0);	/* Display this frame */
+}
+
+/*--------------------- MSG_DB_VIEWER_ANIMATION_START_TIMER ---------------------
+ *  Purpose:	Start animation
+ *  Context:
+ *  Strategy:	- stop current timer for savety
+ *		- read speed value from UI
+ *		- start timer
+ *		- update UI
+ *  Parameters:
+ *  Return:
+ ---------------------------------------------------------------------------*/
+@extern method IconDBViewerClass, MSG_DB_VIEWER_ANIMATION_START_TIMER {
+int tics;
+
+    @call oself::MSG_DB_VIEWER_ANIMATION_STOP_TIMER();
+
+    tics = @call AnimationTimerSlider::MSG_GEN_VALUE_GET_INTEGER_VALUE();
+    pself->DBVI_animation.th = TimerStart(TIMER_EVENT_CONTINUAL, oself, 1 ,
+    		MSG_DB_VIEWER_ANIMATION_TIMER_NEXT_FRAME,  tics , &pself->DBVI_animation.tID);
+
+    pself->DBVI_animation.animState = ANIM_STATE_RUN;
+    AnimationUpdateReplybarUI(ANIM_STATE_RUN);
+}
+
+/*--------------------- MSG_DB_VIEWER_ANIMATION_STOP_TIMER ---------------------
+ *  Purpose:	Stop timer, if it is running
+ *  Context:
+ *  Strategy:	- Update UI
+ *		- stop timer, if it is running
+ *  Parameters:
+ *  Return:
+ ---------------------------------------------------------------------------*/
+@extern method IconDBViewerClass, MSG_DB_VIEWER_ANIMATION_STOP_TIMER {
+
+    pself->DBVI_animation.animState = ANIM_STATE_STOP;
+    AnimationUpdateReplybarUI(ANIM_STATE_STOP);
+    if ( pself->DBVI_animation.th == 0) return;
+
+    TimerStop(pself->DBVI_animation.th, pself->DBVI_animation.tID);
+    pself->DBVI_animation.th = 0;
+    pself->DBVI_animation.tID = 0;
+}
+
+/*--------------------- MSG_DB_VIEWER_ANIMATION_TIMER_NEXT_FRAME ---------------------
+ *  Purpose:	Enter next animation frame
+ *  Context:
+ *  Strategy:	- if animState == ANIM_STATE_NEED_RESTART: the user has changed
+ *		  the speed value. --> Stop timer and restart it. This will
+ *		  read the new speed value from UI.
+ *		- Enter next frame
+ *  Parameters:	-
+ *  Return:	-
+ ---------------------------------------------------------------------------*/
+@extern method IconDBViewerClass, MSG_DB_VIEWER_ANIMATION_TIMER_NEXT_FRAME {
+
+    if ( pself->DBVI_animation.animState == ANIM_STATE_NEED_RESTART) {
+    	@call oself::MSG_DB_VIEWER_ANIMATION_STOP_TIMER();
+    	@call oself::MSG_DB_VIEWER_ANIMATION_START_TIMER();
+    	return;
+    }
+
+    if ( pself->DBVI_animation.animState != ANIM_STATE_RUN) return;
+
+    @call oself::MSG_DB_VIEWER_ANIMATION_SINGLE_STEP(1);
+}
+
+/*--------------------- MSG_DB_VIEWER_ANIMATION_SINGLE_STEP ---------------------
+ *  Purpose:	Enter next frame and draw it to the screen
+ *  Context:
+ *  Strategy:	- find out next frame
+ *		- draw frame-icon to buffer bitmap (this is a more complex task)
+ *		- redraw image
+ *  Parameters:	steps:	+1: draw next frame
+ *			-1: draw previuos frame
+ *			 0: redraw current frame
+ *  Return:
+ ---------------------------------------------------------------------------*/
+@extern method IconDBViewerClass, MSG_DB_VIEWER_ANIMATION_SINGLE_STEP {
+
+    /*
+     * When GEOS shuts down while a timer event is left in the queue, the
+     * global.temfile may already be closed. So we checkt this here.
+     */
+    if (!global.tempFile) { return; }
+
+    pself->DBVI_animation.curFrame += steps;
+    if (pself->DBVI_animation.curFrame >= pself->DBVI_animation.numFrames ) pself->DBVI_animation.curFrame = 0;
+    if (pself->DBVI_animation.curFrame < 0) pself->DBVI_animation.curFrame = pself->DBVI_animation.numFrames - 1;
+
+    @call oself::MSG_DB_VIEWER_ANIMATION_UPDATE_BUFFER_BITMAP();
+    @call AnimationContent::MSG_OC_BITMAP_UPDATED(0);	/* still use current bmp */
+
+    /*
+     * send frame value back to the slider to avoid rounding issues */
+    @call AnimateCurrentFrameValue::MSG_GEN_VALUE_SET_INTEGER_VALUE(pself->DBVI_animation.curFrame, FALSE);
+}
+
+/*--------------------- MSG_DB_VIEWER_ANIMATION_UPDATE_BUFFER_BITMAP ---------------------
+ *  Purpose:	Draw current frame (icon image) to the buffer bitmap
+ *  Context:	mono bitmaps needs an extra handling
+ *  Strategy:	See code
+ *  Parameters:	-
+ *  Return:	-
+ ---------------------------------------------------------------------------*/
+@extern method IconDBViewerClass, MSG_DB_VIEWER_ANIMATION_UPDATE_BUFFER_BITMAP {
+VMBlockHandle bmp;
+int width, height, bmFormat;
+
+    /*
+     * fetch icon bitmap, format of the icon bitmap and size of the buffer-bitmap
+     */
+    bmp = IdGetEntryBitmap(pself->DBVI_vmFile, pself->DBVI_currentISet, pself->DBVI_animation.curFrame);
+    bmFormat = BTGetMoreBitmapInfos(pself->DBVI_vmFile, bmp, 0, 0, 0);
+    BTGetMoreBitmapInfos(global.tempFile, pself->DBVI_animation.bufferBmp, &width, &height, 0);
+
+    if ( (bmFormat & BMT_FORMAT) == BMF_MONO ) {
+    	/*
+    	 * Monochrome icons need a special handling because drawing a monochrome image to a
+    	 * true color image does not work properly.
+    	 * Note: If this bug is fixed in the system, please don't remove the extra handling,
+    	 * or the program will be incomaptible to older PC/GEOS version. R.B. 06/2026
+    	 */
+    	EC( if ( 0==pself->DBVI_animation.monoBuffer ) { ProgError("No monoBuffer bitmap in UPDATE_BUFFER_BITMAP"); return; } )
+
+    	/* draw icon to the monoBuffer bitmap and the draw the monoBuffer bitmap to the real buffer bitmap */
+	AnimationFillBufferBitmap(pself->DBVI_animation.monoGS, width, height);
+	GrDrawHugeBitmap(pself->DBVI_animation.monoGS, 0, 0, pself->DBVI_vmFile, bmp);
+	GrDrawHugeBitmap(pself->DBVI_animation.bufferGS, 0, 0, global.tempFile, pself->DBVI_animation.monoBuffer);
+
+    } else {
+    	/* simply draw the icon to the buffer bitmap */
+	AnimationFillBufferBitmap(pself->DBVI_animation.bufferGS, width, height);
+	GrDrawHugeBitmap(pself->DBVI_animation.bufferGS, 0, 0, pself->DBVI_vmFile, bmp);
+
+    }
+
+}
+
+
+/*---------------------  ---------------------
+ *  Purpose:
+ *  Context:
+ *  Strategy:
+ *  Parameters:
+ *  Return:
+ ---------------------------------------------------------------------------*/
+/* *********** End of file animation.goc ********************/
+
+

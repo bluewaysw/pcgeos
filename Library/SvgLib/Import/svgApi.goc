@@ -1,0 +1,221 @@
+@include <stdapp.goh>
+#include "Import/svg.h"
+
+#define SVG_HEADER_BYTES 1024
+
+static Boolean
+SvgHeaderIsSpace(byte value)
+{
+    return value == ' ' || value == '\t' || value == '\r' || value == '\n';
+}
+
+static word
+SvgHeaderSkipComment(const byte *sampleP, word bytesRead, word index)
+{
+    while (index + 2 < bytesRead)
+    {
+        if (sampleP[index] == '-' && sampleP[index + 1] == '-' &&
+            sampleP[index + 2] == '>')
+        {
+            return index + 3;
+        }
+        index++;
+    }
+    return bytesRead;
+}
+
+static word
+SvgHeaderSkipDeclaration(const byte *sampleP, word bytesRead, word index)
+{
+    byte quote;
+    byte value;
+    word brackets;
+
+    quote = 0;
+    brackets = 0;
+    while (index < bytesRead)
+    {
+        value = sampleP[index++];
+        if (quote)
+        {
+            if (value == quote) quote = 0;
+        }
+        else if (value == '\'' || value == '"')
+        {
+            quote = value;
+        }
+        else if (value == '[')
+        {
+            brackets++;
+        }
+        else if (value == ']' && brackets)
+        {
+            brackets--;
+        }
+        else if (value == '>' && brackets == 0)
+        {
+            return index;
+        }
+    }
+    return bytesRead;
+}
+
+Boolean _export _pascal
+SvgCheckHeader(FileHandle sourceFile)
+{
+    MemHandle sampleH;
+    byte *sampleP;
+    dword oldPosition;
+    word bytesRead;
+    word index;
+    word svgIndex;
+    Boolean found;
+
+    if (!sourceFile)
+    {
+        return FALSE;
+    }
+
+    oldPosition = FilePos(sourceFile, 0, FILE_POS_RELATIVE);
+    FilePos(sourceFile, 0, FILE_POS_START);
+
+    sampleH = MemAlloc(SVG_HEADER_BYTES, HF_DYNAMIC, HAF_ZERO_INIT);
+    if (!sampleH)
+    {
+        FilePos(sourceFile, oldPosition, FILE_POS_START);
+        return FALSE;
+    }
+    sampleP = (byte *)MemLock(sampleH);
+    if (!sampleP)
+    {
+        MemFree(sampleH);
+        FilePos(sourceFile, oldPosition, FILE_POS_START);
+        return FALSE;
+    }
+
+    bytesRead = FileRead(sourceFile, sampleP, SVG_HEADER_BYTES, FALSE);
+    if (bytesRead == 0xffff)
+    {
+        bytesRead = 0;
+    }
+    found = FALSE;
+    index = 0;
+    if (bytesRead >= 3 && sampleP[0] == 0xef && sampleP[1] == 0xbb &&
+        sampleP[2] == 0xbf)
+    {
+        index = 3;
+    }
+    while (index < bytesRead)
+    {
+        while (index < bytesRead && SvgHeaderIsSpace(sampleP[index]))
+        {
+            index++;
+        }
+        if (index >= bytesRead || sampleP[index] != '<' ||
+            index + 1 >= bytesRead)
+        {
+            break;
+        }
+        if (index + 3 < bytesRead && sampleP[index + 1] == '!' &&
+            sampleP[index + 2] == '-' && sampleP[index + 3] == '-')
+        {
+            index = SvgHeaderSkipComment(sampleP, bytesRead, index + 4);
+            continue;
+        }
+        if (sampleP[index + 1] == '!' || sampleP[index + 1] == '?')
+        {
+            index = SvgHeaderSkipDeclaration(sampleP, bytesRead, index + 2);
+            continue;
+        }
+
+        svgIndex = index + 1;
+        if (svgIndex + 3 < bytesRead && sampleP[svgIndex] == 's' &&
+            sampleP[svgIndex + 1] == 'v' && sampleP[svgIndex + 2] == 'g' &&
+            (sampleP[svgIndex + 3] == '>' ||
+             sampleP[svgIndex + 3] == '/' ||
+             SvgHeaderIsSpace(sampleP[svgIndex + 3])))
+        {
+            found = TRUE;
+        }
+        break;
+    }
+
+    MemUnlock(sampleH);
+    MemFree(sampleH);
+    FilePos(sourceFile, oldPosition, FILE_POS_START);
+    return found;
+}
+
+TransError _export _pascal
+SvgImport(FileHandle sourceFile,
+          VMFileHandle destinationFile,
+          VMChain *resultChainP,
+          RectDWord *boundsP,
+          SvgProgressCallback *callback,
+          const volatile Boolean *cancelP)
+{
+    MemHandle contextH;
+    SvgImportContext *contextP;
+    GStateHandle gstate;
+    VMBlockHandle gstringBlock;
+    TransError status;
+
+    if (resultChainP)
+    {
+        *resultChainP = 0;
+    }
+    if (!sourceFile || !destinationFile || !resultChainP)
+    {
+        return TE_INVALID_FORMAT;
+    }
+
+    if (cancelP && *cancelP)
+    {
+        return TE_ERROR;
+    }
+
+    contextH = MemAlloc((word)sizeof(SvgImportContext), HF_DYNAMIC,
+                        HAF_ZERO_INIT);
+    if (!contextH)
+    {
+        return TE_OUT_OF_MEMORY;
+    }
+    contextP = (SvgImportContext *)MemLock(contextH);
+    if (!contextP)
+    {
+        MemFree(contextH);
+        return TE_OUT_OF_MEMORY;
+    }
+
+    gstate = GrCreateGString(destinationFile, GST_VMEM, &gstringBlock);
+    if (!gstate)
+    {
+        MemUnlock(contextH);
+        MemFree(contextH);
+        return TE_METAFILE_CREATION_ERROR;
+    }
+
+    SvgRendererInit(contextP, gstate);
+    status = SvgImportParse(contextP, sourceFile, callback, cancelP);
+    if (status == TE_NO_ERROR)
+    {
+        GrEndGString(gstate);
+        if (boundsP)
+        {
+            GrSetGStringPos(gstate, GSSPT_BEGINNING, 0);
+            GrGetGStringBoundsDWord(gstate, 0, 0, boundsP);
+        }
+        GrDestroyGString(gstate, 0, GSKT_LEAVE_DATA);
+        *resultChainP = VMCHAIN_MAKE_FROM_VM_BLOCK(gstringBlock);
+    }
+    else
+    {
+        GrDestroyGString(gstate, 0, GSKT_LEAVE_DATA);
+        VMFreeVMChain(destinationFile,
+                      VMCHAIN_MAKE_FROM_VM_BLOCK(gstringBlock));
+    }
+
+    MemUnlock(contextH);
+    MemFree(contextH);
+    return status;
+}

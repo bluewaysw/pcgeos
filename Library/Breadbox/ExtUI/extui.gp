@@ -1,5 +1,5 @@
 name extui.lib
-longname "Breadbox Extended UI Library"
+longname "Extended UI Library"
 
 tokenchars "ExUI"
 tokenid    16431
@@ -28,4 +28,3 @@ incminor
 
 export EXTUIUTILSDRAWTEXTLIMITED
 
-usernotes "Copyright 1994-2002  Breadbox Computer Company LLC  All Rights Reserved"

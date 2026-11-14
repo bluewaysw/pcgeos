@@ -1,0 +1,399 @@
+/***********************************************************************
+ * svgParse.goc - low-level parser helpers
+ ***********************************************************************/
+@include <stdapp.goh>
+
+#include <Ansi/string.h>
+#include <Ansi/ctype.h>
+#include <file.h>
+
+#include "Import/svg.h"
+#include "Import/dbglog.h"
+
+
+/* skip common ASCII whitespace characters */
+const char* SvgParserSkipWS(const char *p)
+{
+    while (*p == ' ' || *p == '\t' || *p == '\r' || *p == '\n') { p++; }
+    return p;
+}
+
+/* skip whitespace, optional comma, then whitespace again */
+const char* SvgParserSkipCommaWS(const char *p)
+{
+    p = SvgParserSkipWS(p);
+    if (*p == ',')
+    {
+        p++;
+        p = SvgParserSkipWS(p);
+    }
+    return p;
+}
+
+SvgAttrResult
+SvgParserGetAttrSpan(const char *tag, const char *name,
+                     const char **valuePP, word *lengthP, word maximumBytes)
+{
+    const char *s;
+    word nlen;
+
+    *valuePP = NULL;
+    *lengthP = 0;
+
+    s = tag;
+    while (*s && !isspace(*s) && *s != '>' && *s != '/')
+    {
+        s++;
+    }
+
+    nlen = (word)strlen(name);
+
+    while (*s && *s != '>')
+    {
+        const char *an;
+        word        alen;
+
+        while (*s && (isspace(*s) || *s == '/'))
+        {
+            s++;
+        }
+        if (!*s || *s == '>')
+        {
+            break;
+        }
+
+        an = s;
+        alen = 0;
+
+        while (*s && *s != '=' && !isspace(*s) && *s != '>' && *s != '/')
+        {
+            s++;
+            alen++;
+        }
+
+        if (alen == nlen && !memcmp(an, name, nlen))
+        {
+            const char *valueP;
+            unsigned long length;
+
+            while (*s && isspace(*s)) s++;
+            if (*s != '=') return SVG_ATTR_MALFORMED;
+            s++;
+            while (*s && isspace(*s)) s++;
+
+            if (*s == '"' || *s == '\'')
+            {
+                char q;
+
+                q = *s++;
+                valueP = s;
+                length = 0;
+                while (*s && *s != q) { s++; length++; }
+                if (*s != q) return SVG_ATTR_MALFORMED;
+            }
+            else
+            {
+                valueP = s;
+                length = 0;
+                while (*s && !isspace(*s) && *s != '>')
+                { s++; length++; }
+                if (length == 0) return SVG_ATTR_MALFORMED;
+            }
+            if (length + 1 > maximumBytes) return SVG_ATTR_TOO_LONG;
+            *valuePP = valueP;
+            *lengthP = (word)length;
+            return SVG_ATTR_VALID;
+        }
+        else
+        {
+            while (*s && isspace(*s)) s++;
+            if (*s == '=')
+            {
+                s++;
+                while (*s && isspace(*s)) s++;
+                if (*s == '"' || *s == '\'')
+                {
+                    char q;
+                    q = *s++;
+                    while (*s && *s != q) s++;
+                    if (*s != q) return SVG_ATTR_MALFORMED;
+                    s++;
+                }
+                else
+                {
+                    while (*s && !isspace(*s) && *s != '>') s++;
+                }
+            }
+        }
+    }
+    return SVG_ATTR_MISSING;
+}
+
+Boolean SvgParserGetAttrBounded(const char *tag, const char *name,
+                                char *out, word outSize)
+{
+    const char *valueP;
+    word length;
+
+    if (outSize == 0) return FALSE;
+    out[0] = 0;
+    if (SvgParserGetAttrSpan(tag, name, &valueP, &length, outSize) !=
+        SVG_ATTR_VALID)
+    {
+        return FALSE;
+    }
+    if (length != 0) memcpy(out, valueP, length);
+    out[length] = 0;
+    return TRUE;
+}
+
+Boolean SvgParserTagIs(const char *tag, const char *name)
+{
+    const char *s;
+    const char *n;
+
+    s = tag;
+    n = name;
+    while (*s && !isspace(*s) && *s != '/' && *s != '>')
+    {
+        if (*n == 0 || *s != *n)
+        {
+            return FALSE;
+        }
+        s++;
+        n++;
+    }
+    return (*n == 0);
+}
+
+void SvgParserScanInit(SvgScanCtx *c)
+{
+    c->ioH = 0;
+    c->ioP = NULL;
+    c->bytes = 0;
+    c->pos = 0;
+    c->inTag = FALSE;
+    c->inQuote = FALSE;
+    c->quoteCh = 0;
+    c->tagLen = 0;
+}
+
+static SvgScanResult
+SvgParserScanStop(SvgImportContext *contextP, FileHandle fh, SvgScanCtx *c, SvgScanResult result,
+                  const char *reason)
+{
+    (void)contextP;
+    (void)fh;
+    (void)c;
+    (void)reason;
+
+    LOG_STR(contextP, "[SCAN STOP]", reason);
+    LOG_WORD(contextP, "scan.pos", c->pos);
+    LOG_WORD(contextP, "scan.bytes", c->bytes);
+    LOG_WORD(contextP, "scan.tagLen", c->tagLen);
+    LOG_PTR(contextP, "scan.ioP", c->ioP);
+    LOG_DWORD(contextP, "scan.filePos", FilePos(fh, 0, FILE_POS_RELATIVE));
+    return result;
+}
+
+SvgScanResult
+SvgParserScanNextTag(SvgImportContext *contextP, FileHandle fh,
+                     SvgScanCtx *c, SVGScratch *sc)
+{
+    for (;;)
+    {
+        if (c->pos >= c->bytes)
+        {
+            word r;
+
+            if (!c->ioP)
+            {
+                return SvgParserScanStop(contextP, fh, c, SVG_SCAN_NO_INPUT,
+                                         "missing input pointer");
+            }
+            r = FileRead(fh, (void*)c->ioP, SVG_IO_BUF_SIZE, FALSE);
+            if (r == (word)-1)
+            {
+                return SvgParserScanStop(contextP, fh, c, SVG_SCAN_IO_ERROR,
+                                         "FileRead error");
+            }
+            if (r == 0)
+            {
+                if (c->inTag)
+                {
+                    return SvgParserScanStop(contextP, fh, c, SVG_SCAN_TRUNCATED,
+                                             "EOF inside tag");
+                }
+                return SvgParserScanStop(contextP, fh, c, SVG_SCAN_EOF, "EOF");
+            }
+            c->bytes = r;
+            c->pos   = 0;
+        }
+
+        {
+            char ch;
+            ch = c->ioP[c->pos++];
+
+            if (!c->inTag)
+            {
+                if (ch == '<')
+                {
+                    c->inTag = TRUE;
+                    c->inQuote = FALSE;
+                    c->quoteCh = 0;
+                    c->tagLen = 0;
+                }
+                continue;
+            }
+
+            if (c->inQuote)
+            {
+                if (ch == c->quoteCh) c->inQuote = FALSE;
+                if (c->tagLen >= SVG_TEXT_MAX_SIZE - 1)
+                {
+                    return SvgParserScanStop(contextP, fh, c,
+                                             SVG_SCAN_LIMIT_EXCEEDED,
+                                             "tag ceiling in quote");
+                }
+                if (!SvgScratchEnsureTagCapacity(sc, (word)(c->tagLen + 2)))
+                {
+                    return SvgParserScanStop(contextP, fh, c, SVG_SCAN_OUT_OF_MEMORY,
+                                             "tag growth in quote");
+                }
+                sc->tagP[c->tagLen++] = ch;
+                continue;
+            }
+            else
+            {
+                if (c->tagLen >= 3 &&
+                    sc->tagP[0] == '!' &&
+                    sc->tagP[1] == '-' &&
+                    sc->tagP[2] == '-')
+                {
+                    if (ch != '>' ||
+                        sc->tagP[c->tagLen - 1] != '-' ||
+                        sc->tagP[c->tagLen - 2] != '-')
+                    {
+                        if (c->tagLen >= SVG_TEXT_MAX_SIZE - 1)
+                        {
+                            return SvgParserScanStop(contextP,
+                                fh, c, SVG_SCAN_LIMIT_EXCEEDED,
+                                "comment ceiling");
+                        }
+                        if (!SvgScratchEnsureTagCapacity(
+                                sc, (word)(c->tagLen + 2)))
+                        {
+                            return SvgParserScanStop(contextP,
+                                fh, c, SVG_SCAN_OUT_OF_MEMORY,
+                                "comment growth");
+                        }
+                        sc->tagP[c->tagLen++] = ch;
+                        continue;
+                    }
+                }
+                if (ch == '"' || ch == '\'')
+                {
+                    c->inQuote = TRUE;
+                    c->quoteCh = ch;
+                    if (c->tagLen >= SVG_TEXT_MAX_SIZE - 1)
+                    {
+                        return SvgParserScanStop(contextP, fh, c,
+                                                 SVG_SCAN_LIMIT_EXCEEDED,
+                                                 "tag ceiling at quote");
+                    }
+                    if (!SvgScratchEnsureTagCapacity(sc, (word)(c->tagLen + 2)))
+                    {
+                        return SvgParserScanStop(contextP, fh, c,
+                                                 SVG_SCAN_OUT_OF_MEMORY,
+                                                 "tag growth at quote");
+                    }
+                    sc->tagP[c->tagLen++] = ch;
+                    continue;
+                }
+                if (ch != '>')
+                {
+                    if (c->tagLen >= SVG_TEXT_MAX_SIZE - 1)
+                    {
+                        return SvgParserScanStop(contextP, fh, c,
+                                                 SVG_SCAN_LIMIT_EXCEEDED,
+                                                 "tag ceiling");
+                    }
+                    if (!SvgScratchEnsureTagCapacity(sc, (word)(c->tagLen + 2)))
+                    {
+                        return SvgParserScanStop(contextP, fh, c,
+                                                 SVG_SCAN_OUT_OF_MEMORY,
+                                                 "tag growth");
+                    }
+                    sc->tagP[c->tagLen++] = ch;
+                    continue;
+                }
+
+                if (!SvgScratchEnsureTagCapacity(sc, (word)(c->tagLen + 1)))
+                {
+                    return SvgParserScanStop(contextP, fh, c, SVG_SCAN_OUT_OF_MEMORY,
+                                             "tag terminator growth");
+                }
+                sc->tagP[c->tagLen] = 0;
+                c->inTag = FALSE;
+                return SVG_SCAN_TAG;
+            }
+        }
+    }
+}
+
+Boolean SvgParseGetInlineStyleProp(SvgImportContext *contextP,
+                             const char *tag, const char *prop,
+                             char *out, word outSize)
+{
+    char *styleBuf;
+    const char *s;
+    const char *kb;
+    const char *ke;
+    const char *vb;
+    const char *ve;
+    word n;
+
+    styleBuf = contextP->work1;
+    if (outSize == 0) return FALSE;
+    out[0] = 0;
+
+    if (!SvgParserGetAttrBounded(tag, "style", styleBuf,
+                                 sizeof(contextP->work1)))
+        return FALSE;
+
+    s = styleBuf;
+    for (;;) {
+        while (*s == ';' || isspace((byte)*s)) s++;
+        if (!*s) break;
+
+        kb = s;
+        while (*s && *s != ':' && *s != ';') s++;
+        if (*s != ':') {
+            while (*s && *s != ';') s++;
+            if (*s == ';') s++;
+            continue;
+        }
+        ke = s;
+        s++;
+
+        while (*s && isspace((byte)*s)) s++;
+        vb = s;
+        while (*s && *s != ';') s++;
+        ve = s;
+        while (ve > vb && isspace((byte)ve[-1])) ve--;
+
+        if (SvgUtilKeyEqNoCase(kb, ke, prop)) {
+            n = (word)(ve - vb);
+            if (n >= outSize)
+            {
+                out[0] = 0;
+                return FALSE;
+            }
+            if (n > 0) memcpy(out, vb, n);
+            out[n] = 0;
+            return TRUE;
+        }
+        if (*s == ';') s++;
+    }
+    return FALSE;
+}

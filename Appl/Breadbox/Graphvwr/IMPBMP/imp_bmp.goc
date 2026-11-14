@@ -9,6 +9,7 @@
 @include "statbar/statbar.goh"
 #include <Ansi/string.h>
 #include "pnglib.h"
+#include <webplib.h>
 
 #include "IMPBMP/imppcx.h"
 #include "IMPBMP/impbmp.h"
@@ -50,6 +51,10 @@ ImpBmpStatus _pascal ImpJPEGTestFile(FileHandle file);
 ImpBmpStatus _pascal ImpPNGProcessFile(ImpBmpParams *params);
 ImpBmpStatus _pascal ImpPNGTestFile(FileHandle file);
 
+// WebP
+ImpBmpStatus _pascal ImpWebPProcessFile(ImpBmpParams *params);
+ImpBmpStatus _pascal ImpWebPTestFile(FileHandle file);
+
 /* Declaration of functions */
 
 /*********************************************************************/
@@ -63,6 +68,7 @@ ImpBmpStatus _pascal Imp_BmpProcessFile(ImpBmpParams *params,ImpBmpFormat format
 	 format = Imp_BmpTestFile(params->IBP_source);
 	 if(format == 0) return(IBS_UNKNOWN_FORMAT);
   };
+  params->IBP_format = format;
 
   if(format == IBF_BMP)
 	 status = ImpBMPProcessFile(params);
@@ -72,6 +78,9 @@ ImpBmpStatus _pascal Imp_BmpProcessFile(ImpBmpParams *params,ImpBmpFormat format
 
   if(format == IBF_PNG)
 	 status = ImpPNGProcessFile(params);
+
+  if(format == IBF_WEBP)
+	 status = ImpWebPProcessFile(params);
 
 /*
   if(format == IBF_TIFF)
@@ -120,6 +129,9 @@ ImpBmpFormat _pascal Imp_BmpTestFile(FileHandle file)
 
   status = ImpPNGTestFile(file);
   if(status == IBS_NO_ERROR) return(IBF_PNG);
+
+  status = ImpWebPTestFile(file);
+  if(status == IBS_NO_ERROR) return(IBF_WEBP);
 
 /*
   status = ImpTIFFTestFile(file);
@@ -442,5 +454,119 @@ ImpBmpStatus _pascal ImpPNGTestFile(FileHandle file)
   return (IBS_NO_ERROR);
 }
 
+/*********************************************************************/
+
+static ImpBmpStatus
+ImpWebPMapResult(WebPResult result)
+{
+  switch(result)
+  {
+	case WEBP_ERROR_WRONG_FORMAT:
+	  return(IBS_WRONG_FORMAT);
+	case WEBP_ERROR_UNSUPPORTED:
+	  return(IBS_UNSUPPORTED_COMPRESSION);
+	case WEBP_ERROR_OUT_OF_MEMORY:
+	  return(IBS_NO_MEMORY);
+	case WEBP_ERROR_CORRUPT:
+	case WEBP_ERROR_READ:
+	case WEBP_ERROR_IMAGE_TOO_LARGE:
+	  return(IBS_WRONG_FILE);
+	default:
+	  return(IBS_SYS_ERROR);
+  }
+}
+
+/*********************************************************************/
+
+ImpBmpStatus _pascal ImpWebPProcessFile(ImpBmpParams *params)
+{
+  WebPImportHandle decoder;
+  WebPImageInfo info;
+  WebPResult result;
+  ImpBmpStatus status;
+  VMBlockHandle bitmap;
+  word firstLine;
+  word lineCount;
+  Boolean flag;
+
+  decoder = NullHandle;
+  bitmap = NullHandle;
+  status = IBS_NO_ERROR;
+  flag = TRUE;
+  params->IBP_bitmap = NullHandle;
+
+  if(params->IBP_status != 0)
+	@call params->IBP_status::MSG_SB_START_PROCESS();
+
+  result = WebPImportBegin(params->IBP_source, params->IBP_dest,
+						   &decoder, &bitmap, &info);
+  if(result != WEBP_RESULT_OK)
+  {
+	status = ImpWebPMapResult(result);
+	goto cleanup;
+  }
+
+  params->IBP_bitmap = bitmap;
+  params->IBP_width = info.width;
+  params->IBP_height = info.height;
+  params->IBP_format = IBF_WEBP;
+  strcpy(params->IBP_impForm, ".WEB");
+
+  for(;;)
+  {
+	result = WebPImportNext(decoder, &firstLine, &lineCount);
+	if(result == WEBP_RESULT_DONE)
+	  break;
+	if(result != WEBP_RESULT_OK)
+	{
+	  status = ImpWebPMapResult(result);
+	  break;
+	}
+
+	if(params->IBP_status != 0 && lineCount != 0)
+	  flag = @call params->IBP_status::
+		MSG_SB_SET_STATUS_VALUE(((dword)firstLine + lineCount) * 100 /
+								info.height);
+	if(flag == FALSE)
+	{
+	  status = IBS_IMPORT_STOPPED;
+	  break;
+	}
+  }
+
+cleanup:
+  WebPImportDestroy(decoder);
+  if(status != IBS_NO_ERROR && bitmap != NullHandle)
+  {
+	VMFreeVMChain(params->IBP_dest, VMCHAIN_MAKE_FROM_VM_BLOCK(bitmap));
+	params->IBP_bitmap = NullHandle;
+  }
+
+  if(params->IBP_status != 0)
+	@call params->IBP_status::MSG_SB_STOP_PROCESS();
+
+  return(status);
+}
+
+/*********************************************************************/
+
+ImpBmpStatus _pascal ImpWebPTestFile(FileHandle file)
+{
+  byte header[12];
+  int result;
+
+  if(FilePos(file, 0, FILE_POS_START) != 0)
+	return(IBS_WRONG_FILE);
+
+  result = FileRead(file, header, sizeof(header), 0);
+  if(result == -1)
+	return(IBS_SYS_ERROR);
+  if(result != sizeof(header))
+	return(IBS_WRONG_FILE);
+  if(memcmp(header, "RIFF", 4) != 0 || memcmp(header + 8, "WEBP", 4) != 0)
+	return(IBS_WRONG_FORMAT);
+
+  return(IBS_NO_ERROR);
+}
 
 /*********************************************************************/

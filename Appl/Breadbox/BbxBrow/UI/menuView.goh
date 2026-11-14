@@ -47,10 +47,8 @@
 
 @object GenBooleanGroupClass HTMLSettingsBoolGroup = {
     GBGI_selectedBooleans = DEFAULT_HTML_OPTIONS ;
-@if defined(JAVASCRIPT_SUPPORT) || defined(COMPILE_OPTION_AUTO_BROWSE)
     GBGI_applyMsg = MSG_HMLVP_HTML_OPTIONS_CHANGED;
     GBGI_destination = process;
-@endif
     ATTR_GEN_INIT_FILE_KEY = "htmlSettings";
     GI_comp =
 @ifdef COMPILE_OPTION_FAST_MODE_ON
@@ -60,7 +58,8 @@
                 @AddMarginOpt ,
 @endif
                 @viewTextColors,
-                @viewBackgroundImages
+                @viewBackgroundImages,
+                @ignoreNoScript
 @if defined(JAVASCRIPT_SUPPORT) || defined(COMPILE_OPTION_AUTO_BROWSE)
             , @enableJavaScript
 @endif
@@ -91,6 +90,11 @@
     GBI_identifier = HTML_NO_BACKGROUND;
 }
 
+/* This OR shares the checkbox between execution and analysis builds.
+ * JAVASCRIPT_SUPPORT provides execution; COMPILE_OPTION_AUTO_BROWSE alone
+ * provides collection/analysis. "Enable JavaScript" describes the former;
+ * "Analyze JavaScript" would describe an AutoBrowse-only build.
+ */
 @if defined(JAVASCRIPT_SUPPORT) || defined(COMPILE_OPTION_AUTO_BROWSE)
 @object GenBooleanClass enableJavaScript = {
     GI_visMoniker = 'J',"Enable JavaScript";
@@ -98,13 +102,18 @@
 }
 @endif
 
+@object GenBooleanClass ignoreNoScript = {
+    GI_visMoniker = 'n',"Ignore <noscript>";
+    GBI_identifier = HTML_IGNORE_NOSCRIPT;
+}
+
 @object GenInteractionClass LoadGraphicsGroup = {
     GI_attrs = @default | GA_KBD_SEARCH_PATH;
 @ifdef TV_BW_OPTION
     GI_comp = @NavigateTVBW,
-    @NavigateLoadGraphics,@NavigateLoadGraphicsNow
+    @NavigateLoadGraphics,@NavigateFitToWindow,@NavigateLoadGraphicsNow
 @else
-    GI_comp = @NavigateLoadGraphics,@NavigateLoadGraphicsNow
+    GI_comp = @NavigateLoadGraphics,@NavigateFitToWindow,@NavigateLoadGraphicsNow
 @endif
 @ifdef DO_DBCS
     ,@EncodingMenu;
@@ -171,6 +180,22 @@
 
 @object GenBooleanClass NavigateLoadGraphicsToggle = {
     GI_visMoniker = 'A',"Load Graphics Automatically";
+    GBI_identifier = TRUE;
+}
+
+@object GenBooleanGroupClass NavigateFitToWindow = {
+    GBGI_selectedBooleans = TRUE;
+    GBGI_destination = process;
+    GBGI_applyMsg = MSG_HMLVP_FIT_TO_WINDOW_CHANGED;
+    ATTR_GEN_INIT_FILE_KEY = "fitToWindow";
+    GI_comp = @NavigateFitToWindowToggle;
+}
+
+/*
+    window here also means html4 frame
+*/
+@object GenBooleanClass NavigateFitToWindowToggle = {
+    GI_visMoniker = 'w',"Fit To Window";
     GBI_identifier = TRUE;
 }
 

@@ -1,0 +1,327 @@
+/***********************************************************************
+ * svgUtil.goc - common ASCII helpers
+ ***********************************************************************/
+@include <stdapp.goh>
+
+#include <Ansi/string.h>
+#include <Ansi/stdlib.h>
+#include <Ansi/ctype.h>
+#include <file.h>
+#include <system.h>
+#include <graphics.h>
+#include <gstring.h>
+#include "Import/svg.h"
+#include "Import/dbglog.h"
+
+#define SVG_MAX_DECIMAL_EXPONENT 9   /* clamp exponent magnitude to keep WWFixed scaling sane */
+
+/* small ASCII case-insensitive compare */
+Boolean SvgUtilAsciiNoCaseEq(const char *a, const char *b)
+{
+    byte ca;
+    byte cb;
+
+    while (*a || *b) {
+        ca = (byte)*a++;
+        cb = (byte)*b++;
+        if (ca >= 'A' && ca <= 'Z') ca = (byte)(ca + ('a' - 'A'));
+        if (cb >= 'A' && cb <= 'Z') cb = (byte)(cb + ('a' - 'A'));
+        if (ca != cb) return FALSE;
+        if (ca == 0)  return TRUE;
+    }
+    return TRUE;
+}
+
+word SvgUtilHexNibble(char c)
+{
+    if (c >= '0' && c <= '9') return (word)(c - '0');
+    if (c >= 'A' && c <= 'F') return (word)(10 + (c - 'A'));
+    if (c >= 'a' && c <= 'f') return (word)(10 + (c - 'a'));
+    return 0;
+}
+
+word SvgUtilHexByte(const char *p)
+{
+    return (word)((SvgUtilHexNibble(p[0]) << 4) | SvgUtilHexNibble(p[1]));
+}
+
+Boolean SvgUtilExpandShortHex(const char *s, word *r, word *g, word *b)
+{
+    if (s[0] == '#' && strlen(s) == 4) {
+        char hh[7];
+        hh[0] = '#';
+        hh[1] = s[1]; hh[2] = s[1];
+        hh[3] = s[2]; hh[4] = s[2];
+        hh[5] = s[3]; hh[6] = s[3];
+        *r = SvgUtilHexByte(hh + 1);
+        *g = SvgUtilHexByte(hh + 3);
+        *b = SvgUtilHexByte(hh + 5);
+        return TRUE;
+    }
+    return FALSE;
+}
+
+Boolean SvgUtilParseRGBFunc(const char *s, word *r, word *g, word *b)
+{
+    const char *p;
+    int v1;
+    int v2;
+    int v3;
+    int isPct;
+
+    p = strstr(s, "rgb(");
+    if (!p) {
+        return FALSE;
+    }
+    p += 4;
+
+    isPct = 0;
+    v1 = atoi(p);
+    while (*p && *p != ',' && *p != ')' && *p != '%') p++;
+    if (*p == '%') { isPct = 1; p++; }
+    if (*p == ',') p++;
+    v2 = atoi(p);
+    while (*p && *p != ',' && *p != ')' && *p != '%') p++;
+    if (*p == '%') { isPct = 1; p++; }
+    if (*p == ',') p++;
+    v3 = atoi(p);
+    while (*p && *p != ')' && *p != '%') p++;
+    if (*p == '%') { isPct = 1; }
+
+    if (isPct) {
+        if (v1 < 0) v1 = 0; if (v1 > 100) v1 = 100;
+        if (v2 < 0) v2 = 0; if (v2 > 100) v2 = 100;
+        if (v3 < 0) v3 = 0; if (v3 > 100) v3 = 100;
+        *r = (word)((v1 * 255) / 100);
+        *g = (word)((v2 * 255) / 100);
+        *b = (word)((v3 * 255) / 100);
+    } else {
+        if (v1 < 0) v1 = 0; if (v1 > 255) v1 = 255;
+        if (v2 < 0) v2 = 0; if (v2 > 255) v2 = 255;
+        if (v3 < 0) v3 = 0; if (v3 > 255) v3 = 255;
+        *r = (word)v1; *g = (word)v2; *b = (word)v3;
+    }
+    return TRUE;
+}
+
+Boolean SvgUtilKeyEqNoCase(const char *kb, const char *ke, const char *prop)
+{
+    const char *p;
+    const char *k;
+
+    p = prop;
+    k = kb;
+    while (k < ke && *p) {
+        char kc, pc;
+        kc = *k++; pc = *p++;
+        if (kc >= 'A' && kc <= 'Z') kc = (char)(kc + ('a' - 'A'));
+        if (pc >= 'A' && pc <= 'Z') pc = (char)(pc + ('a' - 'A'));
+        if (kc != pc) return FALSE;
+    }
+    return (k == ke && *p == 0);
+}
+
+const char* SvgUtilParseWWFixed16_16(const char *s, WWFixedAsDWord *out)
+{
+    const char      *start;
+    sdword           sign;
+    dword            ip;
+    dword            frac;
+    dword            scale;
+    dword            digit;
+    dword            integerLimit;
+    dword            magnitude;
+    dword            magnitudeLimit;
+    word             c;
+    WWFixedAsDWord   result;
+    dword            fpart;
+    dword            num;
+    sdword           exponent;
+    sdword           expSign;
+    dword            expValue;
+    Boolean          hasExpDigits;
+    const char      *expStart;
+    WWFixedAsDWord   baseTen;
+    sdword           expLoop;
+    Boolean          haveDigits;
+    Boolean          nonZeroFraction;
+    Boolean          outOfRange;
+
+    start = s;
+    sign  = 1;
+    ip    = 0;
+    frac  = 0;
+    scale = 1;
+    exponent = 0;
+    haveDigits = FALSE;
+    nonZeroFraction = FALSE;
+    outOfRange = FALSE;
+
+    while (*s && isspace((unsigned char)*s))
+    {
+        s++;
+    }
+    if (*s == '+')
+    {
+        s++;
+    }
+    else if (*s == '-')
+    {
+        sign = -1;
+        s++;
+    }
+
+    integerLimit = (sign < 0) ? 32768UL : 32767UL;
+    while ((c = (word)(byte)*s) >= '0' && c <= '9')
+    {
+        digit = (dword)(c - '0');
+        haveDigits = TRUE;
+        if (ip > (integerLimit - digit) / 10UL)
+        {
+            outOfRange = TRUE;
+        }
+        else if (!outOfRange)
+        {
+            ip = ip * 10UL + digit;
+        }
+        s++;
+    }
+
+    if (*s == '.')
+    {
+        s++;
+        while ((c = (word)(byte)*s) >= '0' && c <= '9')
+        {
+            haveDigits = TRUE;
+            if (c != '0') nonZeroFraction = TRUE;
+            if (scale < 1000000UL)
+            {
+                frac  = frac * 10 + (c - '0');
+                scale = scale * 10;
+            }
+            s++;
+        }
+    }
+
+    expStart = s;
+    expSign = 1;
+    expValue = 0;
+    hasExpDigits = FALSE;
+    if (*s == 'e' || *s == 'E')
+    {
+        s++;
+        if (*s == '+')
+        {
+            s++;
+        }
+        else if (*s == '-')
+        {
+            expSign = -1;
+            s++;
+        }
+        while ((c = (word)(byte)*s) >= '0' && c <= '9')
+        {
+            hasExpDigits = TRUE;
+            if (expValue < (dword)SVG_MAX_DECIMAL_EXPONENT)
+            {
+                expValue = expValue * 10 + (c - '0');
+                if (expValue > (dword)SVG_MAX_DECIMAL_EXPONENT)
+                {
+                    expValue = (dword)SVG_MAX_DECIMAL_EXPONENT;
+                }
+            }
+            s++;
+        }
+        if (!hasExpDigits)
+        {
+            s = expStart;
+        }
+        else
+        {
+            exponent = (sdword)expValue;
+            if (expSign < 0)
+            {
+                exponent = (sdword)(-exponent);
+            }
+        }
+    }
+
+    /* ATTENTION: The mantissa must fit WWFixed before exponent scaling.
+     * Upgrade with a wider decimal accumulator to accept values such as
+     * 40000e-2 without losing range information.
+     */
+    if (!haveDigits || outOfRange ||
+        (sign < 0 && ip == 32768UL && nonZeroFraction))
+    {
+        *out = 0;
+        return start;
+    }
+
+    fpart = 0;
+    if (scale != 0)
+    {
+        num   = (frac << 8);
+        num   = (num + (scale >> 1)) / scale;
+        fpart = (num << 8);
+    }
+    magnitude = (ip << 16) + fpart;
+    magnitudeLimit = (sign < 0) ? 0x80000000UL : 0x7fffffffUL;
+    if (magnitude > magnitudeLimit)
+    {
+        *out = 0;
+        return start;
+    }
+    result = (sign < 0)
+        ? (WWFixedAsDWord)(0UL - magnitude)
+        : (WWFixedAsDWord)magnitude;
+
+    if (exponent != 0)
+    {
+        baseTen = SvgGeomMakeWWFixedFromInt(10);
+        if (exponent > 0)
+        {
+            expLoop = exponent;
+            while (expLoop > 0)
+            {
+                magnitude = (sign < 0)
+                    ? (dword)(0UL - (dword)result)
+                    : (dword)result;
+                if (magnitude > magnitudeLimit / 10UL)
+                {
+                    *out = 0;
+                    return start;
+                }
+                result = GrMulWWFixed(result, baseTen);
+                expLoop--;
+            }
+        }
+        else
+        {
+            expLoop = (sdword)(-exponent);
+            while (expLoop > 0)
+            {
+                result = GrSDivWWFixed(result, baseTen);
+                expLoop--;
+                if (result == 0)
+                {
+                    break;
+                }
+            }
+        }
+    }
+
+#if ERROR_CHECK
+    if (scale >= 1000000UL && frac != 0) {
+    }
+    if ((sdword)result == 0 && (ip!=0 || frac!=0)) {
+    }
+#endif
+
+    *out = result;
+    return s;
+}
+
+Boolean SvgUtilIsNumStart(char c)
+{
+    return (c=='+' || c=='-' || c=='.' || (c>='0' && c<='9'));
+}

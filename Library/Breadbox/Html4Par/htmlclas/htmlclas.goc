@@ -818,8 +818,8 @@ void LOCAL ICopyRegionPaths(
  *
  * Description:
  *     Free an HTML transfer item and all associated data not covered by
- *     the VMChain itself. Currently, these are only the DBItems for non-
- *     rectangular paths.
+ *     the VMChain itself. These include inline SVG backing files and
+ *     the DBItems for non-rectangular paths.
  *
  * Inputs:
  *     VMFileHandle vmf           -- VM file holding item
@@ -832,7 +832,11 @@ void _export FreeHTMLTransferItem(VMFileHandle vmf, VMChain vmc)
     word i, size, n;
     T_regionArrayHandle rah ;
     HypertextTransferBlockHeader *htbh;
-    MemHandle hypertextHeaderMem;
+    MemHandle hypertextHeaderMem, imageMemH;
+    HypertextArrayBlockHeader *imageHeaderP;
+    HTMLimageData *imageP;
+    optr imageArray, pool;
+    TCHAR name[1], *nameP;
 #if (!COMPILE_OPTION_HUGE_ARRAY_REGIONS)
     HypertextArrayBlockHeader *habh;
     MemHandle memHandle;
@@ -840,6 +844,25 @@ void _export FreeHTMLTransferItem(VMFileHandle vmf, VMChain vmc)
 
     /* lock down */
     htbh = VMLock(vmf, VMCHAIN_GET_VM_BLOCK(vmc), &hypertextHeaderMem);
+
+    /* Only the transfer item owns these files; detached objects do not. */
+    if(htbh->HTBH_other.HTBHO_fileInfo & HTML_FI_INLINE_SVG) {
+        pool = NamePoolVMLoad(vmf, htbh->HTBH_other.HTBHO_namePoolToUse);
+        imageHeaderP = VMLockChainifiedLMemBlock(vmf,
+            VMCHAIN_GET_VM_BLOCK(htbh->HTBH_arrayBlock), &imageMemH);
+        imageArray = ConstructOptr(imageMemH, imageHeaderP->HABH_imageArray);
+        n = ChunkArrayGetCount(imageArray);
+        for(i=0; i<n; i++) {
+            imageP = ChunkArrayElementToPtr(imageArray, i, &size);
+            if(imageP->flags & HTML_IDF_INLINE_SVG) {
+                NamePoolCopy(pool, name, sizeof(name), imageP->svgFile, &nameP);
+                FileDelete(nameP);
+                NamePoolDestroyIfDynamic(nameP);
+            }
+        }
+        VMUnlockChainifiedLMemBlock(imageMemH);
+        NamePoolVMUnload(pool);
+    }
 
 #if (!COMPILE_OPTION_HUGE_ARRAY_REGIONS)
     /* lock down array block */
@@ -892,7 +915,8 @@ void LOCAL IMarkAllImagesUnresolved(optr imageArray)
       for(i=ChunkArrayGetCount(imageArray)-1; (int)i>=0; i--)  {
         imageArrayElement = ChunkArrayElementToPtr(imageArray, i, NULL);
         imageArrayElement->flags &= ~(HTML_IDF_RESOLVED | HTML_IDF_RESOLVING | 
-                                      HTML_IDF_BROKEN | HTML_IDF_SIZE_DIRTY) ;
+                                      HTML_IDF_BROKEN | HTML_IDF_SIZE_DIRTY |
+                                      HTML_IDF_PICTURE_FALLBACK_USED) ;
 
         /* Make sure we're note associated with any graphic */
         imageArrayElement->HID_cacheToken = 0;
@@ -2238,7 +2262,8 @@ void MarkTableLayoutDirty(HTMLTextInstance *pself, word tableIndex)
                 /* currently being formatted.  If so, we have to put the */
                 /* formatter in a mode where we keep all dirty tags until */
                 /* we are done with the master table and go at it again. */
-                if (pself->HTI_layoutStack)  {
+                if (pself->HTI_layoutStack &&
+                    !(data->flags & HTML_IDF_INLINE_SVG))  {
                     T_layoutStack *p_stack ;
                     p_stack = LayoutStackLock(pself->HTI_layoutStack) ;
                     if ((cellIndex >= p_stack->LS_currentMasterCell) &&
@@ -2258,8 +2283,9 @@ void MarkTableLayoutDirty(HTMLTextInstance *pself, word tableIndex)
             
             VMDirty(mem);
 
-            /* If we found a dirty location, add it to the list */
-            if (!wasDirty)
+            /* Inline SVG retains dirty geometry for the browser
+               pending-count completion, avoiding intermediate reflows. */
+            if (!wasDirty && !(data->flags & HTML_IDF_INLINE_SVG))
                 @call oself::MSG_HTML_TEXT_WAITING_IMAGE_ADD(nImage, cellIndex) ;
           }
 

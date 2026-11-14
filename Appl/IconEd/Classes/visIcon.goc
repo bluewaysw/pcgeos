@@ -1,0 +1,520 @@
+/**************************************************************************
+ *
+ * PROJECT:	Icon Editor	(GOC Version)
+ * FILE:	visIcon.goc
+ *
+ *		This project is inspired by the Icon Editor by Steve Yegge, 1992 - 1994
+ *
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	stevey	3/27/93		Initial revision (formatUI.asm)
+ *	RainerB 7/27/2025	Ported to GOC
+ *
+ *
+ * DESCRIPTION:	Implementation of VisIconClass and IconViewerClass
+ *		VisIconClass - displays an icon in IconListView
+ *		IconViewerClass - the content for the IconListView
+ *
+ *
+ **************************************************************************/
+
+
+/*  Standard include files */
+@include <stdapp.goh>
+@include <Ansi/stdlib.h>
+@include <Ansi/stdio.h>
+@include <Ansi/string.h>
+
+@include "iconed.goh"
+@include "UI/appui.goh"
+
+
+@include "token.h"
+
+extern GlobalStruct global;
+
+@classdecl VisIconClass;
+@classdecl IconViewerClass;
+
+/*--------------------- Local Headers ---------------------
+ ---------------------------------------------------------------------------*/
+void AddVisIcon(VMFileHandle vmFile, optr contentObj, int icon);
+void DrawIconBorder(GStateHandle gstate, optr visIconObj);
+
+/*#########################################################################
+ *
+ * 	VisIconClass - Geometry Management
+ *
+ *#########################################################################*/
+
+/*--------------------- MSG_VIS_DRAW ---------------------
+ *  Purpose:
+ *	Draw method for VisIconClass.
+ *  Context:
+ *  Strategy:
+	- draw the appropriate border around the icon
+	- get the bitmap
+	- see if it's valid (not a perfect test, but works sometimes)
+	- if it's valid, draw it
+ *  Parameters:	void (DrawFlags drawFlags, GStateHandle gstate);
+ *  Return:
+ ---------------------------------------------------------------------------*/
+@method VisIconClass, MSG_VIS_DRAW	{
+int x0, y0;
+VMFileHandle	vmFile;
+VMBlockHandle   bmp;
+int currentISet;
+
+    /*
+     * See if there is an current icon set.
+     * If yes, draw Border and Bitmap
+     */
+    vmFile = @call @visParent::MSG_ICON_VIEWER_GET_DATABASE();
+    if (!vmFile) return;
+    currentISet = @call @visParent::MSG_ICON_VIEWER_GET_CURRENT_ISET();
+    if ( currentISet == NO_CURRENT_ISET ) return;
+
+    DrawIconBorder(gstate, oself);
+
+    bmp = IdGetEntryBitmap(vmFile, currentISet, pself->VII_iconNumber);
+    if (!bmp) return;
+
+	/*
+	*  Draw the bitmap into the icon area.  We draw it indented
+	*  3 pixels from the top and left sides, to make room for the
+	*  3-pixel border that gets drawn around the perimeter.
+	*/
+
+    x0 = pself->VI_bounds.R_left +3;
+    y0 = pself->VI_bounds.R_top +3;
+    GrDrawHugeBitmap(gstate, x0, y0, vmFile, bmp);
+
+}
+
+
+/*--------------------- DrawIconBorder ---------------------
+ *  Purpose:
+ *  Context:
+ *  Strategy:
+	The border around a icon consists of a 3-pixel-wide
+	rectangle around the perimeter of the icon itself.
+	If the icon is highlighted we'll draw the icon
+	as if it were a depressed trigger, sort of, and if
+	not we'll draw it as if it were a really happy trigger.
+	(i.e. not depressed).
+
+
+	if we have Hightlight:
+		- draw top & left in dark
+		- draw bottom & right in bright
+	otherwise:
+		- draw top & left in brigth
+		- draw bottom & right in dark
+
+ *  Return:
+ ---------------------------------------------------------------------------*/
+void DrawIconBorder(GStateHandle gstate, optr visIconObj) {
+int currentIcon;
+int x0, y0, x1, y1, color, col1, col2;
+VisIconInstance *pself;
+optr obj, oself;
+int dotted = 0;
+
+    pself = ObjDerefVis(visIconObj);
+
+    /*
+     *  initialize the bounds for the outer rectangle
+     */
+    x0 = pself->VI_bounds.R_left;
+    y0 = pself->VI_bounds.R_top;
+    x1 = pself->VI_bounds.R_right - 1;
+    y1 = pself->VI_bounds.R_bottom - 1;	/*  why? Dunno. I just had to. (Steve) */
+
+	/*
+	 * Get view background color and clear out the background
+	 * MSG_GEN_VIEW_GET_COLOR returns a dword, where the least
+	 * significant byte contains the color index.
+	 */
+    obj = ConstructOptr(OptrToHandle(visIconObj), ChunkOf(@IconListView));
+    color = @call obj::MSG_GEN_VIEW_GET_COLOR();
+    GrSetAreaColor(gstate, CF_INDEX, color, 0, 0);
+    GrFillRect(gstate, x0, y0, x1, y1);
+
+
+    /*
+     *  If coloredIconListView is set, the
+     *  border colors depend on the background color
+     *  For bright backgrounds, we use partially dotted lines.
+     */
+    if ( global.coloredIconListView ) {
+	switch (color) {
+	case VC_WHITE:
+	case VC_YELLOW:
+	    col1 = C_BLACK;
+	    col2 = C_BLACK;
+	    dotted = 1;
+	    break;
+	case VC_SILVER:
+	case VC_GRAY:
+	case VC_BLUE:
+	case VC_ORANGE:
+	    col1 = C_WHITE;
+	    col2 = C_DARK_GRAY;
+	    break;
+	case VC_GREEN:
+	    col1 = C_WHITE;
+	    col2 = C_BLACK;
+	    break;
+	}
+    } else {
+	col1 = C_WHITE;
+	col2 = C_DARK_GRAY;
+    }
+
+    /*
+     *  See if we have the highlight.
+     *  Then draw the rectangles as described above. Pressed trigger will be
+     *  have a broader frame to make it more visible.
+     */
+    oself = visIconObj;		// @visParent macro uses oself
+    currentIcon = @call @visParent::MSG_ICON_VIEWER_GET_CURRENT_ICON();
+
+    if (currentIcon == pself->VII_iconNumber) {
+    	IconDrawRectangle(gstate, x0, y0, x1, y1, col2, col1, -dotted);
+    	IconDrawRectangle(gstate, x0+1, y0+1, x1-1, y1-1, col2, col1, -dotted);
+    } else {
+    	IconDrawRectangle(gstate, x0, y0, x1, y1, col1, col2, dotted);
+    }
+
+
+}
+
+/*--------------------- IconDrawRectangle ---------------------
+ *  Purpose:
+		Draws a rectangle of the specified color and dimensions
+		to the passed gstate.
+ *  Context:	Called by DrawIconBorder
+ *  Strategy:
+ *  Parameters:	gstate
+ 		coordiantes of the rectangle
+ *		dotted: may be 0 (no dotted), -1 (right bottom dotted) or 1 (top left dotted)
+ *			This is because a bright colored view cannot have a white frame
+ *  Return:
+ ---------------------------------------------------------------------------*/
+void IconDrawRectangle(GStateHandle gstate, int x0, int y0, int x1, int y1, int col1, int col2, int dotted) {
+
+     GrSaveState(gstate);
+
+     if ( dotted == 1) GrSetLineMaskSys(gstate, SDM_50);
+     GrSetLineColor(gstate, CF_INDEX, col1, 0, 0);
+     GrDrawLine(gstate, x0, y0, x1, y0);
+     GrDrawLine(gstate, x0, y0, x0, y1);
+
+     GrRestoreState(gstate);
+     GrSaveState(gstate);
+
+     if ( dotted == -1) GrSetLineMaskSys(gstate, SDM_50);
+     GrSetLineColor(gstate, CF_INDEX, col2, 0, 0);
+     GrDrawLine(gstate, x1, y0, x1, y1);
+     GrDrawLine(gstate, x0, y1, x1, y1);
+
+     GrRestoreState(gstate);
+
+}
+
+
+/*--------------------- MSG_VIS_ICON_INITIALIZE ---------------------
+ *  Purpose:
+ *	Sets up all the instance data.
+ *	Find out our size and set it.
+ *  Context:
+ *  Strategy:
+ *  Parameters:	icon:	icon number
+ *  Return:
+ ---------------------------------------------------------------------------*/
+@method VisIconClass, MSG_VIS_ICON_INITIALIZE	{
+VMFileHandle vmFile;
+int	currentISet, width, height;
+
+    pself->VII_iconNumber = icon;
+    vmFile = @call @visParent::MSG_ICON_VIEWER_GET_DATABASE();
+    currentISet = @call @visParent::MSG_ICON_VIEWER_GET_CURRENT_ISET();
+
+    IdGetEntryDimensions(vmFile, currentISet, icon, &width, &height);
+    @send oself::MSG_VIS_SET_SIZE(width + 6, height + 6);
+    	/* 6 pixels more for drawing the border */
+
+    @call oself::MSG_VIS_MARK_INVALID(VOF_GEOMETRY_INVALID | VOF_IMAGE_INVALID, VUM_NOW);
+}
+
+/*--------------------- MSG_VIS_ICON_INVALIDATE ---------------------
+ *  Purpose:
+ *	forces a redraw of the VisIcon
+ *  Context:
+ *  Strategy:
+ *  Parameters:	-
+ *  Return:
+ ---------------------------------------------------------------------------*/
+@method VisIconClass, MSG_VIS_ICON_INVALIDATE	{
+
+    @call oself::MSG_VIS_MARK_INVALID(VOF_GEOMETRY_INVALID | VOF_IMAGE_INVALID, VUM_NOW);
+
+}
+
+/*--------------------- MSG_META_START_SELECT ---------------------
+ *  Purpose:	Handle left mouse click.
+ *		Causes the editing to switch to this icon.
+ *  Context:
+ *  Strategy:
+	- if we were selected, do nothing.
+	- if there was a icon selected previously, cause it to redraw
+	- send a switch-icon message (with our number) to the process.
+ *  Parameters:void (MouseReturnParams *retVal,
+ *		sword xPosition, sword yPosition,
+ *		word inputState)
+ *      	inputState: lowByte: ButtonInfo
+ *			    highByte: UIFunctionsActive
+ *  Return:
+ ---------------------------------------------------------------------------*/
+@method VisIconClass, MSG_META_START_SELECT {
+optr viewerObj;
+int selectedIcon;
+
+    /*
+     *  Our goal here is to see if we're already selected.  The
+     *  DBViewer has that information, so we call it to get the info.
+     *  If we were selected, do nothing.
+     */
+    viewerObj = @call @visParent::MSG_ICON_VIEWER_GET_VIEWER_OBJECT();
+    selectedIcon = @call viewerObj::MSG_DB_VIEWER_GET_CURRENT_ICON();
+
+    if ( selectedIcon == pself->VII_iconNumber ) goto done;
+    if ( selectedIcon == NO_CURRENT_ICON ) goto done;
+
+
+    /*
+     *  Now we can do the actual switch-icon thing.
+     *  This message also sees if the old icon needed saving.
+     */
+    @send, forceQueue viewerObj::MSG_DB_VIEWER_SWITCH_ICON(pself->VII_iconNumber);
+
+done:
+    /* mark mouse message as handled */
+    retVal->flags = MRF_PROCESSED;
+}
+
+
+/*#########################################################################
+ *
+ * 	IconViewerClass - Special handlers
+ *
+ *#########################################################################*/
+
+/*--------------------- MSG_ICON_VIEWER_SET_VIEWER_OBJECT ---------------------
+ *  Purpose:	Store the database viewer object.
+ *  Startegy:	Any other information can by retived by call to this object
+ *  Parameters: dbViewerObj	database viewer
+ *  Return:	-
+ ---------------------------------------------------------------------------*/
+@method IconViewerClass, MSG_ICON_VIEWER_SET_VIEWER_OBJECT {
+     pself->IVI_dbViewerObj = dbViewerObj;
+}
+
+/*--------------------- MSG_ICON_VIEWER_GET_DATABASE ---------------------
+ *  Purpose:	Return the database file
+ *  Parameters:
+ *  Return:	Database file
+ ---------------------------------------------------------------------------*/
+@method IconViewerClass, MSG_ICON_VIEWER_GET_DATABASE {
+VMFileHandle vmFile;
+     vmFile = @call pself->IVI_dbViewerObj::MSG_DB_VIEWER_GET_DATABASE();
+     return vmFile;
+}
+
+/*--------------------- MSG_ICON_VIEWER_GET_VIEWER_OBJECT ---------------------
+ *  Purpose:	Return the viewer object
+ *  Parameters:
+ *  Return:	object
+ ---------------------------------------------------------------------------*/
+@method IconViewerClass, MSG_ICON_VIEWER_GET_VIEWER_OBJECT {
+     return pself->IVI_dbViewerObj;
+}
+
+
+
+/*--------------------- MSG_ICON_VIEWER_GET_CURRENT_ISET ---------------------
+ *  Purpose:	Return the current icon set number
+ *  Parameters:
+ *  Return:	the currently-edited icon set.
+ ---------------------------------------------------------------------------*/
+@method IconViewerClass, MSG_ICON_VIEWER_GET_CURRENT_ISET {
+int iSet;
+    iSet = @call pself->IVI_dbViewerObj::MSG_DB_VIEWER_GET_CURRENT_ISET();
+    return iSet;
+}
+
+
+/*--------------------- MSG_ICON_VIEWER_GET_CURRENT_ICON ---------------------
+ *  Purpose:	Return the currently selected icon number
+ *  Parameters:
+ *  Return:	Returns the currently-editied icon.
+ ---------------------------------------------------------------------------*/
+@method IconViewerClass, MSG_ICON_VIEWER_GET_CURRENT_ICON {
+int icon;
+
+    icon = @call pself->IVI_dbViewerObj::MSG_DB_VIEWER_GET_CURRENT_ICON();
+    return icon;
+}
+
+
+/*--------------------- MSG_ICON_VIEWER_RESCAN_LIST ---------------------
+ *  Purpose:	Creates a bunch of vis-icons (removes existing ones first).
+ *  Parameters:
+ *  Warning: 	This method creates new objects and can therefore move the
+ 		block on the global heap, which invalidates all pointers to
+ 		the block (e.g. pself of the calling method)!
+     		In BBX4 and later, pself is dereferenced automatically if the
+     		caller is a method, but not if the caller is a routine.
+ *  Return:	-
+ ---------------------------------------------------------------------------*/
+@method IconViewerClass, MSG_ICON_VIEWER_RESCAN_LIST {
+int iconCount, n, iSet;
+VMFileHandle vmFile;
+optr	fatbits;
+
+	/*
+	*  Get rid of any existing vis-icons.
+	*/
+    @call oself::MSG_ICON_VIEWER_DESTROY_LIST();
+
+	/*
+	*  Get the icon count for the current iSet.
+	*  For each icon, add a vis-child.
+	*  If the list is empty, clear fatbits object
+	*/
+    vmFile = @call pself->IVI_dbViewerObj::MSG_DB_VIEWER_GET_DATABASE();
+    iSet = @call pself->IVI_dbViewerObj::MSG_DB_VIEWER_GET_CURRENT_ISET();
+    iconCount = IdGetEntryCount(vmFile, iSet);
+
+    if ( iconCount) {
+    	for ( n = 0; n < iconCount; n++ )  AddVisIcon(vmFile, oself, n);
+    } else {
+    	fatbits = ConstructOptr(OptrToHandle(oself), OptrToChunk(@MyFatbits));
+    	@send fatbits::MSG_FATBITS_FREE_BITMAP();
+    }
+
+    	/*
+    	 *  Redraw.
+    	 */
+    @send, forceQueue oself::MSG_VIS_VUP_UPDATE_WIN_GROUP(VUM_NOW);
+
+}
+
+
+/*--------------------- AddVisIcon ---------------------
+ *  Purpose:
+ *  Parameters:
+ *  Return:
+ ---------------------------------------------------------------------------*/
+void AddVisIcon(VMFileHandle vmFile, optr contentObj, int icon) {
+optr iconObj;
+MemHandle objBlock;
+
+    objBlock = OptrToHandle(contentObj);
+    iconObj = ObjInstantiate(objBlock, &VisIconClass);
+    @call contentObj::MSG_VIS_ADD_CHILD(iconObj, CCO_LAST);
+    @call iconObj::MSG_VIS_ICON_INITIALIZE(icon);
+
+}
+
+/*--------------------- MSG_ICON_VIEWER_DESTROY_LIST ---------------------
+ *  Purpose:	removes all the vis-icons from the list, so there's
+		nothing to draw.
+ *  Strategy:
+ 	- destroy all our vis-children
+*  Return:
+ ---------------------------------------------------------------------------*/
+@method IconViewerClass, MSG_ICON_VIEWER_DESTROY_LIST {
+EventHandle ev;
+
+    /*
+     *  Send a destroy event to each child.
+     */
+    ev = @record VisIconClass::MSG_VIS_DESTROY(VUM_NOW);
+    @call oself::MSG_VIS_SEND_TO_CHILDREN(ev);
+}
+
+/*--------------------- MSG_ICON_VIEWER_REDRAW_ICON ---------------------
+ *  Purpose:	redraw the specified VisIcon object
+ *  Parameters:	void (int icon);
+ *  Return:
+ ---------------------------------------------------------------------------*/
+@method IconViewerClass, MSG_ICON_VIEWER_REDRAW_ICON {
+optr iconOptr;
+
+    /*
+     *  Find the child to redraw. Then redraw it.
+     */
+    if ( icon == NO_CURRENT_ICON ) return;
+    iconOptr = @call oself::MSG_VIS_FIND_CHILD_AT_POSITION(icon);
+    @call iconOptr::MSG_VIS_ICON_INVALIDATE();
+}
+
+
+
+/*#########################################################################
+ *
+ * 	IconViewerClass - Geometry Management
+ *
+ *#########################################################################*/
+
+/*--------------------- MSG_VIS_COMP_GET_CHILD_SPACING ---------------------
+ *  Purpose:	Returns the spacing for the children.
+ *  	This message returns the child spacing used by the composite. The high word
+ *  	of the return value is the spacing between lines of wrapped children; the low
+ *  	word is the horizontal spacing between children.
+ *  Parameters:
+ *  Return:	SpacingAsDWord
+ *		high-word->y-direction, low-word->x-direction
+ ---------------------------------------------------------------------------*/
+@method IconViewerClass, MSG_VIS_COMP_GET_CHILD_SPACING {
+dword spacing;
+	spacing = ICON_LIST_VERTICAL_CHILD_SPACING;
+	spacing <<= 16; 					// Line Space
+	spacing += ICON_LIST_HORIZONTAL_CHILD_SPACING;	// horizontal
+	return spacing;
+}
+
+/*--------------------- MSG_VIS_COMP_GET_MARGINS ---------------------
+ * Purpose: Returns the distance of the children from the edges.
+ *		This message returns the margins the composite should use when
+ *		recalculating its child spacing. If you want a special left, top, right, or bottom
+ *		margin around the composite's children, intercept this message and return
+ *		the margin(s) in the appropriate field(s) of the Rectangle structure.
+ * Parameters:	void (Rectangle *retValue);
+ * Return:		-
+ ---------------------------------------------------------------------------*/
+@method IconViewerClass, MSG_VIS_COMP_GET_MARGINS {
+	retValue->R_left = ICON_LIST_MARGIN;
+	retValue->R_right = ICON_LIST_MARGIN;
+	retValue->R_top = ICON_LIST_MARGIN;
+	retValue->R_bottom = ICON_LIST_MARGIN;
+	}
+
+
+
+
+
+/*---------------------  ---------------------
+ *  Purpose:
+ *  Context:
+ *  Strategy:
+ *  Parameters:
+ *  Return:
+ ---------------------------------------------------------------------------*/
+
+/* *********** End of file visIcon.goc ********************/
+
+

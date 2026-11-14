@@ -595,7 +595,7 @@ EC( ECCheckBounds( face ) );
 
 EC( ECCheckBounds( exec ) );
 
-    Context_Load( exec, face, instance );
+    Context_Load( exec, instance );
 
     if ( instance )
     {
@@ -634,8 +634,6 @@ EC( ECCheckBounds( exec ) );
 
     /* now access stream */
 
-    /*if ( USE_Stream( face->stream, stream ) )
-      goto Fin;*/
     stream = face->stream;
 
     /* Main loading loop */
@@ -723,7 +721,6 @@ EC( ECCheckBounds( exec ) );
           if (load_flags & TTLOAD_SCALE_GLYPH)
             subglyph->pp2.x = Scale( &exec->metrics, subglyph->pp2.x );
 
-          exec->glyphSize = 0;
           phase = Load_End;
           GEO_UNLOCK( face->glyphLocationBlock );
           break;
@@ -958,12 +955,9 @@ EC( ECCheckBounds( exec ) );
           /* apply scale */
 
           if ( subglyph2->is_scaled )
-          {
-            TT_Matrix* matrix = (TT_Matrix*) &subglyph->transform;
-
-            TransVecList( subglyph2->zone.cur, num_points, matrix );
-            TransVecList( subglyph2->zone.org, num_points, matrix );
-          }
+            TransVecList( subglyph2->zone.cur,
+                          num_points,
+                          (TT_Matrix*)&subglyph->transform );
 
           /* adjust counts */
 
@@ -1061,6 +1055,14 @@ EC( ECCheckBounds( exec ) );
 
     exec->pts = base_pts;
 
+#ifdef __GEOS__
+    /* Execution context persists between glyph loads. Use its arrays        */
+    /* directly instead of copying the outline into a second set of buffers. */
+    glyph->outline.points   = exec->pts.cur;
+    glyph->outline.flags    = exec->pts.touch;
+    glyph->outline.contours = exec->pts.contours;
+    //glyph->outline.owner    = FALSE;
+#else
     for ( u = 0; u < num_points + 2; ++u )
     {
       glyph->outline.points[u] = exec->pts.cur[u];
@@ -1069,6 +1071,7 @@ EC( ECCheckBounds( exec ) );
 
     for ( k = 0; k < num_contours; ++k )
       glyph->outline.contours[k] = exec->pts.contours[k];
+#endif
 
     glyph->outline.n_points    = num_points;
     glyph->outline.n_contours  = num_contours;
@@ -1124,19 +1127,18 @@ EC( ECCheckBounds( exec ) );
     }
 #endif
 
-    glyph->outline.dropout_mode = (Char)exec->GS.scan_type;
+    glyph->outline.dropout_mode = exec->GS.scan_control
+                                  ? (Char)exec->GS.scan_type : 0;
 
     error = TT_Err_Ok;
 
   Fail_File:
   Fail:
 
-  Fin:
-
     /* reset the execution context */
     exec->pts = base_pts;
 
-    Done_Context( exec );
+    Done_Context( );
 
     return error;
   }
