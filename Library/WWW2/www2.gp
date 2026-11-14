@@ -48,10 +48,10 @@ entry HTMEMLIBRARYENTRY
 # Resources: list all resource blocks which are used by the application.
 # (standard discardable code resources do not need to be mentioned).
 #
-resource WW2MEM_G	fixed read-only code shared
-resource SGML_E		fixed read-only code shared
-resource SCHED_E	fixed read-only code shared
-resource REQ_E		fixed read-only code shared
+resource ww2mem_TEXT	fixed read-only code shared
+resource sgml_TEXT	fixed read-only code shared
+resource sched_TEXT	fixed read-only code shared
+resource req_TEXT	fixed read-only code shared
 
 
 #
@@ -62,46 +62,46 @@ resource REQ_E		fixed read-only code shared
 #
 # String routines
 #
-export Tstrlen
-export Tstrcpy
+export TSTRLEN
+export TSTRCPY
 export Tstrncpy
-export Tstrrchr
-export WWStringECCheck
+export TSTRRCHR
+export WWSTRINGECCHECK
 # export JstrncpyToTCHAR
-export Tstrcat
-export Jstrcpy
-export Jstrncpy
-export WWStrCaseCmp
-export WWStrCaseCmpWWMem
-export WWStrNCaseCmp
-export WWStrNCaseCmpWWMem
-export WWStrCaseStr
-export WWStrToLower
-export WWStrToUpper
-export stralloccopy
-export strnalloccopy
-export strnalloccopyTCHAR
-export strncpyTCHAR
-export strncpyToTCHAR
-export WWStrLenWWMem
-export WWStringLen
-export WWStrCpyWWMem
-export WWStrCatWWMem
-export WWStrAllocCopy
-export WWStrNAllocCopyTCHAR
-export WWStrNAllocCopy
-export WWStrAllocCat
-export WWStrNAllocCatTCHAR
-export strnalloccatTCHAR
-export WWStrAllocCopyWWMem
+export TSTRCAT
+export JSTRCPY
+export JSTRNCPY
+export WWSTRCASECMP
+export WWSTRCASECMPWWMEM
+export WWSTRNCASECMP
+export WWSTRNCASECMPWWMEM
+export WWSTRCASESTR
+export WWSTRTOLOWER
+export WWSTRTOUPPER
+export STRALLOCCOPY
+export STRNALLOCCOPY
+export STRNALLOCCOPYTCHAR
+export STRNCPYTCHAR
+export STRNCPYTOTCHAR
+export WWSTRLENWWMEM
+export WWSTRINGLEN
+export WWSTRCPYWWMEM
+export WWSTRCATWWMEM
+export WWSTRALLOCCOPY
+export WWSTRNALLOCCOPYTCHAR
+export WWSTRNALLOCCOPY
+export WWSTRALLOCCAT
+export WWSTRNALLOCCATTCHAR
+export STRNALLOCCATTCHAR
+export WWSTRALLOCCOPYWWMEM
 
 #
 # Suffix routine
 #
-export SuffixMimeType
-export UrlMimeType
-export UrlMimeTypeTCHAR
-export MimeTypeToSuffix
+export SUFFIXMIMETYPE
+export URLMIMETYPE
+export URLMIMETYPETCHAR
+export MIMETYPETOSUFFIX
 
 
 #
@@ -116,15 +116,15 @@ export WWFileURIOpen
 #
 # Mem routines
 #
-export ECCheckWWMemHandle
-export WWMemAlloc
-export WWMemRealloc
-export WWMemFree
-export WWMemLock
-export WWMemUnlock
-export WWMemDeref
-export WWMemAllocAndLock
-export WWMemUnlockAndFree
+export ECCHECKWWMEMHANDLE
+export WWMEMALLOC
+export WWMEMREALLOC
+export WWMEMFREE
+export WWMEMLOCK
+export WWMEMUNLOCK
+export WWMEMDEREF
+export WWMEMALLOCANDLOCK
+export WWMEMUNLOCKANDFREE
 
 
 

@@ -58,6 +58,22 @@
 
 #endif
 
+#ifdef __WATCOMC__
+
+#ifndef PUSHDS
+void _PUSHDS(void);
+#pragma aux _PUSHDS = "push ds";
+#define PUSHDS  _PUSHDS()
+#endif
+
+#ifndef POPDS
+void _POPDS(void);
+#pragma aux _POPDS = "pop ds";
+#define POPDS   _POPDS()
+#endif
+
+#endif
+
 #ifndef SET_DS_LIB_DGROUP
 #define SET_DS_LIB_DGROUP GeodeLoadDGroup (GeodeGetCodeProcessHandle())
                                 /* destroys ds! */
@@ -69,7 +85,7 @@
 #define ASSERT(expr) { if (!(expr)) FatalError(-1); }
 #define ASSERTS(expr, str) { if (!(expr)) FatalError(-1); }
 #define PARAM_ASSERT(expr) ASSERT(expr)
-#define PARAM_ASSERTS(expr, str) ASSERT(expr, str)
+#define PARAM_ASSERTS(expr, str) ASSERT(expr)
 #define EC_WARN(str) CWarningNotice(-1)
 #define EC_FAIL(str)  FatalError(-1);
 

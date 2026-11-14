@@ -34,11 +34,11 @@ library text
 library math
 library www2
 
-resource APPRESOURCE   ui-object
-resource BINTERFACE    ui-object
-resource GENERICUI     ui-object
-resource PAGEMENURESOURCE  ui-object
-resource ICONSRESOURCE ui-object
+resource AppResource   ui-object
+resource BInterface    ui-object
+resource GenericUI     ui-object
+resource PageMenuResource  ui-object
+resource IconsResource ui-object
 
 #
 # Its a good size for a wireless web browser. Also, 300K is used
