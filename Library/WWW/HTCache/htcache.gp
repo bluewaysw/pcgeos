@@ -11,7 +11,7 @@
 #
 # geode parameters for the cache manager
 #
-#	$Id: htcache.gp,v 1.7.3.2 97/11/18 22:41:30 kkee Exp $
+#	$Id: htcache.gp,v 1.1 97/04/07 11:49:39 newdeal Exp $
 #
 ##############################################################################
 #
@@ -47,17 +47,22 @@ entry HTCACHELIBRARYENTRY
 # Resources: list all resource blocks which are used by the application.
 # (standard discardable code resources do not need to be mentioned).
 #
+resource HTCacheData           shared lmem discardable
 
 #
 # Resources: list all resource blocks which are used by the application.
 # (standard discardable code resources do not need to be mentioned).
 #
 
+#
+# Export classes. 
+#
+export HTCacheWriterClass
+
 export HTCACHEENABLE
 export HTCACHEDISABLE
 export HTCACHEISENABLED
 export HTCACHEGETREFERENCE
 export HTCACHESETLIMIT
-export HTCACHECLEAR
 export HTCACHEWRITERCREATE
 

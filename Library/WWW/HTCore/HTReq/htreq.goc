@@ -21,7 +21,7 @@ DESCRIPTION:
 	The Request Manager. Manages asynchronous requests for data
 	objects.
 
-	$Id: htreq.goc,v 1.24.1.6 97/11/18 22:34:08 kkee Exp $
+	$Id: htreq.goc,v 1.1 97/04/07 11:48:45 newdeal Exp $
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
 
@@ -32,16 +32,17 @@ DESCRIPTION:
 @include <WWW/HTCore/hturi.goh>
 #include <WWW/htmem.h>
 @include <WWW/HTCore/htaabrow.goh>
-@include <WWW/HTCore/htuu.goh>
-@include <WWW/HTCore/htsock.goh>
+@include <WWW/HTCore/htsockMan.goh>
+
 #include <sem.h>
 
 @include <socket.goh>
 #include <Ansi/string.h>
 
-@include "HTReq/htsession.goh"
 @include "HTNet/htnetMan.goh"
 @include "htfatals.goh"
+
+extern void _pascal HTAnchorDelete(HTAnchorHandle parent);
 
 /* --------------------------------------------------------------------------
  * 		PRIVATE DATA
@@ -52,10 +53,61 @@ DESCRIPTION:
  */
 byte htRequestDummy;
 
+/* 
+ * List of registered WWW Library client. Access to it must be synchronized
+ * using a semaphore.
+ */
+static HTListHandle wwwClientList = NULL;
+static SemaphoreHandle wwwClientListSem = NULL;
+
 
 /* --------------------------------------------------------------------------
  * 		PRIVATE ROUTINES
  * --------------------------------------------------------------------------*/
+
+
+/***********************************************************************
+ *		HTRequestLibraryEntry
+ ***********************************************************************
+ * SYNOPSIS:	Initialize static vars. 
+ * CALLED BY:	HTCoreLibraryEntry
+ * RETURN:	Must return 0 to indicate all ok to Geos.
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:    Allocated semaphore must be made owner of HTCore
+ *              Library other it will go away when the creator exits.
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	kkee	6/10/96   	Initial Revision
+ *
+ ***********************************************************************/
+int _far _pascal
+HTRequestLibraryEntry (LibraryCallType ty, GeodeHandle client)
+{
+    /* 
+     * The following two lines are *NOT* redundant. They are needed to
+     * first bring the resource into memory as MemThreadGrab used
+     * throughout the Library does not bring the resource into memory.
+     */
+    if (ty == LCT_ATTACH) {
+	wwwClientList = HTListNew();
+	wwwClientListSem = ThreadAllocSem(1);  /* Only one thread can grab */	
+	HandleModifyOwner(wwwClientListSem, GeodeGetCodeProcessHandle());
+
+    } else if (ty == LCT_DETACH) {
+	HTListDelete(wwwClientList);
+	wwwClientList = 0;   /* Lazarus protection. */
+
+	ThreadFreeSem(wwwClientListSem);
+	wwwClientListSem = 0;
+    }
+
+    return 0; /* Return value required by Geos */
+}	/* End of HTRequestLibraryEntry.	*/
+
+
 
 
 /***********************************************************************
@@ -79,16 +131,16 @@ static void _pascal
 HTRequestResetRequest (HTRequest *rptr)
 {
 
-    rptr->HTR_uriRedirected = FALSE;
+EC( if (rptr->HTR_protocol)                                             )
+EC(      EC_ERROR(ATTEMPTING_TO_RESUBMIT_AN_IN_USE_REQUEST);            )
+
     rptr->HTR_bytesRead = 0;
     rptr->HTR_bytesPushed = 0;
-    rptr->HTR_bytesPut = 0;
     rptr->HTR_inputStream = NullOptr;
+    rptr->HTR_sockfd = 0;
+    rptr->HTR_protocol = NullOptr;
     rptr->HTR_anchor = 0;
     rptr->HTR_responseStatusCode = 0;
-    /* Assume caching across sessions */
-    rptr->HTR_persistentCache = TRUE;
-    rptr->HTR_cacheHit = FALSE;
 }	/* End of HTRequestResetRequest.	*/
 
 
@@ -125,8 +177,8 @@ EC( ECCheckRequest(request);                                            )
      * need to check default values.
      */
     if ((!rptr->HTR_method) || (!rptr->HTR_uriString) ||
-	(!rptr->HTR_accessPoint) ||
-	(rptr->HTR_bytesRead) ||
+	(!rptr->HTR_accessPoint) || (rptr->HTR_protocol) ||
+	(rptr->HTR_sockfd) || (rptr->HTR_bytesRead) ||
 	(rptr->HTR_responseStatusCode) || (!rptr->HTR_anchor))
 	ret = FALSE;
 
@@ -150,34 +202,115 @@ EC( if (!ret) EC_ERROR(INVALID_REQUEST);                                )
  * 		PUBLIC ROUTINES
  * --------------------------------------------------------------------------*/
 
-
+
 /***********************************************************************
- *		ECCHECKREQUESTNOTLOCKED
+ *		HTREGISTER
  ***********************************************************************
- *
- * SYNOPSIS:	Check that a request is not locked. Dies if it is.
- * CALLED BY:	Client
- * RETURN:	Nothing
+ * SYNOPSIS:	Initialize the Library by registering the client 
+ * 	        application.
+ * CALLED BY:	Client. Must be called!
+ * PASS:	geodeHandle = application GeodeHandle.
+ *              accessPoint = the application access point as 
+ *              defined in the "ini" file.
+ * RETURN:	HT_OK = initialization ok, application can proceed.
+ *		HT_NO = not ok, application should not proceed.
+ * SIDE EFFECTS:Uses MemThreadGrab on HTRequestData. 
  *	
- * STRATEGY:	EC only.
+ * STRATEGY:	MemThreadGrab HTRequestData to allocate a HTLibEnv for a 
+ *		new client. Other than the converter thread, info here
+ *		is used mainly for debugging purposes. We first allocate
+ *		all the necessary chunks before doing any dereferencing.
+ * 		Otherwise, some of the dereferenced pointers may be 
+ *		invalid.
+ *
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	kkee	5/22/96   	Initial Revision
+ *
+ ***********************************************************************/
+int _far _pascal
+HTREGISTER (GeodeHandle geodeHandle, word accessPoint)
+{
+    int ret = HT_OK;
+    HTLibEnv libEnv;
+
+EC( ECCheckProcessHandle(geodeHandle);                                  )
+
+    libEnv.HTLE_geodeHandle = geodeHandle;
+    libEnv.HTLE_accessPoint = accessPoint;
+    
+    PUSHDS;
+    SET_DS_LIB_DGROUP;
+
+    ThreadPSem(wwwClientListSem);
+    HTListAppend(wwwClientList, (void *)&libEnv, sizeof(HTLibEnv));
+    ThreadVSem(wwwClientListSem);
+
+    POPDS;
+
+    return ret;
+}	/* End of HTREGISTER.	*/
+
+
+
+
+/***********************************************************************
+ *		HTUNREGISTER
+ ***********************************************************************
+ * SYNOPSIS:	Unregister a client by perrforming the necessary garbage
+ *              collection.
+ * CALLED BY:	Client. Must be called!
+ * PASS		client - client ID.
+ * RETURN:	HT_OK - termination ok.
+ *		HT_NO - termination not ok.
+ * SIDE EFFECTS:None
+ *	
+ * STRATEGY:	MemThreadGrab to free the client environment in the 
+ *		library.
  *	
  * REVISION HISTORY:
- *	Name		Date		Description
- *	----		----		-----------
- *	kkee    	11/10/97   	Initial Revision
- *	
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	kkee	5/22/96   	Initial Revision
+ *
  ***********************************************************************/
-void _far _pascal
-ECCHECKREQUESTNOTLOCKED (HTRequestHandle request)
+int _far _pascal
+HTUNREGISTER (GeodeHandle geodeHandle)
 {
-#if ERROR_CHECK
-    word flag_and_lock;
-    flag_and_lock = MemGetInfo(request, MGIT_FLAGS_AND_LOCK_COUNT);
-    if (MGI_LOCK_COUNT(flag_and_lock)) {
-	EC_ERROR(INVALID_REQUEST);
+    HTLibEnv libEnv;
+    word i, count, index, size;
+    Boolean found = FALSE;
+
+EC( ECCheckProcessHandle(geodeHandle);                                  )
+
+    PUSHDS;
+    SET_DS_LIB_DGROUP;               /* To use wwwClientList{Sem} */
+
+    ThreadPSem(wwwClientListSem);
+
+    count = HTListGetCount(wwwClientList);
+    size = sizeof(HTLibEnv);
+
+    for (i=0; i<count; i++) {
+	HTListGetItem(wwwClientList, i, (void *)&libEnv, size);
+	if (libEnv.HTLE_geodeHandle == geodeHandle) {
+	    found = TRUE;
+	    index = i;
+	    break;
+	}
     }
-#endif
-}	/* End of ECCHECKREQUESTNOTLOCKED.	*/
+
+    if (found)
+	HTListRemoveItem(wwwClientList, index, (void *)&libEnv, size);
+
+    ThreadVSem(wwwClientListSem);
+
+    POPDS;
+
+    return HT_OK;
+}	/* End of HTUNREGISTER.	*/
 
 
 
@@ -231,7 +364,6 @@ EC(        EC_ERROR(NOT_IMPLEMENTED);                                   )
 	rptr->HTR_entityHdMask = DEFAULT_ENTITY_HEADERS;
 	rptr->HTR_proxy = FALSE;
 	rptr->HTR_requestHandle = request;
-	rptr->HTR_internalReq = FALSE;
 
 	/* Access Authentication stuff, the rest are NULL */
 	rptr->HTR_aa.HTA_wwwScheme = HTAA_NONE;
@@ -242,7 +374,6 @@ EC(        EC_ERROR(NOT_IMPLEMENTED);                                   )
 	 * network, bypassing local memory cache and file cache.
 	 */
 	rptr->HTR_reloadMode = HTRELOAD_FORCE_RELOAD;
-	rptr->HTR_cacheHit = FALSE;
 
 	MemUnlock(request);
     }
@@ -287,28 +418,13 @@ EC( ECCheckRequest(request);                                            )
 
     if (rptr->HTR_uriString) 
 	MemFree(rptr->HTR_uriString);
-    if (rptr->HTR_proxyAuth)
-	HTMemFree(rptr->HTR_proxyAuth);
+    if (rptr->HTR_source)
+	HTAnchorDelete(rptr->HTR_source);
     if (rptr->HTR_aa.HTA_authorization)
 	HTMemFree(rptr->HTR_aa.HTA_authorization);
     if (rptr->HTR_errorList)
 	HTListDelete(rptr->HTR_errorList);
-    if (rptr->HTR_anchor)
-	HTAnchorDone(rptr->HTR_anchor);  /* Obtained via HTAnchorFind */
-    if (rptr->HTR_extraHeaders) {
-	HTMemHandle str;
-	int i, count = HTListGetCount(rptr->HTR_extraHeaders);
-	for (i=0; i<count; i++) {
-	    HTListRemoveItem(rptr->HTR_extraHeaders, 0, (void*)&str, 
-			     sizeof(HTMemHandle));
-	    HTMemFree(str);
-	}
-	HTListDelete(rptr->HTR_extraHeaders);
-    }
 
-    if (rptr->HTR_data) {
-	HTMemFree(rptr->HTR_data);
-    }
     MemFree(request);
     return HT_OK;
 }	/* End of HTREQUESTDELETE.	*/
@@ -372,6 +488,31 @@ EC( ECCheckGeodeHandle(client);                                         )
 
     HTNetKillAll(client, HT_INTERRUPTED);
 }	/* End of HTREQUESTKILLALL.	*/
+
+
+
+/***********************************************************************
+ *		HTREQUESTSHUTDOWN
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Shutdown all connections currently alive in the HTCore
+ *              library. All requests will be terminated.
+ * CALLED BY:	GLOBAL
+ * RETURN:	Nothing
+ *	
+ * STRATEGY:	
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	kkee    	3/21/97   	Initial Revision
+ *	
+ ***********************************************************************/
+void _far _pascal
+HTREQUESTSHUTDOWN (void)
+{
+    HTShutDown();                     /* In htsockMan.goc */
+}	/* End of HTREQUESTSHUTDOWN.	*/
 
 
 
@@ -930,46 +1071,6 @@ EC( ECCheckRequest(request);                                            )
 
 
 /***********************************************************************
- *		HTREQUESTSETCHARCBF
- ***********************************************************************
- * SYNOPSIS:	
- * CALLED BY:   Client.
- * RETURN:	HT_OK or HT_NO.
- * SIDE EFFECTS:
- *	
- * STRATEGY:
- *	
- * REVISION HISTORY:
- *	Name	Date		Description
- *	----	----		-----------
- *	kkee	6/23/96   	Initial Revision
- *
- ***********************************************************************/
-int _far _pascal
-HTREQUESTSETCHARCBF (HTRequestHandle request, 
-					 CharConverterCallback toLocalCbf,
-					 CharConverterCallback toStandardCbf)
-{
-    HTRequest *rptr;
-
-    if (!request) return HT_NO;
-
-EC( ECCheckRequest(request);                                            )
-
-    rptr = (HTRequest *) MemThreadGrab(request);
-
-    rptr->HTR_toLocalCharCbf = toLocalCbf;
-    rptr->HTR_toStandardCharCbf = toStandardCbf;
-
-    MemThreadRelease(request);
-
-    return HT_OK;
-}	/* End of HTREQUESTSETCHARCBF.	*/
-
-
-
-
-/***********************************************************************
  *		HTREQUESTSETPROXY
  ***********************************************************************
  * SYNOPSIS:	Set the proxy to use instead of the host provided in 
@@ -989,8 +1090,7 @@ EC( ECCheckRequest(request);                                            )
  ***********************************************************************/
 int _far _pascal
 HTREQUESTSETPROXY (HTRequestHandle request, const char *proxyName,
-		   word portNumber, const char *username, 
-		   const char *password)
+		   word portNumber)
 {
     HTRequest *rptr;
 
@@ -998,32 +1098,14 @@ HTREQUESTSETPROXY (HTRequestHandle request, const char *proxyName,
 
 EC( ECCheckRequest(request);                                            )
 
-EC( if (proxyName && strlen((char *) proxyName) >= MAX_HOST_NAME_LENGTH))
+EC( if (strlen((char *) proxyName) >= MAX_HOST_NAME_LENGTH)             )
 EC(     EC_ERROR(PROGRAM_ERROR_HOST_NAME_EXCEEDS_MAX_HOST_NAME_LENGTH); )
 
     rptr = (HTRequest *) MemThreadGrab(request);
 
     rptr->HTR_proxy = TRUE;
-    if (proxyName) strcpy((char *)rptr->HTR_proxyName, proxyName);
-    if (portNumber) rptr->HTR_proxyPortNumber = portNumber;
-
-    if (username && password) {
-	HTMemHandle cleartext;
-	char *result;
-	int len = strlen(username) + strlen(password) + 3;
-	char *c = HTMemAllocAndLock(&cleartext, len);
-	strcpy(c, username);
-	c[strlen(username)] = ':';
-	strcat(c, password);
-	
-	/* Delete old proxyAuth if client is retrying */
-	if (rptr->HTR_proxyAuth) HTMemFree(rptr->HTR_proxyAuth);
-	result = HTMemAllocAndLock(&(rptr->HTR_proxyAuth), 
-				   (4*((len+2)/3+1)));
-	HTUUEncodePtr((byte*)c, strlen(c), (byte*)result);
-	HTMemUnlockAndFree(cleartext);
-	HTMemUnlock(rptr->HTR_proxyAuth);
-    }
+    strcpy((char *)rptr->HTR_proxyName, proxyName);
+    rptr->HTR_proxyPortNumber = portNumber;
 
     MemThreadRelease(request);
     
@@ -1032,10 +1114,16 @@ EC(     EC_ERROR(PROGRAM_ERROR_HOST_NAME_EXCEEDS_MAX_HOST_NAME_LENGTH); )
 
 
 /***********************************************************************
- *		HTREQUESTSENDDATA
+ *		HTREQUESTSETDATASOURCE
  ***********************************************************************
  *
- * SYNOPSIS:	Send data with the request.
+ * SYNOPSIS:	Set the data source of a request. The data is sent to
+ *              the server along with the request. This API is used to
+ *              submit data to the server. Mostly used for post.
+ *              The passed in anchor *must* be created using HTAnchorNew
+ *              and not HTAnchorFind. The source anchor will be 
+ *              deleted when the source document (provided using API
+ *              HTAnchorSetDocument) has been sent.
  * CALLED BY:	Client
  * RETURN:	HT_OK or HT_NO
  *	
@@ -1048,63 +1136,130 @@ EC(     EC_ERROR(PROGRAM_ERROR_HOST_NAME_EXCEEDS_MAX_HOST_NAME_LENGTH); )
  *	
  ***********************************************************************/
 int _far _pascal
-HTREQUESTSENDDATA (HTRequestHandle request, HTMemHandle data)
+HTREQUESTSETDATASOURCE (HTRequestHandle request, HTAnchorHandle source)
 {
     HTRequest *rptr;
 
     if (!request) return HT_NO;
 
 EC( ECCheckRequest(request);                                            )
-EC( ECCheckHTMemHandle(data);                                           )
+EC( ECCheckHTAnchor(source);                                            )
 
     rptr = (HTRequest *) MemThreadGrab(request);
 
-    rptr->HTR_data = data;
+    rptr->HTR_source = source;
 
     MemThreadRelease(request);
     
     return HT_OK;
-}	/* End of HTREQUESTSENDDATA.	*/
+}	/* End of HTREQUESTSETDATASOURCE.	*/
+
+
+
+
+
+/***********************************************************************
+ *		HTREQUESTSETGENERALHEADERMASK
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Set the general header mask of a request. The mask 
+ *              indicate what general headers to include in the request
+ *              to server.
+ * CALLED BY:	Client.
+ * RETURN:	HT_OK or HT_NO.
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	kkee	9/14/96   	Initial Revision
+ *
+ ***********************************************************************/
+int _far _pascal
+HTREQUESTSETGENERALHEADERMASK (HTRequestHandle request, HTGenHd mask)
+{
+    HTRequest *rptr;
+
+    if (!request) return HT_NO;
+
+EC( ECCheckRequest(request);                                            )
+
+    rptr = (HTRequest *) MemThreadGrab(request);
+
+    rptr->HTR_genHdMask = mask;
+
+    MemThreadRelease(request);
+    
+    return HT_OK;
+}	/* End of HTREQUESTSETGENERALHEADERMASK.	*/
+
 
 
 /***********************************************************************
- *		HTREQUESTADDHEADER
+ *		HTREQUESTSETREQUESTHEADERMASK
  ***********************************************************************
  *
- * SYNOPSIS:	Add a header to the request. Header is passed to server
- *              as 
- *                        name: value <CRLF>
+ * SYNOPSIS:	Set the request header mask of a request. The mask 
+ *              indicates what request header fields to include in the 
+ *              request to server.
  * CALLED BY:	Client
- * RETURN:	Nothing
+ * RETURN:	HT_OK or HT_NO
  *	
  * STRATEGY:	
  *	
  * REVISION HISTORY:
  *	Name		Date		Description
  *	----		----		-----------
- *	kkee    	10/20/97   	Initial Revision
+ *	kkee    	3/19/97   	Initial Revision
  *	
  ***********************************************************************/
-void _far _pascal
-HTREQUESTADDHEADER (HTRequestHandle request, const char *name,
-		    const char *value)
+int _far _pascal
+HTREQUESTSETREQUESTHEADERMASK (HTRequestHandle request, HTReqHd mask)
+{
+    return HT_OK;
+}	/* End of HTREQUESTSETREQUESTHEADERMASK.	*/
+
+
+
+/***********************************************************************
+ *		HTREQUESTSETENTITYHEADERMASK
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Set the entity header mask of a request. The mask 
+ *              indicate what headers to include in the request to 
+ *              server. These headers are only included if there is 
+ *              data to send, which is provided using API  
+ *              HTRequestSetDataSource.
+ * CALLED BY:	Client
+ * RETURN:	HT_OK or HT_NO
+ *	
+ * STRATEGY:	
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	kkee    	3/19/97   	Initial Revision
+ *	
+ ***********************************************************************/
+int _far _pascal
+HTREQUESTSETENTITYHEADERMASK (HTRequestHandle request, HTEntityHd mask)
 {
     HTRequest *rptr;
-    HTMemHandle ext;
-    if (!request || !name || !value) return;
+
+    if (!request) return HT_NO;
 
 EC( ECCheckRequest(request);                                            )
 
     rptr = (HTRequest *) MemThreadGrab(request);
-    if (!rptr->HTR_extraHeaders) {
-	rptr->HTR_extraHeaders = HTListNew();
-    }
-    ext = HTStrAllocCopy(name),
-    HTListAppend(rptr->HTR_extraHeaders, (void*)&ext, sizeof(HTMemHandle));
-    ext = HTStrAllocCopy(value);
-    HTListAppend(rptr->HTR_extraHeaders, (void*)&ext, sizeof(HTMemHandle));
+
+    rptr->HTR_entityHdMask = mask;
+
     MemThreadRelease(request);
-}	/* End of HTREQUESTADDHEADER.	*/
+    
+    return HT_OK;
+}	/* End of HTREQUESTSETENTITYHEADERMASK.	*/
 
 
 
@@ -1136,8 +1291,7 @@ EC( ECCheckRequest(request);                                            )
 int _far _pascal
 HTREQUESTSUBMIT (HTRequestHandle request, GeodeHandle client)
 {
-    HTMemHandle htmh;
-    HTLibEnv *eptr;
+    HTLibEnv libEnv;
     HTRequest *rptr;
     word i, count, size;
     char *url;
@@ -1157,16 +1311,29 @@ EC( ECCheckProcessHandle(client);                                       )
 
     HTRequestResetRequest(rptr);
 
+    PUSHDS;
+    SET_DS_LIB_DGROUP;                 /* To use wwwClientList{Sem} */
+    
+    ThreadPSem(wwwClientListSem);
+
+    /* Find the client environment */
+    count = HTListGetCount(wwwClientList);
+    size = sizeof(HTLibEnv);
+
+    for (i=0; i<count; i++) {
+	HTListGetItem(wwwClientList, i, (void *)&libEnv, size);
+	if (libEnv.HTLE_geodeHandle == client) {
+	    found = TRUE;
+	    break;
+	}
+    }
+
     /*
      * This request is own by a client.
      */
-    if ((htmh = HTSessionLookup(client)) != 0) {
-	eptr = (HTLibEnv *) HTMemLock(htmh);
-
-	rptr->HTR_client = eptr->HTLE_client;
-	rptr->HTR_accessPoint = eptr->HTLE_accessPoint;
-
-	HTMemUnlock(htmh);
+    if (found) {
+	rptr->HTR_clientGeodeHandle = libEnv.HTLE_geodeHandle;
+	rptr->HTR_accessPoint = libEnv.HTLE_accessPoint;
 
 	url = (char *) MemLock(rptr->HTR_uriString);
 	rptr->HTR_anchor = HTAnchorFind(url);
@@ -1174,6 +1341,10 @@ EC( ECCheckProcessHandle(client);                                       )
 
     } else 
 	ret = HT_NO;
+
+    ThreadVSem(wwwClientListSem);
+
+    POPDS;
 
     MemThreadRelease(request);
 
@@ -1190,7 +1361,7 @@ EC( ECCheckProcessHandle(client);                                       )
 
 
 /***********************************************************************
- *		HTREQUESTGETBYTES
+ *		HTREQUESTGETBYTESREAD
  ***********************************************************************
  * SYNOPSIS:	Query number of bytes by a request.
  * CALLED BY:	Client.
@@ -1208,9 +1379,9 @@ EC( ECCheckProcessHandle(client);                                       )
  *
  ***********************************************************************/
 dword _far _pascal
-HTREQUESTGETBYTES (HTRequestHandle request, HTBytesStream kind)
+HTREQUESTGETBYTESREAD (HTRequestHandle request)
 {
-    dword ret=0;
+    dword bytesRead;
     HTRequest *rptr;
 
     if (!request) return 0;
@@ -1219,21 +1390,11 @@ EC( ECCheckRequest(request);                                            )
 
     rptr = (HTRequest *) MemThreadGrab(request);
 
-    switch (kind) {
-    case HTBS_CONTENT:
-	ret = rptr->HTR_bytesRead;
-	break;
-    case HTBS_PUT_TO_SERVER:
-	ret = rptr->HTR_bytesPut;
-	break;
-    case HTBS_PUSHED_TO_CLIENT:
-	ret = rptr->HTR_bytesPushed;
-	break;
-    }
+    bytesRead = rptr->HTR_bytesRead;
 
     MemThreadRelease(request);
 
-    return ret;
+    return bytesRead;
 }	/* End of HTREQUESTGETBYTESREAD.	*/
 
 
@@ -1329,11 +1490,10 @@ EC( ECCheckRequest(request);                                            )
  *		HTREQUESTGETRESPONSELASTMODIFIED
  ***********************************************************************
  *
- * SYNOPSIS:	Get the last modified date of the response. Client must
- *              delete the return HTMemHandle.
+ * SYNOPSIS:	Get the last modified date of the response. 
  * CALLED BY:	Client
- * RETURN:	Last modified date as HTMemHandle which caller must 
- *              delete after use. 0 if no date available.
+ * RETURN:	Last modified date and return TRUE, else FALSE if no 
+ *              date is available.
  *	
  * STRATEGY:	
  *	
@@ -1343,11 +1503,12 @@ EC( ECCheckRequest(request);                                            )
  *	kkee    	3/20/97   	Initial Revision
  *	
  ***********************************************************************/
-HTMemHandle _far _pascal
-HTREQUESTGETRESPONSELASTMODIFIED (HTRequestHandle request)
+Boolean _far _pascal
+HTREQUESTGETRESPONSELASTMODIFIED (HTRequestHandle request,
+				  TimerDateAndTime *dateTime)
 {
+    TimerDateAndTime tm = {0,0,0,0,0,0,0};
     HTRequest *rptr;
-    HTMemHandle ret = 0;
 
     if (!request) return FALSE;
 
@@ -1355,139 +1516,13 @@ EC( ECCheckRequest(request);                                            )
 
     rptr = (HTRequest *) MemThreadGrab(request);
 
-    ret = HTAnchorLastModified(rptr->HTR_anchor);
+    HTAnchorLastModified(rptr->HTR_anchor, dateTime);
 
     MemThreadRelease(request);
 
-    return ret;
+    if (!memcmp(&tm, dateTime, sizeof(TimerDateAndTime)))
+	return FALSE;
+
+    return TRUE;
 }	/* End of HTREQUESTGETRESPONSELASTMODIFIED.	*/
 
-
-/***********************************************************************
- *		HTREQUESTGETRESPONSEHEADER
- ***********************************************************************
- *
- * SYNOPSIS:	Get the a response header. If you are looking for common 
- *              headers, you MUST use other APIs, like 
- *              HTRequestGetResponderLastModified, etc.
- * CALLED BY:	Client
- * RETURN:	HTMemHandle or NULL, caller must delete after use.
- *	
- * STRATEGY:	
- *	
- * REVISION HISTORY:
- *	Name		Date		Description
- *	----		----		-----------
- *	kkee    	10/22/97   	Initial Revision
- *	
- ***********************************************************************/
-HTMemHandle _far _pascal
-HTREQUESTGETRESPONSEHEADER (HTRequestHandle request, const char *name)
-{
-    HTRequest *rptr;
-    HTMemHandle ret = 0;
-
-    if (!request) return FALSE;
-
-EC( ECCheckRequest(request);                                            )
-
-    rptr = (HTRequest *) MemThreadGrab(request);
-
-    ret = HTAnchorGetHeader(rptr->HTR_anchor, name);
-
-    MemThreadRelease(request);
-
-    return ret;
-}	/* End of HTREQUESTGETRESPONSEHEADER.	*/
-
-
-
-
-/***********************************************************************
- *		HTREQUESTSETCACHEHIT
- ***********************************************************************
- *
- * SYNOPSIS:	Indicate whether we have a cache hit or not.
- * CALLED BY:	Internal
- * RETURN:	Nothing
- *	
- * STRATEGY:	
- *	
- * REVISION HISTORY:
- *	Name		Date		Description
- *	----		----		-----------
- *	kkee    	4/10/97   	Initial Revision
- *	
- ***********************************************************************/
-void _far _pascal
-HTREQUESTSETCACHEHIT (HTRequestHandle request, Boolean hit)
-{
-    HTRequest *rptr;
-EC( ECCheckRequest(request);                                            )
-
-    rptr = (HTRequest *) MemThreadGrab(request);
-    rptr->HTR_cacheHit = hit;
-    HTAnchorSetCacheHit(rptr->HTR_anchor, hit);
-    MemThreadRelease(request);
-}	/* End of HTREQUESTSETCACHEHIT.	*/
-
-
-
-/***********************************************************************
- *		HTREQUESTCACHEHIT
- ***********************************************************************
- *
- * SYNOPSIS:	See we have hit cache.
- * CALLED BY:	Internal
- * RETURN:	TRUE or FALSE.
- *	
- * STRATEGY:	
- *	
- * REVISION HISTORY:
- *	Name		Date		Description
- *	----		----		-----------
- *	kkee    	4/10/97   	Initial Revision
- *	
- ***********************************************************************/
-Boolean _far _pascal
-HTREQUESTCACHEHIT (HTRequestHandle request)
-{
-    HTRequest *rptr;
-    Boolean ret;
-EC( ECCheckRequest(request);                                            )
-
-    rptr = (HTRequest *) MemThreadGrab(request);
-    ret = rptr->HTR_cacheHit;
-    MemThreadRelease(request);
-    return ret;
-}	/* End of HTREQUESTCACHEHIT.	*/
-
-
-/***********************************************************************
- *		HTREQUESTANCHOR
- ***********************************************************************
- *
- * SYNOPSIS:	Obtain the request anchor.
- * CALLED BY:	Client
- * RETURN:	HTAnchorHandle
- *	
- * STRATEGY:	
- *	
- * REVISION HISTORY:
- *	Name		Date		Description
- *	----		----		-----------
- *	kkee    	8/26/97   	Initial Revision
- *	
- ***********************************************************************/
-HTAnchorHandle _far _pascal
-HTREQUESTANCHOR (HTRequestHandle request)
-{
-    HTRequest *rptr;
-    HTAnchorHandle ret;
-EC( ECCheckRequest(request);                                            )
-
-    rptr = (HTRequest *) MemThreadGrab(request);
-    ret = rptr->HTR_anchor;
-    MemThreadRelease(request);
-    return ret;
-}	/* End of HTREQUESTANCHOR.	*/

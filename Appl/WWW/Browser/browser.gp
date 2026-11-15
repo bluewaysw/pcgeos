@@ -27,18 +27,19 @@ library	geos
 library	ui
 library ansic
 
+library htmem
 library htcore
 library http
 library htmlp
 library pmanager
 library uigenera
 
-resource APPRESOURCE   ui-object
-resource INTERFACE    ui-object
-resource CONTENT       ui-object
-resource MENURESOURCE  ui-object
-resource ICONSRESOURCE ui-object
-resource UIGENERATORRES	ui-object
+resource AppResource   ui-object
+resource Interface    ui-object
+resource Content       ui-object
+resource MenuResource  ui-object
+resource IconsResource ui-object
+resource UIGeneratorRes	ui-object
 
 export	ISProcessClass
 export	ISAppClass

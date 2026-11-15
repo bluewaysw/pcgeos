@@ -27,7 +27,7 @@ DESCRIPTION:
 	one for the RAM-limited devices. Memory cache would store
 	parsed tokens that are ready for display.
 
-	$Id: htcache.goh,v 1.9.2.2 97/11/18 22:35:35 kkee Exp $
+	$Id: htcache.goh,v 1.1 97/04/04 15:55:25 newdeal Exp $
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
 
@@ -66,19 +66,6 @@ typedef enum {
 
 
 /*
-**       Cache Types: inter-session and session only.
-**       -------------------------------------------
-**
-**  Inter-session cache persists across multiple sessions
-**  whereas session only cache is deleted after the current 
-**  session is over or when a new session begins.
-*/
-typedef enum {
-    HTCACHE_INTERSESSION,
-    HTCACHE_SESSION
-} HTCacheType;
-
-/*
 **        Memory Cache Management
 **        -----------------------
 ** There are two kinds of local cache: a file cache and a memory cache.
@@ -115,8 +102,57 @@ typedef enum {
 **                           "7324.mim" for MIME formatted file,
 **                           "9024.gif" for gif formatter file).
 **
-**       TimerDateAndTime  = cached file expiration
+**       TimerDateAndTime  = cached file expiration    *** NOT USED ***
 */
+
+typedef struct {
+    int               HTCI_inUse;            /* 1 to lock a cache file */
+    HTMemHandle       HTCI_url;
+    char              HTCI_filename[13];     /* string equivalent of 
+						filenumber + file extension */
+    char              HTCI_fileext[4];       /* File extension, determined
+					        from inputFormat */
+    dword             HTCI_filesize;         /* filesize in bytes */
+ /* TimerDateAndTime  HTCI_expires; */       /* Time the cache file expires 
+					        in GMT. NOT USED */
+} HTCacheItem;
+
+
+/****************************************************************************
+
+  The HTCacheWriterClass and HTCacheReaderClass are inherited from HTStream 
+  defined in htstream.goh{goc}.  
+
+ ****************************************************************************/
+
+@class HTCacheWriterClass, HTStreamClass;
+
+
+/*
+ * Set cache file info.
+ *
+ * Context:	Record keeping of a cached file.
+ * Source:	HTCacheWriterCreate
+ * Destination:	Cache objects.
+ * Interception:Not necessary.
+ * Pass:        HTCacheItem.
+ * Return:      TRUE if ok, else FALSE.
+ */
+@message Boolean MSG_HT_CACHE_SET_INFO(HTMemHandle cache);
+
+
+/* --------------------------------------------------------------------
+ * 		Instance Data.
+ * --------------------------------------------------------------------*/
+
+/*
+ * Cached item.
+ */
+@instance HTMemHandle HTCI_cache;
+@instance FileHandle HTCI_fileHandle;
+
+@endc;
+
 
 extern void _far _pascal HTCacheEnable(void);
 
@@ -124,18 +160,14 @@ extern void _far _pascal HTCacheDisable(void);
 
 extern Boolean _far _pascal HTCacheIsEnabled(void);
 
-extern HTMemHandle _far _pascal HTCacheGetReference(HTMemHandle url, 
-	HTMemHandle *expires);
+extern HTMemHandle _far _pascal HTCacheGetReference(HTMemHandle url);
 
 extern void _far _pascal HTCacheSetLimit(dword limit);
-
-extern void _far _pascal HTCacheClear(void);
 
 extern HTStreamHandle _far _pascal
 	HTCacheWriterCreate(HTStringHandle inputFormat,
 			    HTStreamHandle outputStream,
-			    HTRequestHandle request,
-			    HTCacheType ctype);
+			    HTRequestHandle request);
 
 #ifdef __HIGHC__
 pragma Alias(HTCacheEnable, "HTCACHEENABLE");
@@ -143,7 +175,6 @@ pragma Alias(HTCacheDisable, "HTCACHEDISABLE");
 pragma Alias(HTCacheIsEnabled, "HTCACHEISENABLED");
 pragma Alias(HTCacheGetReference, "HTCACHEGETREFERENCE");
 pragma Alias(HTCacheSetLimit, "HTCACHESETLIMIT");
-pragma Alias(HTCacheClear, "HTCACHECLEAR");
 pragma Alias(HTCacheWriterCreate, "HTCACHEWRITERCREATE");
 #endif
 @endif

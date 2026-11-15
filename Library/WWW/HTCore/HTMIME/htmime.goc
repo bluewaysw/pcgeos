@@ -20,23 +20,20 @@ REVISION HISTORY:
 DESCRIPTION:
 	MIME parser.
 
-	$Id: htmime.goc,v 1.23.1.6 97/11/18 22:29:43 kkee Exp $
+	$Id: htmime.goc,v 1.1 97/04/07 11:48:26 newdeal Exp $
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
 
 @include <stdapp.goh>
 @include <Ansi/string.h>
 @include <WWW/HTCore/htreq.goh>
-@include <WWW/HTCore/htobj.goh>
 @include <WWW/HTCore/htmime.goh>
-@include <WWW/HTCore/httee.goh>
 @include <WWW/HTCore/hterror.goh>
 @include <WWW/HTCore/htutils.goh>
 @include <WWW/HTCore/htpolicy.goh>
 @include <WWW/HTCore/htanchor.goh>
 @include <WWW/HTCore/htstring.goh>
 @include <WWW/HTCore/htaautil.goh>
-@include <WWW/HTCore/hturi.goh>
 @include <sem.h>
 
 @include "HTNet/htnetMan.goh"
@@ -54,15 +51,6 @@ DESCRIPTION:
  * provided.
  */
 #define DEFAULT_CONTENT_TYPE  HT_CONTENT_TYPE_APPLICATION_OCTET_STREAM
-
-
-/* Delimiters for HTScanCookie and IsCookieDelimiter*/
-typedef enum {
-    CD_WHITE         = 0x1,   /* ISWHITE macro */
-    CD_EQUAL         = 0x2,
-    CD_SEMICOLON     = 0x4
-} CookieDelimiter;
-
 
 /***********************************************************************
 		Private Functions
@@ -143,166 +131,6 @@ EC(     EC_WARNING(NOT_IMPLEMENTED);                                      )
 }	/* End of HTParseAuthenticate.	*/
 
 
-/***********************************************************************
- *		IsCookieDelimiter
- ***********************************************************************
- *
- * SYNOPSIS:	Check to see if a char is a cookie delimiter.
- * CALLED BY:	HTScanCookie
- * RETURN:	TRUE or FALSE.
- *	
- * STRATEGY:	
- *	
- * REVISION HISTORY:
- *	Name		Date		Description
- *	----		----		-----------
- *	kkee    	10/31/97   	Initial Revision
- *	
- ***********************************************************************/
-static Boolean _pascal
-IsCookieDelimiter (char c, CookieDelimiter delim)
-{
-    if ((delim & CD_WHITE) && ISWHITE(c)) {
-	return TRUE;
-    }
-    if ((delim & CD_EQUAL) && (c == '=')) {
-	return TRUE;
-    }
-    if ((delim & CD_SEMICOLON) && (c == ';')) {
-	return TRUE;
-    }
-    if (!c) {
-	return TRUE;
-    }
-    return FALSE;
-}	/* End of IsCookieDelimiter.	*/
-
-
-
-
-/***********************************************************************
- *		HTScanCookie
- ***********************************************************************
- *
- * SYNOPSIS:	Scan a cookie header field.
- * CALLED BY:	HTParseCookie
- * RETURN:	HTScanToken
- *	
- * STRATEGY:	
- *	
- * REVISION HISTORY:
- *	Name		Date		Description
- *	----		----		-----------
- *	kkee    	10/31/97   	Initial Revision
- *	
- ***********************************************************************/
-static HTScanToken _pascal
-HTScanCookie (char **pp, char **thisWord, CookieDelimiter delim)
-{
-    char *p = *pp;
-    HTScanToken thisSym = HTST_XXX_EOL;
-
-    while (1) {
-	if (*p && !ISWHITE(*p) && !IsCookieDelimiter(*p, delim)) {
-	    /* 
-	     * Build up a word.
-	     */
-	    *thisWord = p;
-	    while (!IsCookieDelimiter(*p++, delim));
-	    p--;  /* Read one char ahead */
-
-	    if (*p) {
-		/* More to scan in the next call */
-		*p++ = 0;
-	    }
-	    thisSym = HTScanSearchReservedWord(*thisWord);
-	    break;
-	} else if (!*p) {
-	    break;
-	} else {
-	    /* Ignore leading white spaces */
-	    p++;
-	}
-    }
-    *pp = p;
-    return thisSym;
-}	/* End of HTScanCookie.	*/
-
-
-
-/***********************************************************************
- *		HTParseCookie
- ***********************************************************************
- *
- * SYNOPSIS:	Parse Set-Cookies headers.
- * CALLED BY:	HTParseHeader
- * RETURN:	Nothing
- *	
- * STRATEGY:	Parsed according to Netscape cookies specified in 
- *              http://home.netscape.com/newsref/std/cookie_spec.htm
- *
- *              We don't implement the standard RFC2109 (HTTP State 
- *              Management Scheme).
- *	
- * REVISION HISTORY:
- *	Name		Date		Description
- *	----		----		-----------
- *	kkee    	10/29/97   	Initial Revision
- *	
- ***********************************************************************/
-static void _pascal
-HTParseCookie (HTScanner *sptr, HTRequest *rptr)
-{
-    HTScanToken sym;
-    char *p = sptr->HTS_buffer+sptr->HTS_index;
-    char *name = 0, *value = 0, *expires = 0, *path = 0, *domain = 0;
-    char *thisWord = 0;
-    Boolean secure = FALSE;
-
-    /* NAME = VALUE come first and are the ONLY required header */
-    sym = HTScanCookie(&p, &thisWord, CD_EQUAL);
-    if (sym == HTST_XXX_EOL) {
-	return;
-    }
-    name = thisWord;
-
-    sym = HTScanCookie(&p, &thisWord, CD_SEMICOLON);
-    if (sym == HTST_XXX_EOL) {
-	return;
-    }
-    value = thisWord;
-
-    /* The rest of the headers are optional */
-    do {
-	sym = HTScanCookie(&p, &thisWord, CD_EQUAL);
-	switch (sym) {
-	case HTST_EXPIRES:
-	    sym = HTScanCookie(&p, &thisWord, CD_SEMICOLON);
-	    expires = thisWord;
-	    break;
-	case HTST_DOMAIN:
-	    sym = HTScanCookie(&p, &thisWord, CD_SEMICOLON);
-	    domain = thisWord;
-	    break;
-	case HTST_PATH:
-	    sym = HTScanCookie(&p, &thisWord, CD_SEMICOLON);
-	    path = thisWord;
-	    break;
-	case HTST_SECURE:
-	    secure = TRUE;
-	    break;
-	default:
-	    /* Be tolerant, ignore */
-	    break;
-	}
-    } while (sym != HTST_XXX_EOL);
-
-    HTAnchorSetCookie(rptr->HTR_anchor, name, value, expires, path, 
-		      domain, secure);
-}	/* End of HTParseCookie.	*/
-
-
-
 
 
 /***********************************************************************
@@ -311,7 +139,7 @@ HTParseCookie (HTScanner *sptr, HTRequest *rptr)
  *
  * SYNOPSIS:	Parse MIME headers.
  * CALLED BY:	HTMimePutBlock
- * RETURN:	HT_NOT_CACHEABLE, HT_OK.
+ * RETURN:	int
  * SIDE EFFECTS:
  *	
  * STRATEGY:    Store all headers about a data object in its anchor,
@@ -331,7 +159,6 @@ HTParseCookie (HTScanner *sptr, HTRequest *rptr)
 static int _far _pascal
 HTParseHeader (HTScanner *sptr)
 {
-    int ret = HT_OK;
     HTRequest *rptr;
 
     rptr = (HTRequest *) MemThreadGrab(sptr->HTS_request);
@@ -349,15 +176,7 @@ HTParseHeader (HTScanner *sptr)
 	     * cache only implement Pragma: no-cache. Cache control is
 	     * only for HTTP/1.1.
 	     */
-	    {
-		char *p = sptr->HTS_buffer+sptr->HTS_index;
-		while (ISWHITE(*p)) p++;
-		if (strcasestr(p, "no-cache")) {
-		    /* Do not cache */
-		    ret = HT_NOT_CACHEABLE;
-		}
-	    }
-	    sptr->HTS_thisSym = HTST_XXX_EOL;  /* Junk the rest of line */
+	    sptr->HTS_thisSym = HTST_XXX_EOL;     /* Junk line */
 	    break;
 
 	case HTST_CONTENT_ENCODING:
@@ -402,19 +221,6 @@ HTParseHeader (HTScanner *sptr)
 	    sptr->HTS_thisSym = HTST_XXX_EOL;
 	    break;
 
-	case HTST_DATE:
-	    /*
-	     * The date of the data object.
-	     */
-	    {
-		char *p = sptr->HTS_buffer+sptr->HTS_index;
-		while (ISWHITE(*p)) p++;
-		HTAnchorSetDate(rptr->HTR_anchor, p);
-	    }
-
-	    sptr->HTS_thisSym = HTST_XXX_EOL;     /* Junk line */
-	    break;
-
 	case HTST_EXPIRES:
 	    /* 
 	     * The remaining data in sptr->HTS_HTS_buffer as the date
@@ -422,12 +228,9 @@ HTParseHeader (HTScanner *sptr)
 	     */
 	    {
 		TimerDateAndTime dateTime;
-		char *p = sptr->HTS_buffer+sptr->HTS_index;
-		while (ISWHITE(*p)) p++;
-		if (HTParseTime(p, &dateTime)) {
-		    /* Make sure time is valid */
-		    HTAnchorSetExpires(rptr->HTR_anchor, p);
-		}
+
+		if (HTParseTime(sptr->HTS_buffer+sptr->HTS_index, &dateTime))
+		    HTAnchorSetExpires(rptr->HTR_anchor, &dateTime);
 	    }
 			   
 	    sptr->HTS_thisSym = HTST_XXX_EOL;     /* Junk line */
@@ -439,9 +242,10 @@ HTParseHeader (HTScanner *sptr)
 	     * and time.
 	     */
 	    {
-		char *p = sptr->HTS_buffer+sptr->HTS_index;
-		while (ISWHITE(*p)) p++;
-		HTAnchorSetLastModified(rptr->HTR_anchor, p);
+		TimerDateAndTime dateTime;
+
+		if (HTParseTime(sptr->HTS_buffer+sptr->HTS_index, &dateTime))
+		    HTAnchorSetLastModified(rptr->HTR_anchor, &dateTime);
 	    }
 			   
 	    sptr->HTS_thisSym = HTST_XXX_EOL;     /* Junk line */
@@ -453,58 +257,24 @@ HTParseHeader (HTScanner *sptr)
 		sptr->HTS_thisSym = HTST_XXX_EOL;  /* Junk line */
 
 	    /*
-	     * Change the request URL to this location to reservice the
-	     * request again.
+	     * Change the request URL to this location in case the
+	     * client fire away the request again.
 	     */
 	    {
-		char *p1, *p2, *relatedName;
-		HTMemHandle newUrl;
+		char *p1, *p2;
 
 		p2 = sptr->HTS_buffer+sptr->HTS_index;
-		while (ISWHITE(*p2)) p2++;
+		while (isspace(*p2)) p2++;
 
-		p1 = (char *)MemLock(rptr->HTR_uriString);
-		newUrl = HTParseURI(p2, p1, HTURI_PARSE_ALL);
-
-		p2 = (char *) HTMemLock(newUrl);
 		MemReAlloc(rptr->HTR_uriString, strlen(p2)+1,
-			   HAF_ZERO_INIT);  /* Already locked */
+			   HAF_ZERO_INIT | HAF_LOCK);
 
 		p1 = (char *) MemDeref(rptr->HTR_uriString);
 		strcpy(p1, p2);
 		MemUnlock(rptr->HTR_uriString);
-		HTMemUnlockAndFree(newUrl);
-
-		/* Indicate that we have been redirected */
-		rptr->HTR_uriRedirected = TRUE;
-
-		/* 
-		 * If the original request method was POST, change it
-		 * to GET as it is unsafe to post data again to a new
-		 * URL. And should also remove POST headers in 
-		 * rptr->HTR_extraHeaders, which is Content-Type.
-		 */
-		if (rptr->HTR_method == HTM_POST) {
-		    rptr->HTR_method = HTM_GET;
-		    if (rptr->HTR_data) {
-			HTMemFree(rptr->HTR_data);
-			rptr->HTR_data = 0;
-		    }
-		}
 	    }
+	    
 	    sptr->HTS_thisSym = HTST_XXX_EOL;
-	    break;
-
-	case HTST_PRAGMA:
-	    {
-		char *p = sptr->HTS_buffer+sptr->HTS_index;
-		while (ISWHITE(*p)) p++;
-		if (strcasestr(p, "no-cache")) {
-		    /* Do not cache */
-		    ret = HT_NOT_CACHEABLE;
-		}
-	    }
-	    sptr->HTS_thisSym = HTST_XXX_EOL;  /* Junk the rest of line */
 	    break;
 
 	case HTST_WWW_AUTHENTICATE:
@@ -530,44 +300,8 @@ HTParseHeader (HTScanner *sptr)
 	    
 	    sptr->HTS_thisSym = HTST_XXX_EOL;  /* Done with line */
 	    break;
-
-	case HTST_SET_COOKIE:
-	    HTScanGobbleSym(sptr);
-	    if (sptr->HTS_thisSym != HTST_COLON)
-		sptr->HTS_thisSym = HTST_XXX_EOL; /* Junk line */
-	    /*
-	     * Save set-cookies headers.
-	     */
-	    {
-		HTParseCookie(sptr, rptr);
-		sptr->HTS_thisSym = HTST_XXX_EOL;  /* Done with line */
-	    }
-	    break;
-
-	case HTST_XIMAGE_SCALE:
-	    /*
-	     * The scale of a resized image by Ericsson's Argos server.
-	     */
-	    {
-		char *p = sptr->HTS_buffer+sptr->HTS_index;
-		while (ISWHITE(*p)) p++;
-		HTAnchorSetXImageScale(rptr->HTR_anchor, p);
-	    }
-
-	    sptr->HTS_thisSym = HTST_XXX_EOL;     /* Junk line */
-	    break;
 	    
-	default: 
-	    /* 
-	     * Store extra headers we don't recognize in case
-	     * client wants it.
-	     */
-	    {
-		char *p = sptr->HTS_buffer+sptr->HTS_index;
-		while (ISWHITE(*p)) p++;
-		HTAnchorAddHeader(rptr->HTR_anchor, sptr->HTS_thisWord, p);
-	    }
-
+	default:
 	    sptr->HTS_thisSym = HTST_XXX_EOL;  /* Junk line */
 	    break;
 	}
@@ -579,7 +313,7 @@ HTParseHeader (HTScanner *sptr)
     sptr->HTS_buffer[0] = '\0';
 
     MemThreadRelease(sptr->HTS_request);
-    return ret;
+    return HT_OK;
 }	/* End of HTParseHeader.	*/
 
 
@@ -590,8 +324,7 @@ HTParseHeader (HTScanner *sptr)
  *		HTMimePutBlock
  ***********************************************************************
  *
- * SYNOPSIS:	Header is terminated by CRCR, LFLF, CRLFLF, CRLFCR, 
- *              CRLFCRLF.
+ * SYNOPSIS:	Header is terminated by CRCR, LFLF, CRLFLF, CRLFCRLF.
  *              Folding is either of CF LWS, LF LWS, CRLF LWS.
  * CALLED BY:	MSG_HT_STREAM_PUT_BLOCK.
  * RETURN:	int, from pushing data to target.
@@ -627,7 +360,7 @@ HTMimePutBlock (HTScanner *sptr, const char *b, word l, int *leftover)
 		return status;                               /* Done! */
 	    } else if (*b == LF)			   	     /* CRLF */
 		sptr->HTS_state = HTSS_EOL_FLF;
-	    else if (ISWHITE(*b)) {			   /* Folding: CR SP */
+	    else if (isspace(*b)) {			   /* Folding: CR SP */
 		sptr->HTS_state = HTSS_EOL_BEGIN;
 		HTScanPutBlock(sptr, start, end-start);
 		HTScanPutChar(sptr, ' ');
@@ -648,7 +381,7 @@ HTMimePutBlock (HTScanner *sptr, const char *b, word l, int *leftover)
 		sptr->HTS_transparent = TRUE;
 		*leftover = l;
 		return status;                               /* Done! */
-	    } else if (ISWHITE(*b)) {	       /* Folding: LF SP or CR LF SP */
+	    } else if (isspace(*b)) {	       /* Folding: LF SP or CR LF SP */
 		sptr->HTS_state = HTSS_EOL_BEGIN;
 		HTScanPutBlock(sptr, start, end-start);
 		HTScanPutChar(sptr, ' ');
@@ -667,19 +400,16 @@ HTMimePutBlock (HTScanner *sptr, const char *b, word l, int *leftover)
 		sptr->HTS_transparent = TRUE;
 		*leftover = l;
 		return status;                               /* Done! */
-	    } else if (ISWHITE(*b)) {	 /* Folding: LF CR SP or CR LF CR SP */
+	    } else if (isspace(*b)) {	 /* Folding: LF CR SP or CR LF CR SP */
 		sptr->HTS_state = HTSS_EOL_BEGIN;
 		HTScanPutBlock(sptr, start, end-start);
 		HTScanPutChar(sptr, ' ');
 		start=b, end=b+1;
 	    } else {						/* New line */
-		/* We have CRLFCR follow by non-WHITE */
-		int status;
+		sptr->HTS_state = HTSS_EOL_BEGIN;
 		HTScanPutBlock(sptr, start, end-start);
-		status = HTParseHeader(sptr);
-		sptr->HTS_transparent = TRUE;
-		*leftover = (l+1);
-		return status;                               /* Done! */
+		HTParseHeader(sptr);
+		start=b, end=b+1;
 	    }
 	} else if (*b == CR) {
 	    sptr->HTS_state = HTSS_EOL_FCR;
@@ -690,12 +420,9 @@ HTMimePutBlock (HTScanner *sptr, const char *b, word l, int *leftover)
 	b++;
     }
 
-    /* Don't forget whatever leftover data not yet parsed */
-    if (end-start > 0) {
-	HTScanPutBlock(sptr, start, end-start);
-    }
     return HT_OK;
 }	/* End of HTMimePutBlock.	*/
+
 
 
 /***********************************************************************
@@ -705,42 +432,8 @@ HTMimePutBlock (HTScanner *sptr, const char *b, word l, int *leftover)
 @classdecl	HTMIMEClass;
 
 /***********************************************************************
-		Message Handlers for HTMIMEClass
+		Message Handlers
 ***********************************************************************/
-
-/***********************************************************************
- *		TeeResolver
- ***********************************************************************
- *
- * SYNOPSIS:	MIME Tee stream resolver for pushing data to MIME and
- *              HTCacheWriter. Target1 is contentType stream and Target2 
- *              is cache stream.
- * CALLED BY:	HTTeeClass
- * RETURN:	
- *	
- * STRATEGY:
- *
- * REVISION HISTORY:
- *	Name		Date		Description
- *	----		----		-----------
- *	kkee    	4/11/97   	Initial Revision
- *	
- ***********************************************************************/
-static int _far _pascal
-TeeResolver (int clientRet, int cacheRet, int *myRet)
-{
-    if (cacheRet != HT_OK && clientRet == HT_OK) {
-	/* Tell Tee stream to abort cache and return HT_OK */
-	*myRet = HT_OK;
-	return HT_TEE_ABORT_TARGET2;
-    } else {
-	*myRet = clientRet;
-    }
-
-    return HT_OK;
-}	/* End of TeeResolver.	*/
-
-
 
 
 /***********************************************************************
@@ -749,7 +442,6 @@ TeeResolver (int clientRet, int cacheRet, int *myRet)
  * SYNOPSIS:	    Parse MIME messages.
  * PARAMETERS:	    int (const byte *data, word len)
  *                  - return HT_OUT_OF_MEMORY if not enough memory.
- *                  - return HT_LOADED if bytesRead is >= content-length.
  *                  - return value from target stream. If all is ok,
  *                    its HT_OK.
  * SIDE EFFECTS:    
@@ -788,19 +480,8 @@ TeeResolver (int clientRet, int cacheRet, int *myRet)
 	ret = PUTBLOCK(@self->HTSI_target, data, len);
 
 	if (len > 0) {
-	    dword contentLength;
-
-@ifdef PRODUCT_RESPONDER
-	pself = ObjDeref(oself,0);
-@endif
 	    rptr = (HTRequest *) MemThreadGrab(@self->HTSI_request);
-	    contentLength = HTAnchorContentLength(rptr->HTR_anchor);
 	    rptr->HTR_bytesRead += len;
-	    if (contentLength && rptr->HTR_bytesRead >= contentLength)
-		ret = HT_LOADED;
-@ifdef PRODUCT_RESPONDER
-	pself = ObjDeref(oself,0);
-@endif
 	    MemThreadRelease(@self->HTSI_request);
 	}
 
@@ -808,18 +489,13 @@ TeeResolver (int clientRet, int cacheRet, int *myRet)
     }
 
     /* Not transparent, so must process data */
-@ifdef PRODUCT_RESPONDER
-	pself = ObjDeref(oself,0);
-@endif
     if (!@self->HTMI_scanner) {
 	/* 
 	 * Create a scanner if we don't have one.
 	 */
-	@self->HTMI_scannerHandle = HTScanNew(@self->HTSI_request);
+	@self->HTMI_scannerHandle = HTScanNew(@self->HTSI_request,
+					      @self->HTSI_target);
 
-@ifdef PRODUCT_RESPONDER
-	pself = ObjDeref(oself,0);
-@endif
 	if (@self->HTMI_scannerHandle)
 	    /* 
 	     * Unlock when we become transparent or when we abort.
@@ -832,111 +508,48 @@ TeeResolver (int clientRet, int cacheRet, int *myRet)
     }
 
     /* Continue parsing */
-@ifdef PRODUCT_RESPONDER
-	pself = ObjDeref(oself,0);
-@endif
     ret = HTMimePutBlock(@self->HTMI_scanner, (char *)data, len, 
 			 &leftover);
 
-    if (ret == HT_NOT_CACHEABLE) {
-@ifdef PRODUCT_RESPONDER
-	pself = ObjDeref(oself,0);
-@endif
-    /* 
-     *  I comment out this code as we have to save a cache copy of the 
-     *  file to fully implement save option. What should be done is that
-     *  this copy should be SESSION not INTERSESSION cache file.
-     *
-     *  @call @self->HTSI_target::MSG_HT_STREAM_ABORT(HT_NOT_CACHEABLE);
-     *  @self->HTSI_target = 0;
-     */
-        ret = HT_OK;
-    }
-
-@ifdef PRODUCT_RESPONDER
-	pself = ObjDeref(oself,0);
-@endif
     if (@self->HTMI_scanner->HTS_transparent) {
-	HTStringHandle contentType;
-	Boolean redirected;
 	/* 
 	 * Put the rest down the stream without touching the data but 
 	 * make sure that we get the correct content length of data.
 	 */
-	ret = HTNetReportProgress(@self->HTSI_request, 
-				  HT_HEADER_DONE);
-	if (ret != HT_OK) return ret;
+	if (!@self->HTSI_target) {
+	    HTStringHandle contentType;
 
-	rptr = (HTRequest *) MemThreadGrab(@self->HTSI_request);
-	/* Done parsing headers for this data object */
-	HTAnchorSetHeaderDone(rptr->HTR_anchor);
-	contentType = HTAnchorContentType(rptr->HTR_anchor);
-	redirected = rptr->HTR_uriRedirected;
-        MemThreadRelease(@self->HTSI_request);
-
-	if (!redirected) {
-	    /*
-             *                   |-> HTCache
-	     * HTMIME -> HTTee ->
-             *                   |-> (from content-type)
-	     */
-	    HTStreamHandle s = NullOptr;
-	    if (!contentType) {
-		s = HTPolicyStreamStack(DEFAULT_CONTENT_TYPE,
+	    rptr = (HTRequest *) MemThreadGrab(@self->HTSI_request);
+	    contentType = HTAnchorContentType(rptr->HTR_anchor);
+	    if (!contentType)
+		@self->HTSI_target = 
+		    HTPolicyStreamStack(DEFAULT_CONTENT_TYPE,
 					NULL,
-					NullOptr,
+					@self->HTSI_target,
 					@self->HTSI_request,
 					FALSE);
-	    } else {
-		s = HTPolicyStreamStack(contentType,
+	    else 
+		@self->HTSI_target = 
+		    HTPolicyStreamStack(contentType,
 					NULL,
-					NullOptr,
+					@self->HTSI_target,
 					@self->HTSI_request,
 					FALSE);
-	    }
-@ifdef PRODUCT_RESPONDER
-	pself = ObjDeref(oself,0);
-@endif
-	    if (s && @self->HTSI_target) {
-		/* Make sure we pass vptr for resolverCbf */
-		static HTTeeResolver resolverCbf = &TeeResolver;
-		HTStreamHandle ss = HTTeeCreate(@self->HTSI_request,
-						s, @self->HTSI_target,
-						resolverCbf, 0);
-@ifdef PRODUCT_RESPONDER
-	        pself = ObjDeref(oself,0);
-@endif
-		@self->HTSI_target = ss;
-	    } else {
-		@self->HTSI_target = s;
-	    }
+	
+	    MemThreadRelease(@self->HTSI_request);
+            if (!@self->HTSI_target) return HT_OUT_OF_MEMORY;
+
 	}
 	    
-	if (!@self->HTSI_target) return HT_NO_CONTENT;
-
 	if (leftover) {
-	    dword contentLength;
+	    PUTBLOCK(@self->HTSI_target, data+len-leftover, leftover);
 
-	    ret = PUTBLOCK(@self->HTSI_target, data+len-leftover, leftover);
-
-@ifdef PRODUCT_RESPONDER
-	pself = ObjDeref(oself,0);
-@endif
 	    rptr = (HTRequest *) MemThreadGrab(@self->HTSI_request);
-	    contentLength = HTAnchorContentLength(rptr->HTR_anchor);
 	    rptr->HTR_bytesRead += leftover;
-	    if (contentLength && rptr->HTR_bytesRead >= contentLength)
-		ret = HT_LOADED;
-@ifdef PRODUCT_RESPONDER
-	pself = ObjDeref(oself,0);
-@endif
 	    MemThreadRelease(@self->HTSI_request);
 	}
 
-@ifdef PRODUCT_RESPONDER
-	pself = ObjDeref(oself,0);
-@endif
-    @self->HTSI_transparent = TRUE;
+	@self->HTSI_transparent = TRUE;
     }
 
     return ret;
@@ -969,52 +582,6 @@ TeeResolver (int clientRet, int cacheRet, int *myRet)
 
     return @callsuper();
 }	/* End of MSG_HT_STREAM_ABORT.	*/
-
-
-
-/***********************************************************************
- *		HTMIMECREATE
- ***********************************************************************
- *
- * SYNOPSIS:	Create a MIME parser. The passed in cache stream will 
- *              receive entity data (MIME data minus all the headers). In 
- *              addition, MIME will create a target based on the content
- *              type of the data.
- * CALLED BY:	Client
- * RETURN:	HTStreamHandle
- *	
- * STRATEGY:	
- *	
- * REVISION HISTORY:
- *	Name		Date		Description
- *	----		----		-----------
- *	kkee    	11/17/97   	Initial Revision
- *	
- ***********************************************************************/
-HTStreamHandle _far _pascal
-HTMIMECREATE (HTRequestHandle request, HTStreamHandle cache)
-{
-    HTStreamHandle stream;
-
-EC( ECCheckOD(cache);                                                   )
-EC( ECCheckRequest(request);                                            )
-
-    PUSHDS;
-    SET_DS_LIB_DGROUP;
-    stream = HTObjInstantiateForThread(0, &HTMIMEClass);
-    POPDS;
-
-    if (!stream) {
-	/* Log error */
-    } else {
-	/* Initialize the stream instance data */
-	@call stream::MSG_HT_STREAM_SET_REQUEST(request);
-	@call stream::MSG_HT_STREAM_SET_TARGET(cache);
-    }
-    
-    return stream;
-}	/* End of HTMIMECREATE.	*/
-
 
 
 

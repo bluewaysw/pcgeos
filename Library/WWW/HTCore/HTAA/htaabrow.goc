@@ -22,7 +22,7 @@ DESCRIPTION:
 
 	Access Authorization (AA) for browser client. 
 
-	$Id: htaabrow.goc,v 1.7.7.2 97/10/26 19:01:21 kkee Exp $
+	$Id: htaabrow.goc,v 1.1 97/04/07 11:49:15 newdeal Exp $
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
 
@@ -128,6 +128,7 @@ HTAAServerNew (HTMemHandle hostname, int portnumber)
 {
     HTMemHandle server;
     HTAAServer *s;
+    char *c;
 
 EC( EC_ERROR_IF(portnumber < 0, INVALID_PORT_NUMBER);                   )
 
@@ -397,7 +398,7 @@ HTAARealmNew (const HTMemHandle realmname,
 	      const char *username, const char *password)
 {
     Boolean ok = TRUE;
-    HTMemHandle realm;  /* Deref into HTAARealm */
+    HTMemHandle realm, rname, user, pass;  /* Deref into HTAARealm */
     HTAARealm *r;
 
     r = (HTAARealm *) HTMemAllocAndLock(&realm, sizeof(HTAARealm));
@@ -458,31 +459,20 @@ HTAARealmUpdate (HTMemHandle realm, const char *realmname,
     HTAARealm *r;
 
 EC( EC_ERROR_IF(realm == NULL, -1);                                     )
+EC( EC_ERROR_IF(userid == NULL, -1);                                    )
+EC( EC_ERROR_IF(password == NULL, -1);                                  )
 
-    if (!realm)
+    if (!realm || !userid || !password) 
 	return;
     
     r = (HTAARealm *) HTMemLock(realm);
-    if (r->HTAA_realmname) {
-	HTMemFree(r->HTAA_realmname);
-	r->HTAA_realmname = 0;
-    }
-    if (r->HTAA_username) {
-	HTMemFree(r->HTAA_username);
-	r->HTAA_username = 0;
-    }
-    if (r->HTAA_password) {
-	HTMemFree(r->HTAA_password);
-	r->HTAA_password = 0;
-    }
+    if (r->HTAA_realmname) HTMemFree(r->HTAA_realmname);
+    if (r->HTAA_username) HTMemFree(r->HTAA_username);
+    if (r->HTAA_password) HTMemFree(r->HTAA_password);
 
     if (realmname) r->HTAA_realmname = HTStrAllocCopy(realmname);
-    if (userid) {
-	r->HTAA_username = HTStrAllocCopy(userid);
-    }
-    if (password) {
-	r->HTAA_password = HTStrAllocCopy(password);
-    }
+    r->HTAA_username = HTStrAllocCopy(userid);
+    r->HTAA_password = HTStrAllocCopy(password);
     
     HTMemUnlock(realm);
 }	/* End of HTAARealmUpdate.	*/
@@ -527,11 +517,6 @@ EC( EC_ERROR_IF(req->HTR_aa.HTA_scheme != HTAA_BASIC, INVALID_REQUEST); )
 	return NULL;
 
     r = HTMemLock(req->HTR_aa.HTA_realm);
-
-    if (!r->HTAA_username || !r->HTAA_password) {
-	HTMemUnlock(req->HTR_aa.HTA_realm);
-	return NULL;
-    }
 
     /* Base64 encoding needs 3 bytes overhead */
     len = strlenHTMem(r->HTAA_username) + strlenHTMem(r->HTAA_password) + 3;
@@ -676,8 +661,7 @@ EC(	EC_WARNING(NOT_IMPLEMENTED);                                   )
  ***********************************************************************
  *
  * SYNOPSIS:	Set the userid and password for Basic scheme 
- *              authorization. Provide a NULL username and password to
- *              unset it.
+ *              authorization. 
  * CALLED BY:	Client.
  * PASS:        userid, must not contain colon (i.e., ":"). ":" is a 
  *                      special character for basic scheme encoding.
@@ -704,6 +688,7 @@ HTAASETBASICUSERIDPASSWORD (HTRequestHandle request,
 {
     HTRequest *req;
     HTAASetup *setup;
+    HTAARealm *realm;
 
 EC( ECCheckRequest(request);                                            )
 

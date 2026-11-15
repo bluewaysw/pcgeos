@@ -20,15 +20,13 @@ REVISION HISTORY:
 DESCRIPTION:
 	MIME generator.
 
-	$Id: htmimerq.goc,v 1.8.6.2 97/10/28 21:11:50 kkee Exp $
+	$Id: htmimerq.goc,v 1.1 97/04/07 11:48:22 newdeal Exp $
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
 
 @include <stdapp.goh>
 @include <WWW/HTCore/htmime.goh>
-@include <WWW/HTCore/htanchor.goh>
 @include <WWW/HTCore/htancMan.goh>
-@include <WWW/HTCore/htobj.goh>
 @include "htfatals.goh"
 #include <Ansi/stdio.h>              /* sprintf */
 #include <Ansi/string.h>             /* strcat */
@@ -75,13 +73,68 @@ HTMIMEMakeRequest (HTRequestHandle request, HTStreamHandle target,
 		   Boolean endHeader)
 {
     HTRequest *rptr;
-    char linebuf[256];
+    HTParentAnchor *entity;
+    char linebuf[256], *p;
 
     rptr = (HTRequest *) MemThreadGrab(request);
 
-    if (rptr->HTR_data) {
-	sprintf(linebuf, "Content-Length: %d%c%c",
-		strlenHTMem(rptr->HTR_data), CR, LF);
+    /* Must have a source anchor */
+EC( ECCheckHTAnchor(rptr->HTR_source);                                  )
+    
+    entity = (HTParentAnchor *) HTMemLock(rptr->HTR_source);
+
+    if (rptr->HTR_entityHdMask & HTEH_CONTENT_ENCODING &&
+	entity->HTPA_content_encoding) {
+	sprintf(linebuf, "Content-Encoding: %s%c%c",
+		HTStringLock(entity->HTPA_content_encoding), CR, LF);
+	HTStringUnlock(entity->HTPA_content_encoding);
+	PUTBLOCK(target, (byte *) linebuf);
+    }
+
+    if (rptr->HTR_entityHdMask & HTEH_CONTENT_LANGUAGE &&
+	entity->HTPA_content_language) {
+	sprintf(linebuf, "Content-Language: %s%c%c",
+		HTStringLock(entity->HTPA_content_language), CR, LF);
+	HTStringUnlock(entity->HTPA_content_language);
+	PUTBLOCK(target, (byte *) linebuf);
+    }
+
+    if (rptr->HTR_entityHdMask & HTEH_CONTENT_LENGTH &&
+	entity->HTPA_content_length) {
+	sprintf(linebuf, "Content-Length: %ld%c%c",
+		entity->HTPA_content_length, CR, LF);
+	PUTBLOCK(target, (byte *) linebuf);
+    }
+#if ERROR_CHECK 
+    else {
+	/* Must have content-length */
+	EC_ERROR(SOURCE_ANCHOR_MUST_HAVE_CONTENT_LENGTH);
+    }
+#endif
+
+    if (rptr->HTR_entityHdMask & HTEH_CONTENT_TYPE &&
+	entity->HTPA_content_type) {
+	int len;
+	sprintf(linebuf, "Content-Type: %s",
+		HTStringLock(entity->HTPA_content_type));
+	HTStringUnlock(entity->HTPA_content_type);
+	if (entity->HTPA_charset) {
+	    strcat(linebuf, "; level=");
+	    strcat(linebuf, HTStringLock(entity->HTPA_level));
+	    HTStringUnlock(entity->HTPA_level);
+	}
+	len = strlen(linebuf);
+	*(linebuf+len) = CR;
+	*(linebuf+len+1) = LF;
+	*(linebuf+len+2) = 0;
+	PUTBLOCK(target, (byte *) linebuf);
+    }
+
+    if (rptr->HTR_entityHdMask & HTEH_TRANSFER_ENCODING &&
+	entity->HTPA_content_transfer_encoding) {
+	sprintf(linebuf, "Content-Transfer-Encoding: %s%c%c",
+		HTStringLock(entity->HTPA_content_transfer_encoding), CR, LF);
+	HTStringUnlock(entity->HTPA_content_transfer_encoding);
 	PUTBLOCK(target, (byte *) linebuf);
     }
 
@@ -125,18 +178,76 @@ static int _far _pascal
 HTMIMEPutEntity (HTRequestHandle request, HTStreamHandle target)
 {
     int status = HT_OK;
+    word i, count;
     HTRequest *rptr;
+    HTParentAnchor *anchor;
+    HTMemHandle htmh;
     byte *p;
 
 EC( ECCheckRequest(request);                                            )
 
     rptr = (HTRequest *) MemThreadGrab(request);
-    if (rptr->HTR_data) {
-	p = HTMemLock(rptr->HTR_data);
-	status = PUTBLOCK(target, p);
-	HTMemUnlock(rptr->HTR_data);
+
+EC( ECCheckHTAnchor(rptr->HTR_source);                                  )
+
+    anchor = (HTParentAnchor *) HTMemLock(rptr->HTR_source);
+
+EC( ECCheckHTList(anchor->HTPA_document);                               )
+
+    /* Push the data in document to target */
+    switch (rptr->HTR_method) {
+    case HTM_POST:
+	count = HTListGetCount(anchor->HTPA_document);
+
+EC ( if (count%2 != 0) EC_ERROR(INVALID_HTDOCUMENT);                    )
+
+	for (i=0; i<count; i += 2) {
+
+	    if (i) PUTBLOCK(target, (byte *) "&");
+		
+	    /*  Variable name */
+	    HTListRemoveItem(anchor->HTPA_document, 0, &htmh, 
+			     sizeof(HTMemHandle));
+	    p = (byte *) HTMemLock(htmh);
+	    PUTBLOCK(target, p);
+	    HTMemUnlockAndFree(htmh);
+
+	    PUTBLOCK(target, (byte *) "=");
+
+	    /* Variable value */
+	    HTListRemoveItem(anchor->HTPA_document, 0, &htmh,
+			     sizeof(HTMemHandle));
+	    p = (byte *) HTMemLock(htmh);
+	    status = PUTBLOCK(target, p);
+	    HTMemUnlockAndFree(htmh);
+
+	    /* Error? Remove all items and abort POST-ing document */
+	    if (status != HT_OK) {
+		count = HTListGetCount(anchor->HTPA_document);
+		for (i=0; i<count; i++) {
+		    HTListRemoveItem(anchor->HTPA_document, 0, &htmh,
+				     sizeof(HTMemHandle));
+		    HTMemFree(htmh);
+		}
+		break;
+	    }
+	}
+
+	break;
+
+    default:
+	EC_ERROR(NOT_IMPLEMENTED);
+	break;
     }
+
+    /* Cleanup */
+    HTListDelete(anchor->HTPA_document);
+    anchor->HTPA_document = 0;
+    HTMemUnlockAndFree(rptr->HTR_source);
+    rptr->HTR_source = 0;
+
     MemThreadRelease(request);
+
     return status;
 }	/* End of HTMIMEPutEntity.	*/
 
@@ -232,23 +343,14 @@ EC( ECCheckStream(@self->HTSI_target);                                  )
 				   @self->HTSI_target,
 				   @self->HTMRI_endHeader);
 
-@ifdef PRODUCT_RESPONDER
-	pself = ObjDeref(oself,0);
-@endif
 	/* Put the entity */
 	if (status == HT_OK)
 	    status = HTMIMEPutEntity(@self->HTSI_request,
 				     @self->HTSI_target);
 
-@ifdef PRODUCT_RESPONDER
-	pself = ObjDeref(oself,0);
-@endif
 	if (status == HT_OK) 
 	    status = @call @self->HTSI_target::MSG_HT_STREAM_PUT_BLOCK(
                                         data, len);
-@ifdef PRODUCT_RESPONDER
-	pself = ObjDeref(oself,0);
-@endif
 	@self->HTSI_transparent = TRUE;
     }
     return status;
@@ -262,7 +364,7 @@ EC( ECCheckStream(@self->HTSI_target);                                  )
 
 
 /***********************************************************************
- *		HTMIMERQNEW
+ *		HTMIMERqNew
  ***********************************************************************
  * SYNOPSIS:	Create a MIME request generator. endHeader 
  *              indicates whether HTMIMERq stream is going to terminate
@@ -281,7 +383,7 @@ EC( ECCheckStream(@self->HTSI_target);                                  )
  *
  ***********************************************************************/
 HTStreamHandle _far _pascal
-HTMIMERQNEW (HTRequestHandle request, Boolean endHeader)
+HTMIMERqNew (HTRequestHandle request, Boolean endHeader)
 {
     HTStreamHandle stream;
 
@@ -289,7 +391,7 @@ EC( ECCheckRequest(request);                                            )
 
     PUSHDS;
     SET_DS_LIB_DGROUP;
-    stream = HTObjInstantiateForThread(0, &HTMIMERqClass);
+    stream = ObjInstantiateForThread(0, &HTMIMERqClass);
     POPDS;
 
     if (!stream) {
@@ -300,7 +402,7 @@ EC( ECCheckRequest(request);                                            )
 	@call stream::MSG_HTMIME_RQ_END_HEADER(endHeader);
     }
     return stream;
-}	/* End of HTMIMERQNEW.	*/
+}	/* End of HTMIMERqNew.	*/
 
 
 

@@ -22,7 +22,7 @@ DESCRIPTION:
 
 	FatalErrors and Warnings.
 
-	$Id: //depot/pcgeos/Library/WWW/HTMem/htfatals.h#5 $
+	$Id: htfatals.h,v 1.1 97/04/07 11:49:48 newdeal Exp $
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
 
@@ -38,7 +38,6 @@ typedef enum {
     CANNOT_FREE_LOCKED_HTMEMORY,
     CANNOT_REALLOC_LOCKED_HTMEMORY,
     CANNOT_UNLOCK_NONLOCKED_HTMEMORY,
-    INVALID_ID_FOR_HTMEMORY,
     INVALID_HTMEMORY
 } FatalErrors;
 #endif /* ERROR_CHECK */
@@ -48,8 +47,7 @@ typedef enum {
  */
 #if ERROR_CHECK
 typedef enum {
-    HTMEMORY_EXCEEDING_LIMIT,
-    HTMEMORY_USING_OLD_ID
+    HTMEMORY_EXCEEDING_LIMIT
 } Warnings;
 #endif
 

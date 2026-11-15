@@ -22,13 +22,12 @@ DESCRIPTION:
 
 	Tee stream.
 
-	$Id: httee.goc,v 1.7.2.4 97/11/06 20:30:51 kkee Exp $
+	$Id: httee.goc,v 1.1 97/04/07 11:49:06 newdeal Exp $
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
 
 @include <WWW/HTCore/httee.goh>
 @include <WWW/HTCore/htreq.goh>
-@include <WWW/HTCore/htobj.goh>
 @include "htfatals.goh"
 
 #define PUTBLOCK(target, data, len)  \
@@ -73,19 +72,16 @@ DESCRIPTION:
  *
  ***********************************************************************/
 static int _far _pascal
-DefaultResolver (int value1, int value2, int *value3)
+DefaultResolver (int value1, int value2)
 {
     /* Case 1. */
     if ((value1 == HT_ERROR) || (value2 == HT_ERROR))
-	*value3 = value1;
 	return value1;
 
     /* Cases 2 and 3. */
     if (value1 < value2)
-	*value3 = value1;
 	return value1;
 
-    *value3 = value2;
     return value2;
 }	/* End of DefaultResolver.	*/
 
@@ -150,41 +146,24 @@ EC( ECCheckOD(target2);                                                )
  ***********************************************************************/
 @method HTTeeClass, MSG_HT_STREAM_PUT_BLOCK
 {
-    int ret1 = HT_OK, ret2 = HT_OK, ret3 = HT_OK;
+    int ret1, ret2;
+
+EC( if ((!@self->HTSI_target) || (!@self->HTTI_secondTarget))          )
+EC(   EC_ERROR(INVALID_HTSTREAMHANDLE);                                )
+EC( ECCheckOD(@self->HTSI_target);                                     )
+EC( ECCheckOD(@self->HTTI_secondTarget);                               )
 
     /* Ignore empty data */
     if (!data || !len)
 	return HT_OK;
 
-@ifdef PRODUCT_RESPONDER
-	pself = ObjDeref(oself,0);
-@endif
-    if (@self->HTSI_target) 
-	ret1 = PUTBLOCK(@self->HTSI_target, data, len);
+    ret1 = PUTBLOCK(@self->HTSI_target, data, len);
+    ret2 = PUTBLOCK(@self->HTTI_secondTarget, data, len);
 
-@ifdef PRODUCT_RESPONDER
-	pself = ObjDeref(oself,0);
-@endif
-    if (@self->HTTI_secondTarget)
-	ret2 = PUTBLOCK(@self->HTTI_secondTarget, data, len);
+    if (@self->HTTI_resolverCbf) 
+	return ProcCallFixedOrMovable_pascal(ret1, ret2);
 
-    if (@self->HTTI_resolverCbf) {
-	int ret = ProcCallFixedOrMovable_pascal(ret1, ret2, &ret3,
-						@self->HTTI_resolverCbf);
-
-	if (ret == HT_TEE_ABORT_TARGET1) {
-	    @call @self->HTSI_target::MSG_HT_STREAM_ABORT(HT_OK);
-	    @self->HTSI_target = 0;
-
-	} else if (ret == HT_TEE_ABORT_TARGET2) {
-	    @call @self->HTTI_secondTarget::MSG_HT_STREAM_ABORT(HT_OK);
-	    @self->HTTI_secondTarget = 0;
-	}
-
-	return ret3;
-    }
-
-    return DefaultResolver(ret1, ret2, &ret3);
+    return DefaultResolver(ret1, ret2);
 }	/* End of MSG_HT_STREAM_PUT_BLOCK.	*/
 
 
@@ -208,39 +187,20 @@ EC( ECCheckOD(target2);                                                )
  ***********************************************************************/
 @method HTTeeClass, MSG_HT_STREAM_FLUSH
 {
-    int ret1 = HT_OK, ret2 = HT_OK, ret3 = HT_OK;
+    int ret1, ret2;
 
-@ifdef PRODUCT_RESPONDER
-	pself = ObjDeref(oself,0);
-@endif
-    if (@self->HTSI_target) 
-	ret1 = @call @self->HTSI_target::MSG_HT_STREAM_FLUSH();
+EC( if ((!@self->HTSI_target) || (!@self->HTTI_secondTarget))          )
+EC(   EC_ERROR(INVALID_HTSTREAMHANDLE);                                )
+EC( ECCheckOD(@self->HTSI_target);                                     )
+EC( ECCheckOD(@self->HTTI_secondTarget);                               )
 
-@ifdef PRODUCT_RESPONDER
-	pself = ObjDeref(oself,0);
-@endif
-    if (@self->HTTI_secondTarget)
-	ret2 = @call @self->HTTI_secondTarget::MSG_HT_STREAM_FLUSH();
+    ret1 = @call @self->HTSI_target::MSG_HT_STREAM_FLUSH();
+    ret2 = @call @self->HTTI_secondTarget::MSG_HT_STREAM_FLUSH();
 
-    if (@self->HTTI_resolverCbf) {
-	int ret = ProcCallFixedOrMovable_pascal(ret1, ret2, &ret3,
-						@self->HTTI_resolverCbf);
+    if (@self->HTTI_resolverCbf) 
+	return ProcCallFixedOrMovable_pascal(ret1, ret2);
 
-	if (ret == HT_TEE_ABORT_TARGET1) {
-	    @call @self->HTSI_target::MSG_HT_STREAM_ABORT(HT_OK);
-	    @self->HTSI_target = 0;
-	    return ret2;
-
-	} else if (ret == HT_TEE_ABORT_TARGET2) {
-	    @call @self->HTTI_secondTarget::MSG_HT_STREAM_ABORT(HT_OK);
-	    @self->HTTI_secondTarget = 0;
-	    return ret1;
-
-	} else
-	    return ret;
-    }
-
-    return DefaultResolver(ret1, ret2, &ret3);
+    return DefaultResolver(ret1, ret2);
 }	/* End of MSG_HT_STREAM_FLUSH.	*/
 
 
@@ -268,18 +228,12 @@ EC( ECCheckOD(target2);                                                )
 @method HTTeeClass, MSG_HT_STREAM_ABORT
 {
     if (@self->HTSI_target != NullOptr) {
-	@call @self->HTSI_target::MSG_HT_STREAM_ABORT(status);
-@ifdef PRODUCT_RESPONDER
-	pself = ObjDeref(oself,0);
-@endif
+	@call @self->HTSI_target::MSG_HT_STREAM_ABORT();
 	@self->HTSI_target = NullOptr;
     }
 
     if (@self->HTTI_secondTarget != NullOptr) {
-	@call @self->HTTI_secondTarget::MSG_HT_STREAM_ABORT(status);
-@ifdef PRODUCT_RESPONDER
-	pself = ObjDeref(oself,0);
-@endif
+	@call @self->HTTI_secondTarget::MSG_HT_STREAM_ABORT();
 	@self->HTTI_secondTarget = NullOptr;
     }
 
@@ -301,7 +255,6 @@ EC( ECCheckOD(target2);                                                )
  ***********************************************************************
  *
  * SYNOPSIS:	Create a Tee stream and bind the two targets together.
- *              Pass burden thread 0 to use the current thread.
  * CALLED BY:	Client.
  * RETURN:	HTStreamHandle, the Tee stream.
  * SIDE EFFECTS:
@@ -316,7 +269,7 @@ EC( ECCheckOD(target2);                                                )
  ***********************************************************************/
 HTStreamHandle _far _pascal
 HTTEECREATE (HTRequestHandle request, HTStreamHandle target1, 
-	     HTStreamHandle target2, HTTeeResolver cbf, ThreadHandle burden)
+	     HTStreamHandle target2, HTTeeResolver cbf)
 {
     HTStreamHandle stream;
 
@@ -326,7 +279,7 @@ EC( ECCheckRequest(request);                                            )
 
     PUSHDS;
     SET_DS_LIB_DGROUP;
-    stream = HTObjInstantiateForThread(burden, &HTTeeClass);
+    stream = ObjInstantiateForThread(0, &HTTeeClass);
     POPDS;
 
     if (!stream) {

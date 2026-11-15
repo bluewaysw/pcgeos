@@ -22,7 +22,7 @@ DESCRIPTION:
         multithreaded I/O model using Geos synchronous socket 
 	Library.
 
-	$Id: htnet.goc,v 1.44.2.9 97/11/15 12:54:01 kkee Exp $
+	$Id: htnet.goc,v 1.1 97/04/07 11:48:31 newdeal Exp $
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
 
@@ -30,21 +30,13 @@ DESCRIPTION:
 @include <WWW/HTCore/htpolicy.goh>
 @include <WWW/HTCore/htnet.goh>
 @include <WWW/HTCore/htlist.goh>
-@include <WWW/HTCore/htutils.goh>
-@include <WWW/HTCore/htobj.goh>
-@include <WWW/HTCore/hturi.goh>
-@include <WWW/HTCore/htmime.goh>
 @include <socket.goh>
-#include <sem.h>
 
-@include "HTReq/htsession.goh"
 @include "HTNet/htnetMan.goh"
 @include "HTNet/htnetS.goh"
-@include "htfatals.goh"
+@include "HTPolicy/htpolMan.goh"
 
-#include <Ansi/string.h>              /* memcmp */
-#include <Ansi/stdlib.h>              /* atoi */
-
+#include <Ansi/string.h>
 
 /* --------------------------------------------------------------------------
  * 		PRIVATE DATA
@@ -53,19 +45,10 @@ DESCRIPTION:
 #define HTNET_THREAD_STACK_SIZE               4096  /* 4K stack for scheduler */
 
 /*
- * List of scheduled Net threads. Here the conditions for using Net
- * threads.
- *
- * 1. A Net thread is free to be reused if HTNetThread.HTNT_free == TRUE.
- * 2. A Net thread's HTNetThread.HTNT_socket connection is persistent if 
- *    HTNetThread.HTNT_persistent == TRUE. Persistent connection is closed 
- *    by the HTNetThread.HTNT_protocol.
- * 3. A persistent connection is uniquely identified by the set 
- *    {HTNetThread.HTNT_scheme, HTNetThread.HTNT_port,
- *     HTNetThread.HTNT_server, HTNetThread.HTNT_serverLength}
+ * Library won't compile unless there is a dgroup, this dummy does the job! :)
  */
-HTNetThread htNetQueue[MAX_HTNET_THREADS];
-SemaphoreHandle htNetSem = NULL;           /* Synch access to queue */
+byte htNetDummy;
+
 
 /* 
  * List of clients using the HTNet Library.
@@ -75,58 +58,12 @@ static word htNetClientCount = 0;
 /*
  * The HTNetScheduler process object for scheduling Net threads.
  */
-#define HT_MAX_SCHEDULER 2
-typedef struct {
-    optr HTSS_scheduler;            /* A scheduler thread */
-    byte HTSS_clientCount;          /* Number of clients */
-} HTSchedulerStruct;
-
-static HTSchedulerStruct htNetScheduler[HT_MAX_SCHEDULER];
-static int htSchedulerIndex=0; /* >=0 and < HT_MAX_SCHEDULER */
-static int htNetIndex=0;  /* >= 0 and <= MAX_HTNET_THREADS */
-static int htNetGarbageCollect=0; /* >=0 and <= MAX_HTNET_THREADS */
-
-/* For socket notification. We are interested in disconnect. */
-typedef void _pascal SSSCType(SysSubsystemType subsys,
-		      SysNotificationType notif,
-		      word word1,
-		      word word2,
-		      word word3,
-		      word word4);
+static optr htNetScheduler = NULL;
 
 
 /* --------------------------------------------------------------------------
  * 		PRIVATE ROUTINES
  * --------------------------------------------------------------------------*/
-
-static void _pascal HTNetThreadInit (void);
-static void _pascal HTNetSchedulerInit(void);
-static void _pascal HTNetSchedulerExit(void);
-static optr _pascal HTSchedulerGetNext (void);
-
-int _pascal HTNetAlloc (HTRequest *req, HTMemHandle url, HTNetThread **net);
-
-/* Locking free */
-void _pascal HTNetFree (HTNetThread *net);
-
-/* Nonlocking free */
-static void _pascal HTNetFreeLow (HTNetThread *net);
-
-HTNetThread * _pascal HTNetGetNext(optr scheduler);
-
-Boolean _pascal HTNetChangeState (HTNetThread *net, HTNetState newState);
-
-Boolean _pascal HTNetGrabState (HTNetThread *net);
-
-int _pascal HTNetKillLow (HTNetThread *net);
-
-void _pascal SocketSystemCbf (SysSubsystemType subsys,
-			      SysNotificationType notif,
-			      word word1, word word2, 
-			      word word3, word word4);
-
-/* This turns sSSCvfptr into a virtual far ptr to socket callback */
-static SSSCType *socketNotification = &SocketSystemCbf;
 
 
 /***********************************************************************
@@ -148,12 +85,6 @@ static SSSCType *socketNotification = &SocketSystemCbf;
  *	kkee	5/31/96   	Initial Revision
  *
  ***********************************************************************/
-@alias (MSG_PROCESS_CREATE_EVENT_THREAD_WITH_OWNER) void \
-	MSG_PROCESS_CREATE_EVENT_THREAD_WITH_OWNER_WWW(\
-		ThreadHandle* newThread = multipleax, \
-		ClassStruct* class = cx:dx, \
-		word stackSize = bp) = carry;
-
 int _far _pascal
 HTNetLibraryEntry (LibraryCallType ty, GeodeHandle client)
 {
@@ -162,31 +93,37 @@ HTNetLibraryEntry (LibraryCallType ty, GeodeHandle client)
 
     if (ty == LCT_ATTACH) {
 	htNetClientCount = 0;
-	HTNetThreadInit();
-
-@ifdef TRUNK
-	SysHookNotification(SST_SOCKET, socketNotification);
-@endif
 
     } else if (ty == LCT_NEW_CLIENT) {
 	htNetClientCount += 1;
 
 	if (htNetClientCount == 1) {
-	    HTNetSchedulerInit();
+	    ThreadHandle thread;
+
+	    @call ConstructOptr(ThreadGetInfo(0, TGIT_THREAD_HANDLE), 
+				GeodeGetCodeProcessHandle())::
+	     MSG_PROCESS_CREATE_EVENT_THREAD_WITH_OWNER(
+				&thread,
+				&HTNetSchedulerClass,			
+				HTNET_THREAD_STACK_SIZE);
+	    htNetScheduler = ConstructOptr(thread, 0);
+	    /*
+	     * Inform other Library components of this thread so that 
+	     * objects created by them run in HTNet library thread.
+	     */
+	    HTPolicySetThread(thread);
 	}
 
     } else if (ty == LCT_CLIENT_EXIT) {
 	htNetClientCount -= 1;
 
 	if (htNetClientCount == 0) {
-            HTNetSchedulerExit();
-	}
 
-    } else if (ty == LCT_DETACH) {
-	ThreadFreeSem(htNetSem);
-@ifdef TRUNK
-	SysUnhookNotification(SST_SOCKET, socketNotification);
-@endif
+	    /* Destroy scheduler object */
+	    @call htNetScheduler::MSG_META_DETACH(0, NullOptr);
+
+	    htNetScheduler = NullOptr;
+	}
     }
 
     POPDS;
@@ -195,777 +132,9 @@ HTNetLibraryEntry (LibraryCallType ty, GeodeHandle client)
 }	/* End of HTNetLibraryEntry.	*/
 
 
-/* --------------------------------------------------------------------------
- *		HTNetThreads management
- * --------------------------------------------------------------------------*/
-
-/***********************************************************************
- *		ECCheckHTNet
- ***********************************************************************
- *
- * SYNOPSIS:	Check that a HTNet is valid.
- * CALLED BY:	GLOBAL
- * RETURN:	Nothing
- *	
- * STRATEGY:	
- *	
- * REVISION HISTORY:
- *	Name		Date		Description
- *	----		----		-----------
- *	kkee    	3/28/97   	Initial Revision
- *	
- ***********************************************************************/
-void _pascal
-ECCheckHTNet (HTNetThread *net)
-{
-#if ERROR_CHECK
-    ECCheckProcessHandle(net->HTNT_owner);
-    ECCheckRequest(net->HTNT_request);
-    ECCheckStream(net->HTNT_protocol);
-    if (net->HTNT_socket) ECCheckHTSocket(net->HTNT_socket);
-#endif
-}	/* End of ECCheckHTNet.	*/
-
-
-
-/***********************************************************************
- *		HTNetSchedulerInit
- ***********************************************************************
- *
- * SYNOPSIS:	Initialize all my schedulers.
- * CALLED BY:	HTNetLibraryEntry
- * RETURN:	Nothing
- *	
- * STRATEGY:	Create multiple htcore threads to service multiple
- *              requests. The htcore threads are stored in htNetScheduler.
- *	
- * REVISION HISTORY:
- *	Name		Date		Description
- *	----		----		-----------
- *	kkee    	9/26/97   	Initial Revision
- *	
- ***********************************************************************/
-static void _pascal
-HTNetSchedulerInit (void)
-{
-    int i;
-    ThreadHandle thread;
-    for(i=0; i<HT_MAX_SCHEDULER; i++) {
-	@call ConstructOptr(ThreadGetInfo(0, TGIT_THREAD_HANDLE), 
-			    GeodeGetCodeProcessHandle())::
-	MSG_PROCESS_CREATE_EVENT_THREAD_WITH_OWNER_WWW(
-				&thread,
-				&HTNetSchedulerClass,			
-				HTNET_THREAD_STACK_SIZE);
-	HTObjAttach(thread);
-	htNetScheduler[i].HTSS_scheduler = ConstructOptr(thread, 0);
-	htNetScheduler[i].HTSS_clientCount = 0;
-    } 
-    /* We need htcore to point any scheduler thread handle */
-    MemModifyOtherInfo(GeodeGetCodeProcessHandle(), 
-		       OptrToHandle(htNetScheduler[0].HTSS_scheduler));
-}	/* End of HTNetSchedulerInit.	*/
-
-
-
-/***********************************************************************
- *		HTNetSchedulerExit
- ***********************************************************************
- *
- * SYNOPSIS:	Clean up all net schedulers.
- * CALLED BY:	HTNetLibraryEntry
- * RETURN:	Nothing
- *	
- * STRATEGY:	
- *	
- * REVISION HISTORY:
- *	Name		Date		Description
- *	----		----		-----------
- *	kkee    	9/26/97   	Initial Revision
- *	
- ***********************************************************************/
-static void _pascal
-HTNetSchedulerExit (void)
-{
-    int i;
-    for (i=0; i<HT_MAX_SCHEDULER; i++) {
-	HTObjDetach(OptrToHandle(htNetScheduler[i].HTSS_scheduler));
-	@call htNetScheduler[i].HTSS_scheduler::
-	    MSG_META_DETACH(0, NullOptr);
-	htNetScheduler[i].HTSS_scheduler = NullOptr;
-	htNetScheduler[i].HTSS_clientCount = 0;
-    }
-}	/* End of HTNetSchedulerExit.	*/
-
-
-
-/***********************************************************************
- *		HTSchedulerGetNext
- ***********************************************************************
- *
- * SYNOPSIS:	Get the next scheduler. A scheduler is chosen using 
- *              round robin.
- * CALLED BY:	
- * RETURN:	ThreadHandle, a htNetScheduler[?].
- *	
- * STRATEGY:	
- *	
- * REVISION HISTORY:
- *	Name		Date		Description
- *	----		----		-----------
- *	kkee    	9/26/97   	Initial Revision
- *	
- ***********************************************************************/
-static optr _pascal 
-HTSchedulerGetNext (void)
-{
-    optr ret=0;
-    int i;
-    PUSHDS;
-    SET_DS_LIB_DGROUP;
-    for (i=0; i<HT_MAX_SCHEDULER; i++) {
-	if (htNetScheduler[i].HTSS_clientCount == 0) {
-	    ret = htNetScheduler[i].HTSS_scheduler;
-	    htNetScheduler[i].HTSS_clientCount = 1;
-	    break;
-	}
-    }
-    if (!ret) {
-	htSchedulerIndex = (htSchedulerIndex+1) % HT_MAX_SCHEDULER;
-	if ((htSchedulerIndex == 0) && (HT_MAX_SCHEDULER > 1)) {
-	    /* 
-	     * Don't pick the first one if its not free since it
-	     * must be processing the main download.
-	     */
-	    htSchedulerIndex = (htSchedulerIndex+1) % HT_MAX_SCHEDULER;
-	}
-	ret = htNetScheduler[htSchedulerIndex].HTSS_scheduler;
-	htNetScheduler[htSchedulerIndex].HTSS_clientCount += 1;
-    }
-    POPDS;
-    return ret;
-}	/* End of HTSchedulerGetNext.	*/
-
-
-
-/***********************************************************************
- *		HTNetThreadInit
- ***********************************************************************
- *
- * SYNOPSIS:	Initialize list of HTNetThreads.
- * CALLED BY:	HTNetLibraryEntry
- * RETURN:	Nothing
- *	
- * STRATEGY:	
- *	
- * REVISION HISTORY:
- *	Name		Date		Description
- *	----		----		-----------
- *	kkee    	5/21/97   	Initial Revision
- *	
- ***********************************************************************/
-static void _pascal
-HTNetThreadInit (void)
-{
-    int i;
-    GeodeHandle myGeode = GeodeGetCodeProcessHandle();
-
-    htNetSem = ThreadAllocSem(1);
-    HandleModifyOwner(htNetSem, myGeode);
-
-    for(i=0; i<MAX_HTNET_THREADS; i++) {
-	htNetQueue[i].HTNT_scheduler = 0;
-	htNetQueue[i].HTNT_owner = 0;
-	htNetQueue[i].HTNT_request = 0;
-	htNetQueue[i].HTNT_socket = 0;
-	htNetQueue[i].HTNT_protocol = 0;
-	htNetQueue[i].HTNT_persistent = FALSE;
-	htNetQueue[i].HTNT_garbageCollectable = TRUE;
-	htNetQueue[i].HTNT_free = TRUE;
-	htNetQueue[i].HTNT_sharedCmd = HT_OK;
-	htNetQueue[i].HTNT_changeState = ThreadAllocSem(1);
-	HandleModifyOwner(htNetQueue[i].HTNT_changeState, myGeode);
-	htNetQueue[i].HTNT_state = HTNET_DEAD;
-	htNetQueue[i].HTNT_scheme = 0;
-	htNetQueue[i].HTNT_port = 0;
-	htNetQueue[i].HTNT_server[0] = 0;
-	htNetQueue[i].HTNT_serverLength = 0;
-	htNetQueue[i].HTNT_status = HT_OK;
-	htNetQueue[i].HTNT_data = 0;
-	htNetQueue[i].HTNT_data2 = 0;
-	htNetQueue[i].HTNT_data3 = 0;
-    }
-}	/* End of HTNetThreadInit.	*/
-
-
-/***********************************************************************
- *		HTNetAlloc
- ***********************************************************************
- *
- * SYNOPSIS:	Allocate a HTNetThread. The passed in URL is freed here.
- * CALLED BY:	
- * RETURN:	HT_LINK_FAILED cannot allocate link.
- *              HT_CANNOT_RESOLVE_HOST cannot find host.
- *              HT_OK.
- *              HTNetThread is valid if return code is HT_OK, else NULL.
- *
- * STRATEGY:	We reuse existing HTNetThreads. If there is a persistent
- *              connection for this port, we reuse it. Else return one
- *              that is invalid.
- *	
- * REVISION HISTORY:
- *	Name		Date		Description
- *	----		----		-----------
- *	kkee    	5/21/97   	Initial Revision
- *	
- ***********************************************************************/
-int _pascal
-HTNetAlloc (HTRequest *req, HTMemHandle url, HTNetThread **net)
-{
-    int i;
-    HTStringHandle scheme=0;
-    char *p, *q;
-    word port;
-    int ret = HT_OK;
-
-    *net = 0;
-
-    p = (char *) HTMemLock(url);
-    if ((q=strstr(p, "://")) != 0) {
-	*q = 0;
-	scheme = HTStringForCase(p);
-	*q = ':';
-    }
-    if (!strncasecmp(p, "file", 4)) {
-	/* File protocol needs no network connection */
-	port = 0;
-	req->HTR_resolvedAddress[0] = 0;
-	req->HTR_resolvedLength = 0;
-    } else if (req->HTR_proxy) {
-	port = req->HTR_proxyPortNumber;
-    	ret = HTSocketFastResolve(req, (byte *) req->HTR_proxyName);
-    } else {
-	HTMemHandle htmh = HTParseURI(p, NULL, HTURI_PARSE_PORT);
-	port = atoi((char *) HTMemLock(htmh));
-	HTMemUnlockAndFree(htmh);
-	if (!port) port = HTDefaultPort(p);
-	htmh = HTParseURI(p, NULL, HTURI_PARSE_HOST);
-	ret = HTSocketFastResolve(req, (byte *)HTMemLock(htmh));
-	HTMemUnlockAndFree(htmh);
-    }
-    HTMemUnlockAndFree(url);
-
-    if (ret != HT_OK) return ret;
-
-    /* Now find a Net (maybe persistent) for the request */
-    ThreadPSem(htNetSem);
-
-    for(i=0; i<MAX_HTNET_THREADS; i++) {
-	if (!net && htNetQueue[i].HTNT_free &&
-	    !htNetQueue[i].HTNT_persistent) {
-	    *net = &htNetQueue[i];
-
-	} else if (scheme && htNetQueue[i].HTNT_free &&
-		   htNetQueue[i].HTNT_persistent &&
-		   (htNetQueue[i].HTNT_scheme == scheme) &&
-		   (htNetQueue[i].HTNT_port == port) &&
-		   (htNetQueue[i].HTNT_serverLength == 
-		    req->HTR_resolvedLength) &&
-		   !memcmp(htNetQueue[i].HTNT_server, 
-			   req->HTR_resolvedAddress, 
-			   req->HTR_resolvedLength)) {
-	    /* got a persistent connection we can use */
-	    htNetQueue[i].HTNT_free = FALSE;     /* Allocated */
-	    ThreadVSem(htNetSem);
-	    *net = &htNetQueue[i];  /* Use persistent connection */
-	    return HT_OK;
-	}
-    }
-
-    if (!(*net)) {
-	/* 
-	 * Failed to find a non-persistent connection to use.
-	 * Try garbage collecting a persistent connection that is
-	 * not in use.
-	 */
-	for(i=0; i<MAX_HTNET_THREADS; i++, 
-	    htNetGarbageCollect = (htNetGarbageCollect + 1) % 
-	    MAX_HTNET_THREADS) {
-	    if (htNetQueue[htNetGarbageCollect].HTNT_free &&
-		htNetQueue[htNetGarbageCollect].HTNT_garbageCollectable) {
-		HTNetFreeLow(&htNetQueue[htNetGarbageCollect]);
-		*net = &htNetQueue[htNetGarbageCollect];
-		break;
-	    }
-	}
-    }
-
-    if (*net) {
-	(*net)->HTNT_free = FALSE;         /* Allocated */
-	(*net)->HTNT_scheme = scheme;
-	(*net)->HTNT_port = port;
-	if (req->HTR_resolvedLength < MAX_RESOLVED_ADDRESS_LENGTH) {
-	    memcpy((*net)->HTNT_server, req->HTR_resolvedAddress, 
-		   req->HTR_resolvedLength);
-	    (*net)->HTNT_serverLength = req->HTR_resolvedLength;
-	}
-	#if ERROR_CHECK
-	else EC_ERROR(BUFFER_IS_NOT_BIG_ENOUGH);
-	#endif
-
-    }
-
-    ThreadVSem(htNetSem);
-    return HT_OK;
-}	/* End of HTNetAlloc.	*/
-
-
-/***********************************************************************
- *		HTNetFreeLow
- ***********************************************************************
- *
- * SYNOPSIS:	Free a Net thread. Does not care if its persistent.
- *              Also does not lock using semaphore htNetSem.
- * CALLED BY:	
- * RETURN:	Nothing
- *	
- * STRATEGY:	
- *	
- * REVISION HISTORY:
- *	Name		Date		Description
- *	----		----		-----------
- *	kkee    	5/21/97   	Initial Revision
- *	
- ***********************************************************************/
-static void _pascal
-HTNetFreeLow (HTNetThread *net)
-{
-#if ERROR_CHECK
-    int i;
-    Boolean found=FALSE;
-    for (i=0; i<MAX_HTNET_THREADS; i++) {
-	if (&htNetQueue[i] == net) {
-	    found=TRUE;
-	    break;
-	}
-    }
-    if (!found) EC_ERROR(INVALID_HTNET_THREAD);
-    if (net->HTNT_state != HTNET_DEAD) EC_ERROR(CANNOT_FREE_LIVE_HTNET);
-#endif
-
-    /* 
-     * Data applicable to both persistent and non-persistent connection.
-     */
-    net->HTNT_scheduler = 0;
-    net->HTNT_owner = 0;
-    net->HTNT_request = 0;
-    net->HTNT_protocol = 0;
-    net->HTNT_free = TRUE;
-    net->HTNT_sharedCmd = HT_OK;
-    net->HTNT_status = HT_OK;
-    if (net->HTNT_socket)  
-	/* Allocated by protocols, but deleted here */ 
-	HTSocketDelete(net->HTNT_socket);
-    net->HTNT_socket = 0;
-    net->HTNT_persistent = FALSE;
-    net->HTNT_garbageCollectable = TRUE;
-    net->HTNT_scheme = 0;
-    net->HTNT_port = 0;
-    net->HTNT_server[0] = 0;
-    net->HTNT_serverLength = 0;
-    net->HTNT_data = 0;
-    net->HTNT_data2 = 0;
-    net->HTNT_data3 = 0;
-}	/* End of HTNetFree.	*/
-
-
-
-/***********************************************************************
- *		HTNetFree
- ***********************************************************************
- *
- * SYNOPSIS:	Free a HTNetThread. Don't free persistent connections
- *              with this API. For persistent connections, you must set
- *              HTNT_persistent = FALSE and NOT call this API.
- * CALLED BY:	
- * RETURN:	Nothing
- *	
- * STRATEGY:	
- *	
- * REVISION HISTORY:
- *	Name		Date		Description
- *	----		----		-----------
- *	kkee    	5/21/97   	Initial Revision
- *	
- ***********************************************************************/
-void _pascal
-HTNetFree (HTNetThread *net)
-{
-#if ERROR_CHECK
-    int i;
-    Boolean found=FALSE;
-    for (i=0; i<MAX_HTNET_THREADS; i++) {
-	if (&htNetQueue[i] == net) {
-	    found=TRUE;
-	    break;
-	}
-    }
-    if (!found) EC_ERROR(INVALID_HTNET_THREAD);
-    if (net->HTNT_state != HTNET_DEAD) EC_ERROR(CANNOT_FREE_LIVE_HTNET);
-#endif
-
-    ThreadPSem(htNetSem);
-
-    /* 
-     * Data applicable to both persistent and non-persistent connection.
-     */
-    net->HTNT_scheduler = 0;
-    net->HTNT_owner = 0;
-    net->HTNT_request = 0;
-    net->HTNT_protocol = 0;
-    net->HTNT_free = TRUE;
-    net->HTNT_sharedCmd = HT_OK;
-    net->HTNT_status = HT_OK;
-
-    /* 
-     * For non-persistent connection.
-     */
-    if (!net->HTNT_persistent) {
-	if (net->HTNT_socket)  
-	    /* Allocated by protocols, but deleted here */ 
-	    HTSocketDelete(net->HTNT_socket);
-	net->HTNT_socket = 0;
-	net->HTNT_persistent = FALSE;
-	net->HTNT_scheme = 0;
-	net->HTNT_port = 0;
-	net->HTNT_server[0] = 0;
-	net->HTNT_serverLength = 0;
-	net->HTNT_data = 0;
-	net->HTNT_data2 = 0;
-	net->HTNT_data3 = 0;
-    }
-
-    ThreadVSem(htNetSem);
-}	/* End of HTNetFree.	*/
-
-
-/***********************************************************************
- *		HTNetGetNext
- ***********************************************************************
- *
- * SYNOPSIS:	Get the next schedulable Net thread for a scheduler.
- * CALLED BY:	
- * RETURN:	HTNetThread or NULL if there is no Net thread for 
- *              a scheduler.
- *	
- * STRATEGY:	
- *	
- * REVISION HISTORY:
- *	Name		Date		Description
- *	----		----		-----------
- *	kkee    	5/21/97   	Initial Revision
- *	
- ***********************************************************************/
-HTNetThread * _pascal
-HTNetGetNext (optr scheduler)
-{
-    int i;
-    HTNetThread *net=0;
-    ThreadPSem(htNetSem);
-    for (i=0; i<MAX_HTNET_THREADS; i++) {
-	if ((htNetQueue[htNetIndex].HTNT_scheduler == scheduler) &&
-	    !htNetQueue[htNetIndex].HTNT_free) {
-	    net= &htNetQueue[htNetIndex];
-	}
-	/* Move forward before we return */
-	htNetIndex = (htNetIndex+1) % MAX_HTNET_THREADS;
-	if (net) break;
-    }
-    ThreadVSem(htNetSem);
-    return net;
-}	/* End of HTNetGetNext.	*/
-
-
-/***********************************************************************
- *		HTNetChangeState
- ***********************************************************************
- *
- * SYNOPSIS:	Change state of execution of a Net thread.
- * CALLED BY:	
- * RETURN:	TRUE if state change successful, else FALSE.
- *	
- * STRATEGY:	
- *	
- * REVISION HISTORY:
- *	Name		Date		Description
- *	----		----		-----------
- *	kkee    	5/25/97   	Initial Revision
- *	
- ***********************************************************************/
-Boolean _pascal
-HTNetChangeState (HTNetThread *net, HTNetState newState)
-{
-    switch (net->HTNT_state) {
-    case HTNET_DEAD:
-	if (newState == HTNET_DEAD) {
-	    return FALSE;
-	} else if (newState == HTNET_BLOCKED) {
-	    net->HTNT_state = HTNET_BLOCKED;
-	    return TRUE;
-	} else {  /* HTNET_RUNNING */
-	    return FALSE;
-	}
-    case HTNET_BLOCKED:
-	if (newState == HTNET_DEAD) {
-	    net->HTNT_state = HTNET_DEAD;
-	    return TRUE;
-	} else if (newState == HTNET_BLOCKED) {
-	    return TRUE;
-	} else {  /* HTNET_RUNNING */
-	    return TRUE;
-	}
-    case HTNET_RUNNING:
-	if (newState == HTNET_DEAD) {
-	    net->HTNT_state = HTNET_DEAD;
-	    return TRUE;
-	} else if (newState == HTNET_BLOCKED) {
-	    return TRUE;
-	} else {  /* HTNET_RUNNING */
-	    return TRUE;
-	}
-    }
-}	/* End of HTNetChangeState.	*/
-
-
-/***********************************************************************
- *		HTNetGrabState
- ***********************************************************************
- *
- * SYNOPSIS:	To safely grab the semaphore HTNT_changeState from both
- *              the scheduler and client thread.
- * CALLED BY:	HTNetKillLow and MSG_HTNS_SCHEDULE_ROUND_ROBIN.
- * RETURN:	Return FALSE if the net we are trying to grab has been
- *              killed (HTNET_DEAD).
- * STRATEGY:	
- *	
- * REVISION HISTORY:
- *	Name		Date		Description
- *	----		----		-----------
- *	kkee    	5/25/97   	Initial Revision
- *	
- ***********************************************************************/
-Boolean _pascal
-HTNetGrabState (HTNetThread *net)
-{
-    SemaphoreError err;
-
-    /* !IMPORTANT!
-     * We have to use a busy wait since this routine is called from 
-     * both client and scheduler thread; to avoid deadlock in 
-     * @call to abort a protocol object or anywhere where it could
-     * cause deadlock.
-     */
-    while ((err=ThreadPTimedSem(net->HTNT_changeState, 1)) == SE_TIMEOUT &&
-	   net->HTNT_state != HTNET_DEAD);
-    if (net->HTNT_state == HTNET_DEAD) {
-	/* Already dead */
-	if (err != SE_TIMEOUT) 
-	    ThreadVSem(net->HTNT_changeState);
-	return FALSE;
-    }
-
-    /* If we get here, we have successfully grab the semaphore */
-    return TRUE;
-}	/* End of HTNetGrabState.	*/
-
-
-
 
 /***********************************************************************
- *		HTNetKillLow
- ***********************************************************************
- * SYNOPSIS:	Kill a request, internal use by the Library. 
- * CALLED BY:	MSG_HTNS_SCHEDULE_ROUND_ROBIN, MSG_HTNS_KILL_THREAD,
- *              MSG_HTNS_NEW_CLIENT.
- * RETURN:	Whatever is returned from client "after" callbacks.
- * SIDE EFFECTS:
- *	
- * STRATEGY:
- *	
- * REVISION HISTORY:
- *	Name	Date		Description
- *	----	----		-----------
- *	kkee	8/21/96   	Initial Revision
- *
- ***********************************************************************/
-int _pascal
-HTNetKillLow (HTNetThread *net)
-{
-    HTRequest *rptr;
-    HTRequestHandle request;
-    HTListHandle afterList;
-    HTStreamHandle protocol = NULL;
-    int status, i, ret;
-
-    /* Decrement a scheduler client count */
-    for (i=0; i<HT_MAX_SCHEDULER; i++) {
-	if (net->HTNT_scheduler == 
-	    htNetScheduler[i].HTSS_scheduler) {
-	    htNetScheduler[i].HTSS_clientCount =
-		(htNetScheduler[i].HTSS_clientCount == 0) ?
-		    0 : htNetScheduler[i].HTSS_clientCount-1;
-	    break;
-	}
-    }
-    
-    /* If the net thread is already dead, ignore it */
-    if (net->HTNT_free) return HT_OK;
-
-    if (!HTNetGrabState(net))
-	/* Already dead */
-	return HT_OK;
-
-    if (!HTNetChangeState(net, HTNET_DEAD)) {
-	/* Already dead */
-	ThreadVSem(net->HTNT_changeState);
-	return HT_OK;
-    }
-
-EC( ECCheckRequest(net->HTNT_request);                            )
-    rptr = (HTRequest *) MemThreadGrab(net->HTNT_request);
-    afterList = rptr->HTR_afterList;
-    MemThreadRelease(net->HTNT_request);
-
-    protocol =  net->HTNT_protocol;
-	request = net->HTNT_request;
-	status = net->HTNT_status;
-    ThreadVSem(net->HTNT_changeState);
-
-	/* Make sure the net is free before executing "after" callbacks
-	 * as this behavior is guaranteed for client. If the net contains
-	 * a persistent connection, we will be able to reuse if the client
-	 * decides to make a request in its "after" callback.
-	 */
-    HTNetFree(net);
-
-    /* 
-     * Remember, we can't lock the request during callback as the 
-     * callback might use the request and cause a deadlock. That's
-     * why we make a copy of afterList.
-     */
-    if (protocol) {
-	ret = @call protocol::MSG_HT_STREAM_ABORT(status);
-	status = (ret == HT_OK) ? status : ret;
-    }
-    return HTNetExecuteCallback(afterList, request, status);
-
-    /* 
-     * We can't use the request after the "after" callbacks as the 
-     * request is no longer valid.
-     */
-}	/* End of HTNetKillLow.	*/
-
-
-
-/***********************************************************************
- *		SocketSystemCbf
- ***********************************************************************
- *
- * SYNOPSIS:	System notification for socket.
- * CALLED BY:	Geos System
- * RETURN:	Nothing
- *	
- * STRATEGY:	If we get disconnected notification, about all pending
- *              persistent connections.
- *	
- * REVISION HISTORY:
- *	Name		Date		Description
- *	----		----		-----------
- *	kkee    	7/21/97   	Initial Revision
- *	
- ***********************************************************************/
-void _pascal
-SocketSystemCbf (SysSubsystemType subsys,
-		 SysNotificationType notif,
-		 word word1, word word2, word word3, word word4)
-{
-@ifdef TRUNK
-
-    SysNotificationType notice;
-    if (subsys != SST_SOCKET) return;
-    
-    notice = notif & SNF_NOTIFICATION;
-
-    if (notice == SSN_LINK_NOT_CONNECTED) {
-	/* Tell scheduler to terminate all threads.
-	 * We should not call HTNetKillAll here as we are running
-	 * in system thread.
-	 */
-	PUSHDS;
-	SET_DS_LIB_DGROUP;  /* To access htNetScheduler */
-	@send,forceQueue, replace, checkDuplicate 
-	    (htNetScheduler[0].HTSS_scheduler)::
-	    MSG_HTNS_NETWORK_DISCONNECTED();
-	POPDS;
-	HTSessionNotify(HT_SOCKET_DISCONNECT_NOTIFICATION);
-    } else if (notice == SSN_LINK_CONNECTED) {
-	HTSessionNotify(HT_SOCKET_CONNECT_NOTIFICATION);
-	HTSocketSetOpen();
-    }
-
-@endif /* @ifdef TRUNK */
-}	/* End of SocketSystemCbf.	*/
-
-
-
-
-/* --------------------------------------------------------------------------
- * 		PUBLIC ROUTINES
- * --------------------------------------------------------------------------*/
-
-
-/***********************************************************************
- *		HTNETSETPERSISTENT
- ***********************************************************************
- *
- * SYNOPSIS:	Set a Net thread to be persistent. To set non-persisten,
- *              set net->HTNT_persistent to FALSE. This must happen 
- *              before you want to free a persistent HTNetThread. because
- *              persistent connections are never freed unles they are 
- *              set to non-persistent.
- * CALLED BY:	Protocol Handlers
- * RETURN:	Nothing
- *	
- * STRATEGY:	
- *	
- * REVISION HISTORY:
- *	Name		Date		Description
- *	----		----		-----------
- *	kkee    	5/22/97   	Initial Revision
- *	
- ***********************************************************************/
-void _far _pascal
-HTNETSETPERSISTENT (HTNetThread *net, Boolean bool)
-{
-EC( if (net->HTNT_free) EC_ERROR(INVALID_HTNET_THREAD);                 )
-    ECCheckHTNet(net);
-
-    /* 
-     * A persistent connection is uniquely identified by the set of 
-     * {port, server, and serverLen}.
-     */
-    net->HTNT_persistent = bool;
-    if (bool) {
-	HTSocketGetInfo(net->HTNT_socket, &(net->HTNT_port), net->HTNT_server,
-			&(net->HTNT_serverLength));
-    }
-}	/* End of HTNETSETPERSISTENT.	*/
-
-
-
-
-/***********************************************************************
- *		HTNETADDCALLBACKCOMMON
+ *		HTNetAddCallbackCommon
  ***********************************************************************
  * SYNOPSIS:	Common routine for adding a callback to a list.
  * CALLED BY:	HTNETADDBEFORECALLBACK, HTNETADDAFTERCALLBACK, 
@@ -982,7 +151,7 @@ EC( if (net->HTNT_free) EC_ERROR(INVALID_HTNET_THREAD);                 )
  *
  ***********************************************************************/
 int _far _pascal
-HTNETADDCALLBACKCOMMON (HTListHandle list, HTNetCallback cbf, int status)
+HTNetAddCallbackCommon (HTListHandle list, HTNetCallback cbf, int status)
 {
     HTNetCall netCall;
 
@@ -991,8 +160,12 @@ HTNETADDCALLBACKCOMMON (HTListHandle list, HTNetCallback cbf, int status)
     HTListAppend(list, &netCall, sizeof(HTNetCall));
 
     return HT_OK;
-}	/* End of HTNETADDCALLBACKCOMMON.	*/
+}	/* End of HTNetAddCallbackCommon.	*/
 
+
+/* --------------------------------------------------------------------------
+ * 		PUBLIC ROUTINES
+ * --------------------------------------------------------------------------*/
 
 
 /***********************************************************************
@@ -1003,9 +176,9 @@ HTNETADDCALLBACKCOMMON (HTListHandle list, HTNetCallback cbf, int status)
  *		multitasking. 	
  * CALLED BY:	Request Manager (in HTRequestSubmit)
  * PASS:        request = the request structure.
- * RETURN:	HT_OK if ok, else HT_NO, HT_OUT_OF_MEMORY. HT_NO if a 
- *              protocol object is already attached to the request, 
- *              i.e., has been called to HTNetNewClient before.
+ * RETURN:	HT_OK if ok, else HT_NO. HT_NO if a protocol object
+ *              is already attached to the request, i.e., has been 
+ *              called to HTNetNewClient before.
  * SIDE EFFECTS:Nothing.
  *	
  * STRATEGY:	Call all the "before" callbacks in order to see if we 
@@ -1024,9 +197,68 @@ HTNETADDCALLBACKCOMMON (HTListHandle list, HTNetCallback cbf, int status)
 int _far _pascal
 HTNetNewClient (HTRequestHandle request)
 {
-    /* Create a new net client for the request */
-    @send,forceQueue (HTSchedulerGetNext())::MSG_HTNS_NEW_CLIENT(request);
-    return HT_OK;
+    int status;
+    HTStreamHandle protocol;
+    HTMemHandle physical;
+    HTListHandle beforeList, afterList;
+    HTRequest *rptr;
+
+    if (!request) return HT_NO;
+EC( ECCheckRequest(request);                                            )
+
+    rptr = (HTRequest *) MemThreadGrab(request);
+    beforeList = rptr->HTR_beforeList;
+    afterList = rptr->HTR_afterList;
+    protocol = rptr->HTR_protocol;
+    MemThreadRelease(request);
+
+    if (protocol != NullOptr) return HT_NO;
+
+    /* 
+     * Call "before" callbacks. We cannot lock the request during callback
+     * as the callback routine might use the request & cause a deadlock 
+     * (since all the HTRequest routines lock the request object).
+     */
+    if ((status = HTNetExecuteCallback(beforeList, request, HT_ALL)) 
+	         != HT_OK) {
+	HTNetExecuteCallback(afterList, request, status);
+	return HT_OK;
+    }
+
+    status = HT_OK;
+
+    /*
+     * If no URL address translation was provided by the application, 
+     * then use the anchor URL address directly.
+     */
+    rptr = (HTRequest *) MemThreadGrab(request);
+    physical = HTAnchorPhysical(rptr->HTR_anchor);
+
+    if (!physical) {
+	HTMemHandle addr = HTAnchorAddress(rptr->HTR_anchor);
+	if (addr) {
+	    char *cptr;
+	    cptr = (char *) HTMemLock(addr);
+	    HTAnchorSetPhysical(rptr->HTR_anchor, cptr);
+	    HTMemUnlockAndFree(addr);
+	} else 
+	    status = HT_OUT_OF_MEMORY;
+
+    } else 
+	HTMemFree(physical);
+
+    MemThreadRelease(request);
+
+    /* Create a new client with the network protocol scheduler. */
+    if (status == HT_OK) {
+	PUSHDS;            /* To access htNetScheduler */
+	SET_DS_LIB_DGROUP;
+	@send,forceQueue (htNetScheduler)::MSG_HTNS_NEW_CLIENT(request); 
+	POPDS;
+    }
+
+    return status;
+
 }	/* End of HTNetNewClient.	*/
 
 
@@ -1065,33 +297,41 @@ HTNetNewClient (HTRequestHandle request)
 int _far _pascal
 HTNetKill (HTRequestHandle request, int status)
 {
-    int i;
-    HTNetThread *net=0;
+    HTRequest *rptr;
+    HTStreamHandle protocol;
 
 EC( ECCheckRequest(request);                                           )
 
+    rptr = (HTRequest *) MemThreadGrab(request);
+    protocol = rptr->HTR_protocol;
+
+    /* 
+     * If htsocket is doing something sychronous, we interrupt from 
+     * outside. If it is doing something asych, we stop it using
+     * MSG_HT_PROTOCOL_STOP.
+     */
+
+    if (rptr->HTR_sockfd) { 
+	SocketInterrupt(rptr->HTR_sockfd); 
+    }	
+
+    /* Can't lock request while calling protocol */
+    MemThreadRelease(request);
+
+    @call protocol::MSG_HT_PROTOCOL_STOP();
+
+    /*
+     * Block to dequeue the protocol from the scheduler queue to make
+     * sure the protocol is dequeued (stop servicing the request) before
+     * we go to "after" callback (as one of the callbacks might delete
+     * the request invalidating the copy in the protocol.). Since the  
+     * scheduler is run by a different thread (htcore:0), make sure we
+     * don't lock the request.
+     */
     PUSHDS;
     SET_DS_LIB_DGROUP;
-
-    ThreadPSem(htNetSem);
-    
-    for (i=0; i<MAX_HTNET_THREADS; i++) {
-	if (!htNetQueue[i].HTNT_free &&
-	    htNetQueue[i].HTNT_request == request) {
-	    htNetQueue[i].HTNT_sharedCmd = HT_INTERRUPTED;
-	    if (htNetQueue[i].HTNT_socket)
-		HTSocketStop(htNetQueue[i].HTNT_socket);
-	    net = &htNetQueue[i];
-	    break;
-	}
-    }
-
-    ThreadVSem(htNetSem);
-
-    if (net) {
-	net->HTNT_status = status;
-	HTNetKillLow(net);
-    }
+    if (protocol)
+	@call (htNetScheduler)::MSG_HTNS_DEQUEUE_THREAD(protocol, status); 
     POPDS;
 
     return HT_OK;
@@ -1104,8 +344,7 @@ EC( ECCheckRequest(request);                                           )
  *		HTNetKillAll
  ***********************************************************************
  *
- * SYNOPSIS:	Kill all Net threads of a client or 0 to kill all threads
- *              of all clients. 
+ * SYNOPSIS:	Kill all Net threads of a client. 
  * CALLED BY:	GLOBAL
  * RETURN:	HT_OK
  * SIDE EFFECTS:
@@ -1121,42 +360,10 @@ EC( ECCheckRequest(request);                                           )
 int _far _pascal
 HTNetKillAll (GeodeHandle client, int status)
 {
-    int i;
-    Boolean kill[MAX_HTNET_THREADS];
-    
+    /* Dequeue all Net threads of a client */
     PUSHDS;
     SET_DS_LIB_DGROUP;
-
-    ThreadPSem(htNetSem);
-
-    for (i=0; i<MAX_HTNET_THREADS; i++) {
-	/* Persistent net threads not serving any request must be
-	 * freed directly.
-	 */
-	if (status == HT_SHUT_DOWN && htNetQueue[i].HTNT_free &&
-	    htNetQueue[i].HTNT_persistent) {
-		htNetQueue[i].HTNT_persistent = FALSE;
-		HTNetFreeLow(&htNetQueue[i]);
-	    kill[i] = FALSE;			
-	} else if (!htNetQueue[i].HTNT_free && 
-	          (!client || htNetQueue[i].HTNT_owner == client)) {
-	    kill[i]=TRUE;
-	    if (htNetQueue[i].HTNT_socket)
-		HTSocketStop(htNetQueue[i].HTNT_socket);   /* Interrupt */
-	} else
-	    kill[i] = FALSE;
-    }
-
-    ThreadVSem(htNetSem);
-
-    /* Kill here so we don't have to block on htNetSem */
-    for (i=0; i<MAX_HTNET_THREADS; i++) {
-	if (kill[i]) {
-	    htNetQueue[i].HTNT_status = status;
-	    HTNetKillLow(&htNetQueue[i]);
-	}
-    }
-
+    @call (htNetScheduler)::MSG_HTNS_DEQUEUE_THREADS_FOR(client, status); 
     POPDS;
 
     return HT_OK;

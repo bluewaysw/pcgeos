@@ -23,7 +23,7 @@ DESCRIPTION:
 	(2) registering mime content-type classes and requesting content
 	    handlers.
 
-	$Id: htpolicy.goh,v 1.15.8.2 97/11/18 22:34:51 kkee Exp $
+	$Id: htpolicy.goh,v 1.1 97/04/04 15:54:51 newdeal Exp $
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
 
@@ -33,8 +33,8 @@ DESCRIPTION:
 @include <stdapp.goh>
 @include <WWW/HTCore/htstream.goh>
 @include <WWW/HTCore/htlist.goh>
+@include <WWW/HTCore/htutils.goh>
 @include <WWW/HTCore/htstring.goh>
-@include <WWW/HTCore/htcbf.goh>
 #include <WWW/htmem.h>
 
 
@@ -96,6 +96,16 @@ typedef struct {
 
 
 /*
+ * Content name has the form "text/html", "image/gif" (MIME format).
+ * The callback returns a HTMemHandle which contains a HTContentHandler.
+ * The Library will free the allocated HTMemHandle.
+ * Return NullOptr if no content handler.
+ */
+typedef HTMemHandle _far _pascal (*HTPolicyContentCallback) 
+     (HTRequestHandle request, HTStringHandle contentName);
+
+
+/*
  * A content-type is in MIME format. You should use these constants
  * whenever possible. Any type begining with "xgw" is type that
  * has been converted to fit Geoworks clients. So, normally you would
@@ -137,7 +147,6 @@ typedef struct {
  */
 #define HT_CONTENT_TYPE_APPLICATION_OCTET_STREAM  \
 					HTStringFor("application/octet-stream")
-#define HT_CONTENT_TYPE_MULTIPART_MIXED HTStringFor("multipart/mixed")
 #define HT_CONTENT_TYPE_TEXT_PLAIN      HTStringFor("text/plain")
 #define HT_CONTENT_TYPE_TEXT_HTML       HTStringFor("text/html")
 #define HT_CONTENT_TYPE_TEXT_XGW_HTML   HTStringFor("text/xgw-html")
@@ -158,6 +167,11 @@ typedef struct {
  * 		III. Policy Manager APIs.
  * --------------------------------------------------------------------------*/
 
+extern int _far _pascal HTPolicyAddClient(GeodeHandle clientHandle, 
+			HTPolicyContentCallback contentCbf);
+
+extern int _far _pascal HTPolicyDeleteClient(GeodeHandle clientHandle);
+
 extern int _far _pascal
 	HTPolicyAddProtocolHandler(HTListHandle list, HTStringHandle name,
 				   HTStringHandle library);
@@ -167,19 +181,22 @@ extern HTStreamHandle _far _pascal
 				HTListHandle list, HTStringHandle name);
 
 extern HTStreamHandle _far _pascal
+	HTPolicyGetStreamStack(HTRequestHandle request,
+			       HTStringHandle contentName);
+
+extern HTStreamHandle _far _pascal
 	HTPolicyStreamStack(HTStringHandle inputFormat,
 			    HTStringHandle outputFormat,
 			    HTStreamHandle outputStream,
 			    HTRequestHandle request,
 			    Boolean guess);
 
-extern const char * _far _pascal
-	HTPolicyContentTypeToFileExt(HTStringHandle contentType);
-
 #ifdef __HIGHC__
 pragma Alias(HTPolicyAddProtocolHandler, "HTPOLICYADDPROTOCOLHANDLER");
+pragma Alias(HTPolicyAddClient, "HTPOLICYADDCLIENT");
+pragma Alias(HTPolicyDeleteClient, "HTPOLICYDELETECLIENT");
+pragma Alias(HTPolicyGetStreamStack, "HTPOLICYGETSTREAMSTACK");
 pragma Alias(HTPolicyStreamStack, "HTPOLICYSTREAMSTACK");
-pragma Alias(HTPolicyContentTypeToFileExt, "HTPOLICYCONTENTTYPETOFILEEXT");
 #endif
 
 @endif /* __HT_POLICY_GOH */

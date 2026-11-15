@@ -23,7 +23,7 @@ DESCRIPTION:
 	exceptions here. Especially when we fail to push and 
 	read data.
 	
-	$Id: http.goc,v 1.34.1.14 97/12/08 19:47:48 mzhu Exp $
+	$Id: http.goc,v 1.1 97/04/07 11:49:57 newdeal Exp $
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
 
@@ -31,19 +31,19 @@ DESCRIPTION:
 @include <WWW/http.goh>
 @include <WWW/htcache.goh>
 @include <WWW/HTCore/htsock.goh>
+@include <WWW/HTCore/htsockMan.goh>
 @include <WWW/HTCore/htmime.goh>
 @include <WWW/HTCore/hterror.goh>
 @include <WWW/HTCore/htnet.goh>
 #include <WWW/htmem.h>
-@include <WWW/HTCore/htutils.goh>
 @include <WWW/HTCore/hturi.goh>
 @include <WWW/HTCore/htsuffix.goh>
 @include <WWW/HTCore/htpolicy.goh>
 @include <WWW/HTCore/htanchor.goh>
+@include <WWW/HTCore/httee.goh>
 @include <WWW/HTCore/htaabrow.goh>
-@include <WWW/HTCore/htobj.goh>
 @include <math.h>
-#include <Ansi/string.h>     /* memcpy */
+#include <Ansi/string.h>
 #include <Ansi/stdlib.h>
 #include <sem.h>
 
@@ -154,7 +154,8 @@ EC( ECCheckRequest(request);                                            )
 	strcpy(htAddress->HTSA_ipAddress,
 	       (char *)rptr->HTR_proxyName);
     else {
-	cptr = (char *) MemLock(rptr->HTR_uriString);
+	MemLock(rptr->HTR_uriString);
+	cptr = (char *) MemDeref(rptr->HTR_uriString);
 	htmh = HTParseURI(cptr, NULL, HTURI_PARSE_HOST);
 	MemUnlock(rptr->HTR_uriString);
 
@@ -170,7 +171,8 @@ EC( ECCheckRequest(request);                                            )
 	htAddress->HTSA_port = rptr->HTR_proxyPortNumber;
     
     else {
-	cptr = (char *) MemLock(rptr->HTR_uriString);
+	MemLock(rptr->HTR_uriString);
+	cptr = (char *) MemDeref(rptr->HTR_uriString);
 	htmh = HTParseURI(cptr, NULL, HTURI_PARSE_PORT);
 	MemUnlock(rptr->HTR_uriString);
 
@@ -235,10 +237,9 @@ EC( ECCheckStream(rptr->HTR_inputStream);                               )
      */
     if ((rptr->HTR_type == HTTPT_REQUEST) && 
 	(rptr->HTR_version != HTTPV_0_9) &&
-	(rptr->HTR_postCallback)) {
+	(rptr->HTR_postCallback)) 
 	status = ProcCallFixedOrMovable_pascal(request, rptr->HTR_inputStream,
                                               rptr->HTR_postCallback);
-    }	
     /*
      * In both cases (callback or no callback), we must flush all 
      * buffered data down the stream pipe.
@@ -263,7 +264,7 @@ EC( ECCheckStream(rptr->HTR_inputStream);                               )
  *	
  * STRATEGY:    If a client header parser is sucessfully created, the 
  *              output stream becomes:
- *              HTSocket --> HTTP (nondestructive) --> ClientHeaderParser
+ *              HTSock --> HTTP (nondestructive) --> ClientHeaderParser
  *	
  * REVISION HISTORY:
  *	Name	Date		Description
@@ -281,7 +282,7 @@ EC( ECCheckRequest(request);                                            )
 
     rptr = (HTRequest *) MemThreadGrab(request);
     if (rptr->HTR_responseParserClass) 
-	stream = HTObjInstantiateForThread(0, rptr->HTR_responseParserClass);
+	stream = ObjInstantiateForThread(0, rptr->HTR_responseParserClass);
     MemThreadRelease(request);
 
     if (stream) 
@@ -430,7 +431,7 @@ HTTPNextState (HTRequestHandle request, word statusCode, char *reason)
       case 407:			    /* Proxy Authentication Required */
 	HTRequestAddError(request, HTERRS_FATAL, FALSE, HTERR_PROXY,
 		   reason,  strlen(reason), "HTTPNextState");
-	ret = HTTP_PROXY_AUTH;
+	ret = HTTP_ERROR;
 	break;
 
       case 408:				  /* Request Timeout */
@@ -485,6 +486,7 @@ HTTPNextState (HTRequestHandle request, word statusCode, char *reason)
 }	/* End of HTTPNextState.	*/
 
 
+
 /***********************************************************************
 		Message Handlers
 ***********************************************************************/
@@ -509,7 +511,6 @@ HTTPNextState (HTRequestHandle request, word statusCode, char *reason)
 {
     /* Initialize HTTP state machine to initial state */
     @self->HTTPI_currentState = HTTP_BEGIN;
-    @self->HTTPI_nextState = HTTP_INVALID_STATE;
 
     @callsuper();
 }	/* End of MSG_META_INITIALIZE.	*/
@@ -522,7 +523,7 @@ HTTPNextState (HTRequestHandle request, word statusCode, char *reason)
  ***********************************************************************
  * SYNOPSIS:	    Trigger an abort sequence to abort both input and
  *                  output stream pipes bound to this protocol.
- * PARAMETERS:	    void (int status)
+ * PARAMETERS:	    void (void)
  * SIDE EFFECTS:
  *
  * STRATEGY:        If we have asynch receive going on, stop it now.
@@ -541,17 +542,10 @@ HTTPNextState (HTRequestHandle request, word statusCode, char *reason)
 
     /* Abort input stream */
     if (rptr->HTR_inputStream) 
-	@call rptr->HTR_inputStream::MSG_HT_STREAM_ABORT(status);
+	@call rptr->HTR_inputStream::MSG_HT_STREAM_ABORT();
 
-@ifdef PRODUCT_RESPONDER
-	pself = ObjDeref(oself,0);
-@endif
+    rptr->HTR_sockfd = NULL;
     MemThreadRelease(@self->HTSI_request);
-
-    if (@self->HTTPI_data) {
-	HTMemFree(@self->HTTPI_data);
-	@self->HTTPI_data = 0;
-    }
 
     /* Abort output stream and self */
     return @callsuper();
@@ -559,38 +553,28 @@ HTTPNextState (HTRequestHandle request, word statusCode, char *reason)
 
 
 
+
 /***********************************************************************
- *		MSG_HT_STREAM_FLUSH for HTTPClass
+ *		MSG_HT_PROTOCOL_STOP for HTTPClass
  ***********************************************************************
  *
- * SYNOPSIS:	    Flush buffered data in @self->HTTPI_data and delete
- *                  the flushed data.
- * PARAMETERS:	    int (void)
+ * SYNOPSIS:	    Stop all backgroup processing of http protocol.
+ * PARAMETERS:	    void (void)
  * SIDE EFFECTS:    
  *
- * STRATEGY:	    
+ * STRATEGY:        The only thing we may have running in the background
+ *                  is htsocket.
  *
  * REVISION HISTORY:
- *	Name		Date		Description
- *	----		----		-----------
- *	kkee    	4/29/97   	Initial Revision
- *	
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	kkee	9/ 4/96   	Initial Revision
+ *
  ***********************************************************************/
-@method HTTPClass, MSG_HT_STREAM_FLUSH
+@method HTTPClass, MSG_HT_PROTOCOL_STOP
 {
-    int ret = HT_OK;
-
-    if (@self->HTTPI_data) {
-	byte *b = (byte *) HTMemLock(@self->HTTPI_data);
-	ret = PUTBLOCK(@self->HTSI_target, b, @self->HTTPI_len);
-	HTMemUnlockAndFree(@self->HTTPI_data);
-	@self->HTTPI_data = 0;
-    }
-
-    if (ret != HT_OK) return ret;
-    return @callsuper();
-}	/* End of MSG_HT_STREAM_FLUSH.	*/
-
+    @call @self->HTPI_socket::MSG_HT_SOCKET_STOP();
+}	/* End of MSG_HT_PROTOCOL_STOP.	*/
 
 
 
@@ -616,9 +600,6 @@ HTTPNextState (HTRequestHandle request, word statusCode, char *reason)
 {
     HTRequest *rptr;
     char *cptr;
-@ifdef PRODUCT_RESPONDER
-    HTStreamHandle temp ;
-@endif
 
     /* 
      * Always the first thing to check.
@@ -632,9 +613,6 @@ EC(	ECCheckOD(@self->HTSI_target);                                 )
 			@self->HTTPI_bufferLength);
     }
     
-@ifdef PRODUCT_RESPONDER
-	pself = ObjDeref(oself,0);
-@endif
 EC( ECCheckRequest(@self->HTSI_request);                               )
 
     /* 
@@ -644,27 +622,21 @@ EC( ECCheckRequest(@self->HTSI_request);                               )
      */
     rptr = (HTRequest *) MemThreadGrab(@self->HTSI_request);
 
-@ifdef PRODUCT_RESPONDER
-	pself = ObjDeref(oself,0);
-@endif
     if ((cptr = strcasestr((char *)@self->HTTPI_buffer, "http/")) 
 	!= NULL) {
 
 	char *ver = cptr;
-    	while (!ISWHITE(*cptr)) cptr++;      /* HTTP-Version */
+    	while (!isspace(*cptr)) cptr++;      /* HTTP-Version */
 	*cptr = '\0';                        /* Null-terminate it */
 	cptr++;
 	rptr->HTR_responseVersion = HTTPVersionEnum(ver);
-	while (ISWHITE(*cptr)) cptr++;       /* Skip SP */
+	while (isspace(*cptr)) cptr++;       /* Skip SP */
     
-	if (ISDIGIT(*cptr)) {                /* Status-Code */
+	if (isdigit(*cptr)) {                /* Status-Code */
 	    rptr->HTR_responseStatusCode = atoi(cptr);
 	}
 
-	while (ISWHITE(*cptr)) cptr++;
-@ifdef PRODUCT_RESPONDER
-	pself = ObjDeref(oself,0);
-@endif
+	while (isspace(*cptr)) cptr++;
 	@self->HTTPI_reason = cptr-@self->HTTPI_buffer;
 	if (cptr && (cptr = strchr(cptr, LF)) != NULL)
 	    *cptr = '\0';
@@ -681,44 +653,33 @@ EC( ECCheckRequest(@self->HTSI_request);                               )
 	if ((@self->HTSI_target = 
 	     HTTPUseClientHeaderParser(@self->HTSI_request)) == NULL) {
 	    
-	    HTStreamHandle s = NullOptr;
+	    HTStreamHandle s;
 
-@ifdef PRODUCT_RESPONDER
-	pself = ObjDeref(oself,0);
-@endif
+	    @self->HTSI_target = 
+		HTPolicyStreamStack(HT_WWW_MIME, 
+				    NULL,
+				    @self->HTSI_target, 
+				    @self->HTSI_request, 
+				    FALSE);
+
 	    /*
 	     * See if we can cache this data object. Note that 
-	     * we only cache HTTP/1.0 & higher reponses.  If CacheWriter
-	     * stream is created, we have output stream as:
-	     *
-             *                                     |-> HTCache
-	     * HTSock -> HTTP -> HTMIME -> HTTee ->
-             *                                     |-> (from content-type)
+	     * we only cache HTTP/1.0 & higher reponses. 
 	     */
-            if (HTCacheIsEnabled() && HTSessionUseCache(rptr->HTR_client)) {
-		if (rptr->HTR_responseStatusCode == 200 &&
-		    rptr->HTR_persistentCache && 
-		    rptr->HTR_method == HTM_GET) {
-		    /* Valid across sessions */
-		    s = HTCacheWriterCreate(0, NullOptr,
-					    @self->HTSI_request,
-					    HTCACHE_INTERSESSION);
-		} else {
-		    /* Valid for current session only */
-		    s = HTCacheWriterCreate(0, NullOptr,
-					    @self->HTSI_request,
-					    HTCACHE_SESSION);
-		}
-	    }
-	    @self->HTSI_target = HTMIMECreate(@self->HTSI_request, s);
+	    if (rptr->HTR_responseStatusCode == 200 && 
+		rptr->HTR_method == HTM_GET && 
+		HTCacheIsEnabled() &&
+		((s = HTCacheWriterCreate(HT_WWW_MIME, NullOptr,
+					  @self->HTSI_request)) != NULL))
+		@self->HTSI_target = HTTeeCreate(@self->HTSI_request,
+						 @self->HTSI_target,
+						 s, NULL);
+		
 	}
 
-@ifdef PRODUCT_RESPONDER
-	pself = ObjDeref(oself,0);
-@endif
 	if (!@self->HTSI_target) {
 	    MemThreadRelease(@self->HTSI_request);
-	    return HT_NO_CONTENT;
+	    return HT_OUT_OF_MEMORY;
 	}
 
     } else {
@@ -726,40 +687,25 @@ EC( ECCheckRequest(@self->HTSI_request);                               )
 	 * No HTTP headers, so its HTTP/0.9 response here. Try using
 	 * file extension (suffix), if not, use a guess stream.
 	 */
-	cptr = (char *) MemLock(rptr->HTR_uriString);
+	rptr = (HTRequest *) MemThreadGrab(@self->HTSI_request);
+	MemLock(rptr->HTR_uriString);
+
+	cptr = (char *) MemDeref(rptr->HTR_uriString);
 	cptr = strrchr(cptr, '.');
 	if (cptr) cptr++;
 
-	if (cptr) { /* Use suffix to create a stream */
-	    /* can't lock request when calling this routine */
-	    MemThreadRelease(@self->HTSI_request);
-@ifdef PRODUCT_RESPONDER
-	    pself = ObjDeref(oself,0);
-	    temp = HTSuffixCreate(cptr, @self->HTSI_request);
-	    pself = ObjDeref(oself,0);
-	    @self->HTSI_target = temp ;
-@else
-	@self->HTSI_target = HTSuffixCreate(cptr, @self->HTSI_request);
-@endif
-	    rptr = (HTRequest *) MemThreadGrab(@self->HTSI_request);
-	}
+	if (cptr) /* Use suffix to create a stream */
+	    @self->HTSI_target = HTSuffixCreate(cptr, @self->HTSI_request);
 
 	MemUnlock(rptr->HTR_uriString);
-@ifdef PRODUCT_RESPONDER
-	pself = ObjDeref(oself,0);
-@endif
+	MemThreadRelease(@self->HTSI_request);
 
 	/*
 	 * If client does not provide a parser, 
 	 * we need a guess stream. The output stream stack is as
 	 * follows: HTSocket --> HTTP --> HTGuess.
 	 */
-@ifdef PRODUCT_RESPONDER
-	pself = ObjDeref(oself,0);
-@endif
-	if (!@self->HTSI_target) {
-	    /* Can't lock request when calling these routines */
-	    MemThreadRelease(@self->HTSI_request);
+	if (!@self->HTSI_target)
 	    if ((@self->HTSI_target = 
 		 HTTPUseClientHeaderParser(@self->HTSI_request)) == NULL)
 		@self->HTSI_target = 
@@ -768,15 +714,11 @@ EC( ECCheckRequest(@self->HTSI_request);                               )
 					@self->HTSI_target,
 					@self->HTSI_request,
 					FALSE);
-	    rptr = (HTRequest *) MemThreadGrab(@self->HTSI_request);
-	}
 
     }
-@ifdef PRODUCT_RESPONDER
-	pself = ObjDeref(oself,0);
-@endif
-    @self->HTSI_transparent = TRUE;
 
+    @self->HTSI_transparent = TRUE;
+    
     /*
      * Passing pointer here, make sure HTTPNextState don't change
      * the resource of this object.
@@ -786,9 +728,6 @@ EC( ECCheckRequest(@self->HTSI_request);                               )
 		      rptr->HTR_responseStatusCode, 
 		      @self->HTTPI_buffer+@self->HTTPI_reason);
     
-@ifdef PRODUCT_RESPONDER
-	pself = ObjDeref(oself,0);
-@endif
     MemThreadRelease(@self->HTSI_request);
 
     return HT_OK;
@@ -811,14 +750,12 @@ EC( ECCheckRequest(@self->HTSI_request);                               )
  *                    proceed.
  *                  - return value from target stream. If all is well,
  *                    its HT_OK.
- *                  - return HT_HEADER_DONE if we have parsed out
- *                    HTTP status-line header.
  * SIDE EFFECTS:    
  *
  * STRATEGY:        Parses the http header for HTTP status-line, general 
  *                  headers, and response headers.
  *
- *                  If it is a HTTP/0.9 response, there are no headers. 
+ *                  If it is a HTTP/0.9 response, there are headers. 
  *                  (1) If there is a filename in the URL, use the file
  *                      extension to determine the entity.
  *                  (2) If no file extension, then use a guess stream.
@@ -831,71 +768,42 @@ EC( ECCheckRequest(@self->HTSI_request);                               )
  ***********************************************************************/
 @method HTTPClass, MSG_HT_STREAM_PUT_BLOCK
 {
-    int l = (int) len, status = HT_OK;
-
     if (!data || !len) return HT_OK;
 
-@ifdef PRODUCT_RESPONDER
-	pself = ObjDeref(oself,0);
-@endif
-    if (@self->HTSI_transparent) 
-	return PUTBLOCK(@self->HTSI_target, data, len);
-
-    while (!@self->HTSI_transparent && l-- > 0) {
+    while (!@self->HTSI_transparent && len-- > 0) {
+	int status;
 
 	*(@self->HTTPI_buffer+@self->HTTPI_bufferLength++) = *data;
 	if (@self->HTTPI_parseState == EOL_FCR) {
 	    if (*data == LF) {	/* Line found */
 		if ((status = @call oself::MSG_HTTP_STREAM_PIPE())
-		    == HT_OK) {
-		    status = HT_HEADER_DONE;
-		}
+		    != HT_OK)
+		    return status;
 		
 	    } else {
 		@self->HTTPI_parseState = EOL_BEGIN;
 	    }
 
 	} else if (*data == CR) {
-
 	    @self->HTTPI_parseState = EOL_FCR;
 
 	} else if (*data == LF) {
 	    if ((status = @call oself::MSG_HTTP_STREAM_PIPE())
-		== HT_OK) {
-		status = HT_HEADER_DONE;
-	    }
+		!= HT_OK)
+		return status;
 
 	} else {
 	    if (@self->HTTPI_bufferLength >= HTTP_MAX_STATUS_LENGTH) {
 		if ((status = @call oself::MSG_HTTP_STREAM_PIPE())
-		    == HT_OK) {
-		    status = HT_HEADER_DONE;
-		}
+		    != HT_OK)
+		    return status;
 	    }
 	}
 	data++;
     }
 
-
-    /* 
-     * Buffer the leftover data while MSG_HT_PROTOCOL_LOAD tries
-     * to decide the next action in state HTTP_CHECK_RESPONSE.
-     * If necessary, buffered data is flushed using MSG_HT_STREAM_FLUSH.
-     */
-    if (l > 0) {
-	byte *b;
-
-EC(     if (@self->HTTPI_data) EC_ERROR(HTTP_DATA_NOT_FLUSHED);          )
-        if (@self->HTTPI_data) HTMemFree(@self->HTTPI_data);
-
-	@self->HTTPI_len = l;
-	@self->HTTPI_data = HTMemAlloc(l+1);
-	if (!@self->HTTPI_data) return HT_OUT_OF_MEMORY;
-	b = (byte *) HTMemLock(@self->HTTPI_data);
-	memcpy(b, data, l);
-	HTMemUnlock(@self->HTTPI_data);
-    }
-    return status;
+    if (len > 0) return PUTBLOCK(@self->HTSI_target, data, len);
+    return HT_OK;
 
 }	/* End of MSG_HT_STREAM_PUT_BLOCK.	*/
 
@@ -907,7 +815,7 @@ EC(     if (@self->HTTPI_data) EC_ERROR(HTTP_DATA_NOT_FLUSHED);          )
  ***********************************************************************
  * SYNOPSIS:	    Load data object. This is a state-based implementation
  *		    of the HTTP protocol. 
- * PARAMETERS:	    int (HTNetThread *net)
+ * PARAMETERS:	    int (int status)
  *                  - return HT_OK if all is well and want to be 
  *                    rescheduled.
  *                  - return HT_ASYNCH_LOAD if HTTP is going into asynch
@@ -921,8 +829,6 @@ EC(     if (@self->HTTPI_data) EC_ERROR(HTTP_DATA_NOT_FLUSHED);          )
  *                    proxy name is bad.
  *                  - return HT_LINK_FAILED if some hardware or configuration
  *                    prevents use of socket.
- *                  - return HT_KILL_AND_RESUBMIT_INTERNALLY if the request
- *                    were to be resubmitted internally.
  *                  - return HT_ERROR if an unrecoverable has occurred.
  * SIDE EFFECTS:    
  * STRATEGY:	    Implement the HTTP protocol in a state-based fashion. 
@@ -944,12 +850,11 @@ EC(     if (@self->HTTPI_data) EC_ERROR(HTTP_DATA_NOT_FLUSHED);          )
  ***********************************************************************/
 @method HTTPClass, MSG_HT_PROTOCOL_LOAD
 {
-#define MYRETURN(code) {if (code!=HT_OK && code!=HT_LOADED)\
-			    {net->HTNT_persistent=FALSE;\
-				 return code;}\
-                        else return code;}
     int ret;
+    HTStreamHandle stream;
     HTRequest *rptr;
+    GeodeHandle clientGeodeHandle;
+    Boolean genEndHeader, reqEndHeader, entityEndHeader;
 
 EC( if (@self->HTSI_request == NULL) EC_ERROR(HTTP_REQUEST_NOT_SET);    )
 
@@ -957,92 +862,87 @@ EC( if (@self->HTSI_request == NULL) EC_ERROR(HTTP_REQUEST_NOT_SET);    )
      * Now jump into the machine. We know the state from the previous run.
      * This is one big switch loop.
      */
+    if (status != HT_OK) 
+	@self->HTTPI_currentState = status;
+
     while (1) {
-@ifdef PRODUCT_RESPONDER
-	pself = ObjDeref(oself,0);
-@endif
 	switch (@self->HTTPI_currentState) {
 
 	case HTTP_BEGIN:
-	    {
-		HTStreamHandle stream;
 
-		/* Create and initialize a HTStreamSocket */
-                stream = HTStreamSocketCreate(@self->HTSI_request);
+	    /* Inform client what we are doing with the request. */
+	    ret = HTNetReportProgress(@self->HTSI_request, 
+				      HT_RESOLVING_HOST);
+	    if (ret != HT_OK) return ret;
+	    
+	    /* Create and initialize a HTSocket */
+	    ret = HTSocketCreate(@self->HTSI_request, &stream);
+	    @self->HTPI_socket = stream;
+	    if (ret == HT_WOULD_BLOCK) return HT_OK; /* Continue on. */
+	    if (ret != HT_OK) return ret;
 
-@ifdef PRODUCT_RESPONDER
-	pself = ObjDeref(oself,0);
-@endif	
-                @self->HTPI_streamSocket = stream;
-		if (!@self->HTPI_streamSocket) {
-		    MYRETURN(HT_OUT_OF_MEMORY);
-		}
+	    rptr = (HTRequest *) MemThreadGrab(@self->HTSI_request);
+	    if (ret == HT_OK) {
 
-		if (net->HTNT_persistent) {
-		    @self->HTTPI_currentState = HTTP_PERSISTENT_BEGIN;
-		} else {
-		    @self->HTTPI_currentState = HTTP_NONPERSISTENT_BEGIN;
-		} 
-	    }
-	    break;
+		rptr->HTR_sockfd = @call @self->HTPI_socket::
+		    MSG_HT_SOCKET_GET_DESCRIPTOR();
 
-	case HTTP_PERSISTENT_BEGIN:
-	    {
-		/* Make sure the socket is still connected */
-@ifdef PRODUCT_RESPONDER
-	pself = ObjDeref(oself,0);
-@endif
-		@call @self->HTPI_streamSocket::
-		    MSG_HTSOCKET_INITIALIZE(net->HTNT_socket);
-
-@ifdef PRODUCT_RESPONDER
-	pself = ObjDeref(oself,0);
-@endif
-		if (HTSocketIsConnected(net->HTNT_socket) == HT_OK) {
-		    @self->HTTPI_currentState = HTTP_NEED_REQUEST;
-		} else {
-		    /* Must close socket before reconnect */
-		    HTSocketClose(net->HTNT_socket);
-		    HTNetSetPersistent(net, FALSE);
-		    @self->HTTPI_currentState = HTTP_NEED_CONNECTION;
-		}
-	    }
-	    break;
-
-	case HTTP_NONPERSISTENT_BEGIN:
-	    {
-		/* SSL stuff */
-#ifdef SSL_ENABLE
-		Boolean secure;
-		rptr = (HTRequest *) MemThreadGrab(@self->HTSI_request);
-		secure = (strncmp(MemLock(rptr->HTR_uriString), "https:", 6) == 0);
-		MemUnlock(rptr->HTR_uriString);
-		MemThreadRelease(@self->HTSI_request);
-#endif
-		/* Create and initialize a HTStreamSocket */
-#ifdef SSL_ENABLE
-		net->HTNT_socket = HTSocketCreate(net, secure);
-#else
-		net->HTNT_socket = HTSocketCreate(net);
-#endif
-		if (!net->HTNT_socket) {
-		    MYRETURN(HT_OUT_OF_MEMORY);
-		}
-
-		/* Initialize the stream socket to handle a HTSocket */
-@ifdef PRODUCT_RESPONDER
-	pself = ObjDeref(oself,0);
-@endif
-		@call @self->HTPI_streamSocket::
-		    MSG_HTSOCKET_INITIALIZE(net->HTNT_socket);
-
-@ifdef PRODUCT_RESPONDER
-	pself = ObjDeref(oself,0);
-@endif
-                @self->HTTPI_currentState = HTTP_NEED_CONNECTION;
 	    }
 
-	    break;
+	    /* Decide on who is suppose to end the headers. Headers
+	     * are ended using a line with only CRLF. Only one of
+	     * the following booleans is TRUE.
+	     */
+	    genEndHeader = FALSE;
+	    reqEndHeader = (!rptr->HTR_postCallback && !rptr->HTR_source);
+	    entityEndHeader = (!rptr->HTR_postCallback && rptr->HTR_source);
+
+	    MemThreadRelease(@self->HTSI_request);
+
+	    /* 
+	     * HTSocket is the FIRST stream object in both input and 
+	     * output stream stacks; it is used for reading by input 
+	     * stream stack and for writing by output stream stack.
+	     */
+	    HTStreamGrowInputStreamStack(@self->HTSI_request,
+					 @self->HTPI_socket);
+
+	    /*
+	     * Create HTTP general headers generator, HTTP request
+	     * headers generator, and HTTP entity headers and bind it to 
+	     * the input stream stack.
+	     *
+	     * HTSocket <-- HTTPGen (general headers)  
+	     *   <-- HTTPReq (request headers) 
+	     *   <-- HTMIMERq (entity headers)
+	     */
+
+	    /*
+	     * stream = HTTPGenNew(@self->HTSI_request, genEndHeader);
+	     * if (!stream) return HT_OUT_OF_MEMORY;
+	     * HTStreamGrowInputStreamStack(@self->HTSI_request, stream);
+	     */
+
+	    stream = HTTPReqNew(@self->HTSI_request, reqEndHeader);
+	    if (!stream) return HT_OUT_OF_MEMORY;
+	    HTStreamGrowInputStreamStack(@self->HTSI_request, stream);
+	    
+	    if (entityEndHeader) {
+		stream = HTMIMERqNew(@self->HTSI_request, entityEndHeader);
+		if (!stream) return HT_OUT_OF_MEMORY;
+		HTStreamGrowInputStreamStack(@self->HTSI_request, stream);
+	    }
+
+	    /* 
+	     * HTTP is the second stream object in the output stream pipe.
+	     * The output stream stack is now as follows:
+	     *
+	     * HTSocket --> HTTP.
+	     */
+	    @call @self->HTPI_socket::MSG_HT_STREAM_SET_TARGET(oself);
+
+	    @self->HTTPI_currentState = HTTP_NEED_CONNECTION;
+	    return HT_OK;
 
 	case HTTP_NEED_CONNECTION:
 	    /* 
@@ -1052,450 +952,136 @@ EC( if (@self->HTSI_request == NULL) EC_ERROR(HTTP_REQUEST_NOT_SET);    )
 	    {
 		HTSocketAddress address;
 
-@ifdef PRODUCT_RESPONDER
-	pself = ObjDeref(oself,0);
-@endif
 		HTTPGetAddress(@self->HTSI_request, &address);
 
-		/* Inform client what we are going to do next. */
-@ifdef PRODUCT_RESPONDER
-	pself = ObjDeref(oself,0);
-@endif
-		if (HTSocketResolveAndConnect(net->HTNT_socket, 
-					      &address) == HT_OK) {
-@ifdef PRODUCT_RESPONDER
-	pself = ObjDeref(oself,0);
-@endif
-		    @self->HTTPI_currentState = HTTP_NEED_REQUEST;
+		rptr = (HTRequest *) MemThreadGrab(@self->HTSI_request);
+		clientGeodeHandle = rptr->HTR_clientGeodeHandle;
+		MemThreadRelease(@self->HTSI_request);
+
+		if ((ret = @call @self->HTPI_socket::
+		     MSG_HT_SOCKET_RESOLVE_AND_CONNECT(&address,
+				clientGeodeHandle, NULL)) == HT_OK) {
+		    @self->HTTPI_currentState = HTTP_CHECK_CONNECTION;
 
 		} else {
 		    /* 
 		     * If we failed to connect, retry? Let's make it
 		     * simple here...
 		     */
-		    MYRETURN(HTSocketState(net->HTNT_socket));
+		    return HT_SOCKET_ERROR;
 		}
 	    }
 
-	    break;
+	    /* Inform client what we are going to do next. */
+	    ret = HTNetReportProgress(@self->HTSI_request, 
+				      HT_CONNECTING_TO_SERVER);
+	    if (ret != HT_OK) return ret;
+
+	    return HT_OK;
+
+	case HTTP_CHECK_CONNECTION:
+	    /* 
+	     * Need to check these states: resolving, cannot_resolve,
+	     * resolved, connecting, cannot_connect, connected.
+	     */
+	    ret = @call @self->HTPI_socket::MSG_HT_SOCKET_GET_STATE();
+
+	    if (ret == HT_OK)
+		@self->HTTPI_currentState = HTTP_NEED_REQUEST;
+
+	    else if (ret == HT_CANNOT_CONNECT ||
+		     ret == HT_LINK_FAILED ||
+		     ret == HT_CANNOT_RESOLVE_HOST_NAME ||
+		     ret == HT_INTERRUPTED)
+		return ret;
+
+	    else if ((ret == HT_RESOLVING_HOST) ||
+		     (ret == HT_CONNECTING_TO_SERVER)) {
+		/* Check again later. */
+		return HT_OK;
+
+	    } else {
+EC (        	EC_ERROR(HTTP_STATE_NOT_HANDLED);                       )
+	    }
+
+	    return HT_OK;
 
 	case HTTP_NEED_REQUEST:
-	    {
-		Boolean reqEndHeader, entityEndHeader;
-		HTStreamHandle stream;
-
-		/* 
-		 * Decide on who is suppose to end the headers. Headers
-		 * are ended using a line with only CRLF. Only one of
-		 * the following booleans is TRUE.
-		 */
-@ifdef PRODUCT_RESPONDER
-	pself = ObjDeref(oself,0);
-@endif
-		rptr = (HTRequest *) MemThreadGrab(@self->HTSI_request);
-
-		reqEndHeader = (!rptr->HTR_postCallback && !rptr->HTR_data);
-		entityEndHeader = (!rptr->HTR_postCallback && rptr->HTR_data);
-
-@ifdef PRODUCT_RESPONDER
-	pself = ObjDeref(oself,0);
-@endif
-		MemThreadRelease(@self->HTSI_request);
-
-		/* 
-		 * HTSocket is the FIRST stream object in both input and 
-		 * output stream stacks; it is used for reading by input 
-		 * stream stack and for writing by output stream stack.
-		 */
-@ifdef PRODUCT_RESPONDER
-	pself = ObjDeref(oself,0);
-@endif
-		HTStreamGrowInputStreamStack(@self->HTSI_request,
-					     @self->HTPI_streamSocket);
-
-		/*
-		 * Create HTTP general headers generator, HTTP request
-		 * headers generator, and HTTP entity headers and bind it to 
-		 * the input stream stack.
-		 *
-		 * HTSocket <-- HTTPGen (general headers)  
-		 *   <-- HTTPReq (request headers) 
-		 *   <-- HTMIMERq (entity headers)
-		 */
-
-		/*
-		 * stream = HTTPGenNew(@self->HTSI_request, genEndHeader);
-		 * if (!stream) MYRETURN(HT_OUT_OF_MEMORY);
-		 * HTStreamGrowInputStreamStack(@self->HTSI_request, stream);
-		 */
-		
-@ifdef PRODUCT_RESPONDER
-	pself = ObjDeref(oself,0);
-@endif
-		stream = HTTPReqNew(net, reqEndHeader);
-		if (!stream) {
-		    MYRETURN(HT_OUT_OF_MEMORY);
-		}
-@ifdef PRODUCT_RESPONDER
-	pself = ObjDeref(oself,0);
-@endif
-		HTStreamGrowInputStreamStack(@self->HTSI_request, stream);
+	    /*
+	     * Push request data to the network using the input stream stack.
+	     */
+	    if ((ret = HTTPPushRequest(@self->HTSI_request)) != HT_OK)
+		return ret;
 	    
-		if (entityEndHeader) {
-@ifdef PRODUCT_RESPONDER
-	pself = ObjDeref(oself,0);
-@endif
-		    stream = HTMIMERqNew(@self->HTSI_request, entityEndHeader);
-		    if (!stream) {
-			MYRETURN(HT_OUT_OF_MEMORY);
-		    }
-@ifdef PRODUCT_RESPONDER
-	pself = ObjDeref(oself,0);
-@endif
-		    HTStreamGrowInputStreamStack(@self->HTSI_request, stream);
-		}
+	    @self->HTTPI_currentState = HTTP_CHECK_RESPONSE;
+	    @self->HTTPI_parseState = EOL_BEGIN;
 
-		/*
-		 * Push request data to network using the input stream stack.
-		 */
-@ifdef PRODUCT_RESPONDER
-	pself = ObjDeref(oself,0);
-@endif
-                if ((ret = HTTPPushRequest(@self->HTSI_request)) != HT_OK) {
-		    MYRETURN(ret);
-		}
-	    
-@ifdef PRODUCT_RESPONDER
-	pself = ObjDeref(oself,0);
-@endif
-	        @self->HTTPI_currentState = HTTP_CHECK_RESPONSE;
-@ifdef PRODUCT_RESPONDER
-	pself = ObjDeref(oself,0);
-@endif
-	        @self->HTTPI_parseState = EOL_BEGIN;
+	    /* Inform client what we are going to do next. */
+	    ret = HTNetReportProgress(@self->HTSI_request, 
+				      HT_WAITING_FOR_REPLY);
+	    if (ret != HT_OK) return ret;
 
-		/* Inform client what we are going to do next. */
-@ifdef PRODUCT_RESPONDER
-	pself = ObjDeref(oself,0);
-@endif
-	        ret = HTNetReportProgress(@self->HTSI_request, 
-					  HT_WAITING_FOR_REPLY);
-	        if (ret != HT_OK) {
-		    MYRETURN(ret);
-		}
-	    }
-	    break;
+	    return HT_OK;
 
 	case HTTP_CHECK_RESPONSE:
-	    /* 
-	     * Push data from network using the output stream stack until
-	     * we have enough info to decide what to do next (i.e., the 
-	     * next state). Check response buffers data which, if needed,
-	     * must be flushed before we continue to push data from socket.
-	     * htSocket -> HTTP.
-	     */
-	    if (!HTSocketRecv(net->HTNT_socket, 60)) {
-		ret = HTSocketState(net->HTNT_socket);
-		if (ret != HT_OK) {
-		    MYRETURN(ret);
-		}
-		break;
-	    }
-
 	    /*
-	     * Inspect response header and then set next state. Also buffers
-	     * data here!
+	     * Inform client we are loading data.
 	     */
-	    ret = HTSocketPush(oself, net->HTNT_socket);
-	    /* Done parsing HTTP status line ? */
-	    if (ret == HT_HEADER_DONE) {
-@ifdef PRODUCT_RESPONDER
-                pself = ObjDeref(oself,0);
-@endif
-	        @self->HTTPI_currentState = @self->HTTPI_nextState;
-            } else if (ret != HT_OK) {
-		MYRETURN(ret);
-	    }
-	    break;
+	    ret = HTNetReportProgress(@self->HTSI_request, 
+				      HT_LOADING_DATA);
+	    if (ret != HT_OK) return ret;
 
-	case HTTP_GOT_DATA:
+	    /* 
+	     * Push data from network using the output stream stack. 
+	     * MSG_HT_SOCKET_PUSH_DATA is an asynchronous call to 
+	     * push data to target.
+	     */
+	    @self->HTTPI_currentState = HTTP_LOAD_DATA;
+	    return @call @self->HTPI_socket::MSG_HT_SOCKET_PUSH();
+	    
+	case HTTP_LOAD_DATA:
 	    /*
 	     * Push data to target until there is no more data, or
-	     * some error occurs. Don't forget to flush buffered data.
+	     * some error occurs.
 	     */
-            /* 
-	     * We want to make sure that HT_LOADING_DATA is
-	     * called before flushing buffered data that would
-	     * end up creating client streams (like image/gif
-	     * converter). And if we flush data before calling
-	     * HT_LOADING_DATA, the UI tree would be created and 
-	     * later deleted when we call HT_LOADING_DATA, thus
-	     * no UI to display data!
-	     */
-@ifdef PRODUCT_RESPONDER
-	pself = ObjDeref(oself,0);
-@endif
-            ret = HTNetReportProgress(@self->HTSI_request, 
-				      HT_LOADING_DATA);
-	    if (ret != HT_OK) {
-		MYRETURN(ret);
-	    }
+	    ret = @call @self->HTPI_socket::MSG_HT_SOCKET_PUSH();
+	    /* If OK, maintain state to load more data */
+	    if (ret == HT_OK) {
+		ret = HTNetReportProgress(@self->HTSI_request, 
+					  HT_MORE_DATA);
+		if (ret != HT_OK) return ret;
 
-@ifdef PRODUCT_RESPONDER
-	pself = ObjDeref(oself,0);
-@endif
-	    ret = @call oself::MSG_HT_STREAM_FLUSH();
-	    if (ret != HT_OK) {
-		MYRETURN(ret);
-	    }
-		
-@ifdef PRODUCT_RESPONDER
-	pself = ObjDeref(oself,0);
-@endif
-	    @self->HTTPI_currentState = HTTP_STREAM_ALL_DATA;
-	    @self->HTTPI_streamDataRet = HT_OK;
+	    } else 
+		/* No more data to load, so move on */
+		@self->HTTPI_currentState = @self->HTTPI_nextState;
 
-	    break;
+	    return HT_OK;
 
+	case HTTP_GOT_DATA:
 	case HTTP_PERM_REDIRECT:
+	    /*
+	     * No more data, return loaded.
+	     */
+	    return HT_LOADED;
+
 	case HTTP_TEMP_REDIRECT:
 	    /*
 	     * Client should reissue the request where the 
 	     * submitted URL has been replaced with a new one.
-	     * The new URL is in MIME headers, so we need to 
-	     * flush buffered data to MIME to change that URL.
 	     */
-	    ret = @call oself::MSG_HT_STREAM_FLUSH();
-	    if (ret != HT_OK) {
-		Boolean redirected;
-		rptr = (HTRequest *) MemThreadGrab(@self->HTSI_request);
-		redirected = rptr->HTR_uriRedirected;
-		MemThreadRelease(@self->HTSI_request);
-		if (redirected) {
-		    MYRETURN(HT_DOCUMENT_MOVED);
-		} else {
-		    MYRETURN(ret);
-		}
-	    }
-@ifdef PRODUCT_RESPONDER
-	pself = ObjDeref(oself,0);
-@endif
-	    @self->HTTPI_currentState = HTTP_STREAM_ALL_DATA;
-	    @self->HTTPI_streamDataRet = HT_DOCUMENT_MOVED;
-	    break;
+	    return HT_DOCUMENT_MOVED;
 
 	case HTTP_AA:
-	    /*
-	     * Needs authorization from client.
-	     * First delete old authorization for this URL,
-	     * and then ask for a new one.
-	     */
-	    /* Actually, should I assume basic auth? */
-	    HTAASetBasicUserIDPassword(@self->HTSI_request, NULL, NULL);
-            ret = HTNetReportProgress(@self->HTSI_request, 
-				      HT_NEEDS_AA);
-	    
-	    if (ret == HT_OK) {
-		/* Try authenticating again */
-		MYRETURN(HT_KILL_AND_RESUBMIT_INTERNALLY);
-	    }
+	    return HT_UNAUTHORIZED;
 
-	    /* 
-	     * UNAUTHORIZED, but client needs whatever data is 
-	     * provided by the server (e.g., to show to the user).
-	     */
-            /* 
-	     * We want to make sure that HT_LOADING_DATA is
-	     * called before flushing buffered data that would
-	     * end up creating client streams (like image/gif
-	     * converter). And if we flush data before calling
-	     * HT_LOADING_DATA, the UI tree would be created and 
-	     * later deleted when we call HT_LOADING_DATA, thus
-	     * no UI to display data!
-	     */
-            ret = HTNetReportProgress(@self->HTSI_request, 
-				      HT_LOADING_DATA);
-	    if (ret != HT_OK) {
-		MYRETURN(ret);
-	    }
-
-@ifdef PRODUCT_RESPONDER
-	pself = ObjDeref(oself,0);
-@endif
-	    ret = @call oself::MSG_HT_STREAM_FLUSH();
-	    if (ret != HT_OK) {
-		MYRETURN(ret);
-	    }
-
-@ifdef PRODUCT_RESPONDER
-	pself = ObjDeref(oself,0);
-@endif
-	    @self->HTTPI_currentState = HTTP_STREAM_ALL_DATA;
-	    @self->HTTPI_streamDataRet = HT_UNAUTHORIZED;
-
-	    break;
-
-	case HTTP_PROXY_AUTH:
-@ifdef PRODUCT_RESPONDER
-	pself = ObjDeref(oself,0);
-@endif
-            /* 
-	     * We want to make sure that HT_LOADING_DATA is
-	     * called before flushing buffered data that would
-	     * end up creating client streams (like image/gif
-	     * converter). And if we flush data before calling
-	     * HT_LOADING_DATA, the UI tree would be created and 
-	     * later deleted when we call HT_LOADING_DATA, thus
-	     * no UI to display data!
-	     */
-            ret = HTNetReportProgress(@self->HTSI_request, 
-				      HT_LOADING_DATA);
-	    if (ret != HT_OK) {
-		MYRETURN(ret);
-	    }
-
-	    /* Load whatever error data is there for display */
-@ifdef PRODUCT_RESPONDER
-	pself = ObjDeref(oself,0);
-@endif
-	    ret = @call oself::MSG_HT_STREAM_FLUSH();
-	    if (ret != HT_OK) {
-		MYRETURN(ret);
-	    }
-
-@ifdef PRODUCT_RESPONDER
-	pself = ObjDeref(oself,0);
-@endif
-	    @self->HTTPI_currentState = HTTP_STREAM_ALL_DATA;
-	    @self->HTTPI_streamDataRet = HT_PROXY_UNAUTHORIZED;
-	    break;
-	    
-	case HTTP_NOT_MODIFIED:
-	    /* Use unmodified cached copy, do not force reload */
-	    rptr = (HTRequest *) MemThreadGrab(@self->HTSI_request);
-	    rptr->HTR_reloadMode = HTRELOAD_ANY_VERSION;
-	    HTAnchorSetHeaderDone(rptr->HTR_anchor);
-	    MemThreadRelease(@self->HTSI_request);
-	    MYRETURN(HT_KILL_AND_RESUBMIT_INTERNALLY);
-
-	case HTTP_ERROR: 
-@ifdef PRODUCT_RESPONDER
-	pself = ObjDeref(oself,0);
-@endif
-            /* 
-	     * We want to make sure that HT_LOADING_DATA is
-	     * called before flushing buffered data that would
-	     * end up creating client streams (like image/gif
-	     * converter). And if we flush data before calling
-	     * HT_LOADING_DATA, the UI tree would be created and 
-	     * later deleted when we call HT_LOADING_DATA, thus
-	     * no UI to display data!
-	     */
-            ret = HTNetReportProgress(@self->HTSI_request, 
-				      HT_LOADING_DATA);
-	    if (ret != HT_OK) {
-		MYRETURN(ret);
-	    }
-
-	    /* Load whatever error data is there for display */
-@ifdef PRODUCT_RESPONDER
-	pself = ObjDeref(oself,0);
-@endif
-	    ret = @call oself::MSG_HT_STREAM_FLUSH();
-	    if (ret != HT_OK) {
-		MYRETURN(ret);
-	    }
-
-@ifdef PRODUCT_RESPONDER
-	pself = ObjDeref(oself,0);
-@endif
-	    @self->HTTPI_currentState = HTTP_STREAM_ERROR_DATA;
-	    @self->HTTPI_streamDataRet = HT_LOADED;
-	    break;
-
-	case HTTP_STREAM_ALL_DATA:
-	    /*
-	     * The return code must be provided in @self->HTTPI_streamDataRet.
-	     * If it is HT_OK, then return code from streaming data is used.
-	     */
-	    if (HTSocketRecv(net->HTNT_socket, 60)) {
-		ret = HTSocketPush(oself, net->HTNT_socket);
-	    } else {
-		ret = HTSocketState(net->HTNT_socket);
-	    }
-
-	    if (ret != HT_OK) {
-@ifdef PRODUCT_RESPONDER
-	pself = ObjDeref(oself,0);
-@endif
-		if (@self->HTTPI_streamDataRet == HT_OK) {
-		    MYRETURN(ret);
-		} else if (@self->HTTPI_streamDataRet ==
-			   HT_DOCUMENT_MOVED) {
-		    Boolean redirected;
-		    rptr = (HTRequest *) MemThreadGrab(@self->HTSI_request);
-		    redirected = rptr->HTR_uriRedirected;
-		    MemThreadRelease(@self->HTSI_request);
-		    if (redirected) {
-			MYRETURN(HT_DOCUMENT_MOVED);
-		    } else {
-			MYRETURN(ret);
-		    }
-		} else {
-		    MYRETURN(@self->HTTPI_streamDataRet);
-		}
-	    }
-	    break;
-
-	case HTTP_STREAM_ERROR_DATA:
-	    /* 
-	     * If there is an entity-body, then the body data is streamed
-	     * to target, else generate error data from HTTP status line.
-	     */
-	    if (!HTSocketRecv(net->HTNT_socket, 60)) {
-		int state;
-		state = HTSocketState(net->HTNT_socket);
-		if (state == HT_LOADED) {
-		    /* If no entity body, generate an error message */
-		    HTRequest *rptr = MemThreadGrab(@self->HTSI_request);
-		    Boolean noBody = (rptr->HTR_bytesRead == 0 ? TRUE : FALSE);
-		    MemThreadRelease(@self->HTSI_request);
-
-		    if (noBody) {
-			char crlf2[] = {CR, LF, CR, LF, '\0'};
-			char str[128];
-			PUTBLOCK(oself, (byte*)crlf2, 4);  /* end headers */
-			strcpy(str, "<HTML>");
-			@self->HTTPI_buffer[@self->HTTPI_reason-1]=' ';
-			strncat(str, @self->HTTPI_buffer, 100);
-			strcat(str, "</HTML>");
-			PUTBLOCK(oself, (byte*)str, strlen(str));
-		    }
-		    MYRETURN(HT_LOADED);
-		} else {
-		    /* Come back later or done */
-		    MYRETURN(state);
-		}
-	    }
-
-	    ret = HTSocketPush(oself, net->HTNT_socket);
-	    if (ret != HT_OK) {
-@ifdef PRODUCT_RESPONDER
-	pself = ObjDeref(oself,0);
-@endif
-                MYRETURN(@self->HTTPI_streamDataRet);
-	    }
-	    MYRETURN(HT_OK);
-
-	case HTTP_NO_DATA:
-	    MYRETURN(HT_NO);
-	    break;
+	case HTTP_ERROR:
+	    return HT_ERROR;
 
 	default:
 
 EC(         EC_ERROR(HTTP_STATE_NOT_HANDLED);                           )
 
-	    MYRETURN(HT_ERROR);
+	    break;
 	}
     }
 }	/* End of MSG_HT_PROTOCOL_LOAD.	*/

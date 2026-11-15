@@ -1,0 +1,117 @@
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Geoworks 1996.  All rights reserved.
+	GEOWORKS CONFIDENTIAL
+
+PROJECT:	Geos WWW Library
+MODULE:		htfile
+FILE:		htfile.goh
+
+AUTHOR:		Kok Kin Kee, Sep 19, 1996
+
+ROUTINES:
+	Name			Description
+	----			-----------
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	kkee	9/19/96   	Initial version.
+
+DESCRIPTION:
+
+	HTFile protocol.
+
+	$Id: htfile.goh,v 1.4.8.1 97/09/05 10:10:34 jeremyb Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+
+@ifndef __HT_FILE_GOH__
+@define __HT_FILE_GOH__
+
+@deflib htfile
+
+@include <WWW/HTCore/htstream.goh>
+@include <WWW/HTCore/htreq.goh>
+#include <Ansi/stdio.h>                         /* FILE operations */
+
+/* --------------------------------------------------------------------------
+ * 		I. FREQUENTLY ASKED QUESTIONS - FAQ
+ * --------------------------------------------------------------------------*/
+
+/* --------------------------------------------------------------------------
+ * 		A. HTFile CLASS
+ * --------------------------------------------------------------------------*/
+
+/****************************************************************************
+
+  The HTFileClass is inherited from HTProtocolClass defined in htstream.goh.
+  We intercept all the methods in the class to implement the protocol. The most
+  important method is MSG_HT_PROTOCOL_LOAD. The method is implemented in a
+  finite-state machine manner, i.e., HTFile keeps track of its execution state
+  so that it knows where to resume execution when it is scheduled to run 
+  again. Scheduling a protocol is done in the Net Manager, see API 
+  HTNetNewClient in file htnet.goh{goc}.
+
+  All intercepted methods must return HT_ERROR or HT_OK, an integer value.
+
+ ****************************************************************************/
+
+/* --------------------------------------------------------------------------
+ * 		B. Register HTTP CLASS
+ * --------------------------------------------------------------------------*/
+
+/****************************************************************************
+
+  In order for the Library to be aware of the HTTP class so as to use it,
+  you need to register the class with the Library through the Policy
+  Manager using API HTPolicyAddProtocolHandler in htpolicy.goh{goc}. 
+  If you don't, the Library uses the default HTFile Library.
+  Whenever needed, the Library will instantiate an object of HTTP to handle
+  a HTTP request.
+
+ ****************************************************************************/
+
+/*
+ * HTFile states. Final states have negative value.
+ */
+typedef enum {
+    HTFILE_BEGIN                = 0,
+    HTFILE_READ
+} HTFileState;
+
+
+@class HTFileClass, HTProtocolClass;
+
+
+/* --------------------------------------------------------------------------
+ * 		Instance Data.
+ * --------------------------------------------------------------------------*/
+
+/*
+ * HTFile finite state machine info is kept by HTFI_currentState
+ */
+@instance HTFileState HTFI_currentState;
+
+/* 
+ * File pointer.
+ */
+@instance FileHandle HTFI_fileHandle;
+
+/*
+ * Buffer for reading data.
+ */
+@instance MemHandle HTFI_block;
+@instance char *HTFI_buffer;
+@instance Boolean HTFI_hasMIME;
+
+@ifdef PRODUCT_RESPONDER
+/* for Waiter demo only! to simulate the transmission time */
+@instance word WAITER_delayTime;	/* ticks */
+@endif
+
+@endc;
+
+
+@endif

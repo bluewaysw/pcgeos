@@ -20,7 +20,7 @@ REVISION HISTORY:
 DESCRIPTION:
 	URI Management.
 
-	$Id: hturi.goc,v 1.18.1.6 97/11/13 22:04:01 kkee Exp $
+	$Id: hturi.goc,v 1.1 97/04/07 11:48:57 newdeal Exp $
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
 
@@ -32,8 +32,7 @@ DESCRIPTION:
 
 #include <Ansi/string.h>
 #include <Ansi/stdlib.h>
-#include <Ansi/stdio.h>                /* sprintf */
-#include <Ansi/ctype.h>              
+
 
 /* --------------------------------------------------------------------------
  * 		PRIVATE DATA
@@ -51,63 +50,10 @@ typedef struct {
     char * anchor;
 } HTURI;
 
-static char uriEncodeTable[] = "0123456789ABCDEF";
-
-static struct {
-    StandardPath GSP_path;
-    char *GSP_str;
-} geosStdPath[] = {
-    {SP_PRIVATE_DATA, "SP_PRIVATE_DATA"},
-    {SP_USER_DATA,    "SP_USER_DATA"},
-    {0, 0}
-};
-
 
 /***********************************************************************
   		PRIVATE FUNCTIONS
 ***********************************************************************/
-
-
-/***********************************************************************
- *		GeosStandardPathMap
- ***********************************************************************
- *
- * SYNOPSIS:	Geos directory mappings. Cannot be ported to other
- *              platforms.
- * CALLED BY:	HTFileURIOpen
- * RETURN:	StandardPath, if path does not matche a Goes std path,
- *              returns SP_NOT_STANDARD_PATH.
- *	
- * STRATEGY:	
- *	
- * REVISION HISTORY:
- *	Name		Date		Description
- *	----		----		-----------
- *	kkee    	10/17/97   	Initial Revision
- *	
- ***********************************************************************/
-static StandardPath _pascal
-GeosStandardPathMap (const char *path)
-{
-    StandardPath ret = SP_NOT_STANDARD_PATH;
-    int i;
-
-    PUSHDS;
-    SET_DS_LIB_DGROUP;
-    for (i=0;;i++) {
-	if (!geosStdPath[i].GSP_str) {
-	    break;
-	}
-	if (!strncasecmp(geosStdPath[i].GSP_str, path, 
-			 strlen(geosStdPath[i].GSP_str))) {
-	    ret = geosStdPath[i].GSP_path;
-	    break;
-	}
-    }
-    POPDS;
-    return ret;
-}	/* End of GeosStandardPathMap.	*/
-
 
 
 /***********************************************************************
@@ -207,21 +153,22 @@ HTScanURI (char *name, HTURI *parts)
 	    parts->host = p+2;         /* host has been specified 	*/
 	    *p=0;	               /* Terminate access 		*/
 
-	    /* look for port number */
-	    p = parts->host;
-	    while(*p && *p != '/') {
-		if(*p == ':') {
-		    parts->port = p+1;
-		    *p=0;                  /* terminate host */
-		}
-		p ++;
+	    p=strchr(parts->host,':'); /* look for port number */
+	    
+	    if(p) {
+		parts->port = p+1;
+		*p=0;                  /* terminate host */
+		p=parts->port;
+	    } else
+		p=parts->host;
+		
+	    p=strchr(p,'/');           /* look for end of host or port if any */
+
+	    if(p) {
+	        *p=0;	        	/* terminate host or port */
+	        parts->absolute = p+1;	/* Root has been found */
 	    }
 
-	    if(*p == '/') {
-		*p = 0;	
-		parts->absolute = p+1;	/* Root found but no host */
-	    }
-	    
 	} else {
 	    parts->absolute = p+1;	/* Root found but no host */
 	}
@@ -280,7 +227,7 @@ HTCanonURI (char **filename, char *host)
 
     strptr = host;				    /* Convert to lower-case */
     while (strptr<path) {
-	*strptr = TOLOWER(*strptr);
+	*strptr = tolower(*strptr);
 	strptr++;
     }
     
@@ -343,161 +290,6 @@ HTCanonURI (char **filename, char *host)
 ***********************************************************************/
 
 
-/***********************************************************************
- *		HTENCODEFORURI
- ***********************************************************************
- *
- * SYNOPSIS:	Encode data so it is safe to be combined into a URI. Note
- *              that this API must not be called on a URI as that would
- *              encode reserved chars in the URI not meant to be encoded.
- * CALLED BY:	- data, to be encoded for inclusion in a URI.
- * RETURN:	HTMemHandle of encoded data, must be freed by caller.
- *              NULL if there is no data to encode.
- *	
- * STRATEGY:	Encoding is done according to RFC1738 which recommends
- *              encoding the following octets in their hex values preceded
- *              by %. 
- *               - No corresponding graphics US-ASCII.
- *                     octets 0x80-0xFF, 00-0x1F, and 0x7F.
- *               - Unsafe.
- *                     octets 0x20, "<", ">", """, "#", "%",
- *                     "{", "}", "|", "\", "^", "~", "[", "]", "`".
- *               - Reserved.
- *                     octets ";", "/", "?", ":", "@", "=", "&", "+".
- *               - What I think should also be encoded.
- *                     octets CRLF (or \n).
- *
- * REVISION HISTORY:
- *	Name		Date		Description
- *	----		----		-----------
- *	kkee    	5/ 2/97   	Initial Revision
- *	
- ***********************************************************************/
-HTMemHandle _far _pascal
-HTENCODEFORURI (const char *data)
-{
-    char *p;
-    word len=0;
-    HTMemHandle htmh;
-    
-    if (data && *data) 
-	/* Big enough if we were to encode all chars in data */
-	/* Content initialized to zero */
-	p = (char *) HTMemAllocAndLock(&htmh, strlen(data)*3+1);
-    else return NULL;
-    
-    PUSHDS;
-    SET_DS_LIB_DGROUP;
-
-    while (*data) {
-
-	if ((*data >= 0x80   && *data <= 0xFF)  || 
-	    (*data <= 0x20)  || (*data == 0x7F) ||
-	    (*data == '<')   || (*data == '>')  ||
-	    (*data == '\"')  || (*data == '#')  ||
-	    (*data == '%')   || (*data == '{')  ||
-	    (*data == '}')   || (*data == '|')  ||
-	    (*data == '\\')  || (*data == '^')  ||
-	    (*data == '~')   || (*data == '[')  ||
-	    (*data == ']')   || (*data == '`')  ||
-	    (*data == ';')   || (*data == '/')  ||
-	    (*data == '?')   || (*data == ':')  ||
-	    (*data == '@')   || (*data == '=')  ||
-	    (*data == '&')   || (*data == '+')  ||
-	    (*data == C_CR)  || (*data == C_LF)) {
-	    *p++ = '%';
-	    *p++ = uriEncodeTable[(byte)((*data & 0xF0) >> 4)];
-	    *p++ = uriEncodeTable[(byte)(*data & 0x0F)];
-	    len += 3;
-
-	} else {
-	    *p++ = *data;
-	    len++;
-	}
-
-	data++;
-    }
-
-    *p = 0;  /* Null-terminate encoded data. Actually *p is already NULL
-		from HTMemAllocAndLock which inits memory to 0 */
-
-    POPDS;
-
-    /* Resize to the exact length to save unused space */
-    HTMemUnlock(htmh);
-    return HTMemReAlloc(htmh, len+1);
-}	/* End of HTENCODEFORURI.	*/
-
-
-
-/***********************************************************************
- *		HTDECODEHEX
- ***********************************************************************
- *
- * SYNOPSIS:	Decode hex encoded data to octet.
- * CALLED BY:
- * RETURN:	Modifies and returns the passed in data. We can do that
- *              since hex decoded data is always shorter than hex encoded
- *              data. 
- *	
- * STRATEGY:	
- *	
- * REVISION HISTORY:
- *	Name		Date		Description
- *	----		----		-----------
- *	kkee    	5/ 2/97   	Initial Revision
- *	
- ***********************************************************************/
-char * _far _pascal
-HTDECODEHEX (char *data)
-{
-    char b;
-    char *p = data;        /* p points to data to decode */
-    char *q = data;        /* q points to decoded data */
-    
-    if (!data || !*data) return data;
-
-    while (*p) {
-	if (*p == '%') {
-	    if (*(p+1) && *(p+2)) {
-		b = TOUPPER(*(p+1));
-		if (b>='A' && b<='F')
-		    *q = ((b-'A')+10)*16;
-		else if (b>='0' && b<='9')
-		    *q = (b-'0')*16;
-		else return data; /* Error */
-
-		b = TOUPPER(*(p+2));
-		if (b>='A' && b<='F')
-		    *q += (b-'A')+10;
-		else if (b>='0' && b<='9')
-		    *q += (b-'0');
-		else return data; /* Error */
-		*q++; *q=0;       /* Null-terminate the result */
-		p += 3;
-
-	    } else {
-		*q = *p;
-		if (*(p+1)) {
-		    *(q+1) = *(p+1);
-		    *(q+2) = 0;  /* *(p+2) must be 0, see if condition */
-		} else {
-		    *(q+1) = 0;
-		}
-		break;
-	    }
-		
-	} else {
-	    *q++ = *p++;
-	    if (q != p) *q=0;
-	}
-    }
-
-    return data;
-}	/* End of HTDECODEHEX.	*/
-
-
-
 
 /***********************************************************************
  *		HTSIMPLIFYURI
@@ -553,7 +345,7 @@ HTSIMPLIFYURI (char **url)
 
 	char *newptr;
 	char *access = *url;
-	while (access<path && (*access=TOLOWER(*access)) != NULL) access++;
+	while (access<path && (*access=tolower(*access)) != NULL) access++;
 	path += 3;
 
 	while ((newptr = strstr(path, "://")) != NULL)        /* For proxies */
@@ -574,7 +366,7 @@ HTSIMPLIFYURI (char **url)
 	if (!ptr) ptr = path+5;
 
 	while (*ptr) {			    /* Make group or host lower case */
-	    *ptr = TOLOWER(*ptr);
+	    *ptr = tolower(*ptr);
 	    ptr++;
 	}
 
@@ -711,13 +503,7 @@ HTPARSEURI (const char *aName, const char *relatedName, word wanted)
     result = (char *) HTMemLock(memResult);
 
     strcpy(name, aName);
-    p = name;
-    while ((p=strchr(name, '\\'))!=NULL) 
-	*p = '/';                      /* DOS style */
     strcpy(rel, relatedName);
-    p = rel;
-    while ((p=strchr(rel, '\\'))!=NULL) 
-	*p = '/';                      /* DOS style */
 
     /* Modifies name and rel */
     HTScanURI(name, &given);
@@ -790,7 +576,7 @@ HTPARSEURI (const char *aName, const char *relatedName, word wanted)
     }
 		
     if (wanted & HTURI_PARSE_ANCHOR)
-	if(given.anchor) {
+	if(given.anchor || related.anchor) {
 	    if(given.absolute && given.anchor) {   /*Fixes for relURLs...*/
 		if(wanted & HTURI_PARSE_PUNCTUATION) strcat(result, "#");
 		strcat(result, given.anchor); 
@@ -798,7 +584,7 @@ HTPARSEURI (const char *aName, const char *relatedName, word wanted)
 		strcat(result, "");
 	    } else {
 		if(wanted & HTURI_PARSE_PUNCTUATION) strcat(result, "#");
-		strcat(result, given.anchor);
+		strcat(result, given.anchor ? given.anchor : related.anchor); 
 	    }
 	}
 
@@ -857,169 +643,3 @@ HTPARSEHTMEMHANDLEURI (const HTMemHandle aName,
 
 
 
-/***********************************************************************
- *		HTDEFAULTPORT
- ***********************************************************************
- *
- * SYNOPSIS:	Assign default port to a URL.
- * CALLED BY:	Client
- * RETURN:	Port number or -1 if there is no default.
- *	
- * STRATEGY:	
- *	
- * REVISION HISTORY:
- *	Name		Date		Description
- *	----		----		-----------
- *	kkee    	5/21/97   	Initial Revision
- *	
- ***********************************************************************/
-int _far _pascal
-HTDEFAULTPORT (const char *url)
-{
-    char *p;
-    int ret;
-
-    if (!url) return -1;
-    p = strchr(url, ':');
-    if (!p) return -1;
-    *p = 0;
-
-    PUSHDS;
-    SET_DS_LIB_DGROUP;
-    if (!strncasecmp(url, "http", 4))
-	ret = 80;
-    else if (!strncasecmp(url, "smtp", 4))
-	ret = 25;
-    else if (!strncasecmp(url, "imap", 4))
-	ret = 143;
-    else 
-	ret = -1;
-    POPDS;
-
-    *p = ':';         /* Must restore! */
-    return ret;
-}	/* End of HTDEFAULTPORT.	*/
-
-
-
-/***********************************************************************
- *		HTFILEURIOPEN
- ***********************************************************************
- *
- * SYNOPSIS:	Open a file URL.
- * CALLED BY:	Client
- * RETURN:	FileHandle if open, else NULL.
- *	
- * STRATEGY:	
- *	
- * REVISION HISTORY:
- *	Name		Date		Description
- *	----		----		-----------
- *	kkee    	8/15/97   	Initial Revision
- *	
- ***********************************************************************/
-FileHandle _far _pascal
-HTFILEURIOPEN (const char *url)
-{
-    char *cptr;
-    FileHandle fileHandle = NULL;
-    HTMemHandle temp;
-    int maxlen = 2*strlen(url);
-    char *buffer = HTMemAllocAndLock(&temp, maxlen);
-
-    PUSHDS;
-    SET_DS_LIB_DGROUP;
-
-    /* 
-     * Get fullpath filename & try to open it.
-     */
-    cptr = strcasestr(url, "file://");
-
-    if (cptr && cptr+7) 
-	strncpy(buffer, cptr+7, maxlen);
-    else 
-	*buffer = 0;
-
-    while ((cptr=strchr(buffer, '/'))!=NULL) 
-	*cptr = '\\';                      /* DOS style */
-
-    /* 
-     * Attempt to open file. We try the following options.
-     * if "/f:/pene.ec/file.htm", try "f:/pene.ec/file.htm".
-     * if "SP_PRIVATE_DATA/dir/filename, try dir/filename
-     *    relative to SP_PRIVATE directory.
-     * if "f:/pene.ec/file.htm" try as is.
-     * if "/document/file.htm" try "document/file.htm" 
-     *                  relative to SP_TOP.
-     * if "document/file.htm" try relative to SP_TOP.
-     */
-
-    /* Always assume relative to SP_TOP directory */
-    FilePushDir();
-    FileSetStandardPath(SP_TOP);
-
-    if (buffer[0] == '\\') {
-	/* Absolute directory */
-	fileHandle = FileOpen(buffer+1, FILE_DENY_W | FILE_ACCESS_R);
-
-	/* 
-	 * If failed, check for Geos std directories, such
-	 * as file:///SP_PRIVATE_DATA/dir/filename
-	 */
-	if (!fileHandle && ((cptr = strchr(buffer+1, '\\')) != NULL)) {
-	    StandardPath ret;
-	    *cptr = 0;
-	    ret = GeosStandardPathMap(buffer+1);
-	    if (ret != SP_NOT_STANDARD_PATH) {
-		FilePushDir();
-		FileSetStandardPath(ret);
-		fileHandle = FileOpen(cptr+1, FILE_DENY_W | FILE_ACCESS_R);
-		FilePopDir();
-	    }
-	    *cptr = '\\'; /* Restore */
-	}
-	
-	/* 
-	 * If failed, see if we have a file://localhost/ as 
-	 * specified by RFC1738.
-	 */
-	if (!fileHandle && !strncasecmp(buffer, "\\localhost\\", 11)) {
-	    fileHandle = FileOpen(buffer+11, FILE_DENY_W | FILE_ACCESS_R);
-	}
-		
-    } else {
-	fileHandle = FileOpen(buffer, FILE_DENY_W | FILE_ACCESS_R);
-
-	/* If failed, try "f/filename" with "f:/filename" */
-	if (!fileHandle && buffer[1]=='\\') {
-	    HTMemHandle abs;
-	    char *c = (char *) HTMemAllocAndLock(&abs, strlen(buffer)+2);
-	    *c = buffer[0];
-	    *(c+1) = ':';
-	    strcpy(c+2, buffer+1);
-	    fileHandle = FileOpen(c, FILE_DENY_W | FILE_ACCESS_R);
-	    HTMemUnlockAndFree(abs);
-	}
-
-	/* If failed, try Geos std directories, such as 
-	 * file://SP_TOP/dir/filename.
-	 */
-	if (!fileHandle && ((cptr = strchr(buffer, '\\')) != NULL)) {
-	    StandardPath ret;
-	    *cptr = 0;
-	    ret = GeosStandardPathMap(buffer);
-	    if (ret != SP_NOT_STANDARD_PATH) {
-		FilePushDir();
-		FileSetStandardPath(ret);
-		fileHandle = FileOpen(cptr+1, FILE_DENY_W | FILE_ACCESS_R);
-		FilePopDir();
-	    }
-	    *cptr = '\\';  /* Restore */
-	}
-    }
-
-    FilePopDir();
-    HTMemUnlockAndFree(temp);
-    POPDS;
-    return fileHandle;
-}	/* End of HTFILEURIOPEN.	*/

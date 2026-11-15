@@ -24,7 +24,7 @@ DESCRIPTION:
 	It simulates flat memory model. There is no need for memory
 	deferencing once a HTMemHandle is lock.
 
-	$Id: htmem.goc,v 1.14.2.7 97/10/06 12:48:43 kkee Exp $
+	$Id: htmem.goc,v 1.1 97/04/07 11:49:46 newdeal Exp $
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
 @include <stdapp.goh>
@@ -36,19 +36,12 @@ DESCRIPTION:
 #include <Ansi/string.h>              /* memcpy */
 #include "htfatals.h"
 
-#ifdef __HIGHC__
-#pragma Code ("HTMEMCODE");
-#endif
-#ifdef __BORLANDC__
-#pragma codeseg HTMEMCODE
-#endif
-
 /* 
  * Memory low limits. These limits are checked in HTMemoryLimit and
  * enforced by all HTMemory APIs.
  */
 #define HTMEMORY_HEAP_LOW_LIMIT        20000         /* in bytes */
-#define HTMEMORY_SWAP_LOW_LIMIT        50000         /* in bytes */
+#define HTMEMORY_SWAP_LOW_LIMIT        10000         /* in bytes */
 
 
 /* Macros to access library dgroup */
@@ -76,6 +69,22 @@ DESCRIPTION:
 
 #endif
 
+#ifdef __WATCOMC__
+
+#ifndef PUSHDS
+void _PUSHDS(void);
+#pragma aux _PUSHDS = "push ds";
+#define PUSHDS  _PUSHDS()
+#endif
+
+#ifndef POPDS
+void _POPDS(void);
+#pragma aux _POPDS = "pop ds";
+#define POPDS   _POPDS()
+#endif
+
+#endif
+
 #ifndef SET_DS_LIB_DGROUP
 #define SET_DS_LIB_DGROUP GeodeLoadDGroup (GeodeGetCodeProcessHandle())
                                 /* destroys ds! */
@@ -91,9 +100,8 @@ Warnings    htmemWarnings;
 /* the data struct for the list */
 typedef struct {
     MemHandle          HTMS_memHandle;	/* LMem block handle */
-    word               HTMS_id;         /* for APIs ending with ...WID */
     SemaphoreHandle    HTMS_sem;
-    word	       HTMS_count;      /* number of HTMemories in this block */
+    word	       HTMS_count;
 } HTMemStruct;
 
 /* use chunk array to implement the list */
@@ -105,255 +113,7 @@ static MemHandle   ListMemHandle = NullHandle;
 static word ecPeakNum = 0;	/* the max number of blocks we allocated */
 #endif
 
-/* tally amount of memory allocated using HTMem */
-static dword htMemAllocated = 0;
-
-static word _pascal HTMemID (HTMemHandle htmh);
-static void * _pascal
-    HTMemAllocAndLockLow (word id, HTMemHandle *htmh, word size);
 static void _pascal HTMemFreeLow (HTMemHandle htmh, Boolean unlock);
-static HTMemHandle _pascal
-    HTMemReallocLow (word id, HTMemHandle htmh, word size);
-
-
-/***********************************************************************
- *		HTMemID
- ***********************************************************************
- *
- * SYNOPSIS:	Find the ID of a HTMemory.
- * CALLED BY:	EC code.
- * RETURN:	word.
- *	
- * STRATEGY:	
- *	
- * REVISION HISTORY:
- *	Name		Date		Description
- *	----		----		-----------
- *	kkee    	9/11/97   	Initial Revision
- *	
- ***********************************************************************/
-static word _pascal
-HTMemID (HTMemHandle htmh)
-{
-    HTMemStruct *mb;
-    int i, count;
-    word sz;
-    MemHandle mh = OptrToHandle(htmh);
-    word ret = 0;
-
-    PUSHDS;
-    SET_DS_LIB_DGROUP;
-    ECCheckMemHandle(ListMemHandle);
-
-    MemPLock(ListMemHandle);
-    count = ChunkArrayGetCountHandles(ListMemHandle, ListChunkHandle);
-    
-    for(i=0; i<count; i++) {
-	mb = ChunkArrayElementToPtrHandles(ListMemHandle,
-					ListChunkHandle, i, &sz);
-	if (mb->HTMS_memHandle == mh) {
-	    /* Found the block */
-	    ret = mb->HTMS_id;
-	    break;
-	}
-    }
-
-    MemUnlockV(ListMemHandle);
-
-    POPDS;
-
-    return ret;
-}	/* End of HTMemID.	*/
-
-
-
-/***********************************************************************
- *		HTMemAllocAndLockLow
- ***********************************************************************
- *
- * SYNOPSIS:	Internal routine for allocating and locking. 
- * CALLED BY:	HTMemAllocAndLock, HTMemAlloc, HTMemAllocWID
- * RETURN:	
- *	
- * STRATEGY:	We assign an ID to each allocated block. Blocks with
- *              different IDs are not shared when allocation a HTMemory.
- *	
- *	check the blocks in the list to find one unlocked and size less
- *	   than our limit,
- *	if did not find, create a new block to use,
- *	allocate a new chunk in the block,
- *	every chunk has a one byte header to count the lock number for 
- *	   this chunk.
- *
- * REVISION HISTORY:
- *	Name		Date		Description
- *	----		----		-----------
- *	kkee    	9/11/97   	Initial Revision
- *	
- ***********************************************************************/
-static void * _pascal
-HTMemAllocAndLockLow (word id, HTMemHandle *htmh, word size)
-{
-    HTMemStruct *mb;
-    word sz, count;
-    int i;
-    word flag_and_lock;
-    ChunkHandle retChunk;
-    MemHandle retMem = NullHandle;
-    SemaphoreHandle sem;
-    byte *head;
-
-    PUSHDS;
-    SET_DS_LIB_DGROUP;
-
-    ECCheckMemHandle(ListMemHandle);
-
-    /* exclusive access to the list */
-    MemPLock(ListMemHandle);
-
-    count = ChunkArrayGetCountHandles(ListMemHandle, ListChunkHandle);
-    
-    /* find a unlocked block. */
-    for(i=count-1; i>=0; i--) {
-	mb = ChunkArrayElementToPtrHandles(ListMemHandle,
-					ListChunkHandle, i, &sz);
-
-	/* blocks with different IDs are not shared */
-	if (mb->HTMS_id != id) continue;
-
-	/* to prevent other users to access the data when alloc...*/
-	sem = mb->HTMS_sem;
-	ThreadPSem(sem);
-
-	flag_and_lock = 
-		MemGetInfo(mb->HTMS_memHandle, MGIT_FLAGS_AND_LOCK_COUNT);
-
-	if(!MGI_LOCK_COUNT(flag_and_lock)) {/* this block is unlocked.!! */
-
-	    /* check if its size is too large  */
-	    sz = MemGetInfo(mb->HTMS_memHandle, MGIT_SIZE);
-	    if(sz < DESIRED_HTMEM_BLOCK_SIZE) {
-		retMem = mb->HTMS_memHandle;
-		break;
-	    }
-	}
-	ThreadVSem(sem);
-    }
-	
-    if(!retMem) {       /* didn't find a unlocked block */
-	retMem = MemAllocLMem(LMEM_TYPE_GENERAL, sizeof(LMemBlockHeader));
-	HandleModifyOwner(retMem, GeodeGetCodeProcessHandle());
-    	MemModifyFlags(retMem, HF_SHARABLE, 0);
-
-	/* add this block to the list */
-	mb = ChunkArrayAppendHandles(ListMemHandle,
-					ListChunkHandle, 0);
-	mb->HTMS_memHandle = retMem;
-	mb->HTMS_id = id;
-	mb->HTMS_sem = ThreadAllocSem(1);
-	HandleModifyOwner(mb->HTMS_sem, GeodeGetCodeProcessHandle());
-	mb->HTMS_count = 0;
-	sem = mb->HTMS_sem;
-	ThreadPSem(sem);
-
-EC(	ecPeakNum ++;							)
-    }
-
-    mb->HTMS_count ++;
-
-    MemLock(retMem);
-    /* allocate the chunk, which has a one byte header to count the lock num */
-    retChunk = LMemAlloc(retMem, size + sizeof(byte));
-
-    /* after alloc, others can access this block */
-    ThreadVSem(sem);
-
-    /* create the return optr */
-    *htmh = ConstructOptr(retMem, retChunk);
-
-    /* initalize the new chunk with all 0 */
-    head = LMemDeref(*htmh);
-    for(i=0; i<size+sizeof(byte); i++) *(head + i) = 0;
-    (*head) = 1;
-
-    head += 1;
-
-    /* Tally allocated memory */
-    htMemAllocated += size;
-
-    /* don't need the list anymore */
-    MemUnlockV(ListMemHandle);
-
-    POPDS;
-
-    return (void*)head;
-}	/* End of HTMemAllocAndLockLow.	*/
-
-
-/***********************************************************************
- *		HTMemReallocLow
- ***********************************************************************
- *
- * SYNOPSIS:	Internal routine to reallocate a HTMemHandle. id is used
- *              destroy all HTMemories with the same ID.
- * CALLED BY:	HTMemRealloc, HTMemReallocWID
- * RETURN:	
- *	
- * STRATEGY:	Since all allocated HTMemories belong to some block
- *              which maybe locked, we have to free htmh and 
- *              allocate a new HTMemory if resize to larger.
- *              Otherwise resize it to smaller as it won't affect
- *              other HTMemories in the same block.
- *	
- * REVISION HISTORY:
- *	Name		Date		Description
- *	----		----		-----------
- *	kkee    	9/11/97   	Initial Revision
- *	
- ***********************************************************************/
-static HTMemHandle _pascal
-HTMemReallocLow (word id, HTMemHandle htmh, word size)
-{
-    HTMemHandle ret = htmh;
-    byte *c, *p;
-    word sz;
-
-    c = (byte *) HTMemLock(htmh);
-    sz = LMemGetChunkSize(htmh);
-    sz--;           /* The first byte keeps count of locks */
-
-EC( if (*(c-1) > 0x01) EC_ERROR(CANNOT_REALLOC_LOCKED_HTMEMORY);       )
-
-    if (size < sz) {
-	/* Make it smaller */
-	LMemReAlloc(htmh, size+1); /* Needs an extra byte for lock count */
-	HTMemUnlock(htmh);
-
-    } else if (size > sz) {
-	/* 
-	 * Allocate a new HTMemory, copy data over, 
-	 * and delete old HTMemory. 
-	 */
-	p = (byte *) HTMemAllocAndLockLow(id, &ret, size);
-	memcpy(p, c, sz);
-	HTMemUnlock(ret);
-	HTMemUnlockAndFree(htmh);
-
-    } else {
-	/* Same size, do nothing */
-	HTMemUnlock(htmh);
-    }
-
-    PUSHDS;
-    SET_DS_LIB_DGROUP;
-    /* Tally allocated memory by HTMem */
-    htMemAllocated = htMemAllocated + size - sz;
-    if ((sdword)htMemAllocated < 0) htMemAllocated = 0;
-    POPDS;
-
-    return ret;
-}	/* End of HTMemReallocLow.	*/
-
 
 
 
@@ -385,9 +145,9 @@ ECCHECKHTMEMHANDLE (HTMemHandle htmh)
     PUSHDS;
     SET_DS_LIB_DGROUP;
     
-    MemPLock(ListMemHandle);
     block = OptrToHandle(htmh);
 
+    MemPLock(ListMemHandle);
     count = ChunkArrayGetCountHandles(ListMemHandle, ListChunkHandle);
     if(count > ecPeakNum) ecPeakNum = count;			
     
@@ -456,6 +216,9 @@ HTMEMLIBRARYENTRY (LibraryCallType ty, GeodeHandle client)
 }       /* End of HTMemLibraryEntry.    */
 
 
+
+
+
 
 /***********************************************************************
  *		HTMEMALLOCANDLOCK
@@ -468,6 +231,12 @@ HTMEMLIBRARYENTRY (LibraryCallType ty, GeodeHandle client)
  * SIDE EFFECTS:
  *	
  * STRATEGY:
+ *	check the blocks in the list to find one unlocked and size less
+ *	   than our limit,
+ *	if did not find, create a new block to use,
+ *	allocate a new chunk in the block,
+ *	every chunk has a one byte header to count the lock number for 
+ *	   this chunk.
  *	
  * REVISION HISTORY:
  *	Name	Date		Description
@@ -478,38 +247,93 @@ HTMEMLIBRARYENTRY (LibraryCallType ty, GeodeHandle client)
 void * _far _pascal
 HTMEMALLOCANDLOCK (HTMemHandle *htmh, word size)
 {
-    return HTMemAllocAndLockLow(0, htmh, size);
+    HTMemStruct *mb;
+    word sz, count;
+    int i;
+    word flag_and_lock;
+    ChunkHandle retChunk;
+    MemHandle retMem = NullHandle;
+    SemaphoreHandle sem;
+    byte *head;
+
+    PUSHDS;
+    SET_DS_LIB_DGROUP;
+
+    ECCheckMemHandle(ListMemHandle);
+
+    /* exclusive access to the list */
+    MemPLock(ListMemHandle);
+
+    count = ChunkArrayGetCountHandles(ListMemHandle, ListChunkHandle);
+    
+    /* find a unlocked block. */
+    for(i=count-1; i>=0; i--) {
+	mb = ChunkArrayElementToPtrHandles(ListMemHandle,
+					ListChunkHandle, i, &sz);
+
+	/* to prevent other users to access the data when alloc...*/
+	sem = mb->HTMS_sem;
+	ThreadPSem(sem);
+
+	flag_and_lock = 
+		MemGetInfo(mb->HTMS_memHandle, MGIT_FLAGS_AND_LOCK_COUNT);
+
+	if(!MGI_LOCK_COUNT(flag_and_lock)) {/* this block is unlocked.!! */
+
+	    /* check if its size is too large  */
+	    sz = MemGetInfo(mb->HTMS_memHandle, MGIT_SIZE);
+	    if(sz < DESIRED_HTMEM_BLOCK_SIZE) {
+		retMem = mb->HTMS_memHandle;
+		break;
+	    }
+	}
+	ThreadVSem(sem);
+    }
+	
+    if(!retMem) {       /* didn't find a unlocked block */
+	retMem = MemAllocLMem(LMEM_TYPE_GENERAL, sizeof(LMemBlockHeader));
+	HandleModifyOwner(retMem, GeodeGetCodeProcessHandle());
+    	MemModifyFlags(retMem, HF_SHARABLE, 0);
+
+	/* add this block to the list */
+	mb = ChunkArrayAppendHandles(ListMemHandle,
+					ListChunkHandle, 0);
+	mb->HTMS_memHandle = retMem;
+	mb->HTMS_sem = ThreadAllocSem(1);
+	HandleModifyOwner(mb->HTMS_sem, GeodeGetCodeProcessHandle());
+	mb->HTMS_count = 0;
+	sem = mb->HTMS_sem;
+	ThreadPSem(sem);
+
+EC(	ecPeakNum ++;							)
+    }
+
+    mb->HTMS_count ++;
+
+    /* don't need the list anymore */
+    MemUnlockV(ListMemHandle);
+
+    MemLock(retMem);
+    /* allocate the chunk, which has a one byte header to count the lock num */
+    retChunk = LMemAlloc(retMem, size + sizeof(byte));
+
+    /* after alloc, others can access this block */
+    ThreadVSem(sem);
+
+    /* create the return optr */
+    *htmh = ConstructOptr(retMem, retChunk);
+
+    /* initalize the new chunk with all 0 */
+    head = LMemDeref(*htmh);
+    for(i=0; i<size+sizeof(byte); i++) *(head + i) = 0;
+    (*head) = 1;
+
+    head += 1;
+
+    POPDS;
+
+    return (void*)head;
 }	/* End of HTMEMALLOCANDLOCK.	*/
-
-
-/***********************************************************************
- *		HTMEMALLOCANDLOCKWID
- ***********************************************************************
- *
- * SYNOPSIS:	Same as HTMemAllocAndLock, but with ID. The ID is used
- *              to destroy HTMemories using HTMemFreeAllWID. 
- * CALLED BY:	Client
- * RETURN:	far pointer to HTMemory (valid htmh) OR
- *              NULL (htmh is also NULL) for out of memory.
- *	
- * STRATEGY:	
- *	
- * REVISION HISTORY:
- *	Name		Date		Description
- *	----		----		-----------
- *	kkee    	9/11/97   	Initial Revision
- *	
- ***********************************************************************/
-void * _far _pascal
-HTMEMALLOCANDLOCKWID (word id, HTMemHandle *htmh, word size)
-{
-#if ERROR_CHECK
-    if ((id == HTMID_BASE) || (id >= HTMID_END))
-	EC_ERROR(INVALID_ID_FOR_HTMEMORY);        
-#endif
-    return HTMemAllocAndLockLow(id, htmh, size);
-}	/* End of HTMEMALLOCANDLOCKWID.	*/
-
 
 
 
@@ -536,58 +360,21 @@ HTMEMALLOC (word size)
     HTMemHandle htmh;
     byte *head;
 
-    HTMemAllocAndLockLow(0, &htmh, size);
+    PUSHDS;
+    SET_DS_LIB_DGROUP;
+
+    HTMEMALLOCANDLOCK(&htmh, size);
 
     if (htmh) {
 	head = LMemDeref(htmh);
 	(*head) = 0;
 	MemUnlock(OptrToHandle(htmh));
     }
+
+    POPDS;
 
     return htmh;
 }       /* End of HTMEMALLOC.   */
-
-
-/***********************************************************************
- *		HTMEMALLOCWID
- ***********************************************************************
- *
- * SYNOPSIS:    Same as HTMemAlloc, , but with ID. The ID is used
- *              to destroy HTMemories using HTMemFreeAllWID. 
- * CALLED BY:   Global
- * RETURN:      HTMemHandle or NULL if failed to allocated.
- * SIDE EFFECTS:
- *	
- * STRATEGY:	
- *	
- * REVISION HISTORY:
- *	Name		Date		Description
- *	----		----		-----------
- *	kkee    	9/11/97   	Initial Revision
- *	
- ***********************************************************************/
-HTMemHandle _far _pascal
-HTMEMALLOCWID (word id, word size)
-{
-    HTMemHandle htmh;
-    byte *head;
-
-#if ERROR_CHECK
-    if ((id == HTMID_BASE) || (id >= HTMID_END))
-	EC_ERROR(INVALID_ID_FOR_HTMEMORY);        
-#endif
-
-    HTMemAllocAndLockLow(id, &htmh, size);
-
-    if (htmh) {
-	head = LMemDeref(htmh);
-	(*head) = 0;
-	MemUnlock(OptrToHandle(htmh));
-    }
-
-    return htmh;
-}	/* End of HTMEMALLOCWID.	*/
-
 
 
 /***********************************************************************
@@ -602,6 +389,12 @@ HTMEMALLOCWID (word id, word size)
  *              HTMemHandle, or return NULL if failed to 
  *              reallocate.
  *	
+ * STRATEGY:	Since all allocated HTMemories belong to some block
+ *              which maybe locked, we have to free htmh and 
+ *              allocate a new HTMemory if resize to larger.
+ *              Otherwise resize it to smaller as it won't affect
+ *              other HTMemories in the same block.
+ *	
  * REVISION HISTORY:
  *	Name		Date		Description
  *	----		----		-----------
@@ -611,51 +404,38 @@ HTMEMALLOCWID (word id, word size)
 HTMemHandle _far _pascal
 HTMEMREALLOC (HTMemHandle htmh, word size)
 {
-    word id = HTMemID(htmh);
+    HTMemHandle ret = htmh;
+    byte *c, *p;
+    word sz;
 
-#if ERROR_CHECK
-    if (id) EC_WARNING(HTMEMORY_USING_OLD_ID);
-#endif
+    c = (byte *) HTMemLock(htmh);
+    sz = LMemGetChunkSize(htmh);
+    sz--;           /* The first byte keeps count of locks */
 
-    return HTMemReallocLow(id, htmh, size);
-}	/* End of HTMEMREALLOC.	*/
+EC( if (*(c-1) > 0x01) EC_ERROR(CANNOT_REALLOC_LOCKED_HTMEMORY);       )
 
+    if (size < sz) {
+	/* Make it smaller */
+	LMemReAlloc(htmh, size+1); /* Needs an extra byte for lock count */
+	HTMemUnlock(htmh);
 
+    } else if (size > sz) {
+	/* 
+	 * Allocate a new HTMemory, copy data over, 
+	 * and delete old HTMemory. 
+	 */
+	p = (byte *) HTMemAllocAndLock(&ret, size);
+	memcpy(p, c, sz);
+	HTMemUnlock(ret);
+	HTMemUnlockAndFree(htmh);
 
-/***********************************************************************
- *		HTMEMREALLOCWID
- ***********************************************************************
- *
- * SYNOPSIS:	Same as HTMemRealloc, but with ID. The ID used to destroy
- *              all HTMemories allocated using HTMemDeleteWID. 
- * CALLED BY:	Client
- * RETURN:	HTMemHandle, which may not be the same as the passed in 
- *              HTMemHandle, or return NULL if failed to 
- *              reallocate.
- *	
- * STRATEGY:	
- *	
- * REVISION HISTORY:
- *	Name		Date		Description
- *	----		----		-----------
- *	kkee    	9/11/97   	Initial Revision
- *	
- ***********************************************************************/
-HTMemHandle _far _pascal
-HTMEMREALLOCWID (word id, HTMemHandle htmh, word size)
-{
-
-#if ERROR_CHECK
-    if ((id == HTMID_BASE) || (id >= HTMID_END))
-	EC_ERROR(INVALID_ID_FOR_HTMEMORY);        
-
-    if (HTMemID(htmh) != id) {
-	EC_ERROR(INVALID_ID_FOR_HTMEMORY);
+    } else {
+	/* Same size, do nothing */
+	HTMemUnlock(htmh);
     }
-#endif
 
-    return HTMemReallocLow(id, htmh, size);
-}	/* End of HTMEMREALLOCWID.	*/
+    return ret;
+}	/* End of HTMEMREALLOC.	*/
 
 
 
@@ -687,69 +467,6 @@ EC( ECCheckHTMemHandle(htmh);                                           )
 
     HTMemFreeLow(htmh, FALSE);
 }       /* End of HTMEMFREE.    */
-
-
-/***********************************************************************
- *		HTMEMFREEALLWID
- ***********************************************************************
- *
- * SYNOPSIS:	Free all HTMemories given the allocation ID. Must not 
- *              pass 0.
- * CALLED BY:	Client
- * RETURN:	Nothing
- *	
- * STRATEGY:	
- *	
- * REVISION HISTORY:
- *	Name		Date		Description
- *	----		----		-----------
- *	kkee    	9/11/97   	Initial Revision
- *	
- ***********************************************************************/
-void _far _pascal
-HTMEMFREEALLWID (word id)
-{
-    HTMemStruct *mb;
-    int i, count;
-    word sz;
-    optr blockList;
-
-#if ERROR_CHECK
-    if ((id == HTMID_BASE) || (id >= HTMID_END))
-	EC_ERROR(INVALID_ID_FOR_HTMEMORY);        
-#endif
-
-    PUSHDS;
-    SET_DS_LIB_DGROUP;
-    ECCheckMemHandle(ListMemHandle);
-    MemPLock(ListMemHandle);
-
-    blockList = ConstructOptr(ListMemHandle, ListChunkHandle);
-    count = ChunkArrayGetCount(blockList);
-    i = 0;
-    while (i<count) {
-	mb = ChunkArrayElementToPtr(blockList, i, &sz);
-	if (mb->HTMS_id == id) {
-	    /* Free the block */
-	    MemFree(mb->HTMS_memHandle);
-	    /* And the semaphore */
-	    ThreadFreeSem(mb->HTMS_sem);
-	    ChunkArrayDelete(blockList, mb);	    
-	    count--;
-	} else {
-	    i++;
-	}
-    }
-
-    /* For now, tally those memory allocated during UI building
-       using WID APIs */
-    htMemAllocated = 0;
-
-    MemUnlockV(ListMemHandle);
-
-    POPDS;
-}	/* End of HTMEMFREEALLWID.	*/
-
 
 
 
@@ -815,9 +532,9 @@ EC ( ECCheckHTMemHandle(htmh);                                          )
     PUSHDS;
     SET_DS_LIB_DGROUP;
 
-    MemPLock(ListMemHandle);
     block = OptrToHandle(htmh);
 
+    MemPLock(ListMemHandle);
     count = ChunkArrayGetCountHandles(ListMemHandle, ListChunkHandle);
 
     /* find the block entry in the list */    
@@ -871,19 +588,11 @@ EC ( ECCheckHTMemHandle(htmh);                                          )
         return;
     }
 
-    /* Tally allocated memory by HTMem */
-    {
-	word size = LMemGetChunkSize(htmh);
-	size--;           /* The first byte keeps count of locks */
-	htMemAllocated -= size;
-	if ((sdword)htMemAllocated < 0) htMemAllocated = 0;
-    }
-
+    MemUnlockV(ListMemHandle);
+    
     /* now we can free this chunk. */
     LMemFree(htmh);
     MemUnlock(block);
-    
-    MemUnlockV(ListMemHandle);
     
     POPDS;
 
@@ -924,9 +633,9 @@ EC ( ECCheckHTMemHandle(htmh);                                          )
     PUSHDS;
     SET_DS_LIB_DGROUP;
     
-    MemPLock(ListMemHandle);
     block = OptrToHandle(htmh);
 
+    MemPLock(ListMemHandle);
     count = ChunkArrayGetCountHandles(ListMemHandle, ListChunkHandle);
     
     /* find the block entry in the list */    
@@ -939,6 +648,7 @@ EC ( ECCheckHTMemHandle(htmh);                                          )
 	    break;
 	}
     }
+    MemUnlockV(ListMemHandle);
     
     /* when this block is being allocated chunks, wait. otherwise go on.*/
     ThreadPSem(sem);
@@ -948,7 +658,6 @@ EC ( ECCheckHTMemHandle(htmh);                                          )
     (*ret) ++;
     ThreadVSem(sem);
 
-    MemUnlockV(ListMemHandle);
     POPDS;
 	
     return (void*)(ret+1);
@@ -987,9 +696,9 @@ EC ( ECCheckHTMemHandle(htmh);                                          )
     PUSHDS;
     SET_DS_LIB_DGROUP;
 
-    MemPLock(ListMemHandle);
     block = OptrToHandle(htmh);
 
+    MemPLock(ListMemHandle);
     count = ChunkArrayGetCountHandles(ListMemHandle, ListChunkHandle);
     
     /* find the block entry in the list */    
@@ -1002,6 +711,7 @@ EC ( ECCheckHTMemHandle(htmh);                                          )
 	    break;
 	}
     }
+    MemUnlockV(ListMemHandle);
     
     /* when this block is allocating chunks, wait. otherwise go on.*/
     ThreadPSem(sem);
@@ -1011,37 +721,10 @@ EC( if(!*head) EC_ERROR(CANNOT_UNLOCK_NONLOCKED_HTMEMORY);		  )
     MemUnlock(block);
     ThreadVSem(sem);
 
-    MemUnlockV(ListMemHandle);
     POPDS;
 	
     return;
 }
-
-
-/***********************************************************************
- *		HTMEMDEREF
- ***********************************************************************
- *
- * SYNOPSIS:	Dereference an already locked HTMemory.
- * CALLED BY:	Client
- * RETURN:	void *.
- *	
- * STRATEGY:	
- *	
- * REVISION HISTORY:
- *	Name		Date		Description
- *	----		----		-----------
- *	kkee    	5/26/97   	Initial Revision
- *	
- ***********************************************************************/
-void * _far _pascal
-HTMEMDEREF (HTMemHandle htmh)
-{
-    byte *ret;
-EC ( ECCheckHTMemHandle(htmh);                                          )
-    ret = (byte *)LMemDeref(htmh);
-    return (void*)(ret+1);   /* First byte is lock count */
-}	/* End of HTMEMDEREF.	*/
 
 
 
@@ -1087,22 +770,13 @@ HTMEMORYLIMIT (word size)
     heap = SysGetInfo(HT_SGIT_HEAP_FREE_SIZE);
     swap = SysGetInfo(HT_SGIT_SWAP_FREE_SIZE);
 
-/*
- *    if (heap+size>HTMEMORY_HEAP_LOW_LIMIT && 
- *	swap+size>HTMEMORY_SWAP_LOW_LIMIT)
- *	return TRUE;
- */
-    
-    if (swap+size>HTMEMORY_SWAP_LOW_LIMIT) return TRUE;
-
+    if (heap+size>HTMEMORY_HEAP_LOW_LIMIT && 
+	swap+size>HTMEMORY_SWAP_LOW_LIMIT)
+	return TRUE;
 #else
-/*
- *   if ((SysGetInfo(HT_SGIT_HEAP_FREE_SIZE)+size>HTMEMORY_HEAP_LOW_LIMIT) &&
- *	(SysGetInfo(HT_SGIT_SWAP_FREE_SIZE)+size>HTMEMORY_SWAP_LOW_LIMIT))
- *	return TRUE;
- */
-    if (SysGetInfo(HT_SGIT_SWAP_FREE_SIZE)+size>HTMEMORY_SWAP_LOW_LIMIT)
- 	return TRUE;
+    if ((SysGetInfo(HT_SGIT_HEAP_FREE_SIZE)+size>HTMEMORY_HEAP_LOW_LIMIT) &&
+	(SysGetInfo(HT_SGIT_SWAP_FREE_SIZE)+size>HTMEMORY_SWAP_LOW_LIMIT))
+	return TRUE;
 #endif
 
     EC_WARNING(HTMEMORY_EXCEEDING_LIMIT);
@@ -1111,81 +785,3 @@ HTMEMORYLIMIT (word size)
 
 
 
-/***********************************************************************
- *		HTMEMORYALLOCATED
- ***********************************************************************
- *
- * SYNOPSIS:	Get the amount of memory allocated by HTMem.
- * CALLED BY:	Client
- * RETURN:	dword
- *	
- * STRATEGY:	
- *	
- * REVISION HISTORY:
- *	Name		Date		Description
- *	----		----		-----------
- *	kkee    	9/ 5/97   	Initial Revision
- *	
- ***********************************************************************/
-dword _far _pascal
-HTMEMORYALLOCATED (void)
-{
-    dword ret;
-    PUSHDS;
-    SET_DS_LIB_DGROUP;
-    ret = htMemAllocated;
-    POPDS;
-    return ret;
-}	/* End of HTMEMORYALLOCATED.	*/
-
-
-
-/***********************************************************************
- *		HTMEMUSEDSPACEWID
- ***********************************************************************
- *
- * SYNOPSIS:	The amount of memory used for an id. If id is 0, we get
- *              memory used for non-ID allocation.
- * CALLED BY:	Client
- * RETURN:	dword
- *	
- * STRATEGY:	Find all the blocks allocated for id and sum up their
- *              sizes.
- *	
- * REVISION HISTORY:
- *	Name		Date		Description
- *	----		----		-----------
- *	kkee    	10/ 5/97   	Initial Revision
- *	
- ***********************************************************************/
-dword _far _pascal
-HTMEMUSEDSPACEWID (word id)
-{
-    HTMemStruct *mb;
-    word sz, count;
-    int i;
-    dword ret = 0;
-
-    PUSHDS;
-    SET_DS_LIB_DGROUP;
-
-    ECCheckMemHandle(ListMemHandle);
-
-    /* exclusive access to the list */
-    MemPLock(ListMemHandle);
-
-    count = ChunkArrayGetCountHandles(ListMemHandle, ListChunkHandle);
-    for(i=0; i<count; i++) {
-	mb = ChunkArrayElementToPtrHandles(ListMemHandle,
-					ListChunkHandle, i, &sz);
-	if (mb->HTMS_id == id) {
-	    ret += MemGetInfo(mb->HTMS_memHandle, MGIT_SIZE);
-	}
-    }
-	
-    MemUnlockV(ListMemHandle);
-
-    POPDS;
-
-    return ret;
-}	/* End of HTMEMUSEDSPACEWID.	*/

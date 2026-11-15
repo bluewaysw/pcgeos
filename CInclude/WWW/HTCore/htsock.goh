@@ -18,60 +18,139 @@ REVISION HISTORY:
 	kkee	6/15/96   	Initial version.
 
 DESCRIPTION:
-	HTSocket and its manager.
+	The Socket class, inherited from HTStreamClass in file 
+        htstream.goh{goc}.
 
-	$Id: htsock.goh,v 1.27.3.4 97/11/19 20:02:23 kkee Exp $
+	$Id: htsock.goh,v 1.1 97/04/04 15:54:31 newdeal Exp $
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+/* --------------------------------------------------------------------------
+ * 		COMPILE OPTIONS
+ * HTSocket is written to implement both stream socket (pushing data) and 
+ * non-stream socket (read data). STNC is using non-stream socket. To enable
+ * stream socket, we need to define __HT_STREAM_SOCKET__.
+ * 
+ * Stream socket is included in Library htcore. 
+ *
+ * Stand-alone library called htsock.
+ * --------------------------------------------------------------------------*/
+/*
+ * Define __HT_STREAM_SOCKET__ for HTCore Library. Do not define to implement 
+ * standalone htsock Library.
+ */
+/* @define __STNC__ */ /* Shipping to STNC... */
+
+@ifndef __STNC__
+@define __HT_STREAM_SOCKET__
+@endif
+
+/*
+ * Define __TEST_HT_SOCKET__ to test HTSocket without connecting server
+ * and to simulate various socket behaviour.
+ */
+/* @define __TEST_HT_SOCKET__ */
+
 
 @ifndef __HT_SOCK_GOH__
 @define __HT_SOCK_GOH__
 
-/*
- * #define __LOG_OUTPUT_HTSOCK__ to enable logging of htsocket data to server.
- * in file SP_DOCUMENT/htsock.out.
- *
- * #define __LOG_INPUT_HTSOCK__ to enable logging of server data to htsocket
- * in file SP_DOCUMENT/htsock.in.
- */
-#if ERROR_CHECK
-#define __LOG_OUTPUT_HTSOCK__
-#define __LOG_INPUT_HTSOCK__
-#endif
+@ifndef __HT_STREAM_SOCKET__
+
+@deflib htsock
+
+@endif
 
 @include <stdapp.goh>
 @include <socket.goh>
 @include <sockmisc.h>
 #include <library.h>                           /* LibraryCallType */
-@include <WWW/HTCore/htconst.goh>
+@include <WWW/HTCore/htutils.goh>
 @include <WWW/HTCore/htreq.goh>
-@include <WWW/HTCore/htreqMan.goh>
+
+@ifdef __HT_STREAM_SOCKET__
+
 @include <WWW/HTCore/htstream.goh>
 
-#ifdef SSL_ENABLE
-#include <ssl.h>
-#endif
+@endif
+
+
+@ifdef __TEST_HT_SOCKET__
+
+@include <WWW/HTCore/htreqMan.goh>
+
+@endif
 
 
 /* --------------------------------------------------------------------------
- * 		CONSTANTS and DATA TYPES
+ * 		I. FREQUENTLY ASKED QUESTIONS - FAQ
  * --------------------------------------------------------------------------*/
 
-/* 
- * Maximum string length of an IP address. Guaranteed to hold any IP name. 
-  * See Section 2.1 of RFC 1123.
-  */
- #define MAX_IP_ADDRESS_LENGTH 256
+/* --------------------------------------------------------------------------
+ * 		A. HTSOCKET CLASS
+ * --------------------------------------------------------------------------*/
 
- /* 
-  * TCP address structure to pass to HTSocket MSG_HT_SOCKET_RESOLVE.
-  */
- typedef struct {
-     char HTSA_ipAddress[MAX_IP_ADDRESS_LENGTH];     /* Unresolved address */
-     word HTSA_port;                                 /* TCP/IP port number */
-     word HTSA_accessPoint;                          /* AccessPoint number
-							in your "ini" file */
- } HTSocketAddress;
+/****************************************************************************
+ 
+  The HTSocketClass is inherited from HTStreamClass defined in 
+  htstream.goh{goc}. We compile for both stream socket and non-stream
+  socket. Stream socket is inherited from HTStreamClass while non-stream
+  socket is inherited from MetaClass
+ 
+  For stream socket, we intercept all the methods in the class to implement 
+  a stream socket.
+
+ ****************************************************************************/
+
+/* --------------------------------------------------------------------------
+ * 		B. Register HTSocket CLASS? NOPE!
+ * --------------------------------------------------------------------------*/
+
+/****************************************************************************
+ 
+  HTSocket is an internal class used by all other protocols that uses
+  TCP/IP socket.
+
+ ****************************************************************************/
+
+/* --------------------------------------------------------------------------
+ * 		II. CONSTANTS and DATA TYPES
+ * --------------------------------------------------------------------------*/
+#ifndef HT_OK
+#define	HT_OK 			0	/* Generic success */
+#endif
+
+#ifndef HT_NO
+#define	HT_NO 			1	/* Operation denied, not an error */
+#endif
+
+/* 
+ * Maximum string length of an IP address.
+ */
+#define MAX_IP_ADDRESS_LENGTH 256 /* Guaranteed to hold any IP name. See
+				     Section 2.1 of RFC 1123. */
+
+/*  
+ * Maximum string length of a resolved IP address.
+ */
+#define MAX_RESOLVED_ADDRESS_LENGTH 32
+
+/*
+ * HTSocket callback function prototype socket asynchronous operation
+ * notification. State is one of the HT_? values defined in htreq.goh.
+ */
+typedef void _far _pascal (*HTSocketCallback) (HTStreamHandle stream, 
+					       int htstate);
+
+/* 
+ * TCP address structure to pass to HTSocket MSG_HT_SOCKET_RESOLVE.
+ */
+typedef struct {
+    char HTSA_ipAddress[MAX_IP_ADDRESS_LENGTH];     /* Unresolved address */
+    word HTSA_port;                                 /* TCP/IP port number */
+    word HTSA_accessPoint;                          /* AccessPoint number
+						       in your "ini" file */
+} HTSocketAddress;
 
 /*
  * TCP address structure to pass to Geos SocketResolve.
@@ -87,16 +166,38 @@ typedef struct {
     char            HA_ipAddress[MAX_IP_ADDRESS_LENGTH];
 } HTTCPAddress;
 
+
 /* 
  * The input buffer size is a compromise between speed and memory. 
  */
 #define HTSOCKET_BUFFER_SIZE     512    /* SocketRecv in chunks of 512 */
+#define SOCKET_THREAD_STACK_SIZE 1024   /* No ui stuff, 1K is enough. */
+
+/*
+ * Information of a socket shared by multiple threads. We can't
+ * put them in HTSocket (see below) as we need to read these
+ * data very often. Trust me, we want quick access to socket
+ * state so that HTNetScheduler can multitask faster. We still 
+ * have to use MemLockShared to read this data.
+ */
+typedef struct {
+    /* WWW socket state information. */
+    int HTSI_state;                     /* One of HT_SOCKET_? in htreq.goh */
+    dword HTSI_connectionTime;          /* The estimated round-trip delay (in 
+					   ticks) to server based on the 
+					   time it took to establish the 
+					   connection. */
+} HTSocketInfo;
 
 /*
  * HTSocket structure. Each structure is allocated to be swappable.
  * NOTE: Geos SocketConnect requires that the resolved address field,
  * HTS_resolvedAddress, falls immediately after the SocketAddress
  * field HTS_sockAddress; this is used implicitly in SocketConnect. 
+ *
+ * For this stream, the request structure is optional. It can be NULL.
+ * This is so that we can make use of this Library independently of
+ * all other stream Libraries.
  */
 typedef struct {
     /* Geos socket information. */
@@ -105,157 +206,311 @@ typedef struct {
     byte HTS_resolvedAddress[MAX_RESOLVED_ADDRESS_LENGTH];
     HTTCPAddress HTS_tcpAddress;
 
-    /* Input buffer */
-    byte HTS_buffer[HTSOCKET_BUFFER_SIZE+2]; /* Buffer space for input */
-    word HTS_length;
-    
-    /* HTSocket state */
-    int HTS_state;
+    /* WWW socket information */
+    HTStreamHandle HTS_htsocket;        /* The owner htsocket object of this 
+					   HTSocket structure. */
 
-    /* Make a progress report after receiving/sending a chunk of data */
-    word HTS_progressSize;
+    MemHandle HTS_htSockInfo;           /* Containing HTSocketInfo */
+
+    /* Callback information */
+    HTSocketCallback HTS_connectCbf;    /* Connection callback */
+    HTSocketCallback HTS_receiveCbf;    /* Receive data callback */    
+
+    /* 'V' this sem when we are exiting background thread. */
+    SemaphoreHandle HTS_threadIsRunning;
+    /*
+     * P and V this semaphore before pushing data asynchronously to
+     * target. If failed to P, we should receive loop.
+     */
+    SemaphoreHandle HTS_stop;
 
     /* 
-     * Shared data between thread that runs this HTSocket (HTCore:0) and
-     * the controlling thread (client's thread). Read only by HTSocket.
-     * I think it should be void*.
+     * Input buffer not needed if we are using non-stream socket as we 
+     * won't be pushing data. 
      */
-    HTNetThread *HTS_net;
+@ifdef __HT_STREAM_SOCKET__
+    HTStreamHandle HTS_target;            /* For pushing data */
+    byte HTS_buffer[HTSOCKET_BUFFER_SIZE]; /* Buffer space for input */
+@endif
 
-    /*
-     * SSL support
-     */
-#ifdef SSL_ENABLE
-    SSL *HTS_con;
-#endif
+    /* If we are testing, we read data from a file using the 
+     * request URL */
+@ifdef __TEST_HT_SOCKET__
+    HTRequestHandle HTS_request;
+    FileHandle HTS_fileHandle;
+@endif
 
 } HTSocket;
 
+typedef word HTSocketHandle;    /* 16-bit asynchronous socket handle */
 
-/* --------------------------------------------------------------------------
- * 		A. HTSOCKET CLASS
- * --------------------------------------------------------------------------*/
+@ifndef __HT_STREAM_SOCKET__
 
-/****************************************************************************
- 
-  The HTSocketClass is inherited from HTStreamClass defined in 
-  htstream.goh{goc}.
- 
- ****************************************************************************/
+@class HTStreamClass, MetaClass;
+@endc;
+
+@endif
 
 @class HTSocketClass, HTStreamClass;
 
-/*
- * Initialize a stream socket to take care of pushing data for a HTSocket.
- *
- * Context:	Push data
- * Source:	Anyone
- * Destination:	HTSocketClass
- * Interception:No.
- */
-@message void MSG_HTSOCKET_INITIALIZE(HTSocketHandle htsock);
-
-@instance HTSocketHandle HTSI_socket;
-@endc
-
-
 /* --------------------------------------------------------------------------
- * 		A. PUBLIC APIs
+ * 		Public Methods
  * --------------------------------------------------------------------------*/
 
-
-#define ECCheckHTSocket  ECCheckMemHandle
-
-#ifdef SSL_ENABLE
-extern HTSocketHandle _far _pascal
-    HTSocketCreate(HTNetThread *net, Boolean secure);
-#else
-extern HTSocketHandle _far _pascal
-    HTSocketCreate(HTNetThread *net);
-#endif
-
-extern void _far _pascal
-    HTSocketDelete(HTSocketHandle htsock);
-
-extern void _far _pascal
-    HTSocketClose(HTSocketHandle htsock);
-
-extern int _far _pascal
-    HTSocketResolve(HTSocket *sptr);
-
-extern int _far _pascal
-    HTSocketFastResolve(HTRequest *req, byte *ip);
-
-extern int _far _pascal
-    HTSocketConnect(HTSocket *sptr);
-
-extern int _far _pascal
-    HTSocketResolveAndConnect(HTSocketHandle htsock, 
-			      HTSocketAddress *htAddress);
-
-extern int _far _pascal
-    HTSocketIsConnected(HTSocketHandle htsock);
-
-extern word _far _pascal 
-    HTSocketRecv(HTSocketHandle htsock, int timeOut);
-
-extern int _far _pascal 
-    HTSocketSend(HTSocketHandle htsock, void *data, word length);
-
-extern int _far _pascal
-    HTSocketStop(HTSocketHandle htsock);
-
-extern int _far _pascal
-    HTSocketPush(HTStreamHandle target, HTSocketHandle htsock);
-
-extern int _far _pascal
-    HTSocketState(HTSocketHandle htsock);
-
-extern int _far _pascal
-    HTSocketGetInfo(HTSocketHandle htsock, word *port, byte *server, 
-		    int *serverLen);
-
-extern HTStreamHandle _far _pascal
-    HTStreamSocketCreate(HTRequestHandle request);
+/*
+ * Initialize HTSocket internal data structures. Should be called once
+ * before using HTSocket. If called more than once, previous connection 
+ * will be closed. You will then have to re-resolve and re-connect again.
+ *
+ * Context:	Push Data.
+ * Source:	Anyone.
+ * Destination:	Unrestricted.
+ * Interception:Not necessary.
+ * Pass:        Nothing.
+ * Return:      HT_OK if initialization ok, else HT_SOCKET_ERROR.
+ */
+@message int MSG_HT_SOCKET_INITIALIZE();
 
 /*
- * Shutdown communication for good until the next call to HTActivate
- * to activate communication for all HTSocket APIs.
+ * Get Geos socket descriptor so you use the descriptor directly
+ * with Geos socket functions. This function is provided because
+ * htsocket will not be implementing all Geos socket functions. 
+ * Also, from a software engineering point of view, you should
+ * use htsocket APIs, and interrupt MSG_HT_SOCKET_READ{_PTR}, 
+ * MSG_HT_SOCKET_WRITE, MSG_HT_SOCKET_CONNECT, MSG_HT_SOCKET_RESOLVE, 
+ * and MSG_HT_SOCKET_RESOLVE_AND_CONNECT using Geos SocketInterrupt 
+ * passing the socket descriptor returned by this API.
+ *
+ * Context:	Geos socket.
+ * Source:	Anyone.
+ * Destination:	Unrestricted.
+ * Interception:Not necessary.
+ * Pass:        Nothing.
+ * Return:      Geos socket descriptor of HTSocket.
  */
-extern void _far _pascal
-    HTShutDown(void);
+@message Socket MSG_HT_SOCKET_GET_DESCRIPTOR();
 
-/* 
- * Activate again after last HTShutDown. If not called, subsequent
- * socket APIs HTSocketResolve, HTSocketConnect, HTSocketSend, HTSocketRecv
- * will fail with HTSocketState() == HT_SHUT_DOWN.
+/*
+ * Get the state of HTSocket.
+ *
+ * Context:	Push Data.
+ * Source:	Anyone.
+ * Destination:	Unrestricted.
+ * Interception:Not necessary.
+ * Pass:        Nothing.
+ * Return:      int
  */
-extern void _far _pascal
-    HTActivate(void);
+@message int MSG_HT_SOCKET_GET_STATE();
 
-extern void _far _pascal
-    HTSocketSetOpen(void);
+/*
+ * Get the last socketConnect time in seconds. The time indicates
+ * how many seconds it took to complete an either a sucessful or
+ * failed socketConnect. If no socketConnect was performed earlier,
+ * return 0.
+ *
+ * Context:	Persistent Connection.
+ * Source:	Anyone.
+ * Destination:	Unrestricted.
+ * Interception:Not necessary.
+ * Pass:        Nothing.
+ * Return:      dword - time in ticks (60 ticks per second).
+ */
+@message dword MSG_HT_SOCKET_GET_CONNECT_TIME();
 
-#ifdef __HIGHC__
-pragma Alias(HTSocketCreate, "HTSOCKETCREATE");
-pragma Alias(HTSocketDelete, "HTSOCKETDELETE");
-pragma Alias(HTSocketClose, "HTSOCKETCLOSE");
-pragma Alias(HTSocketResolve, "HTSOCKETRESOLVE");
-pragma Alias(HTSocketFastResolve, "HTSOCKETFASTRESOLVE");
-pragma Alias(HTSocketConnect, "HTSOCKETCONNECT");
-pragma Alias(HTSocketIsConnected, "HTSOCKETISCONNECTED");
-pragma Alias(HTSocketResolveAndConnect, "HTSOCKETRESOLVEANDCONNECT");
-pragma Alias(HTSocketRecv, "HTSOCKETRECV");
-pragma Alias(HTSocketSend, "HTSOCKETSEND");
-pragma Alias(HTSocketStop, "HTSOCKETSTOP");
-pragma Alias(HTSocketPush, "HTSOCKETPUSH");
-pragma Alias(HTSocketState, "HTSOCKETSTATE");
-pragma Alias(HTSocketGetInfo, "HTSOCKETGETINFO");
-pragma Alias(HTStreamSocketCreate, "HTSTREAMSOCKETCREATE");
-pragma Alias(HTShutDown, "HTSHUTDOWN");
-#endif
+/*
+ * Get the resolved hostname of a HTSocket. If the name was 
+ * not resolved earlier using MSG_HT_SOCKET_RESOLVE, the resolved 
+ * address is undefined; i.e., you will get garbage.
+ *
+ * Context:	Persistent Connection.
+ * Source:	Anyone.
+ * Destination:	Unrestricted.
+ * Interception:Not necessary.
+ * Pass:        resolvedAddress - buffer to store the resolved name.
+ *              length - length of the resolvedAddress buffer.
+ * Return:      The actual length of the resolved address copied to
+ *              resolvedAddress. If the actual length is greater than
+ *              the passed in length, we return 0 and resolvedAddress
+ *              is undefined.
+ */
+@message word MSG_HT_SOCKET_GET_RESOLVED_ADDRESS(byte *resolvedAddress,
+						 word length);
+
+/*
+ * Nonblocking resolve and connect of a HTSocket. You should check socket 
+ * state using MSG_HT_SOCKET_GET_STATE before reading or writing to socket. 
+ * Also, you can use MSG_HT_SOCKET_SET_CONNECT_CALLBACK to receive
+ * notification after socket connect has completed. See also 
+ * MSG_HT_SOCKET_RESOLVE and MSG_HT_SOCKET_CONNECT.
+ *
+ * Context:	Push Data.
+ * Source:	Anyone.
+ * Destination:	Unrestricted.
+ * Interception:Not necessary.
+ * Pass:        htAddress - HTSocketAddress for resolve and connect.
+ *              client - GeodeHandle for creating a thread for nonblocking
+ *              resolve and connect.
+ *              cbf - for connection callback. Will be called after 
+ *              socket is done connecting and passing the HTSocket
+ *              stream handle (i.e., oself) and its status.
+ * Return:      HT_OK if resolve and connect are proceeding in the 
+ *              background, else HT_SOCKET_ERROR.
+ */
+@message int MSG_HT_SOCKET_RESOLVE_AND_CONNECT(HTSocketAddress *htAddress,
+					       GeodeHandle client,
+					       HTSocketCallback cbf);
+
+/*
+ * Stop all background operation. Since this is a synchronous call, you
+ * can only stop backgroud operation run by a different thread like 
+ * socketResolve and socketConnect. If you want to stop synchrnounous 
+ * operations like htsocket reading and writing, you need to get a copy
+ * of the Geos soceket descriptor using MSG_HT_SOCKET_GET_DESCRIPTOR
+ * and use socketInterrupt to stop it.
+ *
+ * Context:	Push data.
+ * Source:	Client.
+ * Destination:	Anyone.
+ * Interception:Not necessary
+ */
+@message void MSG_HT_SOCKET_STOP();
+
+/*
+ * Close a HTSocket. This socket is no longer valid for reading and 
+ * writing. If you wish to reuse this socket, you must reinitialize it
+ * using MSG_HT_SOCKET_INITIALIZE and call resolve and connect again.
+ *
+ * Context:	Push Data.
+ * Source:	Anyone.
+ * Destination:	Unrestricted.
+ * Interception:Not necessary.
+ * Pass:        Nothing.
+ * Return:      Nothing.
+ */
+@message void MSG_HT_SOCKET_CLOSE();
+
+
+@ifdef __HT_STREAM_SOCKET__
+
+/*
+ * Asynch read and push data to target. Pass cbf as the receive data 
+ * callback. cbf will be called when there is no more data to 
+ * push.
+ *
+ * Context:	Push Data 
+ * Source:	Anyone.
+ * Destination:	Unrestricted.
+ * Interception:Not necessary.
+ * Pass:        cbf, will be called passing HTSocket's target and 
+ *              HTSocket status. 
+ *              stop, attempt to grab this sem before pushing data
+ *              and release after pushing data. If failed to grab,
+ *              asynch receive loop is exited.
+ * Return:      Return code from target.
+ */
+@message int MSG_HT_SOCKET_PUSH_ASYNCH(HTSocketCallback cbf, 
+				       SemaphoreHandle stop);
+
+@endif
+
+
+@ifdef __HT_STREAM_SOCKET__
+
+/*
+ * Synch read and push data to target. This is a synchronous call
+ * to read a chunk of data from socket and push to target. There
+ * may still be data socket to be read after we return.
+ *
+ * Context:	Push Data.
+ * Source:	Anyone
+ * Destination:	Unrestricted.
+ * Interception:No.
+ * Pass:        Nothing
+ * Return:      int.
+ */
+@message int MSG_HT_SOCKET_PUSH();
+
+@endif
+
+
+
+/*
+ * Read data into buffer.
+ *
+ * Context:	Get Data.
+ * Source:	Anyone.
+ * Destination:	Unrestricted.
+ * Interception:Not necessary.
+ * Pass:        buffer - buffer for storing data.
+ *              length - length of data buffer.
+ *              timeOut - timeout value, use SOCKET_NO_TIMEOUT for no
+ *                       timeout, 0 is the minimum.
+ * Return:      0 if no data is read, else the number of bytes read.
+ *              If you failed to get data, you may want to query
+ *              socket state using MSG_HT_SOCKET_GET_STATE.
+ */
+@message word MSG_HT_SOCKET_READ_PTR(void *buffer, word length, int timeOut);
+
+/*
+ * Write data to HTSocket. This is a non-stream version. For stream 
+ * version, see MSG_HT_STREAM_PUT_BLOCK.
+ *
+ * Context:	Push Data.
+ * Source:	Anyone.
+ * Destination:	Unrestricted.
+ * Interception:Not necesary.
+ * Pass:        data - buffer containing the data.
+ *              length - number of bytes of data.
+ * Return:      HT_OK if ok, else HT_SOCKET_ERROR. You may want to query the 
+ *              socket state using MSG_HT_SOCKET_GET_STATE if you get 
+ *              HT_SOCKET_ERROR.
+ */
+@message int MSG_HT_SOCKET_WRITE_PTR(void *data, word length);
+
+/* --------------------------------------------------------------------------
+ * 		Instance Data.
+ * --------------------------------------------------------------------------*/
+
+/*
+ * HTSocket information grouped in a structure for organization and 
+ * convenience.
+ */
+@instance HTSocketHandle HTSI_socket;
+
+/*
+ * To indicate there is an internal thread running. Used to synch
+ * termination of socket. If HTSI_runningThread == NULL, then we
+ * know there is no running thread. The semaphore is used to 
+ * synchronize termination.
+ */
+@instance ThreadHandle HTSI_runningThread;
+@instance SemaphoreHandle HTSI_threadIsRunning;
+
+/*
+ * HTSocket information indicating what the socket is doing etc. 
+ * The copy is kept in HTSocket.HTS_htSockInfo so we can write
+ * in one thread and read from the other. This is *VERY IMPORTANT*
+ * to fast cooperative multitasking by HTNetScheduler.
+ */
+@instance MemHandle HTSI_htSockInfo;
+
+@endc
+
+@ifndef __HT_STREAM_SOCKET__
+
+@endlib
+
+@endif
 
 @endif /* __HT_SOCK_GOH */
+
+
+
+
+
+
+
+
 
 
 

@@ -11,7 +11,7 @@
 #
 # 
 #
-#	$Id: htmem.gp,v 1.7.5.4 97/10/06 12:49:05 kkee Exp $
+#	$Id: htmem.gp,v 1.1 97/04/07 11:49:44 newdeal Exp $
 #
 ##############################################################################
 #
@@ -45,9 +45,6 @@ entry HTMEMLIBRARYENTRY
 # Resources: list all resource blocks which are used by the application.
 # (standard discardable code resources do not need to be mentioned).
 #
-#resource HTMEM_G		fixed read-only code shared
-#I assume this refers to the main code segment
-resource HTMEMCODE		fixed read-only code shared
 
 #
 # Export routines
@@ -56,27 +53,12 @@ resource HTMEMCODE		fixed read-only code shared
 
 export ECCHECKHTMEMHANDLE
 export HTMEMALLOC
-export HTMEMALLOCWID
 export HTMEMREALLOC
-export HTMEMREALLOCWID
 export HTMEMFREE
-export HTMEMFREEALLWID
 export HTMEMLOCK
 export HTMEMUNLOCK
-export HTMEMDEREF
 export HTMEMALLOCANDLOCK
-export HTMEMALLOCANDLOCKWID
 export HTMEMUNLOCKANDFREE
 export HTMEMORYLIMIT
-export HTMEMORYALLOCATED
-export HTMEMUSEDSPACEWID
-
-export HTBUCKETALLOC
-export HTBUCKETFREE
-export HTBUCKETPUTBLOCK
-export HTBUCKETFLUSH
-export HTBUCKETGETBYTE
-export HTBUCKETGETCHUNK
-
 
 

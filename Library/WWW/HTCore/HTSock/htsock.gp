@@ -11,7 +11,7 @@
 # DESCRIPTION:
 #	geode parameters file for the HTSocket stream class.
 #
-#	$Id: htsock.gp,v 1.4.15.1 97/09/05 10:47:25 jeremyb Exp $
+#	$Id: htsock.gp,v 1.1 97/04/07 11:48:04 newdeal Exp $
 #
 ##############################################################################
 #

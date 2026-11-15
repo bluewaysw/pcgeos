@@ -11,7 +11,7 @@
 # DESCRIPTION:
 #	geode parameters file for the HTTP protocol class.
 #
-#	$Id: http.gp,v 1.4.10.1 97/09/05 10:51:12 jeremyb Exp $
+#	$Id: http.gp,v 1.1 97/04/07 11:49:53 newdeal Exp $
 #
 ##############################################################################
 #

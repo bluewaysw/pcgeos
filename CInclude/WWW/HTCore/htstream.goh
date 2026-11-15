@@ -24,7 +24,7 @@ DESCRIPTION:
 	o HTProtocolClass (e.g., HTTP Protocol).
 	o HTStructuredClass (e.g., SGML, HTML, UIGenerator).
 
-	$Id: htstream.goh,v 1.18.5.3 97/11/15 12:56:56 kkee Exp $
+	$Id: htstream.goh,v 1.1 97/04/04 15:54:52 newdeal Exp $
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
 
@@ -32,7 +32,6 @@ DESCRIPTION:
 @define __HT_STREAM_GOH__
 
 @include <WWW/HTCore/htutils.goh>
-@include <WWW/HTCore/htconst.goh>
 #include <WWW/htmem.h>
 @include <stdapp.goh>
 
@@ -119,71 +118,6 @@ DESCRIPTION:
  * 		II. CONSTANTS and DATA TYPES
  * --------------------------------------------------------------------------*/
 
-/*  
- * Maximum string length of a resolved IP address.
- */
-#define MAX_RESOLVED_ADDRESS_LENGTH 32
-
-/* 
- * This is a scheduler HTNetThread. It maintains the execution state 
- * of HTProtocolClass.
- */
-typedef enum {
-    HTNET_BLOCKED,                 /* Net thread is ready to be run*/
-    HTNET_RUNNING,                 /* Is executing */
-    HTNET_DEAD                     /* No longer alive */
-} HTNetState;
-
-typedef struct {
-    /* Schedule information about a Net thread */
-    HTStreamHandle HTNT_scheduler;           /* The scheduler running this */
-    GeodeHandle HTNT_owner;                  /* owner of this thread */
-    HTRequestHandle HTNT_request;            /* the request being served */
-    HTSocketHandle HTNT_socket;              /* the socket */
-    HTStreamHandle HTNT_protocol;            /* protocol object itself */
-
-    /* Allocated or not */
-    Boolean HTNT_free;                       /* TRUE if not allocated */
-
-    /* Shared data between the HTNetThread running thread (htcore:0) and
-     * client's thread. Used for intercepting a running HTNetThread.
-     */
-    int HTNT_sharedCmd;                      /* HT_INTERRUPTED or HT_OK */
-
-    /* The Net thread state */
-    SemaphoreHandle HTNT_changeState;        /* Semaphore to change state */
-    HTNetState HTNT_state;                   /* Initially is HTNET_DEAD */
-
-    /* For uniquely identifying a persistent connection */
-    Boolean HTNT_persistent;
-    HTStringHandle HTNT_scheme;              /* Scheme, e.g., http, smtp */
-    word HTNT_port;                          /* TCP port number */
-    byte HTNT_server[MAX_RESOLVED_ADDRESS_LENGTH]; /* Resolved address */
-    int HTNT_serverLength;                   /* Length of resolved address */
-    Boolean HTNT_garbageCollectable;         /* TRUE if a persistent
-					      * connection can be garbage 
-					      * collected if HTNT_free is
-					      * TRUE. Else the protocol
-					      * will set it free.
-					      */
-
-    /* 
-     * Protocol specific information that also persists across multiple 
-     * requests. Its up to the protocol to use as it wish.
-     */
-    int HTNT_status;                        /* Last return code from 
-					       MSG_HT_PROTOCOL_LOAD */
-    dword HTNT_data;                        /* Protocol specific data 
-					     * that persists across request
-					     */
-    dword HTNT_data2;
-    dword HTNT_data3;                       /* As many as 3 data items
-					     * used up the discretion of
-					     * the protocol 
-					     */
-} HTNetThread;
-
-
 /* --------------------------------------------------------------------------
  * 		III. CONTAINER CLASSES DEFINITION
  * --------------------------------------------------------------------------*/
@@ -225,10 +159,10 @@ typedef struct {
  * Source:	Anyone.
  * Destination:	Unrestricted.
  * Interception:If necessary, intercept and callsuper.
- * Pass:	status. The status which the abort takes place.
+ * Pass:	Nothing.
  * Return:	HT_OK or HT_ERROR.
  */
-@message int MSG_HT_STREAM_ABORT(int status);
+@message int MSG_HT_STREAM_ABORT();
 
 /*
  * Unload the Library of this stream. VERY IMPORTANT: this message
@@ -339,7 +273,7 @@ typedef struct {
  * Interception:Only for streams unable to set its own transparent
  *              mode and has to be done from outside.
  */
-@message void MSG_HT_STREAM_SET_TRANSPARENT(Boolean mode);
+@message void MSG_HT_STREAM_SET_TRANSPARENT();
 
 /*
  * Returns TRUE if the stream is transparent, else FALSE.
@@ -484,13 +418,13 @@ typedef struct {
  * Destination:	Unrestricted.
  * Interception:Must be intercepted by all protocol subclasses. No need to 
  *		call super.
- * Pass:        net. Information about a schedulable Net thread. A Net thread
- *              runs a protocol object.
+ * Pass:        status. This can be used to externally control the execution
+ *              state of the protocol if status is not HT_OK.
  * Return:	HT_OK or any code. If not HT_OK, the Net Manager terminates
  *              the thread (and call any "after" callbacks registered to be
  *              called based on the return code).
  */
-@message int MSG_HT_PROTOCOL_LOAD(HTNetThread *net);
+@message int MSG_HT_PROTOCOL_LOAD(int status);
 
 /*
  * Stop a protocol. Since this is a synchronous call (the protocol could
@@ -519,7 +453,8 @@ typedef struct {
  * 		Instance Data.
  * --------------------------------------------------------------------------*/
 
-@instance HTStreamHandle  HTPI_streamSocket;
+/* HTSocket descriptor */
+@instance HTStreamHandle  HTPI_socket;
 
 @endc
 

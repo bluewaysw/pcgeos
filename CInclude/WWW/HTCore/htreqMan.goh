@@ -21,14 +21,14 @@ DESCRIPTION:
 	The private request manager, internal to the Library. Public
         request manager is in htreq.goh.
 
-	$Id: htreqMan.goh,v 1.18.1.8 97/11/18 22:33:40 kkee Exp $
+	$Id: htreqMan.goh,v 1.1 97/04/04 15:55:03 newdeal Exp $
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
 
 @ifndef __HT_REQMAN_GOH
 @define __HT_REQMAN_GOH
 
-@include <WWW/HTCore/htconst.goh>
+@include <WWW/HTCore/htutils.goh>
 @include <WWW/HTCore/htreq.goh>
 @include <WWW/HTCore/htstream.goh>
 @include <WWW/HTCore/htanchor.goh>
@@ -40,11 +40,42 @@ DESCRIPTION:
  * 		I. CONSTANTS and DATA TYPES
  * --------------------------------------------------------------------------*/
 
+/*
+ * A client library environment. Each client has one environment
+ * obtained through call to HTRegister and used for garbage collection
+ * in HTUnregister.
+ */
+typedef struct {
+    /* Unique client information */
+    GeodeHandle HTLE_geodeHandle;
+
+    /* Service provider accessPoint */
+    word HTLE_accessPoint;
+
+    /* HTPolicy Manager information */
+    /* @@@ Content callback @@@ */
+    
+    /* HTAnchor Manager information */
+    
+    /* HTCache Manager information */
+
+    /* HTNet Manager information */
+    /* Default "request" and "after" callbacks if none
+       provided with the request */
+
+} HTLibEnv;
+
+
 #define MAX_SCHEME_NAME_LENGTH 32   /* Should be long enough for any
 				       scheme, e.g., "http", "gopher". */
 #define MAX_HOST_NAME_LENGTH   256  /* Guaranteed to hold any domain
 				       name. See Section 2.1 of 
 				       RFC 1123. */
+/*  
+ * Maximum string length of a resolved IP address.
+ */
+#define MAX_RESOLVED_ADDRESS_LENGTH 32
+
 /*
  * Some of the parsed HTTP/MIME response (with respect to a request) headers
  * that we are interested in.  
@@ -69,7 +100,7 @@ typedef struct {
     **
     */
     /* The owner Geode of this request. */
-    GeodeHandle HTR_client;
+    GeodeHandle HTR_clientGeodeHandle;
 
     /* Points to the request handle itself. */
     HTRequestHandle HTR_requestHandle;
@@ -94,13 +125,7 @@ typedef struct {
     /* The HTTP request line. */
     HTMethod	HTR_method;
     MemHandle	HTR_uriString;  /* Unparsed. */
-    Boolean     HTR_uriRedirected;  /* Server redirected our orig url */
     HTTPVersion	HTR_version;
-    
-    /*
-     * Add 10/2/97
-     */
-    optr        HTR_target;
 
     /*
     ** SOURCE OF DATA TO SEND
@@ -116,17 +141,17 @@ typedef struct {
     /* Entity headers */
     HTEntityHd HTR_entityHdMask;
 
-    /* Extra headers extended by client */
-    HTListHandle HTR_extraHeaders;
-
     /* 
-     * The data object to send.
+     * The source anchor that contains all the information about
+     * the data object to send.
      */
-    HTMemHandle HTR_data;
+    HTAnchorHandle HTR_source;          /* Source of data. This anchor
+					   is not cached and must be created
+					   using API HTAnchorNew */
 	
     /*
-    **  PROXY RELATED INFORMATION
-    **  -------------------------
+    **  PROXY AND CONNECTION INFORMATION
+    **  --------------------------------
     **
     */
     /* 
@@ -136,15 +161,26 @@ typedef struct {
     Boolean HTR_proxy;   /* Existence of proxyName. */
     char HTR_proxyName[MAX_HOST_NAME_LENGTH];
     word HTR_proxyPortNumber;
-    HTMemHandle HTR_proxyAuth;
+
+    /* 
+     * The resolved host or proxy name, depending on whether a 
+     * proxy is provided or not. 
+     */
+    byte HTR_resolvedAddress[MAX_RESOLVED_ADDRESS_LENGTH];
+    /*
+     * Geos socket associated with this request. Used ONLY for 
+     * interrputing a request, not to be read/written directly.
+     */
+    Socket HTR_sockfd;
+
+    /* The protocol object (scheduled by HTNetScheduler). */
+    HTStreamHandle HTR_protocol;
+
 
     /*
     ** CALLBACKS TO OWNER
     ** ------------------
     */
-    /* 
-     * We can't delete these HTRequestDelete as they belong to client.
-     */
 
     /* "Before", "request", and "after" callback lists */
     HTListHandle HTR_beforeList;
@@ -153,19 +189,6 @@ typedef struct {
     
     /* Post callback for client to push data to the input stream */
     HTPostCallback HTR_postCallback;
-
-    /* 
-     * Callback for converting standard chars to local chars so 
-     * that they can be viewed properly on local devices.
-     */
-    CharConverterCallback HTR_toLocalCharCbf;
-
-    /* 
-     * Callback for converting local chars to standard chars. 
-     * This is normally done when we compose and view local
-     * text and need to be converted before sending to server. 
-     */
-    CharConverterCallback HTR_toStandardCharCbf;
 
 
     /*
@@ -178,9 +201,7 @@ typedef struct {
      */
     ClassStruct _far *HTR_responseParserClass;
 
-    /* Protocol list to use instead of Library defaults. Cannot delete
-     * this is HTRequestDelete as it belongs to client.
-     */
+    /* Protocol list to use instead of Library defaults. */
     HTListHandle HTR_protocolList;
 
    
@@ -223,15 +244,9 @@ typedef struct {
 
     /*
      * This includes HTR_bytesRead plus bytes from headers. This 
-     * value always increases. The data that is read from HTSocket.
+     * value always increases.
      */
     dword HTR_bytesPushed;
-    
-    /*
-     * The number of bytes written to the Network; the data that
-     * goes into HTSocket.
-     */
-    dword HTR_bytesPut;
 
     /*
      * Timeout value in seconds. This is the amount of connect time
@@ -260,26 +275,8 @@ typedef struct {
     ** HTTP CACHE INFORMATION
     ** ----------------------
     */
-    HTReload HTR_reloadMode;        /* Tells where the response comes from */
-    Boolean HTR_saveToCache;        /* Whether the response is to be cached */
-    Boolean HTR_cacheHit;           /* TRUE if response found in local cache */
-    Boolean HTR_persistentCache;    /* Cache for intersession or current 
-				       session only */
-
-    /*
-    ** INTERNAL INFORMATION
-    ** --------------------
-    */
-    ThreadHandle HTR_scheduler;     /* htcore thread running this request */
-    byte HTR_resolvedAddress[MAX_RESOLVED_ADDRESS_LENGTH];  
-                                    /* If proxy present, then its resolved
-				       proxy address. If not, its resolved
-				       host address of HTR_uriString. Valid
-				       only for protocol requiring network
-				       connection. */
-    int HTR_resolvedLength;         /* Actual length of HTR_resolveAddress */
-
-    Boolean HTR_internalReq;        /* Internal request issued by Library */
+    HTReload HTR_reloadMode;
+    
 } HTRequest;
 
 

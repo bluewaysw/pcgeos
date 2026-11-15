@@ -66,9 +66,9 @@ library htjpeg
 # Resources: list all resource blocks which are used by the application.
 # (standard discardable code resources do not need to be mentioned).
 #
-resource APPRESOURCE		ui-object	read-only shared
-resource INTERFACE		ui-object	read-only shared
-resource TESTHTMLRESOURCE	read-only lmem discardable
+resource AppResource		ui-object	read-only shared
+resource Interface		ui-object	read-only shared
+resource TestHTMLResource	read-only lmem discardable
 
 #
 # My Content-type handlers. These classes receive converted data from

@@ -20,7 +20,7 @@ REVISION HISTORY:
 DESCRIPTION:
 	The Net Scheduler class.
 
-	$Id: htnetS.goh,v 1.15.2.2 97/10/18 14:54:14 kkee Exp $
+	$Id: htnetS.goh,v 1.1 97/04/07 11:48:34 newdeal Exp $
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
 
@@ -34,7 +34,6 @@ DESCRIPTION:
 @include <WWW/HTCore/htpolicy.goh>
 @include <WWW/HTCore/htstream.goh>
 @include <WWW/HTCore/htlist.goh>
-@include <WWW/HTCore/htsock.goh>
 
 @include "HTNet/htnetMan.goh"
 #include <sem.h>
@@ -43,7 +42,18 @@ DESCRIPTION:
 /* --------------------------------------------------------------------------
  * 		Data types
  * --------------------------------------------------------------------------*/
-#define MAX_HTNET_THREADS 3
+
+/* 
+ * Currently, a HTNet thread consists a protocol and its Library
+ * information. I anticipate we will add more info later on...
+ */
+typedef struct {
+    GeodeHandle HTNT_owner;                  /* owner of this thread */
+    HTRequestHandle HTNT_request;            /* the request being served */
+    HTStreamHandle HTNT_protocolHandler;     /* protocol object itself */
+    int HTNT_status;                         /* the previous status being
+						scheduled by the scheduler */
+} HTNetThread;
 
 
 /* --------------------------------------------------------------------------
@@ -53,13 +63,17 @@ DESCRIPTION:
 @class HTNetSchedulerClass, ProcessClass;
 
 /*
- * Create a new net client. It has to be done here instead of in HTNetNewClient
- * because all "after" callbacks must be executed here.
+ * Create a new protocol client and add that to scheduler thread. 
  *
- * Context:	Cooperative Multitasking
- * Source:	HTNetNewClient
- * Destination:	self.
- * Interception:self.
+ * You should *NOT* create a protocol yourself as that would certainly
+ * cause deadlock if you are using ObjInstantiateForThread to instantiate
+ * a protocol object for the policyThread and add it using 
+ * MSG_HTNS_ENQUEUE_THREAD.
+ *
+ * Context:	Cooperative multitasking
+ * Source:	HTNetNewClient.
+ * Destination:	Anyone.
+ * Interception:Not necessary.
  */
 @message void MSG_HTNS_NEW_CLIENT(HTRequestHandle request);
 
@@ -80,17 +94,47 @@ DESCRIPTION:
 
 
 /*
- * Network has disconnected. So our Net scheduler must terminate all
- * pending Net threads, including ones with persistent connections.
+ * Schedule a Net thread by entering it in the round robin queue.
  *
  * Context:	Cooperative Multitasking
- * Source:	self
- * Destination:	self
- * Interception:No.
- * Pass:        Nothing
+ * Source:	Anyone.
+ * Destination: Anyone.	
+ * Interception:Not recommended as you need not inherit this class.
+ * Pass:        net = the Net thread to schedule.
+ * Return:      Nothing.
+ * 
+ */
+@message void MSG_HTNS_ENQUEUE_THREAD(HTNetThread netThread);
+
+
+/*
+ * Unschedule a Net thread by removing it from the round robin queue.
+ * The Net object is deleted.
+ *
+ * Context:	Cooperative Multitasking
+ * Source:	Anyone
+ * Destination:	Anyone
+ * Interception:Not recommended as you need not inherit this class.
+ * Pass:        protocol = the Network protocol thread to dequeue.
+ *              status = the condition on why the protocol is dequeued.
+ * Return:      Nothing.
+ */
+@message void MSG_HTNS_DEQUEUE_THREAD(HTStreamHandle protocol,	
+					 int status);
+
+/*
+ * Unschedule all Net threads for a particular client. 
+ *
+ * Context:	Cooperative Multitasking
+ * Source:	Anyone
+ * Destination:	Anyone
+ * Interception:Not recommended.
+ * Pass:        client = a WWW library client.
+ *              status = status to pass to "after" callbacks after killing
+ *                       each request.
  * Return:      Nothing
  */
-@message void MSG_HTNS_NETWORK_DISCONNECTED();
+@message void MSG_HTNS_DEQUEUE_THREADS_FOR(GeodeHandle client, int status);
 
 @endc
 

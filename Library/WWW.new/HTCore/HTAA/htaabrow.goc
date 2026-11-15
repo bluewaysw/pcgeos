@@ -1,0 +1,789 @@
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Geoworks 1996.  All rights reserved.
+	GEOWORKS CONFIDENTIAL
+
+PROJECT:	Geos WWW Library
+MODULE:		htaabrow
+FILE:		htaabrow.goc
+
+AUTHOR:		Kok Kin Kee, Nov 27, 1996
+
+ROUTINES:
+	Name			Description
+	----			-----------
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	kkee	11/27/96   	Initial version.
+
+DESCRIPTION:
+
+	Access Authorization (AA) for browser client. 
+
+	$Id: htaabrow.goc,v 1.7.7.2 97/10/26 19:01:21 kkee Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+
+@include <WWW/HTCore/htaabrow.goh>
+@include <WWW/HTCore/htutils.goh>
+@include <WWW/HTCore/hturi.goh>
+@include <WWW/HTCore/htassoc.goh>
+@include <WWW/HTCore/htuu.goh>
+@include <WWW/HTCore/htaautil.goh>
+#include <sem.h>
+#include <Ansi/string.h>
+#include <Ansi/stdlib.h>
+@include "htfatals.goh"
+
+/*
+ * List of servers contacted by the client browser that require Access
+ * Authorization. We need a semaphore to protect accessing the list.
+ *
+ * The list is a cache that is maintained as long as the library is 
+ * running. So there is no need to delete the list since when the 
+ * library exits, it will be deleted automatically.
+ */
+static HTListHandle htAAServerList = NULL;
+static SemaphoreHandle htAASem = NULL;
+
+
+/***********************************************************************
+		Private Functions
+***********************************************************************/
+
+
+/***********************************************************************
+ *		HTAALibraryEntry
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Initialize library variables.
+ * CALLED BY:	HTCoreLibraryEntry
+ * RETURN:	Must return 0 to indicate all is ok to Geos
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	kkee	11/27/96   	Initial Revision
+ *
+ ***********************************************************************/
+int _far _pascal
+HTAALibraryEntry (LibraryCallType ty, GeodeHandle client)
+{
+    PUSHDS;
+    SET_DS_LIB_DGROUP;
+
+    if (ty == LCT_ATTACH) {
+	htAAServerList = HTListNew();
+	htAASem = ThreadAllocSem(1);
+	HandleModifyOwner(htAASem, GeodeGetCodeProcessHandle());
+
+    } else if(ty == LCT_DETACH) {
+	HTListDelete(htAAServerList); /* Not really needed, but good 
+					 programming style */
+	htAAServerList = NULL;
+	ThreadFreeSem(htAASem);
+	htAASem = NULL;
+    } 
+
+    POPDS;
+
+    return 0;
+}	/* End of HTAAEntry.	*/
+
+
+
+
+/***********************************************************************
+ *		HTAAServerNew
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Allocate a new node to hold server info and add it to 
+ *              the list of servers. The passed in hostname is 
+ *              consumed here and must *NOT* be deleted by caller.
+ *
+ * CALLED BY:   
+ * PASS:        hostname, consumed here and must *NOT* be deleted by 
+ *                        caller.
+ *              portnumber.
+ * RETURN:	HTMemHandle containing HTAAServer or NULL if cannot
+ *              allocate.
+ * SIDE EFFECTS:
+ *
+ * STRATEGY:    Must synchronize access to htAAServerList using htAASem.
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	kkee	11/27/96   	Initial Revision
+ *
+ ***********************************************************************/
+static HTMemHandle _pascal 
+HTAAServerNew (HTMemHandle hostname, int portnumber)
+{
+    HTMemHandle server;
+    HTAAServer *s;
+
+EC( EC_ERROR_IF(portnumber < 0, INVALID_PORT_NUMBER);                   )
+
+    if (!hostname) return NULL;
+    if (portnumber <= 0) portnumber = 80;
+
+    s = (HTAAServer *) HTMemAllocAndLock(&server, sizeof(HTAAServer));
+    if (!server) {
+	HTMemFree(hostname);   /* Caller has given it to us */
+	return NULL;
+    }
+    
+    s->HTAA_hostname = hostname;         /* Consumed */
+    s->HTAA_portnumber = portnumber;
+    s->HTAA_setups = HTListNew();
+
+    /* Sychronize access to htAAServerList */
+    PUSHDS;
+    SET_DS_LIB_DGROUP;
+    ThreadPSem(htAASem);
+    HTListAppend(htAAServerList, &server, sizeof(HTMemHandle));
+    ThreadVSem(htAASem);
+    POPDS;
+
+    HTMemUnlock(server);
+    return server;
+}	/* End of HTAAServerNew.	*/
+
+
+
+/***********************************************************************
+ *		HTAAServerLookup
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Lookup a server by its hostname and portnumber.
+ *
+ * CALLED BY:	
+ * PASS:        hostname
+ *              portnumber
+ * RETURN:	HTMemHandle, containing HTAAServer or NULL if not found.
+ *              Caller must *NOT* delete the returned HTMemory as it is
+ *              cached by the Library.
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	kkee	11/27/96   	Initial Revision
+ *
+ ***********************************************************************/
+static HTMemHandle _pascal
+HTAAServerLookup (HTMemHandle hostname, int portnumber)
+{
+    HTMemHandle server;
+    Boolean found = FALSE;
+
+    PUSHDS;
+    SET_DS_LIB_DGROUP;
+
+    if (hostname) {
+	HTAAServer *s;
+	char *c, *p;
+	int count, i, size;
+	
+	p = (char *) HTMemLock(hostname);
+
+	count = HTListGetCount(htAAServerList);
+	size = sizeof(HTMemHandle);
+
+	for (i=0; i<count; i++) {
+
+	    HTListGetItem(htAAServerList, i, &server, size);
+	    s = (HTAAServer *) HTMemLock(server);
+	    c = (char *) HTMemLock(s->HTAA_hostname);
+
+	    if (s->HTAA_portnumber == portnumber && !strcmp(c, p))
+		found = TRUE;
+
+	    HTMemUnlock(s->HTAA_hostname);
+	    HTMemUnlock(server);
+
+	    if (found) break;
+	}
+
+	HTMemUnlock(hostname);
+    }
+
+    POPDS;
+    return (found == TRUE ? server : NULL);
+}	/* End of HTAAServerLookup.	*/
+
+
+
+/***********************************************************************
+ *		HTAASetupNew
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Create a new setup node and add it to a HTAAServer. The
+ *              passed in template is consumed and must *NOT* be deleted
+ *              by caller.
+ *
+ * CALLED BY:	
+ * PASS:        server.
+ *              template, caller must *NOT* delete.
+ * RETURN:	HTMemHandle containing a HTAASetup and also added to 
+ *              the server->HTA_setups, list of setups of server.
+ * SIDE EFFECTS:
+ *
+ * STRATEGY:
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	kkee	11/27/96   	Initial Revision
+ *
+ ***********************************************************************/
+static HTMemHandle _pascal
+HTAASetupNew (HTMemHandle server, HTMemHandle template)
+{
+    HTAAServer *pserver;
+    HTMemHandle setup;
+    HTAASetup *psetup;
+
+EC( ECCheckHTMemHandle(server);                                         )
+
+    if (!server || !template) return NULL;
+
+    psetup = (HTAASetup *) HTMemAllocAndLock(&setup, sizeof(HTAASetup));
+
+    if (setup) {
+	psetup->HTAA_server = server;
+	psetup->HTAA_template = template;
+	psetup->HTAA_realm = NULL;
+
+	pserver = (HTAAServer *) HTMemLock(server);
+	HTListAppend(pserver->HTAA_setups, (void *) &setup, 
+		     sizeof(HTMemHandle));
+    	HTMemUnlock(server);
+	HTMemUnlock(setup);
+
+    } else {
+	/* 
+	 * Template was given to us by caller. Hence we must delete them 
+	 * if we fail to create a new setup.
+	 */	
+	HTMemFree(template);
+    }
+
+    return setup;
+}	/* End of HTAASetupNew.	*/
+
+
+
+
+/***********************************************************************
+ *		HTAASetupLookup
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Figure out which authentication setup the server is 
+ *              using for a given file on a given host and port. If 
+ *              the server has setup(s) and none match the given file,
+ *              we pick the first setup for the server (if there is
+ *              one).
+ *
+ * CALLED BY:	
+ * PASS:        hostname
+ *              portnumber
+ *              docname - file to check.
+ * RETURN:	HTMemHandle containing a HTAASetup or NULL if not found.
+ *              The returned HTMemHandle must *NOT* be deleted.
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	kkee	11/27/96   	Initial Revision
+ *
+ ***********************************************************************/
+static HTMemHandle _pascal
+HTAASetupLookup (const HTMemHandle hostname, int portnumber, 
+		 const HTMemHandle docname)
+{
+    HTMemHandle server = NULL, setup = NULL;
+    HTAAServer *pserver = NULL;
+    Boolean found = FALSE;
+    int count = 0, size;
+    
+    if (portnumber <= 0) portnumber = 80;
+
+    if (hostname && docname && 
+	(server = HTAAServerLookup(hostname, portnumber)) != NULL) {
+	
+	HTAASetup *psetup;
+	int i;
+	char *p, *q;
+
+	pserver = (HTAAServer *) HTMemLock(server);
+	count = HTListGetCount(pserver->HTAA_setups);
+	size = sizeof(HTMemHandle);
+	q = (char *) HTMemLock(docname);
+
+	for (i=0; i<count; i++) {
+
+	    HTListGetItem(pserver->HTAA_setups, i, &setup, size);
+
+	    psetup = (HTAASetup *) HTMemLock(setup);
+	    p = (char *) HTMemLock(psetup->HTAA_template);
+
+	    if (HTAATemplateMatch(p, q)) found = TRUE;
+
+	    HTMemUnlock(psetup->HTAA_template);
+	    HTMemUnlock(setup);
+
+	    if (found) break;
+	}
+	
+	HTMemUnlock(docname);
+    } 
+
+    /* 
+     * None of the setups in the server match the docname template. 
+     * So pick the first one, which is most likely to be the right
+     * one or at least we hope so.
+     */
+    if (pserver && count && !found) {
+	HTListGetItem(pserver->HTAA_setups, 0, &setup, size);
+	found = TRUE;
+    }
+
+    if (server) HTMemUnlock(server);
+    
+    return setup;
+}	/* End of HTAASetupLookup.	*/
+
+
+
+
+/***********************************************************************
+ *		HTAARealmNew
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Create a node containing username and password used for 
+ *              the given realm.
+ *
+ * CALLED BY:	
+ * PASS:        realmname, if not NULL, we copy it into realmTable
+ *                          (provided realmTable is not NULL).
+ *              username, can be NULL.
+ *              password, can be NULL. 
+ * RETURN:	HTMemHandle of a new (or modified) HTAARealm, else NULL.
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	kkee	12/ 5/96   	Initial Revision
+ *
+ ***********************************************************************/
+static HTMemHandle _pascal
+HTAARealmNew (const HTMemHandle realmname,
+	      const char *username, const char *password)
+{
+    Boolean ok = TRUE;
+    HTMemHandle realm;  /* Deref into HTAARealm */
+    HTAARealm *r;
+
+    r = (HTAARealm *) HTMemAllocAndLock(&realm, sizeof(HTAARealm));
+    if (!realm) return NULL;
+    
+    if (realmname) {
+	r->HTAA_realmname = HTStrHTMemAllocCopy(realmname);
+	if (!r->HTAA_realmname) ok = FALSE;
+    } else 
+	r->HTAA_realmname = NULL;
+
+    if (ok && username) {
+	r->HTAA_username = HTStrAllocCopy(username);
+    } else
+	r->HTAA_username = NULL;
+
+    if (ok && password) {
+	r->HTAA_password = HTStrAllocCopy(password);
+    } else
+	r->HTAA_password = NULL;
+
+    if (!ok) {
+	if (r->HTAA_realmname) HTMemFree(r->HTAA_realmname);
+	if (r->HTAA_username) HTMemFree(r->HTAA_username);
+	if (r->HTAA_password) HTMemFree(r->HTAA_password);
+	HTMemUnlockAndFree(realm);
+	return NULL;
+    }
+
+    HTMemUnlock(realm);
+    return realm;
+}	/* End of HTAARealmNew.	*/
+
+
+
+
+/***********************************************************************
+ *		HTAARealmUpdate
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Update a password realm.
+ * CALLED BY:	HTAASetBasicUserIDPassword
+ * RETURN:	Updated passed in realm.
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	kkee	1/ 2/97   	Initial Revision
+ *
+ ***********************************************************************/
+static void _pascal
+HTAARealmUpdate (HTMemHandle realm, const char *realmname,
+		 const char *userid, const char *password)
+{
+    HTAARealm *r;
+
+EC( EC_ERROR_IF(realm == NULL, -1);                                     )
+
+    if (!realm)
+	return;
+    
+    r = (HTAARealm *) HTMemLock(realm);
+    if (r->HTAA_realmname) {
+	HTMemFree(r->HTAA_realmname);
+	r->HTAA_realmname = 0;
+    }
+    if (r->HTAA_username) {
+	HTMemFree(r->HTAA_username);
+	r->HTAA_username = 0;
+    }
+    if (r->HTAA_password) {
+	HTMemFree(r->HTAA_password);
+	r->HTAA_password = 0;
+    }
+
+    if (realmname) r->HTAA_realmname = HTStrAllocCopy(realmname);
+    if (userid) {
+	r->HTAA_username = HTStrAllocCopy(userid);
+    }
+    if (password) {
+	r->HTAA_password = HTStrAllocCopy(password);
+    }
+    
+    HTMemUnlock(realm);
+}	/* End of HTAARealmUpdate.	*/
+
+
+
+
+/***********************************************************************
+ *		HTAAComposeBasicAuth
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Compose Basic scheme authentication string.
+ *
+ * CALLED BY:   HTAAComposeAuth
+ * PASS:        req->HTR_aa.HTA_scheme == HTAA_BASIC.
+ *              req->HTR_aa.HTA_realm contains username and password.
+ * RETURN:	HTMemHandle containing the compose string else NULL.
+ *              The returned HTMemHandle *must* be freed by caller.
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	kkee	11/29/96   	Initial Revision
+ *
+ ***********************************************************************/
+static HTMemHandle _pascal
+HTAAComposeBasicAuth (HTRequest *req)
+{
+    HTMemHandle cleartext, result;
+    HTAARealm *r;
+    char *p;
+    int len;
+
+EC( EC_ERROR_IF(req == NULL, INVALID_REQUEST);                          )
+EC( EC_ERROR_IF(req->HTR_aa.HTA_scheme != HTAA_BASIC, INVALID_REQUEST); )
+
+    if (!req || req->HTR_aa.HTA_scheme != HTAA_BASIC ||
+	!req->HTR_aa.HTA_realm)
+	return NULL;
+
+    r = HTMemLock(req->HTR_aa.HTA_realm);
+
+    if (!r->HTAA_username || !r->HTAA_password) {
+	HTMemUnlock(req->HTR_aa.HTA_realm);
+	return NULL;
+    }
+
+    /* Base64 encoding needs 3 bytes overhead */
+    len = strlenHTMem(r->HTAA_username) + strlenHTMem(r->HTAA_password) + 3;
+    
+    cleartext = HTMemAlloc(len);
+    result = HTMemAlloc(4*((len+2)/3+1));
+    if (!cleartext || !result) {
+	if (cleartext) HTMemFree(cleartext);
+	if (result) HTMemFree(result);
+	HTMemUnlock(req->HTR_aa.HTA_realm);
+	return NULL;
+    }
+
+    strcpyHTMem(cleartext, r->HTAA_username);
+    p = (char *) HTMemLock(cleartext);
+    PUSHDS;
+    SET_DS_LIB_DGROUP;   /* To use ":" */
+    strcat(p, ":");  /* Username and Password must not have ":", but
+			where should this be enforced? */
+    POPDS;
+    HTMemUnlock(cleartext);
+    strcatHTMem(cleartext, r->HTAA_password);
+    HTMemUnlock(req->HTR_aa.HTA_realm);
+
+    HTUUEncode(cleartext, strlenHTMem(cleartext), result);
+    HTMemFree(cleartext);
+
+    return result;
+}	/* End of HTAAComposeBasicAuth.	*/
+
+
+
+/***********************************************************************
+		Public Functions
+***********************************************************************/
+
+
+
+/***********************************************************************
+ *		HTAACOMPOSEAUTH
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Compose access authentication field for a HTTP request.
+ *
+ * CALLED BY:	HTTP
+ * RETURN:	TRUE if it has composed Authorization field and 
+ *              req->HTR_aa.HTA_authorization is the result. e.g.,
+ *
+ *		   "Basic AkRDIhEF8sdEgs72F73bfaS=="
+ *
+ *              FALSE if no authorization seems to be needed and 
+ *              req->HTA_aa.HTA_authrorization is NULL.
+ *
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:    ONLY support Basic scheme. Others are not implemented.
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	kkee	11/28/96   	Initial Revision
+ *
+ ***********************************************************************/
+Boolean _far _pascal
+HTAACOMPOSEAUTH (HTRequest *req)
+{
+    HTMemHandle auth;
+
+EC( EC_ERROR_IF(req == NULL, INVALID_REQUEST);                          )
+
+    /* 
+     * The realm contains password information for composing the
+     * authorization field req->HTR_aa.HTA_authorization.
+     */
+    if (!req->HTR_aa.HTA_setup) {
+	HTMemHandle addr, hostname, docname, port;
+	char *p;
+	int portnumber;
+	
+	addr = HTAnchorAddress(req->HTR_anchor);
+	docname = HTParseHTMemHandleURI(addr, NULL, HTURI_PARSE_PATH);
+	hostname = HTParseHTMemHandleURI(addr, NULL, HTURI_PARSE_HOST);
+	port = HTParseHTMemHandleURI(addr, NULL, HTURI_PARSE_PORT);
+	HTMemFree(addr);
+
+	p = (char *) HTMemLock(port);
+	portnumber = atoi(p);
+	HTMemUnlockAndFree(port);
+
+	req->HTR_aa.HTA_setup = HTAASetupLookup(hostname, portnumber,
+						docname);
+	HTMemFree(hostname);
+	HTMemFree(docname);
+
+	req->HTR_aa.HTA_scheme = HTAA_BASIC;  /* Actually should not be fixed,
+						 We should choose one */
+    }
+    
+    if (!req->HTR_aa.HTA_setup)
+	return FALSE;
+
+    else {
+	HTAASetup *setup;
+	setup = (HTAASetup *) HTMemLock(req->HTR_aa.HTA_setup);
+	req->HTR_aa.HTA_realm = setup->HTAA_realm;
+	HTMemUnlock(req->HTR_aa.HTA_setup);
+    }
+
+    switch (req->HTR_aa.HTA_scheme) {
+
+    case HTAA_BASIC:
+	auth = HTAAComposeBasicAuth(req);
+	break;
+
+    case HTAA_PUBKEY:
+    case HTAA_KERBEROS_V4:
+    case HTAA_KERBEROS_V5:
+	/* and others */
+    default:
+	auth = NULL;
+EC(	EC_WARNING(NOT_IMPLEMENTED);                                   )
+	break;
+    }
+    
+    if (!auth) return FALSE;
+
+    if (req->HTR_aa.HTA_authorization) {    /* if previously allocated */
+	HTMemFree(req->HTR_aa.HTA_authorization); 
+	req->HTR_aa.HTA_authorization = NULL;
+    }
+
+    req->HTR_aa.HTA_authorization = auth; 
+    return TRUE;
+}	/* End of HTAACOMPOSEAUTH.	*/
+
+
+
+
+
+/***********************************************************************
+ *		HTAASETBASICUSERIDPASSWORD
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Set the userid and password for Basic scheme 
+ *              authorization. Provide a NULL username and password to
+ *              unset it.
+ * CALLED BY:	Client.
+ * PASS:        userid, must not contain colon (i.e., ":"). ":" is a 
+ *                      special character for basic scheme encoding.
+ *              password, must not contain ":".
+ *              
+ * RETURN:	TRUE if accepted else FALSE.
+ *            
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:   We don't supply the realm value since we have no way of
+ *             knowing the realm value before being challenged by the 
+ *             server.
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	kkee	12/ 8/96   	Initial Revision
+ *
+ ***********************************************************************/
+Boolean _far _pascal
+HTAASETBASICUSERIDPASSWORD (HTRequestHandle request, 
+			    const char *userid,
+			    const char *password)
+{
+    HTRequest *req;
+    HTAASetup *setup;
+
+EC( ECCheckRequest(request);                                            )
+
+    req = (HTRequest *)MemThreadGrab(request);
+
+    /* We must know which server we are trying to authenticate */
+    if (!req->HTR_anchor) {
+	char *url;
+
+EC( EC_ERROR_IF(req->HTR_uriString == NULL, MUST_HAVE_URL);             )
+
+	url = (char *) MemLock(req->HTR_uriString);
+	req->HTR_anchor = HTAnchorFind(url);
+	MemUnlock(req->HTR_uriString);
+    }
+
+    /* We only support Basic scheme */
+    if (req->HTR_aa.HTA_wwwScheme != HTAA_NONE &&
+	req->HTR_aa.HTA_wwwScheme != HTAA_BASIC) {
+	MemThreadRelease(request);
+	return FALSE;
+    }
+    req->HTR_aa.HTA_scheme = HTAA_BASIC;
+
+    /* 
+     * To get the realm, we need HTAASetup since it stores the realm.
+     */
+    if (req->HTR_aa.HTA_setup) {
+	/* 
+	 * We have already setup the authorization. The client
+	 * is resetting because either we did not have access or
+	 * username/password was misspelt.
+	 */
+	setup = (HTAASetup *) HTMemLock(req->HTR_aa.HTA_setup);
+	HTAARealmUpdate(setup->HTAA_realm, NULL, userid, password);
+	req->HTR_aa.HTA_realm = setup->HTAA_realm;
+	HTMemUnlock(req->HTR_aa.HTA_setup);
+
+    } else {
+	/*
+	 * No setup. So its the 1st connection to a protected server
+	 * (actually 2nd since we must have been rejected the 1st time)
+	 * or the server serves a wider set of protection spaces.
+	 */
+	HTMemHandle server, addr, hostname, docname, port;
+	HTMemHandle protectionTemplate;
+	char *p;
+	int portnumber;
+
+	addr = HTAnchorAddress(req->HTR_anchor);
+	docname = HTParseHTMemHandleURI(addr, NULL, HTURI_PARSE_PATH);
+	hostname = HTParseHTMemHandleURI(addr, NULL, HTURI_PARSE_HOST);
+	port = HTParseHTMemHandleURI(addr, NULL, HTURI_PARSE_PORT);
+	HTMemFree(addr);
+
+	p = (char *) HTMemLock(port);
+	portnumber = atoi(p);
+	HTMemUnlockAndFree(port);
+
+	if ((server = HTAAServerLookup(hostname, portnumber)) == NULL) {
+	    /* Must not delete hostname after the following call */
+	    server = HTAAServerNew(hostname, portnumber);
+	}
+
+	protectionTemplate = HTAAMakeProtectionTemplate(docname);
+	HTMemFree(docname);
+
+	/* Create a new realm and cache it with the new setup */
+	req->HTR_aa.HTA_setup = HTAASetupNew(server, protectionTemplate);
+	req->HTR_aa.HTA_realm = HTAARealmNew(NULL, userid, password);
+
+	setup = (HTAASetup *) HTMemLock(req->HTR_aa.HTA_setup);
+	setup->HTAA_realm = req->HTR_aa.HTA_realm;
+	HTMemUnlock(req->HTR_aa.HTA_setup);
+    }
+	
+    MemThreadRelease(request);
+    return TRUE;
+}	/* End of HTAASETBASICUSERIDPASSWORD.	*/
+
+
+
+

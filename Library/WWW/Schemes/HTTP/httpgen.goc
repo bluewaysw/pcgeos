@@ -22,7 +22,7 @@ DESCRIPTION:
 
 	HTTP General headers generator, part of the input stream stack.
 
-	$Id: httpgen.goc,v 1.6.4.1 97/09/05 10:51:05 jeremyb Exp $
+	$Id: httpgen.goc,v 1.1 97/04/07 11:49:55 newdeal Exp $
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
 
@@ -31,7 +31,6 @@ DESCRIPTION:
 @include <WWW/HTCore/htstream.goh>
 @include <WWW/HTCore/htreq.goh>
 @include <WWW/HTCore/htreqMan.goh>
-@include <WWW/HTCore/htobj.goh>
 @include "httpgen.goh"
 
 #include <Ansi/stdio.h>
@@ -128,7 +127,13 @@ HTTPMakeGeneralHeaders (HTRequestHandle request, HTStreamHandle target,
  ***********************************************************************/
 @method HTTPGenClass, MSG_HT_STREAM_FLUSH
 {
-    return @call oself::MSG_HT_STREAM_PUT_BLOCK(NULL, 0);
+    int status = @call oself::MSG_HT_STREAM_PUT_BLOCK(NULL, 0);
+
+EC( ECCheckStream(@self->HTSI_target);                                  )
+
+    if (status == HT_OK)
+	return @call @self->HTSI_target::MSG_HT_STREAM_FLUSH();
+    return status;
 }	/* End of MSG_HT_STREAM_FLUSH.	*/
 
 
@@ -162,15 +167,9 @@ HTTPMakeGeneralHeaders (HTRequestHandle request, HTStreamHandle target,
 	status = HTTPMakeGeneralHeaders(@self->HTSI_request, 
 					@self->HTSI_target,
 					@self->HTGI_endHeader);
-@ifdef PRODUCT_RESPONDER
-	pself = ObjDeref(oself,0);
-@endif
 	if (status == HT_OK) 
 	    status = @call @self->HTSI_target::MSG_HT_STREAM_PUT_BLOCK(
                                         data, len);
-@ifdef PRODUCT_RESPONDER
-	pself = ObjDeref(oself,0);
-@endif
 	@self->HTSI_transparent = TRUE;
     }
     return status;
@@ -202,14 +201,10 @@ HTTPMakeGeneralHeaders (HTRequestHandle request, HTStreamHandle target,
  ***********************************************************************/
 @method HTTPGenClass, MSG_HT_STREAM_ABORT
 {
-@ifdef PRODUCT_RESPONDER
-	pself = ObjDeref(oself,0);
-@endif
+    @call oself::MSG_HT_STREAM_FLUSH();
+
     if (@self->HTSI_target != NullOptr) {
-	@call @self->HTSI_target::MSG_HT_STREAM_ABORT(status);
-@ifdef PRODUCT_RESPONDER
-	pself = ObjDeref(oself,0);
-@endif
+	@call @self->HTSI_target::MSG_HT_STREAM_ABORT();
 	@self->HTSI_target = NullOptr;
     }
 
@@ -258,7 +253,7 @@ EC( ECCheckRequest(request);                                            )
 
     PUSHDS;
     SET_DS_LIB_DGROUP;
-    stream = HTObjInstantiateForThread(0, &HTTPGenClass);
+    stream = ObjInstantiateForThread(0, &HTTPGenClass);
     POPDS;
 
     if (!stream) {

@@ -1,0 +1,210 @@
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Geoworks 1996.  All rights reserved.
+	GEOWORKS CONFIDENTIAL
+
+PROJECT:	Geos WWW Library.
+MODULE:		sgml
+FILE:		sgml.goh
+
+AUTHOR:		Kok Kin Kee, Sep 25, 1996
+
+ROUTINES:
+	Name			Description
+	----			-----------
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	kkee	9/25/96   	Initial version.
+
+DESCRIPTION:
+
+	SGML parser.
+
+	$Id: sgml.goh,v 1.9.3.6 97/11/11 15:23:44 grisco Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+@ifndef __SGML_GOH__
+@define __SGML_GOH__
+
+@include <WWW/HTCore/htstream.goh>
+@include <WWW/HTCore/htreq.goh>
+
+typedef MemHandle SGMLScannerHandle;  /* SGML scanner decriptor */
+
+/*
+ * SGML content models. An SGML content model provides further information
+ * on how to parse data once an element is met. A content model can be 
+ * specified in terms of "other elements" or using "special SGML reserved 
+ * words". The following SGMLContent are all reserved words (some are 
+ * deprecated). Each element in a DTD must include a content model. Its 
+ * easy to use one of the reserved words, but what about "other elements"?
+ * It will make parsing very very slow and complicated if we include 
+ * "other elements". So normally an SGML parser does not know about 
+ * "other elements" content models. It is up to the target to recognize
+ * "other elements" content models. For example, in HTML, the HTMLClass
+ * must be able to deal with elements that does not belong to non-table
+ * elements when it is dealing with table.
+ * So, if you have elements that uses "other elements" as a content model,
+ * you should use SGMLC_MIXED as the content model and then do your own
+ * checking when you receive the properly nested SGML elements.
+ *
+ * Note that we purposely commented out deprecated SGML content models.
+ * Like many others, we also think that these models, CDATA and RCDATA,
+ * cause too much confusion and cannot be implemented properly.
+ */
+typedef enum {
+     SGMLC_EMPTY      = 0x1 /* The element can never an end tag or its 
+			       end tag is optional (e.g., <BR>). The end
+			       element will not not be pushed to SGML 
+			       target. */
+    ,SGMLC_LITERAL    = 0x2 /* Markup within text is ignored except the 
+			       exact close tag only (e.g., <PLAINTEXT>) */
+    ,SGMLC_PREFORMATTED = 0x4  /* Preformatted text. Accept all markup 
+				  and white spaces */
+/*  ,SGMLC_CDATA */   /* Character Data. Recognize </ only. Deprecated!
+		         So, *don't* use!!!! */
+/*  ,SGMLC_RCDATA */  /* Replacable Character Data. Recognize </ and &ref; 
+		         Also deprecated! So, *don't* use!!!! */
+    ,SGMLC_MIXED      /* Elements and PCDATA. Recognize all markup */
+
+    ,SGMLC_IGNORE     /* Anything between the start and end tag will
+                         be ignored. To use this, end tag is required */
+
+/*  ,SGMLC_ELEMENT */ /* Any data found is returned as error,
+                         but currently ignored. */
+} SGMLContent;
+
+/*
+ * Name of an attribute.
+ */
+typedef struct {
+    char *SGMLA_name;
+    word SGMLA_token;         /* e.g., HTML_ATTR_<name> */
+} SGMLAttr;
+
+/* 
+ * Tags that can be gargabe collected if the parser is deperate for 
+ * space.
+ */
+#define SGMLT_GARBAGE_COLLECT 1000 /* Largest positive integer value */
+
+/*
+ * A tag structure describes an SGML element.
+ */
+typedef struct {
+    /* In a flat memory model, we would use the following.. */
+    /* 
+     * char *SGMLT_name; 
+     * word SGMLT_token;
+     * SGMLAttr *SGMLT_attrList;
+     * word SGMLT_numOfAttrs;
+     */
+
+    /* In the wonderful Geos memory model */
+    char *SGMLT_name;              /* Name of the tag, its the string 
+				      that comes after "<" */
+    word SGMLT_token;              /* The token for SGMLT_name */
+    optr SGMLT_attrList;           /* Attribute list, points to a zero-
+				      terminated array of attribute names */
+    word SGMLT_numOfAttrs;         /* Number of possible attributes,	
+				      currently not used as we do not
+				      yet use binary search. This an
+				      optimization we can implement later */
+    SGMLContent SGMLT_content;     /* SGML data content model */
+    int  SGMLT_endScope;           /* The scope for delaying correcting 
+				      mistmatch end tags. When an end tag
+				      is encountered, if its scope is greater
+				      than the current start tag on elementStack,
+				      it is delayed. Whenever the element on
+				      the current stack is popped, try the
+				      delayed element(s) again. At that point,
+				      the element will either be rejected, 
+				      accepted, or delayed again. The idea
+				      is to prevent less important tags 
+				      (e.g., FONT) from correcting important 
+				      tags (e.g., TABLE). If endScope is 
+				      SGMLT_GARBAGE_COLLECTABLE, then it will
+				      be thrown aaway if parser is desparate
+				      for room */
+} SGMLTag;
+
+
+/*
+ * DTD information used in scanning and parsing. DTD tells the parser
+ * what data to scan and parse. All DTD optrs *MUST* be in the same
+ * resource. We do this for speed.
+ */
+typedef struct {
+    /* In a flat memory model, we would use the following...*/
+    /*
+     * SGMLTag *SGMLD_tagList; 
+     * word     SGMLD_numOfTags; 
+     * char   **SGMLD_entityList; 
+     * char   **SGMLD_entityTranslate;
+     * char   **SGMLD_characterTranslate;
+     */
+
+    /* In the wonderful Geos memory model, we use ... */
+    optr     SGMLD_tagList;       /* Must be in strcmp order by name */
+    word     SGMLD_numOfTags;     /* Number of tags */
+
+    optr     SGMLD_entityList;    /* Must in strcmp order by name */
+    optr     SGMLD_entityTranslate; /* Translation table for entityList */
+    word     SGMLD_numOfEntities;  /* Length of SGMLD_entityList */
+
+    optr     SGMLD_characterTranslate; /* Translation table for 
+					  characaterList */
+} SGMLDTD;
+
+/*
+ * This is the structured data generated by sgml and passed to its 
+ * target. (If you read htstream.goh MSG_HT_STRUCTURED_PUT_START_ELEMENT,
+ * the data passed is specific to a structured stream). The target of 
+ * SGML must intercept MSG_HT_STRUCUTRED_PUT_START_ELEMENT to accept the 
+ * data in this format.
+ * 
+ * if SGMLE_token == 0, it means the end of the list of SGMLEntities.
+ * This means that you *must* not use tokens where its value is 0.
+ * See for example, tables HTMLAttr and HTMLTokens in htmlDTD.goh.
+ */
+typedef struct {
+    word SGMLE_token;             /* token number, 0 means end of list */
+    ChunkHandle SGMLE_value;      /* token value in a chunk */
+} SGMLEntity;
+
+
+/****************************************************************************
+
+  The SGMLClass is inherited from HTStreamClass defined in htstream.goh{goc}.
+
+ ****************************************************************************/
+
+@class SGMLClass, HTStreamClass;
+
+
+/* -------------------------------------------------------------------------
+ * 		Instance Data.
+ * ------------------------------------------------------------------------*/
+
+/* 
+ *  SGML scanner.
+ */
+@instance SGMLScannerHandle SGMLI_scanner;
+
+/*
+ * The DTD that defines the parsing of SGML parser.
+ */
+@instance SGMLDTD *SGMLI_dtd;
+
+/* 
+ *  SGML parser is a thread that reads tokens from the scanner.
+ */
+@instance ThreadHandle SGMLI_parserThread;
+
+@endc;
+
+
+@endif

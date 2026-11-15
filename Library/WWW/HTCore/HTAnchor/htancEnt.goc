@@ -24,20 +24,16 @@ DESCRIPTION:
 	anchor object. This file implements the functions that manages
 	these headers.
 
-	$Id: htancEnt.goc,v 1.8.1.3 97/10/22 16:58:11 kkee Exp $
+	$Id: htancEnt.goc,v 1.1 97/04/07 11:49:10 newdeal Exp $
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
 
 
 @include <WWW/HTCore/htancMan.goh>
-@include <WWW/HTCore/htutils.goh>
 @include <WWW/HTCore/htstring.goh>
 @include "htfatals.goh"
-#include <Ansi/string.h>             /* memcpy */
-#include <Ansi/stdlib.h>             /* atoi */
-#include <sem.h>
+#include <Ansi/string.h>		/* memcpy(), memcmp() */
 
-extern SemaphoreHandle anchorSem;    /* In htanchor.goc */
 
 
 /***********************************************************************
@@ -65,16 +61,11 @@ HTANCHORCONTENTTYPE (HTAnchorHandle parent)
     HTStringHandle ret;
 
 EC( ECCheckHTAnchor(parent);                                            )
-    PUSHDS;
-    SET_DS_LIB_DGROUP;
-    ThreadPSem(anchorSem);
 
     anchor = (HTParentAnchor *) HTMemLock(parent);
     ret = anchor->HTPA_content_type;
     HTMemUnlock(parent);
 
-    ThreadVSem(anchorSem);
-    POPDS;
     return ret;
 }	/* End of HTANCHORCONTENTTYPE.	*/
 
@@ -106,16 +97,10 @@ HTANCHORSETCONTENTTYPE (HTAnchorHandle parent, HTStringHandle contentType)
 
 
 EC( ECCheckHTAnchor(parent);                                             )
-    PUSHDS;
-    SET_DS_LIB_DGROUP;
-    ThreadPSem(anchorSem);
 
     anchor = (HTParentAnchor *) HTMemLock(parent);
     anchor->HTPA_content_type = contentType;
     HTMemUnlock(parent);
-
-    ThreadVSem(anchorSem);
-    POPDS;
 }	/* End of HTANCHORSETCONTENTTYPE.	*/
 
 
@@ -148,16 +133,11 @@ HTANCHORCONTENTLENGTH (HTAnchorHandle parent)
     if (!parent) return 0;
 
 EC( ECCheckHTAnchor(parent);                                           )
-    PUSHDS;
-    SET_DS_LIB_DGROUP;
-    ThreadPSem(anchorSem);
 
     anchor = (HTParentAnchor *) HTMemLock(parent);
     ret = anchor->HTPA_content_length;
     HTMemUnlock(parent);
 
-    ThreadVSem(anchorSem);
-    POPDS;
     return ret;
 }	/* End of HTANCHORCONTENTLENGTH.	*/
 
@@ -187,99 +167,11 @@ HTANCHORSETCONTENTLENGTH (HTAnchorHandle parent, dword contentLength)
     HTParentAnchor *anchor;
 
 EC( ECCheckHTAnchor(parent);                                            )
-    PUSHDS;
-    SET_DS_LIB_DGROUP;
-    ThreadPSem(anchorSem);
 
     anchor = (HTParentAnchor *) HTMemLock(parent);
     anchor->HTPA_content_length = contentLength;
     HTMemUnlock(parent);
-
-    ThreadVSem(anchorSem);
-    POPDS;
 }	/* End of HTANCHORSETCONTENTLENGTH.	*/
-
-
-
-/***********************************************************************
- *		HTANCHORDATE
- ***********************************************************************
- *
- * SYNOPSIS:	Get the date of anchor object. This is the Date: of 
- *              HTTP/MIME header.
- * CALLED BY:	Client
- * RETURN:	HTMemHandle or NULL if no date.
- *	
- * STRATEGY:	
- *	
- * REVISION HISTORY:
- *	Name		Date		Description
- *	----		----		-----------
- *	kkee    	8/21/97   	Initial Revision
- *	
- ***********************************************************************/
-HTMemHandle _far _pascal
-HTANCHORDATE (HTAnchorHandle parent)
-{
-    HTParentAnchor *anchor;
-    HTMemHandle ret = 0;
-
-EC( ECCheckHTAnchor(parent);                                            )
-    PUSHDS;
-    SET_DS_LIB_DGROUP;
-    ThreadPSem(anchorSem);
-
-    anchor = (HTParentAnchor *) HTMemLock(parent);
-    if (anchor->HTPA_date)
-	ret = HTStrHTMemAllocCopyWID(HTMID_HTANCHOR, anchor->HTPA_date);
-    HTMemUnlock(parent);
-
-    ThreadVSem(anchorSem);
-    POPDS;
-    return ret;
-}	/* End of HTANCHORDATE.	*/
-
-
-
-/***********************************************************************
- *		HTANCHORSETDATE
- ***********************************************************************
- *
- * SYNOPSIS:	Set the HTTP/MIME date of an anchor object.
- * CALLED BY:	CLient
- * RETURN:	
- *	
- * STRATEGY:	
- *	
- * REVISION HISTORY:
- *	Name		Date		Description
- *	----		----		-----------
- *	kkee    	8/21/97   	Initial Revision
- *	
- ***********************************************************************/
-void _far _pascal
-HTANCHORSETDATE  (HTAnchorHandle parent, const char *str)
-{
-    HTParentAnchor *anchor;
-
-EC( ECCheckHTAnchor(parent);                                            )
-    PUSHDS;
-    SET_DS_LIB_DGROUP;
-    ThreadPSem(anchorSem);
-
-    anchor = (HTParentAnchor *) HTMemLock(parent);
-    if (anchor->HTPA_date) 
-	/* Resetting date? */
-	HTMemFree(anchor->HTPA_date);
-    if (strlen(str))
-	anchor->HTPA_date = HTStrAllocCopyWID(HTMID_HTANCHOR, str);
-    else
-	anchor->HTPA_date = 0;
-    HTMemUnlock(parent);
-
-    ThreadVSem(anchorSem);
-    POPDS;
-}	/* End of HTANCHORSETDATE.	*/
 
 
 
@@ -288,8 +180,7 @@ EC( ECCheckHTAnchor(parent);                                            )
  *		HTANCHORLASTMODIFIED
  ***********************************************************************
  *
- * SYNOPSIS:	Get last-modified data and time. Caller must delete the
- *              return HTMemHandle.
+ * SYNOPSIS:	Get last-modified data and time.
  * CALLED BY:	Client.
  * RETURN:	TimerDateAndTime.
  * SIDE EFFECTS:
@@ -302,26 +193,16 @@ EC( ECCheckHTAnchor(parent);                                            )
  *	kkee	11/ 5/96   	Initial Revision
  *
  ***********************************************************************/
-HTMemHandle _far _pascal
-HTANCHORLASTMODIFIED (HTAnchorHandle parent)
+void _far _pascal
+HTANCHORLASTMODIFIED (HTAnchorHandle parent, TimerDateAndTime *dateTime)
 {
     HTParentAnchor *anchor;
-    HTMemHandle ret = 0;
 
 EC( ECCheckHTAnchor(parent);                                            )
-    PUSHDS;
-    SET_DS_LIB_DGROUP;
-    ThreadPSem(anchorSem);
 
     anchor = (HTParentAnchor *) HTMemLock(parent);
-    if (anchor->HTPA_lastModified)
-	ret = HTStrHTMemAllocCopyWID(HTMID_HTANCHOR, 
-				     anchor->HTPA_lastModified);
+    memcpy(dateTime, &(anchor->HTPA_lastModified), sizeof(TimerDateAndTime));
     HTMemUnlock(parent);
-
-    ThreadVSem(anchorSem);
-    POPDS;
-    return ret;
 }	/* End of HTANCHORLASTMODIFIED.	*/
 
 
@@ -346,27 +227,16 @@ EC( ECCheckHTAnchor(parent);                                            )
  *
  ***********************************************************************/
 void _far _pascal
-HTANCHORSETLASTMODIFIED (HTAnchorHandle parent, const char *str)
+HTANCHORSETLASTMODIFIED (HTAnchorHandle parent, 
+			 const TimerDateAndTime *dateTime)
 {
     HTParentAnchor *anchor;
 
 EC( ECCheckHTAnchor(parent);                                            )
-    PUSHDS;
-    SET_DS_LIB_DGROUP;
-    ThreadPSem(anchorSem);
 
     anchor = (HTParentAnchor *) HTMemLock(parent);
-    if (anchor->HTPA_lastModified) 
-	/* Resetting last modified? */
-	HTMemFree(anchor->HTPA_lastModified);
-    if (strlen(str))
-	anchor->HTPA_lastModified = HTStrAllocCopyWID(HTMID_HTANCHOR, str);
-    else
-	anchor->HTPA_lastModified = 0;
+    memcpy(&(anchor->HTPA_lastModified), dateTime, sizeof(TimerDateAndTime));
     HTMemUnlock(parent);
-
-    ThreadVSem(anchorSem);
-    POPDS;
 }	/* End of HTANCHORSETLASTMODIFIED.	*/
 
 
@@ -390,38 +260,17 @@ EC( ECCheckHTAnchor(parent);                                            )
  *	kkee	11/ 5/96   	Initial Revision
  *
  ***********************************************************************/
-HTMemHandle _far _pascal
-HTANCHOREXPIRES (HTAnchorHandle parent)
+void _far _pascal
+HTANCHOREXPIRES (HTAnchorHandle parent, TimerDateAndTime *dateTime)
 {
     HTParentAnchor *anchor;
-    HTMemHandle ret = 0;
 
 EC( ECCheckHTAnchor(parent);                                            )
-    PUSHDS;
-    SET_DS_LIB_DGROUP;
-    ThreadPSem(anchorSem);
 
     anchor = (HTParentAnchor *) HTMemLock(parent);
-    if (anchor->HTPA_expires)
-	ret = HTStrHTMemAllocCopyWID(HTMID_HTANCHOR, anchor->HTPA_expires);
+    memcpy(dateTime, &(anchor->HTPA_expires), sizeof(TimerDateAndTime));
     HTMemUnlock(parent);
-
-    ThreadVSem(anchorSem);
-    POPDS;
-    return ret;
 }	/* End of HTANCHOREXPIRES.	*/
-
-// void _far _pascal
-// HTANCHOREXPIRES (HTAnchorHandle parent, TimerDateAndTime *dateTime)
-// {
-//    HTParentAnchor *anchor;
-//
-// EC( ECCheckHTAnchor(parent);                                            )
-//
-//    anchor = (HTParentAnchor *) HTMemLock(parent);
-//    memcpy(dateTime, &(anchor->HTPA_expires), sizeof(TimerDateAndTime));
-//    HTMemUnlock(parent);
-// }	/* End of HTANCHOREXPIRES.	*/
 
 
 
@@ -445,126 +294,19 @@ EC( ECCheckHTAnchor(parent);                                            )
  *
  ***********************************************************************/
 void _far _pascal
-HTANCHORSETEXPIRES (HTAnchorHandle parent, const char *str)
+HTANCHORSETEXPIRES (HTAnchorHandle parent, 
+		    const TimerDateAndTime *dateTime)
 {
     HTParentAnchor *anchor;
 
 EC( ECCheckHTAnchor(parent);                                            )
-    PUSHDS;
-    SET_DS_LIB_DGROUP;
-    ThreadPSem(anchorSem);
 
     anchor = (HTParentAnchor *) HTMemLock(parent);
-    if (anchor->HTPA_expires) 
-	/* Resetting expires */
-	HTMemFree(anchor->HTPA_expires);
-    if (strlen(str))
-	anchor->HTPA_expires = HTStrAllocCopyWID(HTMID_HTANCHOR, str);
-    else
-	anchor->HTPA_expires = 0;
+    memcpy(&(anchor->HTPA_expires), dateTime, sizeof(TimerDateAndTime));
     HTMemUnlock(parent);
-
-    ThreadVSem(anchorSem);
-    POPDS;
 }	/* End of HTANCHORSETEXPIRES.	*/
 
-// void _far _pascal
-// HTANCHORSETEXPIRES (HTAnchorHandle parent, 
-//		    const TimerDateAndTime *dateTime)
-// {
-//     HTParentAnchor *anchor;
-//
-// EC( ECCheckHTAnchor(parent);                                            )
-//
-//     anchor = (HTParentAnchor *) HTMemLock(parent);
-//     memcpy(&(anchor->HTPA_expires), dateTime, sizeof(TimerDateAndTime));
-//     HTMemUnlock(parent);
-// }	/* End of HTANCHORSETEXPIRES.	*/
 
-
-/***********************************************************************
- *		HTANCHORSETXIMAGESCALE
- ***********************************************************************
- *
- * SYNOPSIS:	Set the ximage scale of an anchor object.
- * CALLED BY:	HTTP
- * RETURN:	Nothing
- *	
- * STRATEGY:	
- *	
- * REVISION HISTORY:
- *	Name		Date		Description
- *	----		----		-----------
- *	kkee    	8/25/97   	Initial Revision
- *	
- ***********************************************************************/
-void _far _pascal
-HTANCHORSETXIMAGESCALE (HTAnchorHandle parent, const char *str)
-{
-    HTParentAnchor *anchor;
-    char *p;
-
-EC( ECCheckHTAnchor(parent);                                            )
-    PUSHDS;
-    SET_DS_LIB_DGROUP;
-    ThreadPSem(anchorSem);
-
-    if (!str || !(*str)) return;
-    anchor = (HTParentAnchor *) HTMemLock(parent);
-
-    p = strchr(str, ':');
-    if (p) {
-	*p++ = '\0';
-	anchor->HTPA_xImageXScale = atoi(str);
-    }
-    if (p && *p) {
-	anchor->HTPA_xImageYScale = atoi(p);
-    }
-
-    HTMemUnlock(parent);
-
-    ThreadVSem(anchorSem);
-    POPDS;
-}	/* End of HTANCHORSETXIMAGESCALE.	*/
-
-
-
-/***********************************************************************
- *		HTANCHORXIMAGESCALE
- ***********************************************************************
- *
- * SYNOPSIS:	Get the ximage scale of an anchor object.
- * CALLED BY:	Client
- * RETURN:	HTMemHandle or NULL. The scale x/y is given as string 
- *              "x:y". For example, 1:4 means that the image has been
- *              scaled down 4 times.
- *	
- * STRATEGY:	
- *	
- * REVISION HISTORY:
- *	Name		Date		Description
- *	----		----		-----------
- *	kkee    	8/25/97   	Initial Revision
- *	
- ***********************************************************************/
-void _far _pascal
-HTANCHORXIMAGESCALE (HTAnchorHandle parent, word *x, word *y)
-{
-    HTParentAnchor *anchor;
-
-EC( ECCheckHTAnchor(parent);                                            )
-    PUSHDS;
-    SET_DS_LIB_DGROUP;
-    ThreadPSem(anchorSem);
-
-    anchor = (HTParentAnchor *) HTMemLock(parent);
-    *x = anchor->HTPA_xImageXScale;
-    *y = anchor->HTPA_xImageYScale;
-    HTMemUnlock(parent);
-
-    ThreadVSem(anchorSem);
-    POPDS;
-}	/* End of HTANCHORXIMAGESCALE.	*/
 
 
 
@@ -601,146 +343,9 @@ HTANCHORSETDOCUMENT (HTAnchorHandle parent, HTDocument document)
 
 EC( ECCheckHTAnchor(parent);                                            )
 EC( ECCheckHTList(document);                                            )
-    PUSHDS;
-    SET_DS_LIB_DGROUP;
-    ThreadPSem(anchorSem);
 
     anchor = (HTParentAnchor *) HTMemLock(parent);
     if (anchor->HTPA_document) HTListDelete(anchor->HTPA_document);
     anchor->HTPA_document = document;
     HTMemUnlock(parent);
-
-    ThreadVSem(anchorSem);
-    POPDS;
 }	/* End of HTANCHORSETDOCUMENT.	*/
-
-
-
-/***********************************************************************
- *		HTANCHORADDHEADER
- ***********************************************************************
- *
- * SYNOPSIS:	Add extra header the anchor does not recognized. Headers 
- *              recognized by HTAnchor must be obtained via its API,
- *              such as HTAnchorDate, HTAnchorContentType, etc.
- * CALLED BY:	Client
- * RETURN:	Nothing
- *	
- * STRATEGY:	
- *	
- * REVISION HISTORY:
- *	Name		Date		Description
- *	----		----		-----------
- *	kkee    	10/21/97   	Initial Revision
- *	
- ***********************************************************************/
-void _far _pascal
-HTANCHORADDHEADER (HTAnchorHandle parent, const char *name, 
-		   const char *value)
-{
-    HTParentAnchor *anchor;
-    HTMemHandle ext;
-    HTStringHandle str, str1;
-    int count, i=0;
-
-EC( ECCheckHTAnchor(parent);                                            )
-    PUSHDS;
-    SET_DS_LIB_DGROUP;
-    ThreadPSem(anchorSem);
-
-    anchor = (HTParentAnchor *) HTMemLock(parent);
-    if (!anchor->HTPA_extraHeaders) {
-	anchor->HTPA_extraHeaders = HTListNewWID(HTMID_HTANCHOR);
-    }
-
-    str = HTStringForCase(name);   /* Case insensitive */
-
-    /* Make sure str is not already in list */
-    count = HTListGetCount(anchor->HTPA_extraHeaders);
-    /* Must be even, see HTRequestAddHeader */
-EC( if (count%2 != 0) EC_ERROR(1);                                  )
-
-    while (count) {
-	HTListGetItem(anchor->HTPA_extraHeaders, i, (void*)&str1,
-		      sizeof(HTStringHandle));
-	if (str == str1) {
-	    /* Replace them */
-	    HTListRemoveItem(anchor->HTPA_extraHeaders, i, NULL,
-			     sizeof(HTStringHandle));
-	    HTListRemoveItem(anchor->HTPA_extraHeaders, i, (void*)&ext,
-			     sizeof(HTMemHandle));
-	    HTMemFree(ext);
-	    break;
-	}
-	i += 2;
-	count -= 2;
-    }
-    
-    HTListAppend(anchor->HTPA_extraHeaders, (void*)&str, 
-		 sizeof(HTStringHandle));
-    ext = HTStrAllocCopyWID(HTMID_HTANCHOR, value);
-    HTListAppend(anchor->HTPA_extraHeaders, (void*)&ext, 
-		 sizeof(HTMemHandle));
-    HTMemUnlock(parent);
-
-    ThreadVSem(anchorSem);
-    POPDS;
-}	/* End of HTANCHORADDHEADER.	*/
-
-
-
-
-/***********************************************************************
- *		HTANCHORGETHEADER
- ***********************************************************************
- *
- * SYNOPSIS:	Get a header the anchor does not recognized. Headers 
- *              recognized by HTAnchor must be obtained via its API,
- *              such as HTAnchorDate, HTAnchorContentType, etc.
- * CALLED BY:	Client
- * RETURN:	HTMemHandle, client must free.
- *	
- * STRATEGY:	
- *	
- * REVISION HISTORY:
- *	Name		Date		Description
- *	----		----		-----------
- *	kkee    	10/21/97   	Initial Revision
- *	
- ***********************************************************************/
-HTMemHandle _far _pascal
-HTANCHORGETHEADER (HTAnchorHandle parent, const char *name)
-{
-    HTParentAnchor *anchor;
-    HTMemHandle ret = 0;
-
-EC( ECCheckHTAnchor(parent);                                            )
-    PUSHDS;
-    SET_DS_LIB_DGROUP;
-    ThreadPSem(anchorSem);
-
-    anchor = (HTParentAnchor *) HTMemLock(parent);
-    if (anchor->HTPA_extraHeaders) {
-	HTStringHandle str, str1;
-	int i, count = HTListGetCount(anchor->HTPA_extraHeaders);
-
-	str = HTStringForCase(name);
-	for (i=0; i<count; i++) {
-	    if (i%2 == 0) {
-		HTListGetItem(anchor->HTPA_extraHeaders, i, (void*)&str1,
-			      sizeof(HTStringHandle));
-		if (str == str1) {
-		    /* Found! */
-		    HTListGetItem(anchor->HTPA_extraHeaders, i+1,
-				  (void*)&ret, sizeof(HTMemHandle));
-		    ret = HTStrHTMemAllocCopyWID(HTMID_HTANCHOR, ret);
-		    break;
-		}
-	    }
-	}
-    }
-    HTMemUnlock(parent);
-    ThreadVSem(anchorSem);
-    POPDS;
-    return ret;
-}	/* End of HTANCHORGETHEADER.	*/

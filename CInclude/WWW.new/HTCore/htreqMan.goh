@@ -1,0 +1,291 @@
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Geoworks 1996 -- All Rights Reserved
+
+PROJECT:	Geos WWW Library
+MODULE:		The private request manager.
+FILE:		htreqMan.goh
+
+AUTHOR:		Kok Kin Kee, May 22, 1996
+
+ROUTINES:
+	Name			Description
+	----			-----------
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	kkee	5/22/96   	Initial version.
+
+DESCRIPTION:
+	The private request manager, internal to the Library. Public
+        request manager is in htreq.goh.
+
+	$Id: htreqMan.goh,v 1.18.1.8 97/11/18 22:33:40 kkee Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+@ifndef __HT_REQMAN_GOH
+@define __HT_REQMAN_GOH
+
+@include <WWW/HTCore/htconst.goh>
+@include <WWW/HTCore/htreq.goh>
+@include <WWW/HTCore/htstream.goh>
+@include <WWW/HTCore/htanchor.goh>
+@include <WWW/HTCore/htaautil.goh>
+@include <socket.goh>
+
+
+/* --------------------------------------------------------------------------
+ * 		I. CONSTANTS and DATA TYPES
+ * --------------------------------------------------------------------------*/
+
+#define MAX_SCHEME_NAME_LENGTH 32   /* Should be long enough for any
+				       scheme, e.g., "http", "gopher". */
+#define MAX_HOST_NAME_LENGTH   256  /* Guaranteed to hold any domain
+				       name. See Section 2.1 of 
+				       RFC 1123. */
+/*
+ * Some of the parsed HTTP/MIME response (with respect to a request) headers
+ * that we are interested in.  
+ * 
+ * Obviously, we can't support multipart message with this HTResponse
+ * setup as multipart messages would have different content-lengths, ranges,
+ * etc.
+ * 
+ * To support multipart messages, we need multiple copies of these to do 
+ * that, so we may need to use a LMem to maintain multiple copies of this 
+ * information.
+ */
+
+/*
+ * The request structure.
+ */
+typedef struct {
+
+    /*
+    ** OWNER IDENTITY
+    ** --------------
+    **
+    */
+    /* The owner Geode of this request. */
+    GeodeHandle HTR_client;
+
+    /* Points to the request handle itself. */
+    HTRequestHandle HTR_requestHandle;
+
+   
+    /*
+    ** INTERNET SERVICE PROVIDER
+    ** -------------------------
+    **
+    */
+    /* The client accessPoint for network services using socket. */
+    word HTR_accessPoint;
+
+
+    /*
+    ** REQUEST LINE
+    ** ------------
+    */
+    /* Request or Response */
+    HTTPType HTR_type;
+
+    /* The HTTP request line. */
+    HTMethod	HTR_method;
+    MemHandle	HTR_uriString;  /* Unparsed. */
+    Boolean     HTR_uriRedirected;  /* Server redirected our orig url */
+    HTTPVersion	HTR_version;
+    
+    /*
+     * Add 10/2/97
+     */
+    optr        HTR_target;
+
+    /*
+    ** SOURCE OF DATA TO SEND
+    ** ----------------------
+    **
+    */
+    /* General headers. */
+    HTGenHd HTR_genHdMask;
+    
+    /* Request headers */
+    HTReqHd HTR_reqHdMask;
+
+    /* Entity headers */
+    HTEntityHd HTR_entityHdMask;
+
+    /* Extra headers extended by client */
+    HTListHandle HTR_extraHeaders;
+
+    /* 
+     * The data object to send.
+     */
+    HTMemHandle HTR_data;
+	
+    /*
+    **  PROXY RELATED INFORMATION
+    **  -------------------------
+    **
+    */
+    /* 
+     * If a proxy is provided, it will be used instead of the 
+     * hostname in HTR_uri.
+     */
+    Boolean HTR_proxy;   /* Existence of proxyName. */
+    char HTR_proxyName[MAX_HOST_NAME_LENGTH];
+    word HTR_proxyPortNumber;
+    HTMemHandle HTR_proxyAuth;
+
+    /*
+    ** CALLBACKS TO OWNER
+    ** ------------------
+    */
+    /* 
+     * We can't delete these HTRequestDelete as they belong to client.
+     */
+
+    /* "Before", "request", and "after" callback lists */
+    HTListHandle HTR_beforeList;
+    HTListHandle HTR_afterList;
+    HTListHandle HTR_requestList;
+    
+    /* Post callback for client to push data to the input stream */
+    HTPostCallback HTR_postCallback;
+
+    /* 
+     * Callback for converting standard chars to local chars so 
+     * that they can be viewed properly on local devices.
+     */
+    CharConverterCallback HTR_toLocalCharCbf;
+
+    /* 
+     * Callback for converting local chars to standard chars. 
+     * This is normally done when we compose and view local
+     * text and need to be converted before sending to server. 
+     */
+    CharConverterCallback HTR_toStandardCharCbf;
+
+
+    /*
+    ** OVERRIDING LIBRARY DEFAULTS
+    ** ---------------------------
+    */
+    /* 
+     * The response header parser. If null, we use the Library default 
+     * header parser. 
+     */
+    ClassStruct _far *HTR_responseParserClass;
+
+    /* Protocol list to use instead of Library defaults. Cannot delete
+     * this is HTRequestDelete as it belongs to client.
+     */
+    HTListHandle HTR_protocolList;
+
+   
+    /*
+    ** DATA STREAM STACKS
+    ** ------------------
+    */
+    /* 
+     * Request input stream.
+     * It points to the first input stream object for pumping data to the 
+     * network. So it changes as the stream stack is being built. In case 
+     * you are wondering, it is called input stream with respect to the 
+     * Library; i.e., for the Library to input data. Output stream stack
+     * is keep internally as the first object of output stream stack is
+     * always a HTSocket and the last is normally from the client 
+     * application/UI.
+     */
+    HTStreamHandle HTR_inputStream;
+
+
+    /*
+    ** ERROR HANDLING
+    ** --------------
+    */
+    /* List of errors and info managed by HTError */
+    HTListHandle HTR_errorList;
+
+
+    /*
+    ** REQUEST ACCOUNTING INFO
+    ** -----------------------
+    */
+    /* 
+     * Number of bytes read from entity-body, does not include 
+     * bytes from HTTP/MIME headers. If you want to find out 
+     * the bytes in the headers, it is the difference between
+     * HTR_bytesPushed and HTRequest.HTR_bytesRead.
+     */
+    dword HTR_bytesRead;
+
+    /*
+     * This includes HTR_bytesRead plus bytes from headers. This 
+     * value always increases. The data that is read from HTSocket.
+     */
+    dword HTR_bytesPushed;
+    
+    /*
+     * The number of bytes written to the Network; the data that
+     * goes into HTSocket.
+     */
+    dword HTR_bytesPut;
+
+    /*
+     * Timeout value in seconds. This is the amount of connect time
+     * we attempt before we give up. 0 to use default timeout.
+     */
+    int HTR_timeOut; 
+
+
+    /* 
+    ** HTTP RESPONSE INFO
+    ** ------------------
+    */
+    word HTR_responseVersion;        /* HTTP response version */
+    word HTR_responseStatusCode;
+    HTAnchorHandle HTR_anchor;       /* Info about the response object.
+				        This anchor is cached and must be
+					created using API HTAnchorFind */
+
+    /*
+    ** ACCESS AUTHENTICATION INFORMATION
+    ** ---------------------------------
+    */
+    HTAuth HTR_aa;
+
+    /*
+    ** HTTP CACHE INFORMATION
+    ** ----------------------
+    */
+    HTReload HTR_reloadMode;        /* Tells where the response comes from */
+    Boolean HTR_saveToCache;        /* Whether the response is to be cached */
+    Boolean HTR_cacheHit;           /* TRUE if response found in local cache */
+    Boolean HTR_persistentCache;    /* Cache for intersession or current 
+				       session only */
+
+    /*
+    ** INTERNAL INFORMATION
+    ** --------------------
+    */
+    ThreadHandle HTR_scheduler;     /* htcore thread running this request */
+    byte HTR_resolvedAddress[MAX_RESOLVED_ADDRESS_LENGTH];  
+                                    /* If proxy present, then its resolved
+				       proxy address. If not, its resolved
+				       host address of HTR_uriString. Valid
+				       only for protocol requiring network
+				       connection. */
+    int HTR_resolvedLength;         /* Actual length of HTR_resolveAddress */
+
+    Boolean HTR_internalReq;        /* Internal request issued by Library */
+} HTRequest;
+
+
+@endif /* __HT_REQMAN_GOH */
+
+
+
+
+

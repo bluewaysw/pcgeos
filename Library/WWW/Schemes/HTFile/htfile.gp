@@ -12,7 +12,7 @@
 # DESCRIPTION:
 #       geode paramters file for the HTFile protocol class
 #
-#	$Id: htfile.gp,v 1.2.10.1 97/09/05 10:50:54 jeremyb Exp $
+#	$Id: htfile.gp,v 1.1 97/04/07 11:49:49 newdeal Exp $
 #
 ##############################################################################
 #

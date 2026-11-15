@@ -1,0 +1,262 @@
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Geoworks 1996 -- All Rights Reserved
+
+PROJECT:	Geos WWW Library
+MODULE:		Socket
+FILE:		htsock.goh
+
+AUTHOR:		Kok Kin Kee, Jun 15, 1996
+
+ROUTINES:
+	Name			Description
+	----			-----------
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	kkee	6/15/96   	Initial version.
+
+DESCRIPTION:
+	HTSocket and its manager.
+
+	$Id: htsock.goh,v 1.27.3.4 97/11/19 20:02:23 kkee Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+@ifndef __HT_SOCK_GOH__
+@define __HT_SOCK_GOH__
+
+/*
+ * #define __LOG_OUTPUT_HTSOCK__ to enable logging of htsocket data to server.
+ * in file SP_DOCUMENT/htsock.out.
+ *
+ * #define __LOG_INPUT_HTSOCK__ to enable logging of server data to htsocket
+ * in file SP_DOCUMENT/htsock.in.
+ */
+#if ERROR_CHECK
+#define __LOG_OUTPUT_HTSOCK__
+#define __LOG_INPUT_HTSOCK__
+#endif
+
+@include <stdapp.goh>
+@include <socket.goh>
+@include <sockmisc.h>
+#include <library.h>                           /* LibraryCallType */
+@include <WWW/HTCore/htconst.goh>
+@include <WWW/HTCore/htreq.goh>
+@include <WWW/HTCore/htreqMan.goh>
+@include <WWW/HTCore/htstream.goh>
+
+#ifdef SSL_ENABLE
+#include <ssl.h>
+#endif
+
+
+/* --------------------------------------------------------------------------
+ * 		CONSTANTS and DATA TYPES
+ * --------------------------------------------------------------------------*/
+
+/* 
+ * Maximum string length of an IP address. Guaranteed to hold any IP name. 
+  * See Section 2.1 of RFC 1123.
+  */
+ #define MAX_IP_ADDRESS_LENGTH 256
+
+ /* 
+  * TCP address structure to pass to HTSocket MSG_HT_SOCKET_RESOLVE.
+  */
+ typedef struct {
+     char HTSA_ipAddress[MAX_IP_ADDRESS_LENGTH];     /* Unresolved address */
+     word HTSA_port;                                 /* TCP/IP port number */
+     word HTSA_accessPoint;                          /* AccessPoint number
+							in your "ini" file */
+ } HTSocketAddress;
+
+/*
+ * TCP address structure to pass to Geos SocketResolve.
+ */
+typedef struct {
+    word       HTLA_size;             /* size of link data */
+    LinkType   HTLA_type;             /* type of link data */
+    word       HTLA_id;               /* access point id */ 
+} HTLinkAddress;
+
+typedef struct {
+    HTLinkAddress   HA_linkAddress;
+    char            HA_ipAddress[MAX_IP_ADDRESS_LENGTH];
+} HTTCPAddress;
+
+/* 
+ * The input buffer size is a compromise between speed and memory. 
+ */
+#define HTSOCKET_BUFFER_SIZE     512    /* SocketRecv in chunks of 512 */
+
+/*
+ * HTSocket structure. Each structure is allocated to be swappable.
+ * NOTE: Geos SocketConnect requires that the resolved address field,
+ * HTS_resolvedAddress, falls immediately after the SocketAddress
+ * field HTS_sockAddress; this is used implicitly in SocketConnect. 
+ */
+typedef struct {
+    /* Geos socket information. */
+    Socket HTS_sockfd;
+    SocketAddress HTS_sockAddress;
+    byte HTS_resolvedAddress[MAX_RESOLVED_ADDRESS_LENGTH];
+    HTTCPAddress HTS_tcpAddress;
+
+    /* Input buffer */
+    byte HTS_buffer[HTSOCKET_BUFFER_SIZE+2]; /* Buffer space for input */
+    word HTS_length;
+    
+    /* HTSocket state */
+    int HTS_state;
+
+    /* Make a progress report after receiving/sending a chunk of data */
+    word HTS_progressSize;
+
+    /* 
+     * Shared data between thread that runs this HTSocket (HTCore:0) and
+     * the controlling thread (client's thread). Read only by HTSocket.
+     * I think it should be void*.
+     */
+    HTNetThread *HTS_net;
+
+    /*
+     * SSL support
+     */
+#ifdef SSL_ENABLE
+    SSL *HTS_con;
+#endif
+
+} HTSocket;
+
+
+/* --------------------------------------------------------------------------
+ * 		A. HTSOCKET CLASS
+ * --------------------------------------------------------------------------*/
+
+/****************************************************************************
+ 
+  The HTSocketClass is inherited from HTStreamClass defined in 
+  htstream.goh{goc}.
+ 
+ ****************************************************************************/
+
+@class HTSocketClass, HTStreamClass;
+
+/*
+ * Initialize a stream socket to take care of pushing data for a HTSocket.
+ *
+ * Context:	Push data
+ * Source:	Anyone
+ * Destination:	HTSocketClass
+ * Interception:No.
+ */
+@message void MSG_HTSOCKET_INITIALIZE(HTSocketHandle htsock);
+
+@instance HTSocketHandle HTSI_socket;
+@endc
+
+
+/* --------------------------------------------------------------------------
+ * 		A. PUBLIC APIs
+ * --------------------------------------------------------------------------*/
+
+
+#define ECCheckHTSocket  ECCheckMemHandle
+
+#ifdef SSL_ENABLE
+extern HTSocketHandle _far _pascal
+    HTSocketCreate(HTNetThread *net, Boolean secure);
+#else
+extern HTSocketHandle _far _pascal
+    HTSocketCreate(HTNetThread *net);
+#endif
+
+extern void _far _pascal
+    HTSocketDelete(HTSocketHandle htsock);
+
+extern void _far _pascal
+    HTSocketClose(HTSocketHandle htsock);
+
+extern int _far _pascal
+    HTSocketResolve(HTSocket *sptr);
+
+extern int _far _pascal
+    HTSocketFastResolve(HTRequest *req, byte *ip);
+
+extern int _far _pascal
+    HTSocketConnect(HTSocket *sptr);
+
+extern int _far _pascal
+    HTSocketResolveAndConnect(HTSocketHandle htsock, 
+			      HTSocketAddress *htAddress);
+
+extern int _far _pascal
+    HTSocketIsConnected(HTSocketHandle htsock);
+
+extern word _far _pascal 
+    HTSocketRecv(HTSocketHandle htsock, int timeOut);
+
+extern int _far _pascal 
+    HTSocketSend(HTSocketHandle htsock, void *data, word length);
+
+extern int _far _pascal
+    HTSocketStop(HTSocketHandle htsock);
+
+extern int _far _pascal
+    HTSocketPush(HTStreamHandle target, HTSocketHandle htsock);
+
+extern int _far _pascal
+    HTSocketState(HTSocketHandle htsock);
+
+extern int _far _pascal
+    HTSocketGetInfo(HTSocketHandle htsock, word *port, byte *server, 
+		    int *serverLen);
+
+extern HTStreamHandle _far _pascal
+    HTStreamSocketCreate(HTRequestHandle request);
+
+/*
+ * Shutdown communication for good until the next call to HTActivate
+ * to activate communication for all HTSocket APIs.
+ */
+extern void _far _pascal
+    HTShutDown(void);
+
+/* 
+ * Activate again after last HTShutDown. If not called, subsequent
+ * socket APIs HTSocketResolve, HTSocketConnect, HTSocketSend, HTSocketRecv
+ * will fail with HTSocketState() == HT_SHUT_DOWN.
+ */
+extern void _far _pascal
+    HTActivate(void);
+
+extern void _far _pascal
+    HTSocketSetOpen(void);
+
+#ifdef __HIGHC__
+pragma Alias(HTSocketCreate, "HTSOCKETCREATE");
+pragma Alias(HTSocketDelete, "HTSOCKETDELETE");
+pragma Alias(HTSocketClose, "HTSOCKETCLOSE");
+pragma Alias(HTSocketResolve, "HTSOCKETRESOLVE");
+pragma Alias(HTSocketFastResolve, "HTSOCKETFASTRESOLVE");
+pragma Alias(HTSocketConnect, "HTSOCKETCONNECT");
+pragma Alias(HTSocketIsConnected, "HTSOCKETISCONNECTED");
+pragma Alias(HTSocketResolveAndConnect, "HTSOCKETRESOLVEANDCONNECT");
+pragma Alias(HTSocketRecv, "HTSOCKETRECV");
+pragma Alias(HTSocketSend, "HTSOCKETSEND");
+pragma Alias(HTSocketStop, "HTSOCKETSTOP");
+pragma Alias(HTSocketPush, "HTSOCKETPUSH");
+pragma Alias(HTSocketState, "HTSOCKETSTATE");
+pragma Alias(HTSocketGetInfo, "HTSOCKETGETINFO");
+pragma Alias(HTStreamSocketCreate, "HTSTREAMSOCKETCREATE");
+pragma Alias(HTShutDown, "HTSHUTDOWN");
+#endif
+
+@endif /* __HT_SOCK_GOH */
+
+
+
+

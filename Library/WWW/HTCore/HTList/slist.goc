@@ -25,7 +25,7 @@ DESCRIPTION:
 	and delete requests from your "after" callbacks.
 
 
-	$Id: slist.goc,v 1.4.6.1 97/09/05 10:47:34 jeremyb Exp $
+	$Id: slist.goc,v 1.1 97/04/07 11:48:16 newdeal Exp $
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
 
@@ -74,9 +74,6 @@ typedef struct {
 @method SListClass, MSG_META_INITIALIZE
 {
     @self->SLI_list = HTListNew();
-@ifdef PRODUCT_RESPONDER
-	pself = ObjDeref(oself,0);
-@endif
     @self->SLI_isKilling = ThreadAllocSem(1);
 
     @callsuper();
@@ -108,16 +105,10 @@ typedef struct {
 	return;
     }
     
-@ifdef PRODUCT_RESPONDER
-	pself = ObjDeref(oself,0);
-@endif
 EC( if (HTListGetCount(@self->SLI_list))                                )
 EC(     EC_WARNING(SLIST_NOT_COMPLETELY_DELETED);                       )
 
     HTListDelete(@self->SLI_list);
-@ifdef PRODUCT_RESPONDER
-	pself = ObjDeref(oself,0);
-@endif
     ThreadFreeSem(@self->SLI_isKilling);
     
     @callsuper();
@@ -184,9 +175,6 @@ EC( ECCheckRequest(request);                                            )
     size = sizeof(SRequest);
 
     for (i=0; i<count; i++) {
-@ifdef PRODUCT_RESPONDER
-	pself = ObjDeref(oself,0);
-@endif
 	HTListGetItem(@self->SLI_list, i, (void *)&sReq, size);
 	if (sReq.SR_request == request) {
 	    index = i;
@@ -195,9 +183,6 @@ EC( ECCheckRequest(request);                                            )
 	}
     }
 
-@ifdef PRODUCT_RESPONDER
-	pself = ObjDeref(oself,0);
-@endif
     if (found) {
 	HTListRemoveItem(@self->SLI_list, index, (void *)&sReq, size);
 	HTRequestDelete(request);
@@ -238,9 +223,6 @@ EC( ECCheckRequest(request);                                            )
     size = sizeof(SRequest);
 
     for (i=0; i<count; i++) {
-@ifdef PRODUCT_RESPONDER
-	pself = ObjDeref(oself,0);
-@endif
 	HTListGetItem(@self->SLI_list, i, (void *)&sReq, size);
 	if (sReq.SR_request == request) {
 	    index = i;
@@ -249,18 +231,12 @@ EC( ECCheckRequest(request);                                            )
 	}
     }
 
-@ifdef PRODUCT_RESPONDER
-	pself = ObjDeref(oself,0);
-@endif
     if (found) {
 	HTListRemoveItem(@self->SLI_list, index, (void *)&sReq, size);
 	if (!sReq.SR_killed) {
 	    HTRequestKill(request);
 	    sReq.SR_killed = TRUE;
 	}
-@ifdef PRODUCT_RESPONDER
-	pself = ObjDeref(oself,0);
-@endif
 	HTListAppend(@self->SLI_list, (void *)&sReq, size);
 
     } else
@@ -301,9 +277,6 @@ EC( ECCheckRequest(request);                                            )
 	return;
     }
     
-@ifdef PRODUCT_RESPONDER
-	pself = ObjDeref(oself,0);
-@endif
     @self->SLI_ackSemaphore = sem;
 
     @send,forceQueue oself::MSG_SLIST_ACK();
@@ -354,9 +327,6 @@ EC( ECCheckRequest(request);                                            )
 	}
     }
 
-@ifdef PRODUCT_RESPONDER
-	pself = ObjDeref(oself,0);
-@endif
     if (found) {
 	@send,forceQueue oself::MSG_SLIST_KILL_REQUEST(sReq.SR_request);
 	@send,forceQueue oself::MSG_SLIST_KILL_ALL_LOW();
@@ -399,14 +369,8 @@ EC( ECCheckRequest(request);                                            )
     }
 
     /* Done with killing all requests */
-@ifdef PRODUCT_RESPONDER
-	pself = ObjDeref(oself,0);
-@endif
     ThreadVSem(@self->SLI_ackSemaphore);
 
     /* We've grabbed it, so now release it. */
-@ifdef PRODUCT_RESPONDER
-	pself = ObjDeref(oself,0);
-@endif
     ThreadVSem(@self->SLI_isKilling);
 }	/* End of MSG_SLIST_ACK.	*/

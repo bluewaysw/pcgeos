@@ -22,7 +22,7 @@ DESCRIPTION:
 
 	HTTP request headers generator.
 
-	$Id: httpreq.goc,v 1.18.1.6 97/11/11 19:58:16 kkee Exp $
+	$Id: httpreq.goc,v 1.1 97/04/07 11:49:59 newdeal Exp $
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
 
@@ -33,9 +33,6 @@ DESCRIPTION:
 #include <WWW/htmem.h>
 @include <WWW/HTCore/hturi.goh>
 @include <WWW/HTCore/htaabrow.goh>
-@include <WWW/HTCore/htanchor.goh>
-@include <WWW/HTCore/htnet.goh>
-@include <WWW/HTCore/htobj.goh>
 @include "httpreq.goh"
 @include "htmethod.goh"
 @include "htfatals.goh"
@@ -81,7 +78,6 @@ DESCRIPTION:
 static int _pascal
 HTTPMake09Request (HTRequest *rptr, HTStreamHandle target, Boolean endHeader)
 {
-    HTMemHandle urlHtmh;
     HTMemHandle htmh;
     byte crlf[] = {CR, LF, '\0'};
     char *cptr;
@@ -100,22 +96,21 @@ HTTPMake09Request (HTRequest *rptr, HTStreamHandle target, Boolean endHeader)
      * We have to use the complete URI if we are using a proxy, 
      * else use the URI abs_path. 
      */
-    urlHtmh = HTAnchorAddress(rptr->HTR_anchor);
-    cptr = (char *) HTMemLock(urlHtmh);
-
+    MemLock(rptr->HTR_uriString);
+    cptr = (char *) MemDeref(rptr->HTR_uriString);
+    
     if (rptr->HTR_proxy)
 	PUTBLOCK(target, (byte *)cptr);
 
     else {
-	byte *b;
 	htmh = HTParseURI(cptr, NULL,
 			  HTURI_PARSE_PATH | HTURI_PARSE_PUNCTUATION);
-	b = (byte *) HTMemLock(htmh);
-	PUTBLOCK(target, b);
+	cptr = (char *) HTMemLock(htmh);
+	PUTBLOCK(target, (byte *)cptr);
 	HTMemUnlockAndFree(htmh);
     }
 
-    HTMemUnlockAndFree(urlHtmh);
+    MemUnlock(rptr->HTR_uriString);
 
     ret = PUTBLOCK(target, crlf);
 
@@ -146,10 +141,8 @@ HTTPMake09Request (HTRequest *rptr, HTStreamHandle target, Boolean endHeader)
  *
  ***********************************************************************/
 static int _pascal
-HTTPMakeRequest (HTNetThread *net, HTRequest *rptr, 
-		 HTStreamHandle target, Boolean endHeader)
+HTTPMakeRequest (HTRequest *rptr, HTStreamHandle target, Boolean endHeader)
 {
-    HTMemHandle urlHtmh;
     HTMemHandle htmh;
     byte linebuf[256];
     byte crlf[] = {CR, LF, '\0'};
@@ -171,28 +164,44 @@ EC( ECCheckStream(target);                                              )
      * We have to use the complete URI if we are using a proxy, 
      * else use the URI abs_path.
      */
-    urlHtmh = HTAnchorAddress(rptr->HTR_anchor);
-    cptr = (char *) HTMemLock(urlHtmh);
+    MemLock(rptr->HTR_uriString);
+    cptr = (char *) MemDeref(rptr->HTR_uriString);
 
     if (rptr->HTR_proxy) 
 	PUTBLOCK(target, (byte *)cptr);
 
     else { 
-	byte *b;
 	htmh = HTParseURI(cptr, NULL,
 			  HTURI_PARSE_PATH | HTURI_PARSE_PUNCTUATION);
-	b = (byte *) HTMemLock(htmh);
-	PUTBLOCK(target, b);
+
+	/* Check htmh is not NULL!!! */
+
+	cptr = (char *) HTMemLock(htmh);
+	PUTBLOCK(target, (byte *)cptr);
 	HTMemUnlockAndFree(htmh);
     }
 
     switch (rptr->HTR_version) {
     case HTTPV_1_0:
-	sprintf((char *)linebuf, " HTTP/1.0%c%c", CR, LF);
+	sprintf((char *)linebuf, " HTTP/1.0 %c%c", CR, LF);
 	break;
 
     case HTTPV_1_1:
-	sprintf((char *)linebuf, " HTTP/1.1%c%c", CR, LF);
+	/*
+	 * Hostname is required for all HTTP/1.1 requests.
+	 */
+	sprintf((char *)linebuf, " HTTP/1.1 %c%cHost: ", CR, LF);
+
+	cptr = (char *) MemDeref(rptr->HTR_uriString);
+	htmh = HTParseURI(cptr, NULL, HTURI_PARSE_HOST);
+
+	/* Check htmh is not NULL!!! */
+	
+	cptr = (char *) HTMemLock(htmh);
+	strcat((char *)linebuf, cptr);
+	HTMemUnlockAndFree(htmh);
+
+	strcat((char *)linebuf, (char *)crlf); 
 	break;
 
     default:
@@ -202,198 +211,23 @@ EC(     EC_ERROR(HTTP_VERSION_NOT_IMPLEMENTED);                         )
         break;
     }
 
+    MemUnlock(rptr->HTR_uriString);
+
     PUTBLOCK(target, linebuf);
 
     /* 
     ** Put HTTP request headers.
     ** ------------------------
     */
-    
-    /*
-     * Maintain persistent connection
-     *
-     * Connection: Keep-Alive
-     */
-    if (rptr->HTR_version == HTTPV_1_0) {
-	/* 
-	 * Net is persistent until connection closed by server
-	 * or us in garbage collecting Net threads.
-	 */
-	HTNetSetPersistent(net, TRUE);
-	PUTBLOCK(target, (byte*)"Connection: Keep-Alive");
-	PUTBLOCK(target, (byte*)crlf);
-    }
-
-    /*
-     * User-Agent: ...
-     */
-    htmh = HTSessionLookup(rptr->HTR_client); 
-    if (htmh) {
-	HTLibEnv *env = (HTLibEnv *) HTMemLock(htmh);
-	if (env->HTLE_userAgent) {
-	    byte *b;
-	    PUTBLOCK(target, (byte*)"User-Agent: ");
-	    b = (byte*)HTMemLock(env->HTLE_userAgent);
-	    PUTBLOCK(target, b);
-	    HTMemUnlock(env->HTLE_userAgent);
-	    PUTBLOCK(target, (byte *)crlf);
-	}
-	HTMemUnlock(htmh);
-    }
-
-    /*
-     * Host: ...
-     */
-    htmh = HTParseURI(cptr, NULL, HTURI_PARSE_HOST | 
-		      HTURI_PARSE_PORT | HTURI_PARSE_PUNCTUATION);
-    if (htmh) {
-	byte *b;
-	PUTBLOCK(target, (byte*)"Host: ");
-	b = (byte *) HTMemLock(htmh);
-	PUTBLOCK(target, b);
-	PUTBLOCK(target, (byte*)crlf);
-	HTMemUnlockAndFree(htmh);
-    }
-    HTMemUnlockAndFree(urlHtmh);
-
-    /*
-     * Authorization: ...
-     */
     HTAAComposeAuth(rptr);
     if (rptr->HTR_aa.HTA_authorization) {
-	byte *b;
 	PUTBLOCK(target, (byte *)"Authorization: Basic ");
-	b = (byte *) HTMemLock(rptr->HTR_aa.HTA_authorization);
-	PUTBLOCK(target, b);
+	cptr = (char *) HTMemLock(rptr->HTR_aa.HTA_authorization);
+	PUTBLOCK(target, (byte *)cptr);
 	HTMemUnlock(rptr->HTR_aa.HTA_authorization);
 	PUTBLOCK(target, (byte *)crlf);
-	/* Cache response only for the current session */
-	rptr->HTR_persistentCache = FALSE;
     }
 
-    /*
-     * If-Modified-Since: ...
-     */
-    if (rptr->HTR_method == HTM_GET &&
-	rptr->HTR_anchor && HTAnchorCacheHit(rptr->HTR_anchor)) {
-	HTMemHandle date;
-	date = HTAnchorLastModified(rptr->HTR_anchor);
-	if (!date) date = HTAnchorExpires(rptr->HTR_anchor);
-	if (!date) date = HTAnchorDate(rptr->HTR_anchor);
-	if (date) {
-	    byte *b;
-	    PUTBLOCK(target, (byte *)"If-Modified-Since: ");
-	    b = (byte*) HTMemLock(date);
-	    PUTBLOCK(target, b);
-	    HTMemUnlockAndFree(date);
-	    PUTBLOCK(target, (byte*)crlf);
-	}
-    }
-
-    /*
-     * Pragma: no-cache
-     */
-    if (rptr->HTR_reloadMode == HTRELOAD_FORCE_RELOAD) {
-	PUTBLOCK(target, (byte*)"Pragma: no-cache");
-	PUTBLOCK(target, (byte*)crlf);
-    }
-    
-    /*
-     * Proxy-Authorization: "Basic" SP basic-cookie
-     */
-    if (rptr->HTR_proxy && rptr->HTR_proxyAuth) {
-	byte *b;
-	PUTBLOCK(target, (byte*)"Proxy-Authorization: Basic ");
-	b = (byte *) HTMemLock(rptr->HTR_proxyAuth);
-	PUTBLOCK(target, b);
-	HTMemUnlock(rptr->HTR_proxyAuth);
-	PUTBLOCK(target, (byte *)crlf);
-    }
-
-    /* 
-     * Accept: image/gif, image/jpeg, 
-     */
-    if (rptr->HTR_reqHdMask & HTRH_ACCEPT) {
-	PUTBLOCK(target, (byte*)"Accept: image/gif, image/jpeg, */*");
-	PUTBLOCK(target, (byte*)crlf);
-    }
-    
-    /* 
-     * Accept-Charset: iso-8859-1
-     */
-    if (rptr->HTR_reqHdMask & HTRH_ACCEPT_CHARSET) {
-	PUTBLOCK(target, (byte*)"Accept-Charset: iso-8859-1");
-	PUTBLOCK(target, (byte*)crlf);
-    }
-    
-    /* 
-     * Accept-Language: en
-     */
-    if (rptr->HTR_reqHdMask & HTRH_ACCEPT_LANGUAGE) {
-	PUTBLOCK(target, (byte*)"Accept-Language: en");
-	PUTBLOCK(target, (byte*)crlf);
-    }
-
-    /*
-     * Accept-Encoding
-     */
-    /* @@@ */
-
-    /* 
-     * Cookie: ... (Netscape HTTP Cookies) 
-     */
-    {
-	HTListHandle list = HTAnchorFindCookies(rptr->HTR_anchor);
-	if (list) {
-	    int count = HTListGetCount(list);
-	    if (count) {
-		int i;
-		HTMemHandle tmp;
-		char *c;
-
-		PUTBLOCK(target, (byte*)"Cookie: ");
-		for (i=0; i<count; i++) {
-		    if (i != 0) {
-			PUTBLOCK(target, (byte*)"; ");
-		    }
-		    HTListRemoveItem(list, 0, &tmp, sizeof(HTMemHandle));
-		    c = HTMemLock(tmp);
-		    PUTBLOCK(target, (byte*)c);
-		    HTMemUnlockAndFree(tmp);
-		}
-		PUTBLOCK(target, (byte*)crlf);
-	    }
-	    HTListDelete(list);
-	}
-    }
-
-    /* Extra headers as "name: value" pairs */
-    if (rptr->HTR_extraHeaders) {
-	HTMemHandle str;
-	char *c;
-	int i = 0, count = HTListGetCount(rptr->HTR_extraHeaders);
-	/* Must be even, see HTRequestAddHeader */
-EC(     if (count%2 != 0) EC_ERROR(1);                                  )
-	while (count) {
-	    HTListGetItem(rptr->HTR_extraHeaders, i, (void*)&str, 
-			  sizeof(HTMemHandle));
-	    c = (char *)HTMemLock(str);
-	    PUTBLOCK(target, (byte*)c);
-	    PUTBLOCK(target, (byte*)": ");
-	    HTMemUnlock(str);
-
-	    HTListGetItem(rptr->HTR_extraHeaders, i+1, (void*)&str, 
-			  sizeof(HTMemHandle));
-	    c = (char *)HTMemLock(str);
-	    PUTBLOCK(target, (byte*)c);
-	    PUTBLOCK(target, (byte*)crlf);
-	    HTMemUnlock(str);
-
-	    i += 2;
-	    count -= 2;
-	}
-    }
-    
     if (endHeader) PUTBLOCK(target, crlf);
 
     return HT_OK;
@@ -413,7 +247,7 @@ EC(     if (count%2 != 0) EC_ERROR(1);                                  )
  *
  * SYNOPSIS:	    Indicates whether to end header by putting an empty
  *                  line consisting only of CRLF.
- * PARAMETERS:	    void (HTNetThread *net, Boolean endHeader);
+ * PARAMETERS:	    void (Boolean endHeader);
  * SIDE EFFECTS:    
  *
  * STRATEGY:	    
@@ -426,7 +260,6 @@ EC(     if (count%2 != 0) EC_ERROR(1);                                  )
  ***********************************************************************/
 @method HTTPReqClass, MSG_HTTP_REQ_END_HEADER
 {
-    @self->HTRI_net = net;
     @self->HTRI_endHeader = endHeader;
 }	/* End of MSG_HTTP_REQ_END_HEADER.	*/
 
@@ -452,7 +285,14 @@ EC(     if (count%2 != 0) EC_ERROR(1);                                  )
  ***********************************************************************/
 @method HTTPReqClass, MSG_HT_STREAM_FLUSH
 {
-    return @call oself::MSG_HT_STREAM_PUT_BLOCK(NULL, 0);
+    int status = @call oself::MSG_HT_STREAM_PUT_BLOCK(NULL, 0);
+
+EC( ECCheckStream(@self->HTSI_target);                                  )
+
+    if (status == HT_OK)
+	return @call @self->HTSI_target::MSG_HT_STREAM_FLUSH();
+
+    return status;
 }	/* End of MSG_HT_STREAM_FLUSH.	*/
 
 
@@ -487,27 +327,17 @@ EC(     if (count%2 != 0) EC_ERROR(1);                                  )
     else {
 	rptr = (HTRequest *) MemThreadGrab(@self->HTSI_request);
 
-@ifdef PRODUCT_RESPONDER
-	pself = ObjDeref(oself,0);
-@endif
 	if (rptr->HTR_version == HTTPV_0_9)
 	    status = HTTPMake09Request(rptr, @self->HTSI_target, TRUE);
 	else 
-	    status = HTTPMakeRequest(@self->HTRI_net, rptr,
-				     @self->HTSI_target, 
+	    status = HTTPMakeRequest(rptr, @self->HTSI_target, 
 				     @self->HTRI_endHeader);
 
-@ifdef PRODUCT_RESPONDER
-	pself = ObjDeref(oself,0);
-@endif
 	MemThreadRelease(@self->HTSI_request);
 
 	if (status == HT_OK)
 	    status = @call @self->HTSI_target::MSG_HT_STREAM_PUT_BLOCK(
 					data, len);
-@ifdef PRODUCT_RESPONDER
-	pself = ObjDeref(oself,0);
-@endif
 	@self->HTSI_transparent = TRUE;
     }
 
@@ -542,15 +372,10 @@ EC(     if (count%2 != 0) EC_ERROR(1);                                  )
  ***********************************************************************/
 @method HTTPReqClass, MSG_HT_STREAM_ABORT
 {
+    @call oself::MSG_HT_STREAM_FLUSH();
 
-@ifdef PRODUCT_RESPONDER
-	pself = ObjDeref(oself,0);
-@endif
     if (@self->HTSI_target != NullOptr) {
-	@call @self->HTSI_target::MSG_HT_STREAM_ABORT(status);
-@ifdef PRODUCT_RESPONDER
-	pself = ObjDeref(oself,0);
-@endif
+	@call @self->HTSI_target::MSG_HT_STREAM_ABORT();
 	@self->HTSI_target = NullOptr;
     }
 
@@ -591,21 +416,23 @@ EC(     if (count%2 != 0) EC_ERROR(1);                                  )
  *	
  ***********************************************************************/
 HTStreamHandle _far _pascal
-HTTPReqNew (HTNetThread *net, Boolean endHeader)
+HTTPReqNew (HTRequestHandle request, Boolean endHeader)
 {
     HTStreamHandle stream;
 
+EC( ECCheckRequest(request);                                            )
+
     PUSHDS;
     SET_DS_LIB_DGROUP;
-    stream = HTObjInstantiateForThread(0, &HTTPReqClass);
+    stream = ObjInstantiateForThread(0, &HTTPReqClass);
     POPDS;
 
     if (!stream) {
 	/* Log error */
     } else {
 	/* Initialize the stream instance data */
-	@call stream::MSG_HT_STREAM_SET_REQUEST(net->HTNT_request);
-	@call stream::MSG_HTTP_REQ_END_HEADER(net, endHeader);
+	@call stream::MSG_HT_STREAM_SET_REQUEST(request);
+	@call stream::MSG_HTTP_REQ_END_HEADER(endHeader);
     }
     return stream;
 }	/* End of HTTPReqNew.	*/

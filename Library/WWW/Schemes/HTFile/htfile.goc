@@ -22,7 +22,7 @@ DESCRIPTION:
 
 	HTFile protocol class.
 
-	$Id: htfile.goc,v 1.23.1.4 97/10/22 00:31:55 jeremyb Exp $
+	$Id: htfile.goc,v 1.1 97/04/07 11:49:52 newdeal Exp $
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
 
@@ -40,8 +40,6 @@ DESCRIPTION:
 @include "htfatals.goh"
 #include <Ansi/string.h>
 #include <Ansi/stdio.h>
-#include <initfile.h>
-#include <timer.h>
 
 #define HTFILE_BUFFER_SIZE      512
 
@@ -77,21 +75,9 @@ DESCRIPTION:
 @method HTFileClass, MSG_META_INITIALIZE
 {
 	/* Initialize HTFile state machine to initial state */
-@ifdef PRODUCT_RESPONDER
-	/* for Waiter demo only !! */
-	word speed = 0;
-	if(!InitFileReadInteger("wwwLibrary", "speed/100", &speed))
-	    /* 60 ticks = 1 second */
-	    @self->WAITER_delayTime = 512 / speed * 48 / 10; 
-	else
-	    @self->WAITER_delayTime = 0;
-
-	pself = ObjDeref(oself,0);
-@endif
 	@self->HTFI_currentState = HTFILE_BEGIN;
 
 	@callsuper();
-
 }	/* End of MSG_META_INITIALIZE.	*/
 
 
@@ -114,13 +100,8 @@ DESCRIPTION:
  ***********************************************************************/
 @method HTFileClass, MSG_HT_STREAM_ABORT
 {
-@ifdef PRODUCT_RESPONDER
-	pself = ObjDeref(oself,0);
-@endif
     if (@self->HTFI_block)
 	MemFree(@self->HTFI_block);
-    if (@self->HTFI_fileHandle)
-	FileClose(@self->HTFI_fileHandle, FALSE);
 
     return @callsuper();
 }	/* End of MSG_HT_STREAM_ABORT.	*/
@@ -136,13 +117,13 @@ DESCRIPTION:
  * SYNOPSIS:	    Load a file protocol. This is a state-based 
  *                  implementation of the HTFile protocol.
  *
- * PARAMETERS:	    int (HTNetThread *net)
+ * PARAMETERS:	    int (int status)
  *                  - return HT_OK if all is well.
  *                  - return HT_NO_CONTENT.
  *                  - return HT_OUT_OF_MEMORY.
  *                  - return HT_FILE_NOT_FOUND.
  *                  - return HT_LOADED if we are done reading file.
- *                  - passed in net is ignored.
+ *                  - passed in status is ignored.
  * SIDE EFFECTS:    
  *
  * STRATEGY:        Implemented in a state-based fashion. This means 
@@ -161,12 +142,8 @@ DESCRIPTION:
  ***********************************************************************/
 @method HTFileClass, MSG_HT_PROTOCOL_LOAD
 {
-    HTMemHandle tmpMemHandle ;
     int ret = HT_OK;
 
-@ifdef PRODUCT_RESPONDER
-	pself = ObjDeref(oself,0);
-@endif
 EC ( if (@self->HTSI_request == NULL) EC_ERROR(HTFILE_REQUEST_NOT_SET); )
 
     /* 
@@ -174,122 +151,138 @@ EC ( if (@self->HTSI_request == NULL) EC_ERROR(HTFILE_REQUEST_NOT_SET); )
      * previous run. This is one big switch loop.
      */
     while (1) {
-@ifdef PRODUCT_RESPONDER
-	pself = ObjDeref(oself,0);
-@endif
 	switch (@self->HTFI_currentState) {
 
 	case HTFILE_BEGIN:
-	    @self->HTFI_hasMIME = TRUE;
 	    @self->HTFI_block =  MemAlloc(HTFILE_BUFFER_SIZE,
 					  HF_SHARABLE | HF_SWAPABLE,
 					  HAF_LOCK);
-@ifdef PRODUCT_RESPONDER
-	pself = ObjDeref(oself,0);
-@endif
 	    if (!@self->HTFI_block)
 		return HT_OUT_OF_MEMORY;
 
 	    @self->HTFI_buffer = (char *) MemDeref(@self->HTFI_block);
 
 	    /* 
-	     * Open file.
+	     * Get fullpath filename & try to open it.
 	     */
 	    {
 		HTMemHandle physical;
-		HTAnchorHandle anchor;
 		HTRequest *rptr;
 		char *cptr;
 
-@ifdef PRODUCT_RESPONDER
-	pself = ObjDeref(oself,0);
-@endif
 		rptr = (HTRequest *) MemThreadGrab(@self->HTSI_request);
 		physical = HTAnchorPhysical(rptr->HTR_anchor);
+
 		cptr = (char *) HTMemLock(physical);
-		anchor = rptr->HTR_anchor;
-		MemThreadRelease(@self->HTSI_request);
-
-@ifdef PRODUCT_RESPONDER
-	pself = ObjDeref(oself,0);
-@endif
-		@self->HTFI_fileHandle = HTFileUriOpen(cptr);
-
-@ifdef PRODUCT_RESPONDER
-	pself = ObjDeref(oself,0);
-@endif
-	        if (!@self->HTFI_fileHandle) {
-		    ret = HT_CANNOT_OPEN_FILE;
-
-		} else {
-		    /*
-		     * Provide filesize as content length. This maybe over
-		     * written by MIME parser if it sees a content-length
-		     * in the file.
-		     */
-                      HTAnchorSetContentLength(anchor, 
-			        FileSize(@self->HTFI_fileHandle));
-                      /* 
-		       * Check file extension or use a guess stream.
-		       */
-		      ret = HTNetReportProgress(@self->HTSI_request,	
-						HT_LOADING_DATA);
-
-		      /* Look for file suffix */
-		      cptr = strrchr(cptr, '.'); 
-		      if (cptr) cptr++;              /* Skip the '.' */
-
-		      if (strcasecmp(cptr, "mim"))
-			  /* 
-			   * If no MIME parser, we keep track of bytes
-			   * read, else MIME is going to do it.
-			   */
-			  @self->HTFI_hasMIME = FALSE;
-		      
-@ifdef PRODUCT_RESPONDER
-	pself = ObjDeref(oself,0);
-@endif
-                      tmpMemHandle = HTSuffixCreate(cptr, @self->HTSI_request);
-@ifdef PRODUCT_RESPONDER
-	pself = ObjDeref(oself,0);
-@endif
-
-                      @self->HTSI_target = tmpMemHandle ;
-
-@ifdef PRODUCT_RESPONDER
-	pself = ObjDeref(oself,0);
-@endif
-                      /* Don't lock request when calling HTPolicyStreamStack */
-		      if (!@self->HTSI_target)
-			  @self->HTSI_target = 
-			      HTPolicyStreamStack(HT_WWW_GUESS,
-						  NULL,
-						  @self->HTSI_target,
-						  @self->HTSI_request,
-						  FALSE);
-
-@ifdef PRODUCT_RESPONDER
-	pself = ObjDeref(oself,0);
-@endif
-		      if (!@self->HTSI_target) 
-			  ret = HT_NO_CONTENT;
-
-		      /*
-		       * The output stream stack is now:
-		       *       htfile --> stream (created from htsuffix?) 
-		       *                OR
-		       *       htfile --> guess stream --> + streams to be 
-		       *                           created by guess stream.
-		       */
-		      @self->HTFI_currentState = HTFILE_READ;
-
-		  }
+		cptr = strcasestr(cptr, "file://");
+		if (cptr && cptr+7) 
+		    strncpy(@self->HTFI_buffer, cptr+7, HTFILE_BUFFER_SIZE);
+		else 
+		    @self->HTFI_buffer[0] = 0;
 
 		HTMemUnlockAndFree(physical);
-	    }
-	    if (ret != HT_OK) return ret;
+		MemThreadRelease(@self->HTSI_request);
 
-	    break;
+		while ((cptr=strchr(@self->HTFI_buffer, '/'))!=NULL) 
+		    *cptr = '\\';                      /* DOS style */
+	    }
+
+	    /* 
+	     * Attempt to open file. We try the following options.
+	     * if "/f:/pene.ec/file.htm", try "f:/pene.ec/file.htm".
+	     * if "f:/pene.ec/file.htm" try as is.
+	     * if "/document/file.htm" try "document/file.htm" 
+	     *                  relative to SP_TOP.
+	     * if "document/file.htm" try relative to SP_TOP.
+	     */
+
+	    /* Always assume relative to SP_TOP directory */
+	    FilePushDir();
+	    FileSetStandardPath(SP_TOP);
+
+	    if (@self->HTFI_buffer[0] == '\\')
+		/* Absolute directory */
+		@self->HTFI_fileHandle = 
+		    FileOpen(@self->HTFI_buffer+1, FILE_DENY_W | FILE_ACCESS_R);
+	    else {
+		@self->HTFI_fileHandle = 
+		    FileOpen(@self->HTFI_buffer, FILE_DENY_W | FILE_ACCESS_R);
+
+		/* If failed, try "f/filename" with "f:/filename" */
+		if (!@self->HTFI_fileHandle && @self->HTFI_buffer[1]=='\\') {
+		    HTMemHandle abs;
+		    char *c = (char *) HTMemAllocAndLock(&abs, 
+					  strlen(@self->HTFI_buffer)+2);
+		    *c = @self->HTFI_buffer[0];
+		    *(c+1) = ':';
+		    strcpy(c+2, @self->HTFI_buffer+1);
+
+		    @self->HTFI_fileHandle = 
+			FileOpen(c, FILE_DENY_W | FILE_ACCESS_R);
+		    HTMemUnlockAndFree(abs);		    
+		}
+		
+	    }
+
+	    FilePopDir();
+
+	    if (!@self->HTFI_fileHandle) {
+		ret = HT_CANNOT_OPEN_FILE;
+
+	    } else {
+		/*
+		 * Provide filesize as content length. This maybe over
+		 * written by MIME parser if it sees a content-length
+		 * in the file.
+		 */
+		HTRequest *rptr;
+		char *cptr;
+
+		rptr = (HTRequest *) MemThreadGrab(@self->HTSI_request);
+		HTAnchorSetContentLength(rptr->HTR_anchor, 
+					 FileSize(@self->HTFI_fileHandle));
+		MemThreadRelease(@self->HTSI_request);
+
+		/* 
+		 * Check file extension or use a guess stream.
+		 */
+
+		/* Inform client what we are going to do next */
+		ret = HTNetReportProgress(@self->HTSI_request,	
+					  HT_LOADING_DATA);
+
+		if (ret != HT_OK)
+		    return ret;	
+
+		/* Look for file suffix */
+		cptr = strrchr(@self->HTFI_buffer, '.'); 
+		if (cptr) cptr++;              /* Skip the '.' */
+
+		@self->HTSI_target = HTSuffixCreate(cptr,
+						    @self->HTSI_request);
+
+		if (!@self->HTSI_target)
+		    @self->HTSI_target = 
+			HTPolicyStreamStack(HT_WWW_GUESS,
+					    NULL,
+					    @self->HTSI_target,
+					    @self->HTSI_request,
+					    FALSE);
+
+		if (!@self->HTSI_target) 
+		    return HT_NO_CONTENT;
+
+		/*
+		 * The output stream stack is now:
+		 *       htfile --> stream (created from htsuffix?) 
+		 *                OR
+		 *       htfile --> guess stream --> + streams to be 
+		 *                                   created by guess stream.
+		 */
+		@self->HTFI_currentState = HTFILE_READ;
+
+	    }
+	    return ret;
 
 	case HTFILE_READ:
 	    /* 
@@ -301,39 +294,15 @@ EC ( if (@self->HTSI_request == NULL) EC_ERROR(HTFILE_REQUEST_NOT_SET); )
 	    {
 		word bytesRead;
 
-@ifdef PRODUCT_RESPONDER
-	pself = ObjDeref(oself,0);
-@endif
 		bytesRead = FileRead(@self->HTFI_fileHandle, 
 				     (void *) @self->HTFI_buffer, 
 				     HTFILE_BUFFER_SIZE, FALSE);
 	    
 		if (!bytesRead) {
-@ifdef PRODUCT_RESPONDER
-	pself = ObjDeref(oself,0);
-@endif
 		    FileClose(@self->HTFI_fileHandle, FALSE);
-                    @self->HTFI_fileHandle = 0;
 		    ret = HT_LOADED;
 		    
 		} else {
-
-@ifdef PRODUCT_RESPONDER
-	pself = ObjDeref(oself,0);
-@endif
-		    if (!@self->HTFI_hasMIME) {
-			HTRequest *rptr;
-			rptr = (HTRequest *) MemThreadGrab(@self->HTSI_request);
-			rptr->HTR_bytesRead += bytesRead;
-			MemThreadRelease(@self->HTSI_request);
-		    }
-
-@ifdef PRODUCT_RESPONDER
-		    /* for Waiter demo only ! */
-	    	    if(@self->WAITER_delayTime) 
-			TimerSleep(@self->WAITER_delayTime);
-
-@endif
 		    ret = @call @self->HTSI_target::
 			MSG_HT_STREAM_PUT_BLOCK((byte *)@self->HTFI_buffer, 
 						bytesRead);
@@ -341,10 +310,9 @@ EC ( if (@self->HTSI_request == NULL) EC_ERROR(HTFILE_REQUEST_NOT_SET); )
 			ret = HTNetReportProgress(@self->HTSI_request, 
 						  HT_MORE_DATA);
 		}
-		if (ret != HT_OK) return  ret;
-		/* return ret; *//* Give a chance to interrupt */
+
+		return ret;
 	    }
-	    break;
 
 	default:
 

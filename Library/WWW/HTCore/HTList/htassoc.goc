@@ -20,9 +20,11 @@ REVISION HISTORY:
 
 DESCRIPTION:
 
-	Association lists. Lookups are case insensitive for strings.
+	Association lists. Lookups are case insensitive.
 
-	$Id: htassoc.goc,v 1.4.3.1 97/09/05 10:47:37 jeremyb Exp $
+	Note that many of the routines here
+
+	$Id: htassoc.goc,v 1.1 97/04/07 11:48:19 newdeal Exp $
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
 
@@ -31,24 +33,6 @@ DESCRIPTION:
 @include <WWW/HTCore/htstring.goh>
 #include <WWW/htmem.h>
 #include <Ansi/string.h>
-
-/*
- * Association between a name and its value for null-terminated strings.
- */
-typedef struct {
-    HTMemHandle HTA_name;           /* deref into char* */
-    HTMemHandle HTA_value;          /* deref into char* */
-} HTAssoc;
-
-
-/*
- * Association between a name and its value for dwords.
- */
-typedef struct {
-    dword HTAD_name;
-    dword HTAD_value;
-} HTAssocDword;
-
 
 
 /***********************************************************************
@@ -247,176 +231,3 @@ HTASSOCLISTLOOKUPPTR (HTAssocList alist, const char *name)
 
     return ret;
 }	/* End of HTASSOCLISTLOOKUPPTR.	*/
-
-
-
-/***********************************************************************
- *		HTASSOCDWORDLISTADD
- ***********************************************************************
- *
- * SYNOPSIS:	Add a associated dword name and value pair.
- * CALLED BY:	Client
- * RETURN:	TRUE if added, else FALSE.
- *	
- * STRATEGY:	
- *	
- * REVISION HISTORY:
- *	Name		Date		Description
- *	----		----		-----------
- *	kkee    	4/ 2/97   	Initial Revision
- *	
- ***********************************************************************/
-Boolean _far _pascal
-HTASSOCDWORDLISTADD (HTAssocList alist, dword name, dword value)
-{
-    HTAssocDword assoc;
-
-    if (alist) {
-	assoc.HTAD_name = name;
-	assoc.HTAD_value = value;
-	HTListAppend(alist, &assoc, sizeof(HTAssocDword));
-	return TRUE;
-    }
-
-    return FALSE;
-}	/* End of HTASSOCDWORDLISTADD.	*/
-
-
-
-/***********************************************************************
- *		HTASSOCDWORDLISTLOOKUP
- ***********************************************************************
- *
- * SYNOPSIS:	Lookup up the value of a name. Returns the first one 
- *              that match. Value not returned if passed in value is NULL.
- * CALLED BY:	Client
- * RETURN:	TRUE if found, else FALSE and value is undefined.
- *	
- * STRATEGY:	
- *	
- * REVISION HISTORY:
- *	Name		Date		Description
- *	----		----		-----------
- *	kkee    	4/ 2/97   	Initial Revision
- *	
- ***********************************************************************/
-Boolean _far _pascal
-HTASSOCDWORDLISTLOOKUP (HTAssocList alist, dword name, dword *value)
-{
-    if (alist) { 
-	HTAssocDword assoc;
-	int i, count, size;
-	
-	count = HTListGetCount(alist);
-	size = sizeof(HTAssocDword);
-
-	for (i=0; i<count; i++) {
-
-	    HTListGetItem(alist, i, &assoc, size);
-	    if (assoc.HTAD_name == name) {
-		if (value) *value = assoc.HTAD_value;
-		return TRUE;
-	    }
-	}
-
-    }
-
-    return FALSE;
-}	/* End of HTASSOCDWORDLISTLOOKUP.	*/
-
-
-/***********************************************************************
- *		HTASSOCDWORDLISTREMOVE
- ***********************************************************************
- *
- * SYNOPSIS:	Lookup and remove the first item that match name. Value
- *              not returned if passed in value is NULL.
- * CALLED BY:	Client
- * RETURN:	TRUE if found, else FALSE and value undefined.
- *	
- * STRATEGY:	
- *	
- * REVISION HISTORY:
- *	Name		Date		Description
- *	----		----		-----------
- *	kkee    	4/ 2/97   	Initial Revision
- *	
- ***********************************************************************/
-Boolean _far _pascal
-HTASSOCDWORDLISTREMOVE (HTAssocList alist, dword name, dword *value)
-{
-    if (alist) { 
-	HTAssocDword assoc;
-	int i, count, size;
-	
-	count = HTListGetCount(alist);
-	size = sizeof(HTAssocDword);
-
-	for (i=0; i<count; i++) {
-
-
-	    HTListGetItem(alist, i, &assoc, size);
-	    if (assoc.HTAD_name == name) {
-		if (value) *value = assoc.HTAD_value;
-		HTListRemoveItem(alist, i, &assoc, size);
-		return TRUE;
-	    }
-	}
-
-    }
-
-    return FALSE;
-}	/* End of HTASSOCDWORDLISTREMOVE.	*/
-
-
-
-/***********************************************************************
- *		HTASSOCDWORDLISTDELETE
- ***********************************************************************
- *
- * SYNOPSIS:	Delete an associative list.
- * CALLED BY:	Client
- * RETURN:	Nothing
- *	
- * STRATEGY:	
- *	
- * REVISION HISTORY:
- *	Name		Date		Description
- *	----		----		-----------
- *	kkee    	4/ 2/97   	Initial Revision
- *	
- ***********************************************************************/
-void _far _pascal
-HTASSOCDWORDLISTDELETE (HTAssocList alist)
-{
-    HTListDelete(alist);
-}	/* End of HTASSOCDWORDLISTDELETE.	*/
-
-
-
-/***********************************************************************
- *		HTASSOCDWORDLISTGETVALUE
- ***********************************************************************
- *
- * SYNOPSIS:	Get a value from an item in HTAssocDWord list.
- * CALLED BY:	Client
- * RETURN:	Value (not name)
- *	
- * STRATEGY:	
- *	
- * REVISION HISTORY:
- *	Name		Date		Description
- *	----		----		-----------
- *	kkee    	7/24/97   	Initial Revision
- *	
- ***********************************************************************/
-dword _far _pascal
-HTASSOCDWORDLISTGETVALUE (HTAssocList alist, word index)
-{
-    HTAssocDword item;
-
-    HTListGetItem(alist, index, &item, sizeof(HTAssocDword));
-    return item.HTAD_value;
-}	/* End of HTASSOCDWORDLISTGETVALUE.	*/
-
-

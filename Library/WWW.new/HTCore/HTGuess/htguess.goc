@@ -1,0 +1,172 @@
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Geoworks 1996.  All rights reserved.
+	GEOWORKS CONFIDENTIAL
+
+PROJECT:	Geos WWW Library
+MODULE:		
+FILE:		htguess.goc
+
+AUTHOR:		Kok Kin Kee, Oct  1, 1996
+
+ROUTINES:
+	Name			Description
+	----			-----------
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	kkee	10/ 1/96   	Initial version.
+
+DESCRIPTION:
+
+	Guess stream, used to guess the contents of a response 
+	message or file. You should use HTSuffix first before
+	thinking about using a Guess stream.
+
+	$Id: htguess.goc,v 1.7.6.3 97/11/04 19:01:35 mzhu Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+
+@include <WWW/HTCore/htguess.goh>
+@include <WWW/HTCore/htpolicy.goh>
+@include <WWW/HTCore/htreq.goh>
+@include <WWW/HTCore/htstring.goh>
+@include <Ansi/string.h>
+
+#define PUTBLOCK(target, data, len)  \
+        @call target::MSG_HT_STREAM_PUT_BLOCK(data, len)
+
+/***********************************************************************
+		Class Declaration
+***********************************************************************/
+
+@classdecl	HTGuessClass;
+
+
+/***********************************************************************
+		Private Functions
+***********************************************************************/
+
+/***********************************************************************
+		Message Handlers
+***********************************************************************/
+
+
+/***********************************************************************
+ *		MSG_HT_STREAM_PUT_BLOCK for HTGuessClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    Put a block of data into the Guess stream.
+ *                  This method tries to guess the contents and then
+ *                  ask for a content handler to process the data.
+ *                  Hence it nondestructively processes data.
+ * PARAMETERS:	    int (const byte *bptr, word len)
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	kkee	10/ 1/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method HTGuessClass, MSG_HT_STREAM_PUT_BLOCK
+{
+    if (!data || !len) return HT_OK;
+
+    /* Always the first thing to check */
+    if (@self->HTSI_transparent) {
+
+EC(     ECCheckOD(@self->HTSI_target);                                  )
+
+	return PUTBLOCK(@self->HTSI_target, data, len);
+    }
+
+    /* 
+     * Look at the data and try to decide what the contents are.
+     */
+    if (strcasestr((char *) data, "<HTML>") ||
+	strcasestr((char *) data, "<TITLE>") ||
+	strcasestr((char *) data, "<BODY>")) {
+
+@ifdef PRODUCT_RESPONDER
+	pself = ObjDeref(oself,0);
+@endif
+	@self->HTSI_target = 
+	    HTPolicyStreamStack(HT_CONTENT_TYPE_TEXT_HTML,
+				NULL,
+				@self->HTSI_target,
+				@self->HTSI_request,
+				FALSE);
+
+    } else if (strcasestr((char *) data, "Content-type") ||
+	       strcasestr((char *) data, "Content-length")) {
+
+@ifdef PRODUCT_RESPONDER
+	pself = ObjDeref(oself,0);
+@endif
+	@self->HTSI_target = 
+	    HTPolicyStreamStack(HT_WWW_MIME,
+				NULL,
+				@self->HTSI_target,
+				@self->HTSI_request,
+				FALSE);
+
+    } else if (!strncasecmp((char *)data, "GIF", 3)) {
+@ifdef PRODUCT_RESPONDER
+	pself = ObjDeref(oself,0);
+@endif
+	@self->HTSI_target = 
+	    HTPolicyStreamStack(HT_CONTENT_TYPE_IMAGE_GIF,
+				NULL,
+				@self->HTSI_target,
+				@self->HTSI_request,
+				FALSE);
+
+    } else if (!strcasestr((char *)data, "JFIF")) {
+@ifdef PRODUCT_RESPONDER
+	pself = ObjDeref(oself,0);
+@endif
+	@self->HTSI_target = 
+	    HTPolicyStreamStack(HT_CONTENT_TYPE_IMAGE_JPEG,
+				NULL,
+				@self->HTSI_target,
+				@self->HTSI_request,
+				FALSE);
+
+	/* ...and other guesses here... */
+
+    } else {
+	/* Worst case, use debug stream, NOT text/plain. I need to 
+	   change this */
+
+@ifdef PRODUCT_RESPONDER
+	pself = ObjDeref(oself,0);
+@endif
+/*	@self->HTSI_target = 
+	    HTPolicyStreamStack(HT_CONTENT_TYPE_TEXT_PLAIN,
+				NULL,
+				@self->HTSI_target,
+				@self->HTSI_request,
+				FALSE);
+*/	
+    }
+    
+@ifdef PRODUCT_RESPONDER
+	pself = ObjDeref(oself,0);
+@endif
+    @self->HTSI_transparent = TRUE;
+
+@ifdef PRODUCT_RESPONDER
+	pself = ObjDeref(oself,0);
+@endif
+    if (!@self->HTSI_target) return HT_NO_CONTENT;
+
+    return PUTBLOCK(@self->HTSI_target, data, len);
+}	/* End of MSG_HT_STREAM_PUT_BLOCK.	*/
+
+
+

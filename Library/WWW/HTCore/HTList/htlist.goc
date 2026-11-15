@@ -21,7 +21,7 @@ DESCRIPTION:
 	HTList manager. A HTList is a singly linked-list 
 	implemented using Geos Chunk Array.
 
-	$Id: htlist.goc,v 1.13.10.5 97/10/06 12:42:56 kkee Exp $
+	$Id: htlist.goc,v 1.1 97/04/07 11:48:14 newdeal Exp $
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
 
@@ -30,7 +30,6 @@ DESCRIPTION:
 @include <chunkarr.h>
 #include <Ansi/string.h>		/* memcpy(), memcmp() */
 #include <ec.h>
-#include <WWW/htmem.h>
 
 @include "htfatals.goh"
 
@@ -39,31 +38,18 @@ DESCRIPTION:
  * --------------------------------------------------------------------*/
 
 /* 
- * We create a chunkarray in a block if it less than 6K. We append to a 
- * list if its block size is less than 8K.
+ * We create a chunkarray in a block if it has less than 10 
+ * chunkarrays.
  */
-#define DESIRED_HTLIST_PER_BLOCK         10
-#define DESIRED_HTLISTNEW_BLOCK_SIZE     6000
-#define DESIRED_HTLISTAPPEND_BLOCK_SIZE  8000
+#define HTLIST_MAX_CHUNKARRAYS_PER_BLOCK           10
 
 /*
  * Information about a block for creating chunkarrays.
  */
 typedef struct {
     MemHandle HTB_mh;
-    word HTB_id;               /* for APIs ending with ...WID, 0 for no ID */
     word HTB_numOfArrays;      /* number of chunkarrays in this block */
 } HTListBlock;
-
-/*
- * HTList header information. Lists in the same block can not grow
- * bigger than DESIRED_HTLISTAPPEND_BLOCK_SIZE.
- */
-typedef struct {
-    ChunkArrayHeader  HTLH_carray;  /* Original header info */
-    /* Extra information follows here */
-    HTListHandle HTLH_next; /* NULL if last HTList */
-} HTListHeader;
 
 /*
  * Library won't compile unless there is a dgroup, this dummy does 
@@ -85,206 +71,7 @@ byte htListDummy;
  * 		PRIVATE FUNCTIONS
  * --------------------------------------------------------------------*/
 
-static HTListHandle _pascal HTListNewLow (word id);
-static word _pascal HTListID (MemHandle mh);
-
-
-#if ERROR_CHECK
-/***********************************************************************
- *		ECCheckHTListBlocks
- ***********************************************************************
- *
- * SYNOPSIS:	Check the consistency of htlistMemoryBlocks, which must
- *              not be locked.
- * CALLED BY:	
- * RETURN:	Nothing
- *	
- * STRATEGY:	
- *	
- * REVISION HISTORY:
- *	Name		Date		Description
- *	----		----		-----------
- *	kkee    	9/11/97   	Initial Revision
- *	
- ***********************************************************************/
-static void _pascal
-ECCheckHTListBlocks (void)
-{
-    HTListHandle *lptr;
-    HTListBlock *bptr;
-    word count, i, size;
-    MemHandle mh = OptrToHandle(@htlistMemoryBlocks);
-	
-    MemPLock(mh);
-
-    lptr = (HTListHandle *) LMemDeref(@htlistMemoryBlocks);
-    count = ChunkArrayGetCount(*lptr);
-
-    for (i=0; i<count; i++) {
-	bptr = (HTListBlock *) ChunkArrayElementToPtr(*lptr, i, &size);
-	ECCheckMemHandle(bptr->HTB_mh);
-	if (bptr->HTB_id && (bptr->HTB_id >= HTMID_END)) {
-	    EC_ERROR(INVALID_ID_FOR_HTLIST);        
-	}
-    }
-
-    MemUnlockV(mh);
-}	/* End of ECCheckHTListBlocks.	*/
-#endif
-
-
-/***********************************************************************
- *		HTListNewLow
- ***********************************************************************
- *
- * SYNOPSIS:	Create a two types of HTList for an id.
- * CALLED BY:	HTListNew, HTListNewWID
- * RETURN:	
- *	
- * STRATEGY:	
- *	
- * REVISION HISTORY:
- *	Name		Date		Description
- *	----		----		-----------
- *	kkee    	9/10/97   	Initial Revision
- *	
- ***********************************************************************/
-static HTListHandle _pascal
-HTListNewLow (word id)
-{
-    HTListHandle *lptr, list = NullOptr;
-    HTListBlock *bptr;
-    ChunkHandle chunk;
-    word count, i, size;
-    MemHandle mh = OptrToHandle(@htlistMemoryBlocks);
-	
-#if ERROR_CHECK
-    if (id >= HTMID_END)
-	EC_ERROR(INVALID_ID_FOR_HTLIST);        
-#endif
-
-    MemPLock(mh);
-
-    lptr = (HTListHandle *) LMemDeref(@htlistMemoryBlocks);
-    if (!(*lptr)) {
-	/* 
-	 * Create a list for maintaining memory blocks.
-	 * lptr invalidated!
-	 */
-	chunk = ChunkArrayCreate(mh, 0, 0, 0);
-	lptr = (HTListHandle *) LMemDeref(@htlistMemoryBlocks);
-	*lptr = ConstructOptr(mh, chunk); /* save it */
-    }
-
-    /*
-     * Search the list of blocks to create a chunkarray.
-     */
-    count = ChunkArrayGetCount(*lptr);
-
-    for (i=0; i<count; i++) {
-	bptr = (HTListBlock *) ChunkArrayElementToPtr(*lptr, i, &size);
-
-	if ((bptr->HTB_id == id) &&
-	    (bptr->HTB_numOfArrays < DESIRED_HTLIST_PER_BLOCK) &&
-	    (MemGetInfo(bptr->HTB_mh, MGIT_SIZE) < 
-	     DESIRED_HTLISTNEW_BLOCK_SIZE)) {
-
-	    MemThreadGrab(bptr->HTB_mh);
-	    chunk = ChunkArrayCreate(bptr->HTB_mh, 0, 
-				     sizeof(HTListHeader), 0);
-	    MemThreadRelease(bptr->HTB_mh);
-
-	    if (chunk) {
-		/* 
-		 * Update the HTListBlock.
-		 */
-		bptr->HTB_numOfArrays += 1;
-		list = ConstructOptr(bptr->HTB_mh, chunk);
-	    }
-	    break;
-	}
-    }
-
-    /* 
-     * If we did not find a block that fits, create one.
-     */
-    if (!list) {
-	MemHandle nmh = MemAllocLMem(LMEM_TYPE_GENERAL, 0);
-	if (nmh) {
-	    /*
-	     * We need to make the Library own the block as it is
-	     * shared by all other Library clients.
-	     */
-	    HandleModifyOwner(nmh, GeodeGetCodeProcessHandle());
-	    MemModifyFlags(nmh, HF_SHARABLE, 0);
-
-	    MemThreadGrab(nmh);
-	    chunk = ChunkArrayCreate(nmh, 0, sizeof(HTListHeader), 0);
-	    
-	    /* Update the list of memory blocks */
-	    bptr = ChunkArrayAppend(*lptr, sizeof(HTListBlock));
-	    bptr->HTB_mh = nmh;
-	    bptr->HTB_id = id;
-	    bptr->HTB_numOfArrays = 1;
-
-	    list = ConstructOptr(nmh, chunk);
-
-EC(         ECCheckChunkArray(list);                                  )
-
-	    MemThreadRelease(nmh);
-	}
-    }
-
-    MemUnlockV(mh);
-
-EC( ECCheckHTListBlocks();                                             )	
-
-    return list;
-}	/* End of HTListNewLow.	*/
-
-
-/***********************************************************************
- *		HTListID
- ***********************************************************************
- *
- * SYNOPSIS:	Get the ID of a HTList block handle.
- * CALLED BY:	HTListAppend
- * RETURN:	id or 0 for no ID.
- *	
- * STRATEGY:	
- *	
- * REVISION HISTORY:
- *	Name		Date		Description
- *	----		----		-----------
- *	kkee    	9/10/97   	Initial Revision
- *	
- ***********************************************************************/
-static word _pascal
-HTListID (MemHandle han)
-{
-    HTListHandle *lptr;
-    HTListBlock *bptr;
-    word ret = 0;
-    word count, i, size;
-    MemHandle mh = OptrToHandle(@htlistMemoryBlocks);
-	
-    MemPLock(mh);
-
-    lptr = (HTListHandle *) LMemDeref(@htlistMemoryBlocks);
-    count = ChunkArrayGetCount(*lptr);
-
-    for (i=0; i<count; i++) {
-	bptr = (HTListBlock *) ChunkArrayElementToPtr(*lptr, i, &size);
-	if (bptr->HTB_mh == han) {
-	    ret = bptr->HTB_id;
-	    break;
-	}
-    }
-
-    MemUnlockV(mh);
-    return ret;
-}	/* End of HTListID.	*/
-
+/* @@@ */
 
 
 /* ---------------------------------------------------------------------
@@ -318,9 +105,9 @@ ECCHECKHTLIST (HTListHandle list)
 
     if (!list) return;
 
-    MemThreadGrab(mh);
+    MemPLock(mh);
     ECLMemExists(list);
-    MemThreadRelease(mh);
+    MemUnlockV(mh);
 
 #endif
 }	/* End of ECCHECKHTLIST.	*/
@@ -337,7 +124,10 @@ ECCHECKHTLIST (HTListHandle list)
  * RETURN:	HTListHandle	
  * SIDE EFFECTS:Nothing
  *	
- * STRATEGY:	
+ * STRATEGY:	We maintain a list of blocks. Each block contains at 
+ *              most HTLIST_MAX_CHUNKARRAYS_PER_BLOCK number of 
+ *              chunk arrays. Or should I use memory usage per block?
+ *              (which is the same concept used in HTMemory).
  *	
  * REVISION HISTORY:
  *	Name	Date		Description
@@ -348,36 +138,118 @@ ECCHECKHTLIST (HTListHandle list)
 HTListHandle _far _pascal
 HTLISTNEW (void)
 {	
-    return HTListNewLow(0);  /* No id */
-}	/* End of HTLISTNEW.	*/
+    HTListHandle *lptr, blockList, list = NullOptr;
+    HTListBlock htblock, *bptr;
+    ChunkHandle chunk;
+    word count, i, size = sizeof(HTListBlock);
+    MemHandle mh = OptrToHandle(@htlistMemoryBlocks);
+	
+    MemPLock(mh);
 
+    lptr = (HTListHandle *) LMemDeref(@htlistMemoryBlocks);
 
-/***********************************************************************
- *		HTLISTNEWWID
- ***********************************************************************
- *
- * SYNOPSIS:	Create a new list given an ID. 
- * CALLED BY:	
- * RETURN:	
- *	
- * STRATEGY:	
- *	
- * REVISION HISTORY:
- *	Name		Date		Description
- *	----		----		-----------
- *	kkee    	9/10/97   	Initial Revision
- *	
- ***********************************************************************/
-HTListHandle _far _pascal
-HTLISTNEWWID (word id)
-{
+    if (!(*lptr)) {
+	/* 
+	 * Create a list for maintaining memory blocks.
+	 * lptr invalidated!
+	 */
+	chunk = ChunkArrayCreate(mh, 0, 0, 0);
+	lptr = (HTListHandle *) LMemDeref(@htlistMemoryBlocks);
+	*lptr = ConstructOptr(mh, chunk); /* save it */
+	blockList = *lptr;
+	
+	/* 
+	 * Make HTListData the first block for creating chunkarrays 
+	 */
+	htblock.HTB_mh = mh;
+	htblock.HTB_numOfArrays = 0;
+
+	bptr = ChunkArrayAppend(blockList, size);
+	memcpy(bptr, &htblock, size);
+
+    }  else
+	blockList = *lptr;
+
+    /*
+     * Search the list of blocks to create a chunkarray.
+     */
+    count = ChunkArrayGetCount(blockList);
+
+    for (i=0; i<count; i++) {
+	bptr = (HTListBlock *) ChunkArrayElementToPtr(blockList,
+						      i, &size);
+
+	htblock.HTB_mh = bptr->HTB_mh;
+	htblock.HTB_numOfArrays = bptr->HTB_numOfArrays + 1;
+	    
+	if (htblock.HTB_numOfArrays <=
+	    HTLIST_MAX_CHUNKARRAYS_PER_BLOCK) {
+
+	    if (htblock.HTB_mh != mh) MemPLock(htblock.HTB_mh);
+
+	    chunk = ChunkArrayCreate(htblock.HTB_mh, 0, 0, 0);
+
+	    if (htblock.HTB_mh != mh) MemUnlockV(htblock.HTB_mh);
+
+	    if (chunk) {
+		/* 
+		 * Update the list of memory blocks,
+		 * bptr could have invalidated.
+		 */
+		bptr = (HTListBlock *) ChunkArrayElementToPtr(blockList,
+							      i, &size);
+		ChunkArrayDelete(blockList, bptr);
+		bptr = ChunkArrayAppend(blockList, size);
+		memcpy(bptr, &htblock, size);
+
+		list = ConstructOptr(htblock.HTB_mh, chunk);
+
 #if ERROR_CHECK
-    if ((id == HTMID_BASE) || (id >= HTMID_END))
-	EC_ERROR(INVALID_ID_FOR_HTLIST);
+		if (htblock.HTB_mh != mh) MemPLock(htblock.HTB_mh);
+		ECCheckChunkArray(list);
+		if (htblock.HTB_mh != mh) MemUnlockV(htblock.HTB_mh);
 #endif
-    return HTListNewLow(id);
-}	/* End of HTLISTNEWWID.	*/
 
+	    }
+
+	    break;
+	}
+    }
+
+    /* 
+     * If we did not find a block that fits, create one.
+     */
+    if (!list) {
+	htblock.HTB_mh = MemAllocLMem(LMEM_TYPE_GENERAL, 0);
+	htblock.HTB_numOfArrays = 1;
+
+	/* We need to make the Library own the block as it
+	 * are shared by all other Library clients.
+	 */
+	HandleModifyOwner(htblock.HTB_mh, GeodeGetCodeProcessHandle());
+	MemModifyFlags(htblock.HTB_mh, HF_SHARABLE, 0);
+
+	if (htblock.HTB_mh) {
+
+	    MemPLock(htblock.HTB_mh);
+	    chunk = ChunkArrayCreate(htblock.HTB_mh, 0, 0, 0);
+	    
+	    /* Update the list of memory blocks */
+	    bptr = ChunkArrayAppend(blockList, size);
+	    memcpy(bptr, &htblock, size);
+
+	    list = ConstructOptr(htblock.HTB_mh, chunk);
+
+EC(         ECCheckChunkArray(list);                                  )
+
+	    MemUnlockV(htblock.HTB_mh);
+	}
+    }
+
+    MemUnlockV(mh);
+	
+    return list;
+}	/* End of HTLISTNEW.	*/
 
 
 
@@ -403,23 +275,16 @@ void _far _pascal
 HTLISTDELETEALLITEMS (HTListHandle list)
 {
     MemHandle mh = OptrToHandle(list);
-    HTListHeader *header;
-    HTListHandle next;
 
     if (list == NULL) return;
     
-    MemThreadGrab(mh);
+    MemPLock(mh);
 EC( ECCheckChunkArray(list);                                            )
 
     /* All the items */
-    header = (HTListHeader *) LMemDeref(list);
-    next = header->HTLH_next;
-    header->HTLH_next = 0;  /* Delete it later */
-    ChunkArrayDeleteRange(list, 0, header->HTLH_carray.CAH_count);
+    ChunkArrayDeleteRange(list, 0, ChunkArrayGetCount(list));
 
-    MemThreadRelease(mh);
-
-    if (next) HTListDelete(next);  /* Delete the rest */
+    MemUnlockV(mh);
 }	/* End of HTLISTDELETEALLITEMS.	*/
 
 
@@ -428,8 +293,8 @@ EC( ECCheckChunkArray(list);                                            )
  *		HTLISTDELETERANGE
  ***********************************************************************
  *
- * SYNOPSIS:	Delete a range of items. Pass (x)index as the first item
- *              to delete and (y)count as the number of items to delete.
+ * SYNOPSIS:	Delete a range of items. Pass index as the first item to
+ *              to delete and count as the number of items to delete.
  * CALLED BY:	Client.
  * RETURN:	Nothing.
  * SIDE EFFECTS:
@@ -443,51 +308,20 @@ EC( ECCheckChunkArray(list);                                            )
  *
  ***********************************************************************/
 void _far _pascal
-HTLISTDELETERANGE (HTListHandle list, word x, word y) {
-
-#define min(a,b) ((a)>(b) ? (b):(a))
+HTLISTDELETERANGE (HTListHandle list, word index, word count) {
 
     MemHandle mh = OptrToHandle(list);
-    HTListHeader *header;
-    HTListHandle next;
-    word x1, y1;   /* Current range to delete */
-    word x2, y2;   /* Range to delete for header->HTLH_next */
-    word count;
 
     if (list == NULL) return;
     
-    MemThreadGrab(mh);
+    MemPLock(mh);
 EC( ECCheckChunkArray(list);                                            )
-
-    header = (HTListHeader *) LMemDeref(list);
-    count = header->HTLH_carray.CAH_count;
-
-EC( if ((count<(x+y)) && !(header->HTLH_next))                          )
+EC( if (ChunkArrayGetCount(list) < (index + count))                     )
 EC(     EC_ERROR(HTLIST_INDEX_OUT_OF_RANGE);                            )
 
-/* 
- *    x1 = (count>x) ? x:0;
- *    y1 = (count>x) ? min(count-x,y):0;
- *    x2 = (x>count) ? (x-count):0;
- *    y2 = y-y1;
- */
-    if (count > x) {
-	x1 = x; 
-	y1 = min(count-x, y);
-	x2 = 0;
-    } else {
-	x1 = 0;
-	y1 = 0;
-	x2 = x-count;
-    }
-    y2 = y-y1;
+    ChunkArrayDeleteRange(list, index, count);
 
-    if (y1) ChunkArrayDeleteRange(list, x1, y1);
-    next = header->HTLH_next;
-
-    MemThreadRelease(mh);
-
-    if (next && y2) HTListDeleteRange(next, x2, y2);
+    MemUnlockV(mh);
 }	/* End of HTLISTDELETERANGE.	*/
 
 
@@ -515,107 +349,63 @@ void _far _pascal
 HTLISTDELETE (HTListHandle list)
 {
     HTListHandle blockList;
-    HTListBlock *bptr;
-    word count, i, size;
-    MemHandle mh, fmh = OptrToHandle(list);
-    HTListHeader *header;
-    HTListHandle next;
+    HTListBlock *bptr, htblock;
+    word count, i, size = sizeof(HTListBlock);
+    MemHandle mh = OptrToHandle(list);
 
     /* 
      * First, free the chunkarray itself.
      */
     if (list == NULL) return;
     
-    MemThreadGrab(fmh);
+    MemPLock(mh);
 EC( ECCheckChunkArray(list);                                            )
 
-    header = (HTListHeader *) LMemDeref(list);
-    next = header->HTLH_next;
-
-    ChunkArrayDeleteRange(list, 0, header->HTLH_carray.CAH_count);
+    count = ChunkArrayGetCount(list);
+    ChunkArrayDeleteRange(list, 0, count);  /* All the items */
     LMemFree(list);
 
-    MemThreadRelease(fmh);
+    MemUnlockV(mh);
 
     /* 
      * Second, we may need to free the block as well.
+     * Except if the block is the first block since that 
+     * is the same block as the htlistMemoryBlocks.
      */
+    htblock.HTB_mh = mh;
     mh = OptrToHandle(@htlistMemoryBlocks);
     MemPLock(mh);
 
     blockList = *(HTListHandle *) LMemDeref(@htlistMemoryBlocks);
-    count = ChunkArrayGetCount(blockList);
+    
+	count = ChunkArrayGetCount(blockList);
+	for (i=0; i<count; i++) {
+	    bptr = (HTListBlock *) ChunkArrayElementToPtr(blockList,
+							  i, &size);
+	    
+	    if (bptr->HTB_mh == htblock.HTB_mh) {
 
-    for (i=0; i<count; i++) {
-	bptr = (HTListBlock *) ChunkArrayElementToPtr(blockList, i, &size);
-	if (bptr->HTB_mh == fmh) {
-	    bptr->HTB_numOfArrays -= 1;
-	    if (!bptr->HTB_numOfArrays) {
-		MemFree(fmh);
+		htblock.HTB_numOfArrays = bptr->HTB_numOfArrays - 1;
 		ChunkArrayDelete(blockList, bptr);
+
+		/* 
+		 * We cannot free the block used by htlistMemoryBlocks.
+		 */
+		if ((htblock.HTB_mh != mh) && 
+		    (!htblock.HTB_numOfArrays)) 
+		    MemFree(htblock.HTB_mh);
+
+		else {
+		    bptr = ChunkArrayAppend(blockList, size);
+		    memcpy(bptr, &htblock, size);
+		}
+
+		break;
 	    }
-	    break;
 	}
-    }
     
     MemUnlockV(mh);
-
-EC( ECCheckHTListBlocks();                                             )	
-
-    if (next) HTListDelete(next);
 }	/* End of HTLISTDELETE.	*/
-
-
-
-/***********************************************************************
- *		HTLISTDELETEALLWID
- ***********************************************************************
- *
- * SYNOPSIS:	Delete all the HTLists allocated using HTListNewWID.
- * CALLED BY:	Client
- * RETURN:	Nothing
- *	
- * STRATEGY:	
- *	
- * REVISION HISTORY:
- *	Name		Date		Description
- *	----		----		-----------
- *	kkee    	9/10/97   	Initial Revision
- *	
- ***********************************************************************/
-void _far _pascal
-HTLISTDELETEALLWID (word id)
-{
-    HTListHandle blockList;
-    HTListBlock *bptr;
-    word count, i, size;
-    MemHandle mh = OptrToHandle(@htlistMemoryBlocks);
-
-#if ERROR_CHECK
-    if ((id == HTMID_BASE) || (id >= HTMID_END))
-	EC_ERROR(INVALID_ID_FOR_HTLIST);        
-#endif
-
-    MemPLock(mh);
-
-    blockList = *(HTListHandle *) LMemDeref(@htlistMemoryBlocks);
-    count = ChunkArrayGetCount(blockList);
-    i = 0;
-    while (i<count) {
-	bptr = (HTListBlock *) ChunkArrayElementToPtr(blockList, i, &size);
-	if (bptr->HTB_id == id) {
-	    MemFree(bptr->HTB_mh);
-	    ChunkArrayDelete(blockList, bptr);
-	    count--;
-	} else {
-	    i++;
-	}
-    }
-    
-    MemUnlockV(mh);
-
-EC( ECCheckHTListBlocks();                                             )	
-}	/* End of HTLISTDELETEALLWID.	*/
 
 
 
@@ -643,50 +433,68 @@ word _far _pascal
 HTLISTAPPEND (HTListHandle list, const void *item, word size)
 {
     void *element;	
-    word index = 0;
+    word index;
     MemHandle mh = OptrToHandle(list);
-    HTListHeader *header;
-    HTListHandle nlist;
 
-    /* Append to the last HTList in list */
-    MemThreadGrab(mh);
+    MemPLock(mh);
 EC( ECCheckChunkArray(list);                                            )
+	
+    element = ChunkArrayAppend(list, size);
+    memcpy(element, item, size);
 
-    header = (HTListHeader *) LMemDeref(list);
-    index = header->HTLH_carray.CAH_count;
-    while (header->HTLH_next) {
-	list = header->HTLH_next;
-	MemThreadRelease(mh);
-	mh = OptrToHandle(list);
-	MemThreadGrab(mh);
-	header = (HTListHeader *) LMemDeref(list);
-	index += header->HTLH_carray.CAH_count;
-    }
+    index = ChunkArrayGetCount(list) - 1;
 
-    if (MemGetInfo(mh, MGIT_SIZE) < DESIRED_HTLISTAPPEND_BLOCK_SIZE) {
-	element = ChunkArrayAppend(list, size);
-	memcpy(element, item, size);
-	MemThreadRelease(mh);
-    } else {
-	/* Create a new HTList to extend the current list */
-	word id;
-	MemThreadRelease(mh);
-	id = HTListID(mh); /* Can't lock mh calling this API */
-	nlist = (id==0) ? HTListNew():HTListNewWID(id); 
-	MemThreadGrab(mh);
-	header = (HTListHeader *) LMemDeref(list);
-	header->HTLH_next = nlist;
-	MemThreadRelease(mh);
+    MemUnlockV(mh);
 
-	/* Append new item to nlist */
-	mh = OptrToHandle(nlist);
-	MemThreadGrab(mh);
-	element = ChunkArrayAppend(nlist, size);
-	memcpy(element, item, size);
-	MemThreadRelease(mh);
-    }
     return index;
 }	/* End of HTLISTAPPEND.	*/
+
+
+
+
+/***********************************************************************
+ *		HTLISTPREPEND
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Add an item to the front (position 0) of the list.
+ * CALLED BY:	Client.
+ * RETURN:	Nothing.
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	kkee	10/12/96   	Initial Revision
+ *
+ ***********************************************************************/
+void _far _pascal
+HTLISTPREPEND (HTListHandle list, const void *item, word size)
+{
+    void *element;
+    word elementSize;
+    MemHandle mh = OptrToHandle(list);
+
+    MemPLock(mh);
+EC( ECCheckChunkArray(list);                                            )
+	
+    if (!ChunkArrayGetCount(list))
+	/* list is empty */
+	element = ChunkArrayAppend(list, size);
+
+    else
+	element = ChunkArrayInsertAt(list, 
+				     ChunkArrayElementToPtr(list, 
+							    0, 
+							    &elementSize), 
+				     size);
+
+    memcpy(element, item, size);
+
+    MemUnlockV(mh);
+}	/* End of HTLISTPREPEND.	*/
+
 
 
 
@@ -718,24 +526,11 @@ HTLISTREPLACEITEM (HTListHandle list, word index, const void *item,
     void *element, *newElement;
     word elementSize;	
     MemHandle mh = OptrToHandle(list);
-    HTListHeader *header;
 
-    do {
-	MemThreadGrab(mh);
-EC(     ECCheckChunkArray(list);                                        )
-
-	header = (HTListHeader *) LMemDeref(list);
-	if (index < header->HTLH_carray.CAH_count) {
-	    break;
-	} else {
-	    list = header->HTLH_next;
-	    index -= header->HTLH_carray.CAH_count;
-	    MemThreadRelease(mh);
-	}
-	mh = OptrToHandle(list);
-    } while (list);
-
-EC( if (!list)                                                          )
+    MemPLock(mh);
+EC( ECCheckChunkArray(list);                                            )
+	
+EC( if (ChunkArrayGetCount(list) <= index)                              )
 EC(	EC_ERROR(HTLIST_INDEX_OUT_OF_RANGE);                            )
 
     element = ChunkArrayElementToPtr(list, index, &elementSize);
@@ -749,7 +544,7 @@ EC( 	EC_WARNING(HTLIST_REPLACE_ITEM_NOT_THE_SAME_SIZE);              )
     /* Remove old item */
     ChunkArrayDeleteRange(list, index+1, 1);
 
-    MemThreadRelease(mh);
+    MemUnlockV(mh);
 
 }	/* End of HTLISTREPLACEITEM.	*/
 
@@ -777,37 +572,26 @@ int _far _pascal
 HTLISTFINDITEM (HTListHandle list, const void *item, word size)
 {
     void *element;
-    word count, len, offset=0;
+    word count, len;
     int i, found = -1;
-    HTListHeader *header;
+
     MemHandle mh = OptrToHandle(list);
 
-    while (list) {
-	MemThreadGrab(mh);
-EC(     ECCheckChunkArray(list);                                           )
-
-	header = (HTListHeader *) LMemDeref(list);
-	count = header->HTLH_carray.CAH_count;
-	for (i=0; i<count; i++) {
-	    element = ChunkArrayElementToPtr(list, i, &len);
-	    if (!memcmp(item, element, len) && len == size) {
-		found = i;
-		MemThreadRelease(mh);
-		break;
-	    }
-	}
-	if (found == -1) {
-	    /* Not found, search next list */
-	    list = header->HTLH_next;
-	    offset += count;
-	    MemThreadRelease(mh);
-	    mh = OptrToHandle(list);
-	} else {
+    MemPLock(mh);
+EC( ECCheckChunkArray(list);                                           )
+	
+    count = ChunkArrayGetCount(list);
+    for (i=0; i<count; i++) {
+	element = ChunkArrayElementToPtr(list, i, &len);
+	if (!memcmp(item, element, len) && len == size) {
+	    found = i;
 	    break;
 	}
     }
 
-    return ((found != -1) ? (found+offset) : -1);
+    MemUnlockV(mh);
+
+    return found;
 }	/* End of HTLISTFINDITEM.	*/
 
 
@@ -841,84 +625,22 @@ HTLISTGETITEM (HTListHandle list, word index, void *item, word size)
     void *element;
     word elementSize;
     MemHandle mh = OptrToHandle(list);
-    HTListHeader *header;
+		
+    MemPLock(mh);
+EC( ECCheckChunkArray(list);                                            )
 
-    while (list) {
-	MemThreadGrab(mh);
-EC(     ECCheckChunkArray(list);                                        )
-        
-        header = (HTListHeader *) LMemDeref(list);
-	if (index < header->HTLH_carray.CAH_count) {
-	    /* Found in this list */
-	    element = ChunkArrayElementToPtr(list, index, &elementSize);
-
-EC(         if (elementSize > size)                                     )
-EC( 	    EC_WARNING(HTLIST_ELEMENT_SIZE_EXCEEDS_PASSED_IN_SIZE);     )
-
-            item = memcpy(item, element, size);
-	    MemThreadRelease(mh);
-	    break;
-	} else {
-	    list = header->HTLH_next;
-	    index -= header->HTLH_carray.CAH_count;
-	    MemThreadRelease(mh);
-	    mh = OptrToHandle(list);
-	}
-    }
-
-EC( if (!list)                                                          )
+EC( if (ChunkArrayGetCount(list) <= index)                              )
 EC(	EC_ERROR(HTLIST_INDEX_OUT_OF_RANGE);                            )
 
+    element = ChunkArrayElementToPtr(list, index, &elementSize);
+
+EC( if (elementSize > size)                                             )
+EC( 	EC_WARNING(HTLIST_ELEMENT_SIZE_EXCEEDS_PASSED_IN_SIZE);         )
+
+    item = memcpy(item, element, size);
+
+    MemUnlockV(mh);
 }	/* End of HTLISTGETITEM.	*/
-
-
-/***********************************************************************
- *		HTLISTLOCKITEM
- ***********************************************************************
- *
- * SYNOPSIS:	
- * CALLED BY:	
- * RETURN:	
- *	
- * STRATEGY:	
- *	
- * REVISION HISTORY:
- *	Name		Date		Description
- *	----		----		-----------
- *	mzhu    	9/15/97   	Initial Revision
- *	
- ***********************************************************************/
-void * _far _pascal
-HTLISTLOCKITEM (HTListHandle list, word index, MemHandle *mh)
-{
-    void _far *element = NULL;
-    word elementSize;
-    HTListHeader *header;
-
-    *mh = OptrToHandle(list);
-
-    while (list) {
-	MemThreadGrab(*mh);
-EC(     ECCheckChunkArray(list);                                        )
-        
-        header = (HTListHeader *) LMemDeref(list);
-	if (index < header->HTLH_carray.CAH_count) {
-	    /* Found in this list */
-	    element = ChunkArrayElementToPtr(list, index, &elementSize);
-	    break;
-	} else {
-	    list = header->HTLH_next;
-	    index -= header->HTLH_carray.CAH_count;
-	    MemThreadRelease(*mh);
-	    *mh = OptrToHandle(list);
-	}
-    }
-
-EC( if (!list)                                                          )
-EC(	EC_ERROR(HTLIST_INDEX_OUT_OF_RANGE);                            )
-
-    return element;
-}	/* End of HTLISTLOCKITEM.	*/
 
 
 
@@ -942,30 +664,18 @@ EC(	EC_ERROR(HTLIST_INDEX_OUT_OF_RANGE);                            )
 word _far _pascal
 HTLISTGETITEMSIZE (HTListHandle list, word index)
 {
-    word size = 0;
+    word size;
     MemHandle mh = OptrToHandle(list);
-    HTListHeader *header;
 
-    while (list) {
-	MemThreadGrab(mh);
-EC(     ECCheckChunkArray(list);                                        )
-        
-        header = (HTListHeader *) LMemDeref(list);
-	if (index < header->HTLH_carray.CAH_count) {
-	    /* Found in this list */
-	    ChunkArrayElementToPtr(list, index, &size);
-	    MemThreadRelease(mh);
-	    break;
-	} else {
-	    list = header->HTLH_next;
-	    index -= header->HTLH_carray.CAH_count;
-	    MemThreadRelease(mh);
-	    mh = OptrToHandle(list);
-	}
-    }
+    if (list == NULL) return 0;
+		
+    MemPLock(mh);
 
-EC( if (!list)                                                          )
-EC(	EC_ERROR(HTLIST_INDEX_OUT_OF_RANGE);                            )
+EC( ECCheckChunkArray(list);                                           )
+
+    ChunkArrayElementToPtr(list, index, &size);
+
+    MemUnlockV(mh);
 
     return size;
 }	/* End of HTLISTGETITEMSIZE.	*/
@@ -993,23 +703,17 @@ EC(	EC_ERROR(HTLIST_INDEX_OUT_OF_RANGE);                            )
 word _far _pascal
 HTLISTGETCOUNT (HTListHandle list)
 {
-    word count = 0;
+    word count;
     MemHandle mh = OptrToHandle(list);
-    HTListHeader *header;
 
     if (list == NULL) return 0;
+		
+    MemPLock(mh);
+EC( ECCheckChunkArray(list);                                           )
 
-    while (list) {
-	MemThreadGrab(mh);
-EC(     ECCheckChunkArray(list);                                        )
-    
-        header = (HTListHeader *) LMemDeref(list);
-        count += header->HTLH_carray.CAH_count;
+    count = ChunkArrayGetCount(list);
 
-	list = header->HTLH_next;
-	MemThreadRelease(mh);
-	mh = OptrToHandle(list);
-    }
+    MemUnlockV(mh);
 
     return count;
 }	/* End of HTLISTGETCOUNT.	*/
@@ -1054,91 +758,22 @@ HTLISTREMOVEITEM (HTListHandle list, word index, void *item, word size)
     void *element;
     word elementSize;
     MemHandle mh = OptrToHandle(list);
-    HTListHeader *header;
+		
+    MemPLock(mh);
+EC( ECCheckChunkArray(list);                                            )
 
-    while (list) {
-	MemThreadGrab(mh);
-EC(     ECCheckChunkArray(list);                                        )
-
-        header = (HTListHeader *) LMemDeref(list);
-	if (index < header->HTLH_carray.CAH_count) {
-	    /* Found in this list */
-	    element = ChunkArrayElementToPtr(list, index, &elementSize);
-
-EC(         if (elementSize > size)                                     )
-EC(             EC_WARNING(HTLIST_ELEMENT_SIZE_EXCEEDS_PASSED_IN_SIZE); )
-
-            if (item) item = memcpy(item, element, size);
-	    ChunkArrayDelete(list, element);
-	    MemThreadRelease(mh);
-	    break;
-	} else {
-	    list = header->HTLH_next;
-	    index -= header->HTLH_carray.CAH_count;
-	    MemThreadRelease(mh);
-	    mh = OptrToHandle(list);
-	}
-    }
-
-EC( if (!list)                                                          )
+EC( if (ChunkArrayGetCount(list) <= index)                              )
 EC(     EC_ERROR(HTLIST_INDEX_OUT_OF_RANGE);                            )
 
-}	/* End of HTLISTREMOVEITEM.	*/
+    element = ChunkArrayElementToPtr(list, index, &elementSize);
 
+EC( if (elementSize > size)                                             )
+EC(     EC_WARNING(HTLIST_ELEMENT_SIZE_EXCEEDS_PASSED_IN_SIZE);         )
 
+    if (item)
+	item = memcpy(item, element, size);
 
-/***********************************************************************
- *		HTLISTUSEDSPACEWID
- ***********************************************************************
- *
- * SYNOPSIS:	The amount of space used by an id. If id is 0, we get the
- *              memory used in non-id allocation.
- * CALLED BY:	Client
- * RETURN:	dword of total bytes.
- *	
- * STRATEGY:	
- *	
- * REVISION HISTORY:
- *	Name		Date		Description
- *	----		----		-----------
- *	kkee    	10/ 5/97   	Initial Revision
- *	
- ***********************************************************************/
-dword _far _pascal
-HTLISTUSEDSPACEWID (word id)
-{
-    HTListHandle *lptr;
-    HTListBlock *bptr;
-    word count, i, size;
-    MemHandle mh = OptrToHandle(@htlistMemoryBlocks);
-    dword ret = 0;
-	
-#if ERROR_CHECK
-    if (id >= HTMID_END)
-	EC_ERROR(INVALID_ID_FOR_HTLIST);        
-#endif
-
-    MemPLock(mh);
-
-    lptr = (HTListHandle *) LMemDeref(@htlistMemoryBlocks);
-    if (!(*lptr)) {
-	/* No blocks have been created */
-	MemUnlockV(mh);
-	return 0;
-    }
-
-    /*
-     * Search the list of blocks to compute memory usage.
-     */
-    count = ChunkArrayGetCount(*lptr);
-    for (i=0; i<count; i++) {
-	bptr = (HTListBlock *) ChunkArrayElementToPtr(*lptr, i, &size);
-	if (bptr->HTB_id == id) {
-	    ret += MemGetInfo(bptr->HTB_mh, MGIT_SIZE);
-	}
-    }
+    ChunkArrayDelete(list, element);
 
     MemUnlockV(mh);
-
-    return ret;
-}	/* End of HTLISTUSEDSPACEWID.	*/
+}	/* End of HTLISTREMOVEITEM.	*/

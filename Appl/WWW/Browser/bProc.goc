@@ -228,7 +228,7 @@ CreateLMemGString (optr *storagePtr)
     GStateHandle 	gstate;
 
     newBlock = MemAllocLMem(LMEM_TYPE_GENERAL, sizeof(LMemBlockHeader));
-    gstate = GrCreateGString(newBlock, GST_CHUNK, &newChunk);
+    gstate = GrCreateGString(newBlock, GST_CHUNK, (word *)&newChunk);
     *storagePtr = ConstructOptr(newBlock, newChunk);
  
     return(gstate);
@@ -277,8 +277,14 @@ CreateLMemGString (optr *storagePtr)
 
     /* Registers the protocol handlers. */
     protocolList = HTListNew();
+    /* The protocol library is loaded dynamically by name. */
+#if ERROR_CHECK
     HTPolicyAddProtocolHandler(protocolList, HTStringFor("http"),
-				&HTTPClass); 
+				HTStringFor("httpec.geo"));
+#else
+    HTPolicyAddProtocolHandler(protocolList, HTStringFor("http"),
+				HTStringFor("http.geo"));
+#endif
   
     /* Registers "after" callback functions. */
     afterCbfList = HTListNew();

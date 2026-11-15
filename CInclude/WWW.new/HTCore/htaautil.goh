@@ -1,0 +1,88 @@
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Geoworks 1996.  All rights reserved.
+	GEOWORKS CONFIDENTIAL
+
+PROJECT:	Geos WWW Library
+MODULE:		htaautil
+FILE:		htaautil.goh
+
+AUTHOR:		Kok Kin Kee, Nov 27, 1996
+
+ROUTINES:
+	Name			Description
+	----			-----------
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	kkee	11/27/96   	Initial version.
+
+DESCRIPTION:
+
+	Access Authentication utility routines.
+
+	$Id: htaautil.goh,v 1.3.15.1 97/09/05 10:06:58 jeremyb Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+@ifndef __HT_AAUTIL_GOH__
+@define __HT_AAUTIL_GOH__
+
+@include <WWW/HTCore/htassoc.goh>
+#include <WWW/htmem.h>
+
+
+/*
+**
+**  We need to define the following structures as they are used in the 
+**  HTRequest structure. The AA module is declared in htaautil and 
+**  htaabrow. The enumeration HTAAScheme represents the possible 
+**  authentication schemes used by the WWW Access Authorization.
+**
+*/
+typedef enum {
+    HTAA_UNKNOWN          = -2,
+    HTAA_NONE             = -1,       /* Valid schemes *MUST* fall 
+					 after all invalid schemes */
+    HTAA_BASIC            = 0,        /* The only one implemented */
+    HTAA_PUBKEY           = 1,
+    HTAA_KERBEROS_V4      = 2,
+    HTAA_KERBEROS_V5      = 3,
+    HTAA_MAX_SCHEMES      = 4         /* This *MUST* be last! */
+} HTAAScheme;
+
+/*
+ * HTTP Access Authentication for a HTRequest.
+ */
+typedef struct {
+     /* 
+      * Authentication requested by server from client
+      */
+     HTAAScheme   HTA_wwwScheme;       /* WWW-Authenticate scheme. Index
+					  into HTA_wwwSchemeSpecifics */
+     /* 
+      * Authorization supplied by client to server
+      */
+     HTAAScheme   HTA_scheme;          /* If challenged, must be the same
+					  as HTA_wwwScheme */
+     HTMemHandle  HTA_authorization;   /* char*, Authorization: field. Must
+					  be deleted as this is not cached */
+     
+     /* 
+      * Existing knowledge AA may have about the document being requested,
+      * obtained from previous requests to the same protection space in 
+      * the same server. Must not be deleted as this is cached.
+      */
+     HTMemHandle  HTA_setup;           /* HTAASetup*, doc protection info */
+     HTMemHandle  HTA_realm;           /* HTAARealm*, same copy in HTA_setup*/
+
+} HTAuth;
+
+extern Boolean _far _pascal
+    HTAATemplateMatch(const char *template, const char *filename);
+
+extern HTMemHandle _far _pascal
+    HTAAMakeProtectionTemplate(const HTMemHandle docname);
+
+@endif

@@ -1,0 +1,952 @@
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Geoworks 1996.  All rights reserved.
+	GEOWORKS CONFIDENTIAL
+
+PROJECT:	Geos WWW Library
+MODULE:		htanchor
+FILE:		htanchor.goc
+
+AUTHOR:		Kok Kin Kee, Oct 15, 1996
+
+ROUTINES:
+	Name			Description
+	----			-----------
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	kkee	10/15/96   	Initial version.
+
+DESCRIPTION:
+
+	The hypertext anchor object. An anchor represents a region 
+	of the hypertext document which is linked to another anchor
+	in the same or a different document.
+
+	$Id: htanchor.goc,v 1.12.1.5 97/11/11 19:55:09 kkee Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+
+@include <WWW/HTCore/htanchor.goh>
+@include <WWW/HTCore/htancMan.goh>
+@include <WWW/HTCore/htpolicy.goh>
+@include <WWW/HTCore/hturi.goh>
+#include <WWW/htmem.h>
+@include "htfatals.goh"
+
+#include <sem.h>
+#include <Ansi/string.h>
+
+@include "HTAnchor/htancCk.goh"
+
+
+/* --------------------------------------------------------------------------
+ * 		PRIVATE DATA
+ * --------------------------------------------------------------------------*/
+
+#define HTANCHOR_HASH_TABLE_SIZE  9  /* Tunable */
+
+/*
+ * Each slot is a HTList of buckets. Each bucket contains a HTAnchor 
+ * (parent or child *).
+ */
+HTListHandle htAnchorHashTable[HTANCHOR_HASH_TABLE_SIZE] = {0};
+SemaphoreHandle anchorSem = NULL;  /* Synch access to list */
+static word anchorCount = 0;       /* Number of anchors created via
+				      HTAnchorFind. Does not include
+				      those created directly via 
+				      HTAnchorNew. */
+#define HTANCHOR_GARBAGE_COLLECT_LIMIT 100
+
+static void _pascal HTAnchorDeleteLow (HTAnchorHandle parent);
+static void _pascal HTAnchorGarbageCollect(void);
+
+/* --------------------------------------------------------------------------
+ * 		PUBLIC FUNCTIONS
+ * --------------------------------------------------------------------------*/
+
+
+/***********************************************************************
+ *		HTAnchorLibraryEntry
+ ***********************************************************************
+ *
+ * SYNOPSIS:    Initialize a semaphore to synch access to 
+ *              htAnchorHastTable.
+ * CALLED BY:	Kernel
+ * RETURN:	0, required by kernel.
+ *	
+ * STRATEGY:	
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	kkee    	3/21/97   	Initial Revision
+ *	
+ ***********************************************************************/
+int _far _pascal
+HTAnchorLibraryEntry (LibraryCallType ty, GeodeHandle client)
+{
+    if (ty == LCT_ATTACH) {
+	PUSHDS;
+	SET_DS_LIB_DGROUP;
+	anchorSem = ThreadAllocSem(1);  /* Only one thread can grab */
+	HandleModifyOwner(anchorSem, GeodeGetCodeProcessHandle());
+	HTAnchorInitCookies();
+	POPDS;
+
+    } else if (ty == LCT_DETACH) {
+	PUSHDS;
+	SET_DS_LIB_DGROUP;
+	HTAnchorCleanupCookies();
+	ThreadFreeSem(anchorSem);
+	anchorSem = 0;
+	POPDS;
+    }
+
+    return 0;
+}	/* End of HTAnchorLibraryEntry.	*/
+
+
+
+
+/***********************************************************************
+ *		HTANCHORNEW
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Create a parent anchor and set all its data items to 
+ *              default values. 
+ * CALLED BY:	Public HTAnchor routines.
+ * RETURN:	HTAnchorHandle.
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:    
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	kkee	10/29/96   	Initial Revision
+ *
+ ***********************************************************************/
+HTAnchorHandle _far _pascal
+HTANCHORNEW (void)
+{
+    HTAnchorHandle newAnchor = NULL;
+    HTParentAnchor *parent;
+
+    parent = (HTParentAnchor *) 
+	HTMemAllocAndLockWID(HTMID_HTANCHOR, &newAnchor, 
+			     sizeof(HTParentAnchor));
+
+    if (newAnchor) {
+	
+	PUSHDS;
+	SET_DS_LIB_DGROUP;            /* Use HT_CONTENT_TYPE_UNKNOWN */
+
+	parent->HTPA_document = 0;
+	parent->HTPA_inUseCount = 1;
+	parent->HTPA_url = 0;
+	parent->HTPA_physical = 0;
+	parent->HTPA_cacheHit = FALSE;
+	parent->HTPA_headerDone = FALSE;
+
+	parent->HTPA_content_transfer_encoding = 0;
+	parent->HTPA_content_encoding = 0;
+	parent->HTPA_content_language = 0;
+	parent->HTPA_content_type = 0;
+	parent->HTPA_charset = 0;
+	parent->HTPA_level = 0;
+	parent->HTPA_content_length = 0;
+
+	parent->HTPA_date = 0;
+	parent->HTPA_expires = 0;
+	parent->HTPA_lastModified = 0;
+	parent->HTPA_xImageXScale = 1;    /* 1:1 is no scaling */
+	parent->HTPA_xImageYScale = 1;
+
+	POPDS;
+
+	HTMemUnlock(newAnchor);
+    }
+
+    return newAnchor;
+}	/* End of HTANCHORNEW.	*/
+
+
+/* --------------------------------------------------------------------------
+ * 		CREATION FUNCTIONS
+ * --------------------------------------------------------------------------*/
+
+
+/***********************************************************************
+ *		HTANCHORFIND
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Find/Create a parent anchor using a URL. After finish
+ *              using the anchor, must call HTAnchorDone (NOT 
+ *              HTAnchorDelete) to free the anchor.
+ *
+ * CALLED BY:	Client.
+ * RETURN:	HTAnchorHandle.
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:    All anchors created using this API are cached in memory.
+ *
+ *           (1)If the address represents a sub-anchor, we recursively
+ *              loads its parent and then create a child anchor in the
+ *              parent. BUT...we need to communicate this with the UI
+ *              that is displaying the data object so that it knows to 
+ *              move to the anchor position in the document. For example,
+ *              http://www.nasdaq.com/index.htm#copyright. Here we
+ *              make an anchor for http://www.nasdaq.com/index.htm, and
+ *              have the UI move to #copyright anchor position in this 
+ *              document. This is communicated to the UI via the request.
+ *
+ *           (2)Else find the parent anchor or create one.
+ *
+ *           (3)But if the anchor cannot be shared, so if it in used,
+ *              the request is entered in the anchor request list.
+ *
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	kkee	10/31/96   	Initial Revision
+ *
+ ***********************************************************************/
+HTAnchorHandle _far _pascal
+HTANCHORFIND (const char *url)
+{
+    int hash, count, i;
+    word size;
+    HTListHandle *hashTable, parentList;
+    HTMemHandle addrhtmh, parenthtmh, foundhtmh;
+    HTParentAnchor *parent;
+    char *q, *newAddr, *parentAddr; 
+    const char *p;
+
+    /* For now, I simply chop off the subanchor */
+    /* Which in fact I should implement subanchor...sigh! */
+    if ((q=strchr(url, '#')) != NULL) *q=0;
+
+    PUSHDS;
+    SET_DS_LIB_DGROUP;
+
+    ThreadPSem(anchorSem);   /* Synch access to hash table */
+
+    newAddr = (char *) HTMemAllocAndLockWID(HTMID_HTANCHOR, &addrhtmh, 
+					    strlen(url)+1);
+    if (!addrhtmh) {
+	ThreadVSem(anchorSem);
+	POPDS;
+	return NULL;
+    }
+
+    strcpy(newAddr, url);              /* Make a copy to modify */
+    newAddr = HTSimplifyURI(&newAddr);
+ 
+    /* Generate hash function */
+    for(p=newAddr, hash=0; *p; p++) {
+	hash = (int) ((hash * 3 + (*(unsigned char*)p)) % 
+		      HTANCHOR_HASH_TABLE_SIZE);
+    }
+
+    if (!htAnchorHashTable[hash])
+	htAnchorHashTable[hash] = HTListNewWID(HTMID_HTANCHOR);
+    
+    /* Search list of anchor */
+    parentList = htAnchorHashTable[hash];
+    count = HTListGetCount(parentList);
+    size = sizeof(HTMemHandle);
+    foundhtmh = NULL;
+
+    for(i=0; i<count; i++) {
+	HTListGetItem(parentList, i, &parenthtmh, size);
+	parent = (HTParentAnchor *) HTMemLock(parenthtmh);
+	parentAddr = (char *) HTMemLock(parent->HTPA_url);
+
+	/* Case insensitive URLs compare? */
+	if (!strcasecmp(newAddr, parentAddr)) {
+	    /* Found! */
+	    parent->HTPA_inUseCount += 1;
+	    foundhtmh = parenthtmh;
+	    HTMemUnlockAndFree(addrhtmh); /* We already have it */
+	}
+
+	HTMemUnlock(parent->HTPA_url);
+	HTMemUnlock(parenthtmh);
+	if (foundhtmh) break;
+    }
+
+    if (!foundhtmh) {
+	foundhtmh = HTAnchorNew();
+	HTMemUnlock(addrhtmh);
+	parent = (HTParentAnchor *) HTMemLock(foundhtmh);
+	parent->HTPA_url = addrhtmh;
+	HTMemUnlock(foundhtmh);
+	HTListAppend(parentList, &foundhtmh, size);
+	anchorCount += 1;    /* Keep tab for garbage collect */
+    }
+
+    ThreadVSem(anchorSem);
+    POPDS;
+    return foundhtmh;
+}	/* End of HTANCHORFIND.	*/
+
+
+
+/***********************************************************************
+ *		HTANCHORDONE
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Used by client to detach from anchor object gotten via
+ *              HTAnchorFind. So after using the anchor, client that 
+ *              got the anchor using HTAnchorFind must call HTAnchorDone
+ *              so that the anchor maybe garbage collected if space is
+ *              needed.
+ * CALLED BY:	Client
+ * RETURN:	Nothing
+ *	
+ * STRATEGY:	Garbage collect anchors if there are too many. Only
+ *              those anchors where inUseCount == 0 and memCache = 0
+ *              are garbage collected.
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	kkee    	10/ 2/97   	Initial Revision
+ *	
+ ***********************************************************************/
+void _far _pascal
+HTANCHORDONE (HTAnchorHandle parent)
+{
+    HTParentAnchor *anchor;
+
+EC( ECCheckHTAnchor(parent);                                             )
+
+    PUSHDS;
+    SET_DS_LIB_DGROUP;
+
+    ThreadPSem(anchorSem);
+
+    anchor = (HTParentAnchor *) HTMemLock(parent);
+    anchor->HTPA_inUseCount = (anchor->HTPA_inUseCount) ?
+	(anchor->HTPA_inUseCount - 1) : 0;
+    HTMemUnlock(parent);
+
+    HTAnchorGarbageCollect();
+    
+    ThreadVSem(anchorSem);
+    POPDS;
+}	/* End of HTANCHORDONE.	*/
+
+
+
+
+/* -------------------------------------------------------------------------
+ *				DELETION FUNCTIONS
+ * -------------------------------------------------------------------------*/
+
+
+/***********************************************************************
+ *		HTAnchorGarbageCollect
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Garbage collect if there are too many anchors allocated.
+ *              Assume we are in library dgroup and anchorSem is already
+ *              grab.
+ * CALLED BY:	HTAnchorDone
+ * RETURN:	Nothing
+ *	
+ * STRATEGY:	
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	kkee    	10/ 2/97   	Initial Revision
+ *	
+ ***********************************************************************/
+static void _pascal
+HTAnchorGarbageCollect (void)
+{
+    HTAnchorHandle anchor;
+    HTParentAnchor *p;
+    word i, j, count;
+
+    if (anchorCount <= HTANCHOR_GARBAGE_COLLECT_LIMIT) return;
+
+    /* Garbage collect down to about 1/2 number of anchors */
+    for (i=0; i<HTANCHOR_HASH_TABLE_SIZE; i++) {
+	if (htAnchorHashTable[i]) {
+	    count = HTListGetCount(htAnchorHashTable[i]);
+	    count = count/2;  /* Half the list */
+	    for (j=0; j<count; j++) {
+		HTListRemoveItem(htAnchorHashTable[i], 0,
+				 &anchor, sizeof(HTAnchorHandle));
+		p = (HTParentAnchor *) HTMemLock(anchor);
+		if (p->HTPA_inUseCount || p->HTPA_memCache) {
+		    HTMemUnlock(anchor);
+		    HTListAppend(htAnchorHashTable[i], (void*)&anchor, 
+				 sizeof(HTAnchorHandle));
+		} else {
+		    HTMemUnlock(anchor);
+		    HTAnchorDeleteLow(anchor);
+		    anchorCount -= 1;
+		}
+	    }
+	}
+    }
+}	/* End of HTAnchorGarbageCollect.	*/
+
+
+
+/***********************************************************************
+ *		HTAnchorDeleteLow
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Delete an anchor.
+ * CALLED BY:	HTAnchorDeleteAll, HTAnchorDelete.
+ * RETURN:	Nothing
+ *	
+ * STRATEGY:	
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	kkee    	3/18/97   	Initial Revision
+ *	
+ ***********************************************************************/
+static void _pascal
+HTAnchorDeleteLow (HTAnchorHandle parent)
+{
+    HTParentAnchor *anchor;
+
+EC( ECCheckHTAnchor(parent);                                             )
+
+    anchor = (HTParentAnchor *) HTMemLock(parent);
+
+    if (anchor->HTPA_document) {
+	HTMemHandle temp;
+	word count, i; 
+
+	count = HTListGetCount(anchor->HTPA_document);
+	for (i=0; i<count; i++) {
+	    HTListRemoveItem(anchor->HTPA_document, 0, 
+			     &temp, sizeof(HTMemHandle));
+	    HTMemFree(temp);
+	}
+	HTListDelete(anchor->HTPA_document);
+    }
+    if (anchor->HTPA_url)
+	HTMemFree(anchor->HTPA_url);
+    if (anchor->HTPA_physical)
+	HTMemFree(anchor->HTPA_physical);
+    if (anchor->HTPA_extraHeaders) {
+	HTMemHandle temp;
+	word count, i; 
+
+	count = HTListGetCount(anchor->HTPA_extraHeaders);
+	for (i=0; i<count; i++) {
+	    if (i%2) {
+		/* The value has to be deleted, see HTAnchorAddHeader */
+		HTListRemoveItem(anchor->HTPA_extraHeaders, 0, 
+				 &temp, sizeof(HTMemHandle));
+		HTMemFree(temp);
+	    } else {
+		/* The name is cached */
+		HTListRemoveItem(anchor->HTPA_extraHeaders, 0, 
+				 NULL, sizeof(HTStringHandle));
+	    }
+	}
+	HTListDelete(anchor->HTPA_extraHeaders);
+    }
+    if (anchor->HTPA_date) {
+	HTMemFree(anchor->HTPA_date);
+    } 
+    if (anchor->HTPA_expires) {
+	HTMemFree(anchor->HTPA_expires);
+    }
+    if (anchor->HTPA_lastModified) {
+	HTMemFree(anchor->HTPA_lastModified);
+    }
+
+    HTMemUnlockAndFree(parent);
+
+}	/* End of HTAnchorDeleteLow.	*/
+
+
+
+
+/***********************************************************************
+ *		HTAnchorDeleteAll
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Delete all anchors.
+ * CALLED BY:	Client.
+ * RETURN:	Nothing.
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:    If an anchor contains a HTDocument, we should return
+ *              it to the caller....but I can't do it now since we don't
+ *              implement HTDocument.
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	kkee	11/ 3/96   	Initial Revision
+ *
+ ***********************************************************************/
+void _far _pascal
+HTAnchorDeleteAll (void)
+{
+    HTAnchorHandle anchor;
+    word count, i, j, size = sizeof(HTAnchorHandle);
+
+    PUSHDS;
+    SET_DS_LIB_DGROUP;
+    ThreadPSem(anchorSem);
+
+    for (i=0; i<HTANCHOR_HASH_TABLE_SIZE; i++) {
+	if (htAnchorHashTable[i]) {
+	    count = HTListGetCount(htAnchorHashTable[i]);
+
+	    for (j=0; j<count; j++) {
+		HTListRemoveItem(htAnchorHashTable[i], 0, &anchor, size);
+		HTAnchorDeleteLow(anchor);
+	    }
+
+	    HTListDelete(htAnchorHashTable[i]);
+	    htAnchorHashTable[i] = NULL;
+	}
+    }
+
+    ThreadVSem(anchorSem);
+    POPDS;
+}	/* End of HTAnchorDeleteAll.	*/
+
+
+
+/***********************************************************************
+ *		HTAnchorDelete
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Delete an anchor. If called directly by client, the 
+ *              anchor object must not be cached. Clients should not
+ *              delete cached anchors directly.
+ * CALLED BY:	Client
+ * RETURN:	Nothing
+ *	
+ * STRATEGY:	
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	kkee    	3/17/97   	Initial Revision
+ *	
+ ***********************************************************************/
+void _far _pascal
+HTAnchorDelete (HTAnchorHandle parent)
+{
+    if (!parent) return;
+
+    PUSHDS;
+    SET_DS_LIB_DGROUP;
+    ThreadPSem(anchorSem);
+
+EC( ECCheckHTAnchor(parent);                                            )
+
+    HTAnchorDeleteLow(parent);
+
+    ThreadVSem(anchorSem);
+    POPDS;
+}	/* End of HTAnchorDelete.	*/
+
+
+/* --------------------------------------------------------------------------
+ * 		QUERY FUNCTIONS
+ * --------------------------------------------------------------------------*/
+
+
+/***********************************************************************
+ *		HTANCHORADDRESS
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Get the URL of a parent anchor object. 
+ *
+ * CALLED BY:	Client
+ * RETURN:	HTMemHandle must be freed by caller. Or NULL if no 
+ *              address.
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	kkee	11/28/96   	Initial Revision
+ *
+ ***********************************************************************/
+HTMemHandle _far _pascal
+HTANCHORADDRESS (HTAnchorHandle parent)
+{
+    HTParentAnchor *anchor;
+    HTMemHandle ret = NULL;
+
+    if (!parent) return NULL;
+
+EC( ECCheckHTAnchor(parent);                                             )
+
+    PUSHDS;
+    SET_DS_LIB_DGROUP;
+    ThreadPSem(anchorSem);
+
+    anchor = (HTParentAnchor *) HTMemLock(parent);
+
+    if (anchor->HTPA_url)
+	ret = HTStrHTMemAllocCopyWID(HTMID_HTANCHOR, anchor->HTPA_url);
+
+    HTMemUnlock(parent);
+
+    ThreadVSem(anchorSem);
+    POPDS;
+
+    return ret;
+}	/* End of HTANCHORADDRESS.	*/
+
+
+
+
+/***********************************************************************
+ *		HTANCHORSETPHYSICAL
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Set the physical address. This physical address is used
+ *              load the document (this is the translated version of the
+ *              URL in HTRequest.HTR_uriString, after going through cache,
+ *              proxy, and gateway). Passing a NULL physicalURL will 
+ *              clear the physical address of the anchor (if one is 
+ *              already there).
+ * CALLED BY:	Client
+ * RETURN:	Nothing
+ *	
+ * STRATEGY:	
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	kkee    	2/ 2/97   	Initial Revision
+ *	
+ ***********************************************************************/
+void _far _pascal
+HTANCHORSETPHYSICAL (HTAnchorHandle parent, const char *physicalURL)
+{
+    HTParentAnchor *anchor;
+
+EC( ECCheckHTAnchor(parent);                                            )
+
+    PUSHDS;
+    SET_DS_LIB_DGROUP;
+    ThreadPSem(anchorSem);
+
+    anchor = (HTParentAnchor *) HTMemLock(parent);
+    
+    /* If old physical URL exists, free it */
+    if (anchor->HTPA_physical)
+	HTMemFree(anchor->HTPA_physical);
+    if (physicalURL)
+	anchor->HTPA_physical = HTStrAllocCopyWID(HTMID_HTANCHOR, 
+						  physicalURL);
+    else 
+	anchor->HTPA_physical = 0;
+
+    HTMemUnlock(parent);
+
+    ThreadVSem(anchorSem);
+    POPDS;
+}	/* End of HTANCHORSETPHYSICAL.	*/
+
+
+
+
+/***********************************************************************
+ *		HTANCHORPHYSICAL
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Get the physical URL address.
+ *
+ * CALLED BY:	Client
+ * RETURN:	HTMemHandle, must be freed by caller. Else NULL.
+ *	
+ * STRATEGY:	
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	kkee    	2/ 2/97   	Initial Revision
+ *	
+ ***********************************************************************/
+HTMemHandle _far _pascal
+HTANCHORPHYSICAL (HTAnchorHandle parent)
+{
+    HTParentAnchor *anchor;
+    HTMemHandle ret = NULL;
+
+    if (!parent) return NULL;
+
+EC( ECCheckHTAnchor(parent);                                           )
+
+    PUSHDS;
+    SET_DS_LIB_DGROUP;
+    ThreadPSem(anchorSem);
+
+    anchor = (HTParentAnchor *) HTMemLock(parent);
+
+    if (anchor->HTPA_physical)
+	ret = HTStrHTMemAllocCopyWID(HTMID_HTANCHOR, anchor->HTPA_physical);
+
+    HTMemUnlock(parent);
+
+    ThreadVSem(anchorSem);
+    POPDS;
+    return ret;
+}	/* End of HTANCHORPHYSICAL.	*/
+
+
+
+/***********************************************************************
+ *		HTANCHORSETCACHEHIT
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Set disk cache hit.
+ * CALLED BY:	HTReq
+ * RETURN:	Nothing
+ *	
+ * STRATEGY:	
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	kkee    	8/14/97   	Initial Revision
+ *	
+ ***********************************************************************/
+void _far _pascal
+HTANCHORSETCACHEHIT (HTAnchorHandle parent, Boolean hit)
+{
+    HTParentAnchor *anchor;
+
+    if (!parent) return;
+
+EC( ECCheckHTAnchor(parent);                                           )
+
+    PUSHDS;
+    SET_DS_LIB_DGROUP;
+    ThreadPSem(anchorSem);
+
+    anchor = (HTParentAnchor *) HTMemLock(parent);
+    anchor->HTPA_cacheHit = hit;
+    HTMemUnlock(parent);
+
+    ThreadVSem(anchorSem);
+    POPDS;
+}	/* End of HTANCHORSETCACHEHIT.	*/
+
+
+
+/***********************************************************************
+ *		HTANCHORCACHEHIT
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Check disk cache hit.
+ * CALLED BY:	HTReq
+ * RETURN:	TRUE if cache hit, else false.
+ *	
+ * STRATEGY:	
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	kkee    	8/14/97   	Initial Revision
+ *	
+ ***********************************************************************/
+Boolean _far _pascal
+HTANCHORCACHEHIT (HTAnchorHandle parent)
+{
+    HTParentAnchor *anchor;
+    Boolean ret;
+
+    if (!parent) return FALSE;
+
+EC( ECCheckHTAnchor(parent);                                           )
+
+    PUSHDS;
+    SET_DS_LIB_DGROUP;
+    ThreadPSem(anchorSem);
+
+    anchor = (HTParentAnchor *) HTMemLock(parent);
+    ret = anchor->HTPA_cacheHit;
+    HTMemUnlock(parent);
+
+    ThreadVSem(anchorSem);
+    POPDS;
+    return ret;
+}	/* End of HTANCHORCACHEHIT.	*/
+
+
+
+/***********************************************************************
+ *		HTANCHORSETMEMCACHE
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Set the memCache of a anchor object. Client must call
+ *              Pass 0 to unset the memCache. The cache must be unset
+ *              if it were to be garbage collected.
+ * CALLED BY:	Client
+ * RETURN:	Nothing
+ *	
+ * STRATEGY:	
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	kkee    	10/ 2/97   	Initial Revision
+ *	
+ ***********************************************************************/
+void _far _pascal
+HTANCHORSETMEMCACHE (HTAnchorHandle parent, HTMemHandle memCache)
+{
+    HTParentAnchor *anchor;
+
+    if (!parent) return;
+
+EC( ECCheckHTAnchor(parent);                                           )
+    PUSHDS;
+    SET_DS_LIB_DGROUP;
+    ThreadPSem(anchorSem);
+
+    anchor = (HTParentAnchor *) HTMemLock(parent);
+    anchor->HTPA_memCache = memCache;
+    HTMemUnlock(parent);
+
+    ThreadVSem(anchorSem);
+    POPDS;
+}	/* End of HTANCHORSETMEMCACHE.	*/
+
+
+
+/***********************************************************************
+ *		HTANCHORMEMCACHE
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Get the memCache.
+ * CALLED BY:	Client
+ * RETURN:	Nonzero if there is a memCache copy, else NULL.
+ *	
+ * STRATEGY:	
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	kkee    	10/ 2/97   	Initial Revision
+ *	
+ ***********************************************************************/
+HTMemHandle _far _pascal
+HTANCHORMEMCACHE (HTAnchorHandle parent)
+{
+    HTParentAnchor *anchor;
+    HTMemHandle ret;
+
+    if (!parent) return FALSE;
+
+EC( ECCheckHTAnchor(parent);                                           )
+    PUSHDS;
+    SET_DS_LIB_DGROUP;
+    ThreadPSem(anchorSem);
+
+    anchor = (HTParentAnchor *) HTMemLock(parent);
+    ret = anchor->HTPA_memCache;
+    HTMemUnlock(parent);
+
+    ThreadVSem(anchorSem);
+    POPDS;
+    return ret;
+}	/* End of HTANCHORMEMCACHE.	*/
+
+
+
+
+/***********************************************************************
+ *		HTANCHORSETHEADERDONE
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Set done parsing header.
+ * CALLED BY:	HTMIME
+ * RETURN:	Nothing
+ *	
+ * STRATEGY:	
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	kkee    	8/14/97   	Initial Revision
+ *	
+ ***********************************************************************/
+void _far _pascal
+HTANCHORSETHEADERDONE (HTAnchorHandle parent)
+{
+    HTParentAnchor *anchor;
+
+    if (!parent) return;
+
+EC( ECCheckHTAnchor(parent);                                           )
+    PUSHDS;
+    SET_DS_LIB_DGROUP;
+    ThreadPSem(anchorSem);
+
+    anchor = (HTParentAnchor *) HTMemLock(parent);
+    anchor->HTPA_headerDone = TRUE;
+    HTMemUnlock(parent);
+
+    ThreadVSem(anchorSem);
+    POPDS;
+}	/* End of HTANCHORSETHEADERDONE.	*/
+
+
+
+/***********************************************************************
+ *		HTANCHORHEADERDONE
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Check done parsing header.
+ * CALLED BY:   HTMIME
+ * RETURN:	TRUE if header done, else FALSE.
+ *	
+ * STRATEGY:	
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	kkee    	8/14/97   	Initial Revision
+ *	
+ ***********************************************************************/
+Boolean _far _pascal
+HTANCHORHEADERDONE (HTAnchorHandle parent)
+{
+    HTParentAnchor *anchor;
+    Boolean ret;
+
+    if (!parent) return FALSE;
+
+EC( ECCheckHTAnchor(parent);                                           )
+    PUSHDS;
+    SET_DS_LIB_DGROUP;
+    ThreadPSem(anchorSem);
+
+    anchor = (HTParentAnchor *) HTMemLock(parent);
+    ret = anchor->HTPA_headerDone;
+    HTMemUnlock(parent);
+
+    ThreadVSem(anchorSem);
+    POPDS;
+    return ret;
+}	/* End of HTANCHORHEADERDONE.	*/

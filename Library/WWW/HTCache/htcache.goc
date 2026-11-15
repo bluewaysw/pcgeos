@@ -23,7 +23,7 @@ DESCRIPTION:
 	The Hypertext disk cache manager. Memory cache is not 
 	implemented, yet. 
 
-	$Id: htcache.goc,v 1.22.2.5 97/11/19 18:10:57 kkee Exp $
+	$Id: htcache.goc,v 1.1 97/04/07 11:49:42 newdeal Exp $
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
 
@@ -32,10 +32,8 @@ DESCRIPTION:
 @include <WWW/HTCore/htreqMan.goh>
 @include <WWW/HTCore/htlist.goh>
 @include <WWW/HTCore/hturi.goh>
-@include <WWW/HTCore/htutils.goh>
 @include <WWW/HTCore/htstring.goh>
 @include <WWW/HTCore/htpolicy.goh>
-@include <WWW/HTCore/htobj.goh>
 #include <Ansi/string.h>
 #include <library.h>
 #include <timedate.h>
@@ -47,8 +45,6 @@ DESCRIPTION:
 #include <Ansi/stdlib.h>
 
 @include "htfatals.goh"
-@include "cache.goh"
-
 
 #if ERROR_CHECK
 FatalErrors htcacheFatalErrors;
@@ -62,11 +58,6 @@ Warnings    htcacheWarnings;
 ** these are the default information about the cache. Some can be 
 ** altered at runtime, such as the cache limit. 
 **
-** Disk cache is divided into inter-session cache and session cache.
-** Inter-session cache persists through multiple sessions, and session
-** cache is used only for the current session. Once the session ended,
-** session cache is removed.
-**
 */
 #define HTCACHE_LIMIT 10000000       /* Default to 10MEG */
 #define HTCACHE_ROOT  "wwwcache"     /* Directory relative to SP_PRIVATE_DATA */
@@ -74,6 +65,8 @@ Warnings    htcacheWarnings;
 #define HTCACHE_TEMP  "_temp.000"    /* Temp file for updating HTCACHE_INDEX */
 
 static Boolean      htCacheEnabled = FALSE;
+static Boolean      htCacheSeed = 21;  /* Initial seed for randomizing 
+					  a cache filenumber */
 static dword        htCacheLimit = HTCACHE_LIMIT; /* In units of bytes */
 
 static HTExpiresMode htExpMode = HT_EXPIRES_IGNORE;
@@ -82,177 +75,58 @@ static HTExpiresMode htExpMode = HT_EXPIRES_IGNORE;
 /*
 **  Indicates what components of a cache item we want to read. These
 **  only cover components that require allocating memory. All others
-**  are read by default. This is passed to HTCacheGetItem.
+**  are read by default. This is passed to HTCacheReadItem.
 */
 #define HTCACHE_READ_URL                  0x0001
 
 /*
 **  Indicates what components of a cache item to compare in 
-**  HTCacheGetItem.
+**  HTCacheFindItem.
 */
 
+#define HTCACHE_CMP_INUSE                0x0001   /* compare inUse */
 #define HTCACHE_CMP_FILENAME             0x0002   /* compare filename */
 #define HTCACHE_CMP_URL                  0x0004   /* compare URL */
 
 static void _pascal
     HTCacheInit();
 static void _pascal
-    HTCacheUpdateIndex();
+    HTCacheCleanup();
 static void _pascal
-    HTCacheEnforceConsistency(char *indexFile);
+    HTCacheUpdateIndex();
+static Boolean _pascal
+    addq(HTCacheItem *cache);
+static Boolean _pascal
+    addqhtmh(HTMemHandle htmh);
+static HTMemHandle _pascal
+    deleteq(void);
+static Boolean _pascal
+    isEmptyq(void);
+static void _pascal
+    HTCacheEnforceConsistency();
 static HTMemHandle _pascal
     HTCacheMakeWWWName(const char *name);
-static Boolean _pascal
-    HTCacheGetItem(HTCacheItem *cache, word compareAttrs, Boolean remove,
-		   HTCacheItem *found);
-void _pascal
-    HTCacheAppendItem(HTCacheItem *item);
-void _pascal
-    HTCacheDeleteItem(HTCacheItem *cache);
+static HTMemHandle _pascal
+    HTCacheFindItem(HTCacheItem *cache, word compareAttrs);
 static void _pascal
-    HTCacheDeleteItemAndFile(HTCacheItem *cache);
-static void _pascal
-    HTCacheDeleteAllItems();
-static void _pascal
-    HTCacheDeleteAllFiles();
-static word _pascal
-    HashString (HTMemHandle urlStr);
-static void _pascal
-    DeleteCacheList (HTListHandle list, Boolean deleteFile, dword *size);
-
-extern Boolean _pascal ParseIndex (char *p);
+    HTCacheDeleteItem(HTMemHandle htmh);
 
 /* -------------------------------------------------------------------------
  *  			      PRIVATE DATA
  * ------------------------------------------------------------------------- */
 
-word fileNumber = 1;            /* Largest is 65535 */
-dword totalSize = 0;            /* Current total cache size used */
-HTListHandle htCacheHashTable[HTCACHE_HASH_TABLE_SIZE] = {0};
-SemaphoreHandle cacheSem = 0;   /* Synch access to queue */
-static int htCacheGarbageCollectIndex = 0; /* 1 to HTCACHE_HASH_TABLE_SIZE */
+#define HTCACHE_MAX_FILES       1024   /* Large enough to cover the total
+                                          file size of HTCACHE_LIMIT */
+static dword totalSize = 0;            /* Current total cache size used */
+static int front = 0, rear = 0;        /* Initial state of a circular queue */
+static HTMemHandle *queue = NULL;      /* The dereferenced htCacheQueue */
 
-/* -------------------------------------------------------------------------
- *  			      ERROR CHECKING OF QUEUE
- * ------------------------------------------------------------------------- */
-
-#ifdef ERROR_CHECK
-/***********************************************************************
- *		ECCheckHTCache
- ***********************************************************************
- *
- * SYNOPSIS:	Check that the cache is consistent. Assumes that:
- *                    1. htCacheSem is P.
- *                    2. DS is Library dgroup.
- *              Uses global vars head and tail.
- * CALLED BY:	Internal.
- * RETURN:	
- *	
- * STRATEGY:	
- *	
- * REVISION HISTORY:
- *	Name		Date		Description
- *	----		----		-----------
- *	kkee    	4/ 3/97   	Initial Revision
- *	
- ***********************************************************************/
-static void _pascal
-ECCheckHTCache (HTCacheItem *item)
-{
-    int i;
-    for (i=0; i<HTCACHE_HASH_TABLE_SIZE; i++) {
-	if (htCacheHashTable[i]) {
-	    ECCheckHTList(htCacheHashTable[i]);
-	}
-    }
-
-    if (item) {
-	if (item->HTCI_url) ECCheckHTMemHandle(item->HTCI_url);
-    	if (item->HTCI_expires) ECCheckHTMemHandle(item->HTCI_expires);
-    }
-}	/* End of ECCheckHTCache.	*/
-#endif
-
-
-/***********************************************************************
- *		HashString
- ***********************************************************************
- *
- * SYNOPSIS:	Find the has value of a URL string.
- * CALLED BY:	
- * RETURN:	hash value.
- *	
- * STRATEGY:	
- *	
- * REVISION HISTORY:
- *	Name		Date		Description
- *	----		----		-----------
- *	kkee    	11/15/97   	Initial Revision
- *	
- ***********************************************************************/
-static word _pascal
-HashString (HTMemHandle urlStr)
-{
-    word hash;
-    char *b, *string = HTMemLock(urlStr);
-
-    for(b=string, hash=0; *b; b++) {
-	hash =  (hash * 3 + (*(unsigned char *) b)) % 
-	    HTCACHE_HASH_TABLE_SIZE;
-    }
-    HTMemUnlock(urlStr);
-
-    return hash;
-}	/* End of HashString.	*/
-
-
-/***********************************************************************
- *		DeleteCacheList
- ***********************************************************************
- *
- * SYNOPSIS:	Delete a list of cache items. Pass deleteFile TRUE if 
- *              you want the file to be deleted. Pass size = NULL if you 
- *              do not want to know the total disk space claimed from 
- *              deleting the list.
- * CALLED BY:	
- * RETURN:	HTListHandle, updated list, may be NULL and not the 
- *              same as the passed in list. size is the total size
- *              claimed from deleting the cache list.
- *	
- * STRATEGY:	
- *	
- * REVISION HISTORY:
- *	Name		Date		Description
- *	----		----		-----------
- *	kkee    	11/15/97   	Initial Revision
- *	
- ***********************************************************************/
-static void _pascal
-DeleteCacheList (HTListHandle list, Boolean deleteFile, dword *size)
-{
-    HTCacheItem item;
-    
-    if (size) {
-	*size = 0;
-    }
-
-    if (list) {
-	int j;
-	int count = HTListGetCount(list);
-	for (j=0; j<count; j++) {
-	    HTListRemoveItem(list, 0, &item, sizeof(HTCacheItem));
-	    if (size) {
-		*size += item.HTCI_filesize;
-	    }
-	    if (deleteFile) {
-		HTCacheDeleteItemAndFile(&item);
-	    } else {
-		HTCacheDeleteItem(&item);
-	    }
-	}
-	HTListDelete(list);
-    }
-}	/* End of DeleteCacheList.	*/
+@start HTCacheData, data;
+/* 
+ * This is a circular queue. Each slot is a HTMemHandle of HTCacheItem. 
+ */
+@chunk HTMemHandle htCacheQueue[HTCACHE_MAX_FILES+1] = {0};
+@end   HTCacheData;
 
 
 /* -------------------------------------------------------------------------
@@ -282,12 +156,17 @@ int _far _pascal
 HTCACHELIBRARYENTRY (LibraryCallType ty, GeodeHandle client)
 {
     if (ty == LCT_ATTACH) {
+	MemHandle mh = OptrToHandle(@htCacheQueue);
+
 	PUSHDS;
 	SET_DS_LIB_DGROUP;
 
-	cacheSem = ThreadAllocSem(1);  /* Only one thread can grab */
-	HandleModifyOwner(cacheSem, GeodeGetCodeProcessHandle());
+	MemLockExcl(mh);
+	queue = (HTMemHandle *) LMemDeref(@htCacheQueue);
 	HTCacheInit();
+	HTCacheEnforceConsistency();
+	MemUnlockExcl(mh);
+
 	POPDS;
 
     } else if (ty == LCT_DETACH) {
@@ -297,9 +176,8 @@ HTCACHELIBRARYENTRY (LibraryCallType ty, GeodeHandle client)
 	/* Do a disk cache consistency check here before beginning 
 	 * a new session.
 	 */
-	HTCacheUpdateIndex();        /* Write back to disk */
+	HTCacheCleanup();
 	HTCacheDisable();
-	ThreadFreeSem(cacheSem);
 
 	POPDS;
 	
@@ -335,37 +213,6 @@ HTCACHESETLIMIT (dword limit)
     POPDS;
 }	/* End of HTCACHESETLIMIT.	*/
 
-
-
-/***********************************************************************
- *		HTCACHECLEAR
- ***********************************************************************
- *
- * SYNOPSIS:	Clear the cache.
- * CALLED BY:	Client.
- * RETURN:	Nothing.
- *	
- * STRATEGY:	
- *	
- * REVISION HISTORY:
- *	Name		Date		Description
- *	----		----		-----------
- *	kkee    	7/22/97   	Initial Revision
- *	
- ***********************************************************************/
-void _far _pascal
-HTCACHECLEAR (void)
-{
-    PUSHDS;
-    SET_DS_LIB_DGROUP;
-    ThreadPSem(cacheSem);
-
-    /* Remove memory list of cached items and files */
-    HTCacheDeleteAllFiles();
-
-    ThreadVSem(cacheSem);
-    POPDS;
-}	/* End of HTCACHECLEAR.	*/
 
 
 
@@ -413,6 +260,11 @@ HTCACHEENABLE (void)
     }
 
     FilePopDir();
+
+    /*
+     * Randomize a seed for generating cache filenumbers.
+     */
+    htCacheSeed = (int) TimerGetCount();
 
     POPDS;
 }	/* End of HTCACHEENABLE.	*/
@@ -487,16 +339,13 @@ HTCACHEISENABLED (void)
 
 
 /***********************************************************************
- *		HTCacheGetItem
+ *		HTCacheFindItem
  ***********************************************************************
  *
- * SYNOPSIS:	Get a cache item. compareAttrs indicates what attrs of 
- *              the cache to compare for a match. remove is true if the
- *              found item were to be remove from htCacheHashTable.
- *              If passed in found != NULL, it will contain the item 
- *              gotten else NULL.
+ * SYNOPSIS:	Find a cache item in q. Uses global vars front, rear,
+ *              and queue.
  * CALLED BY:	
- * RETURN:	TRUE if found.
+ * RETURN:	HTMemHandle of the found item. NULL if not found.
  *
  * SIDE EFFECTS:
  *	
@@ -508,118 +357,47 @@ HTCACHEISENABLED (void)
  *	kkee	1/24/97   	Initial Revision
  *
  ***********************************************************************/
-static Boolean _pascal
-HTCacheGetItem (HTCacheItem *cache, word compareAttrs, Boolean remove,
-		HTCacheItem *found)
+static HTMemHandle _pascal
+HTCacheFindItem (HTCacheItem *cache, word compareAttrs)
 {
-    int i, count; 
-    HTCacheItem item;
-    Boolean ret = FALSE;
+    HTMemHandle ret = NULL;
+    HTCacheItem *item;
     char *c;
-    word hash;
-    FileHandle fh;
+    word wanted;
+    int localfront = front;
 
 EC( if (compareAttrs & HTCACHE_CMP_URL)                                  )
 EC(    ECCheckHTMemHandle(cache->HTCI_url);                              )
-EC( ECCheckHTCache(NULL);                                                )
 
-    FilePushDir();
-    FileSetCurrentPath(SP_PRIVATE_DATA, HTCACHE_ROOT);
+    wanted = (compareAttrs & HTCACHE_CMP_URL) ? HTCACHE_READ_URL : 0;
 
-    hash = HashString(cache->HTCI_url);
+    while (localfront != rear) {
+	localfront = (localfront + 1) % HTCACHE_MAX_FILES;
 
-    c = HTMemLock(cache->HTCI_url);
+	item = (HTCacheItem *) HTMemLock(queue[localfront]);
+	
+	if ((compareAttrs & HTCACHE_CMP_INUSE) &&
+	    (cache->HTCI_inUse == item->HTCI_inUse)) {
+	    ret = queue[localfront];
 
-    if (htCacheHashTable[hash]) {
-	count = HTListGetCount(htCacheHashTable[hash]);
-    } else {
-	count = 0;
-    }
-
-    for (i=0; i<count; i++) {
-
-	HTListGetItem(htCacheHashTable[hash], i, &item, sizeof(HTCacheItem));
-
-	if ((compareAttrs & HTCACHE_CMP_FILENAME) &&
-	    (!strcasecmp(cache->HTCI_filename, item.HTCI_filename))) {
-
-	    if((fh=FileOpen(item.HTCI_filename, 
-			    FILE_DENY_RW | FILE_ACCESS_R)) != 0) {
-		FileClose(fh, FALSE);
-		if (found) {
-		    memcpy(found, &item, sizeof(HTCacheItem));
-		}
-		ret = TRUE;
-		if (remove) {
-		    HTListRemoveItem(htCacheHashTable[hash], i, NULL,
-				     sizeof(HTCacheItem));
-		}
-	    } else {
-		HTListRemoveItem(htCacheHashTable[hash], i, NULL,
-				 sizeof(HTCacheItem));
-		HTCacheDeleteItem(&item);
-	    }
-	    break; /* done */
+	} else if ((compareAttrs & HTCACHE_CMP_FILENAME) &&
+	    (!strcasecmp(cache->HTCI_filename, item->HTCI_filename))) {
+	    ret = queue[localfront];
 	    
-	} else if ((compareAttrs & HTCACHE_CMP_URL) && (item.HTCI_url) &&
-		   !strcasecmpHTMemHandle(item.HTCI_url, c)) {
-	    if((fh=FileOpen(item.HTCI_filename, 
-			    FILE_DENY_RW | FILE_ACCESS_R)) != 0) {
-		FileClose(fh, FALSE);
-		if (found) {
-		    memcpy(found, &item, sizeof(HTCacheItem));
-		}
-		ret = TRUE;
-		if (remove) {
-		    HTListRemoveItem(htCacheHashTable[hash], i, NULL,
-				     sizeof(HTCacheItem));
-		}
-	    } else {
-		HTListRemoveItem(htCacheHashTable[hash], i, NULL,
-				 sizeof(HTCacheItem));
-		HTCacheDeleteItem(&item);
-	    }
-	    break; /* done */
+	} else if ((compareAttrs & HTCACHE_CMP_URL) && (item->HTCI_url)) {
+	    c = (char *) HTMemLock(item->HTCI_url);
+	    if (!strcasecmpHTMemHandle(cache->HTCI_url, c))
+		ret = queue[localfront];
+	    HTMemUnlock(item->HTCI_url);
 	}
+
+	HTMemUnlock(queue[localfront]);
+
+	if (ret) break; /* found! */
     }
-
-    HTMemUnlock(cache->HTCI_url);
-
-    FilePopDir();
+	
     return ret;
-}	/* End of HTCacheGetItem.	*/
-
-
-
-/***********************************************************************
- *		HTCacheAppendItem
- ***********************************************************************
- *
- * SYNOPSIS:	Append an item to cache list.
- * CALLED BY:	MSG_HT_STREAM_ABORT
- * RETURN:	Nothing
- *	
- * STRATEGY:	
- *	
- * REVISION HISTORY:
- *	Name		Date		Description
- *	----		----		-----------
- *	kkee    	11/16/97   	Initial Revision
- *	
- ***********************************************************************/
-void _pascal
-HTCacheAppendItem (HTCacheItem *cache)
-{
-    word hash;
-
-EC( ECCheckHTCache(cache);                                              )
-
-    hash = HashString(cache->HTCI_url);
-    if (!htCacheHashTable[hash]) {
-	htCacheHashTable[hash] = HTListNewWID(HTMID_HTCACHE);
-    }
-    HTListAppend(htCacheHashTable[hash], cache, sizeof(HTCacheItem));
-}	/* End of HTCacheAppendItem.	*/
+}	/* End of HTCacheFindItem.	*/
 
 
 
@@ -649,12 +427,12 @@ EC( ECCheckHTCache(cache);                                              )
 static Boolean _pascal
 HTCacheEnforceLimit (dword len)
 {
-    int i, currentIndex;
-    dword size;
-
-EC( ECCheckHTCache(NULL);                                               )
-
-    if (totalSize+len < htCacheLimit) return TRUE;
+    HTCacheItem *item;
+    HTMemHandle htmh;
+    char *url;
+    FileHandle fp;
+    int i;
+    Boolean ret = FALSE;
 
     /* 
      * Claim space by removing the files in FIFO order.
@@ -663,30 +441,30 @@ EC( ECCheckHTCache(NULL);                                               )
      * to claim more space.
      */
 
-    FilePushDir();
-    FileSetCurrentPath(SP_PRIVATE_DATA, HTCACHE_ROOT);
+    while (1) {
+	if (totalSize+len < htCacheLimit) return TRUE;
 
-    /* Delete cache items not in use */
-    currentIndex = htCacheGarbageCollectIndex;
-    htCacheGarbageCollectIndex = (htCacheGarbageCollectIndex + 1) %
-	HTCACHE_HASH_TABLE_SIZE;
+	htmh = deleteq();
+	if (!htmh) break;
 
-    for (i=0; i<HTCACHE_HASH_TABLE_SIZE; i++) {
-	if (htCacheHashTable[currentIndex]) {
-	    DeleteCacheList(htCacheHashTable[currentIndex], TRUE, &size);
-	    htCacheHashTable[currentIndex] = 0;
-	    totalSize = (size < totalSize) ? (totalSize - size) : 0;
+	item = (HTCacheItem *) HTMemLock(htmh);
+
+	if (!item->HTCI_inUse) {
+	    totalSize -= item->HTCI_filesize;
+	    FileDelete(item->HTCI_filename);
+	    HTMemFree(item->HTCI_url);
+	    HTMemUnlockAndFree(htmh);
+
+	} else {
+	    /* Can't delete cache file currently in use */
+	    HTMemUnlock(htmh);
+	    addqhtmh(htmh);   /* Put to end of q to simulate first unuse
+				 first out */
+				 
 	}
-	currentIndex = (currentIndex + 1) % HTCACHE_HASH_TABLE_SIZE;
-	if (totalSize+len < htCacheLimit) break;
     }
 
-    FilePopDir();
-
-EC( ECCheckHTCache(NULL);                                                )
-
-    if (totalSize+len < htCacheLimit) return TRUE;
-    return FALSE;
+    return ret;
 }	/* End of HTCacheEnforceLimit.	*/
 
 
@@ -703,8 +481,7 @@ EC( ECCheckHTCache(NULL);                                                )
  * RETURN:	Nothing
  *	
  * STRATEGY:	Delete all files that are not listed in the HTCACHE_INDEX
- *              file and also per session cache files; files that begin
- *              with ~.
+ *              file.
  *              
  *	
  * REVISION HISTORY:
@@ -714,7 +491,221 @@ EC( ECCheckHTCache(NULL);                                                )
  *	
  ***********************************************************************/
 static void _pascal
-HTCacheEnforceConsistency (char *indexFile)
+HTCacheEnforceConsistency (void)
+{
+    int i, count;
+    FEDosInfo *info;
+    MemHandle mh;
+    word remain;
+    HTCacheItem cache;
+    FileEnumParams fep = {
+	FILE_ENUM_ALL_FILE_TYPES,
+	(FileExtAttrDesc *) (((dword)0 << 16) | (word)FESRT_DOS_INFO),
+	sizeof(FEDosInfo),
+	NULL,
+	FE_BUFSIZE_UNLIMITED,      /* Enum all files at once */
+	0,
+	0,
+	0,
+	0,
+	0,
+	0
+    };
+
+    FilePushDir();
+    if (!FileSetCurrentPath(SP_PRIVATE_DATA, HTCACHE_ROOT)) {
+	FilePopDir();
+	return;
+    }
+
+    if (front == rear) {
+	/* Delete all files in the cache directory */
+	if ((count = FileEnum(&fep, &mh, &remain)) > 0) {
+	    info = (FEDosInfo *) MemLock(mh);
+	    for (i=0; i<count; i++) {
+		FileDelete(info->DFIS_name);
+		info += 1;
+	    }
+	    MemFree(mh);
+	}
+	FilePopDir();
+	return;
+    }
+
+    /* For each file, check that it is in queue, else delete it */
+    if ((count = FileEnum(&fep, &mh, &remain)) > 0) {
+	if (front-rear > count) {
+	    info = (FEDosInfo *) MemLock(mh);
+	    for (i=0; i<count; i++) {
+		strcpy(cache.HTCI_filename, info->DFIS_name);
+		if (strcasecmp(info->DFIS_name, HTCACHE_INDEX) &&
+		    !HTCacheFindItem(&cache, HTCACHE_CMP_FILENAME)) {
+		    FileDelete(info->DFIS_name);
+		}
+		info += 1;
+	    }
+	}
+	MemFree(mh);
+    }
+
+    FilePopDir();
+}	/* End of HTCacheEnforceConsistency.	*/
+
+
+
+/***********************************************************************
+ *		addq
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Add a cache item to queue. queue, front, and rear are 
+ *              global variables.
+ * CALLED BY:	
+ * RETURN:	TRUE if added, else FALSE for queue full.
+ *	
+ * STRATEGY:	Implements circular queue.
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	kkee    	3/ 7/97   	Initial Revision
+ *	
+ ***********************************************************************/
+static Boolean _pascal
+addq (HTCacheItem *cache)
+{
+    HTMemHandle htmh;
+    HTCacheItem *item;
+
+EC( ECCheckHTMemHandle(cache->HTCI_url);                                )
+
+    rear = (rear + 1) % HTCACHE_MAX_FILES;
+
+    if (front == rear) {
+EC(     EC_WARNING(HTCACHE_QUEUE_FULL);                                 )
+        return FALSE;
+    }
+
+    item = (HTCacheItem *) HTMemAllocAndLock(&htmh, sizeof(HTCacheItem));
+    if (!htmh) return FALSE;
+    memcpy(item, cache, sizeof(HTCacheItem));
+    HTMemUnlock(htmh);
+    queue[rear] = htmh;
+    
+    return TRUE;
+}	/* End of addq.	*/
+
+
+/***********************************************************************
+ *		addqhtmh
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Same as addq, execept we are passed a HTMemHandle of 
+ *              an allocated HTCacheItem, so we just add to queue 
+ *              without having to allocate memory.
+ * CALLED BY:	
+ * RETURN:	TRUE if added, else FALSE for queue full.
+ *	
+ * STRATEGY:	Implements circular queue.
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	kkee    	3/ 7/97   	Initial Revision
+ *	
+ ***********************************************************************/
+static Boolean _pascal
+addqhtmh (HTMemHandle htmh)
+{
+
+EC( ECCheckHTMemHandle(htmh);                                           )
+
+    rear = (rear + 1) % HTCACHE_MAX_FILES;
+
+    if (front == rear) {
+EC(     EC_WARNING(HTCACHE_QUEUE_FULL);                                 )
+        return FALSE;
+    }
+
+    queue[rear] = htmh;
+    
+    return TRUE;
+}	/* End of addqhtmh.	*/
+
+
+
+/***********************************************************************
+ *		deleteq
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Delete a cache item from queue. queue, front, and rear are 
+ *              global variables.
+ * CALLED BY:	
+ * RETURN:	HTMemHandle of the removed HTCacheItem, NULL if queue
+ *              is empty. Caller must delete the return HTMemHandle.
+ *	
+ * STRATEGY:	Implements circular queue.
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	kkee    	3/ 7/97   	Initial Revision
+ *	
+ ***********************************************************************/
+static HTMemHandle _pascal
+deleteq (void)
+{
+    if (front == rear) {
+EC(     EC_WARNING(HTCACHE_QUEUE_EMPTY);                                )
+	return NULL;
+    }
+
+    front = (front + 1) % HTCACHE_MAX_FILES;
+    return queue[front];
+}	/* End of deleteq.	*/
+
+
+/***********************************************************************
+ *		isEmptyq
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Check if queue is empty. front and rear are global 
+ *              variables.
+ * CALLED BY:	
+ * RETURN:	TRUE if queue is empty, else FALSE.
+ *	
+ * STRATEGY:	
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	kkee    	3/ 7/97   	Initial Revision
+ *	
+ ***********************************************************************/
+static Boolean _pascal
+isEmptyq (void)
+{
+    return (front == rear ? TRUE : FALSE);
+}	/* End of isEmptyq.	*/
+
+
+/***********************************************************************
+ *		HTCacheDeleteAll
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Delete all files in the cache.
+ * CALLED BY:	HTCacheInit (if it fails to init)
+ * RETURN:	Nothing
+ *	
+ * STRATEGY:	
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	kkee    	3/ 8/97   	Initial Revision
+ *	
+ ***********************************************************************/
+static void _pascal
+HTCacheDeleteAll (void)
 {
     int i, count;
     FEDosInfo *info;
@@ -734,34 +725,25 @@ HTCacheEnforceConsistency (char *indexFile)
 	0
     };
 
-EC( ECCheckHTCache(NULL);                                                )
-
     FilePushDir();
     if (!FileSetCurrentPath(SP_PRIVATE_DATA, HTCACHE_ROOT)) {
 	FilePopDir();
 	return;
     }
 
-    /* For each file, check that it is in queue, else delete it */
-    /* And if the filename begins with ~, delete it */
+    /* Delete all files in the cache directory */
     if ((count = FileEnum(&fep, &mh, &remain)) > 0) {
 	info = (FEDosInfo *) MemLock(mh);
 	for (i=0; i<count; i++) {
-	    if (info->DFIS_name[0] == '~') {
-		/* Session only cache file, delete it */
-		FileDelete(info->DFIS_name);
-	    } else if (!strcasestr(indexFile, info->DFIS_name)) {
-		FileDelete(info->DFIS_name);
-	    }
+	    FileDelete(info->DFIS_name);
 	    info += 1;
 	}
 	MemFree(mh);
     }
 
     FilePopDir();
-
-EC( ECCheckHTCache(NULL);                                                )
-}	/* End of HTCacheEnforceConsistency.	*/
+    return;
+}	/* End of HTCacheDeleteAll.	*/
 
 
 /***********************************************************************
@@ -786,15 +768,10 @@ static void _pascal
 HTCacheInit (void)
 {
     HTMemHandle htmh;
-    FileHandle fp;
-    char *p;
+    FileHandle fp, ftemp;
+    HTCacheItem cache;
+    char *p, *q, *r;
     int sz;
-
-EC( ECCheckHTCache(NULL);                                                )
-
-    for (sz=0; sz<HTCACHE_HASH_TABLE_SIZE; sz++) {
-	htCacheHashTable[sz] = 0;
-    }
 
     FilePushDir();
     if (!FileSetCurrentPath(SP_PRIVATE_DATA, HTCACHE_ROOT)) {
@@ -803,49 +780,87 @@ EC( ECCheckHTCache(NULL);                                                )
     }
     fp = FileOpen(HTCACHE_INDEX, FILE_DENY_RW | FILE_ACCESS_R);
 
-    /* Read all data in HTCACHE_INDEX into htCacheHashTable */
+    /* Read all data in HTCACHE_INDEX into htCacheQueue */
     if (fp) {
-	Boolean ok;
 	sz = FileSize(fp);
+	p = (char *) HTMemAllocAndLock(&htmh, sz+5);
+	FileRead(fp, p, sz, FALSE);
+	r = p+sz+1; *(r-1) = ' '; *r = '1'; /* Pad a space and char to
+					       end of buffer */
 
-	if (!sz) {
-	    FileClose(fp, FALSE);
-	    HTCacheDeleteAllFiles();
-	    FilePopDir();
-	    return;
+	while (p != r) {
+	    cache.HTCI_inUse = 0;  /* Always init to not in use */
+	    q = strchr(p, ' ');
+
+EC (if (!q) EC_WARNING(CORRUPTED_HTCACHE_INDEX_FILE);                       )
+	
+            if (!q) {
+		/* Correct corrupted index by ignoring the current item */
+		FileDelete(p);  /* Safe assumption: p is a cache filename */
+		continue;
+	    }
+
+	    if (q) *q = 0;         /* Null terminate the URL */
+	    else break;
+
+	    cache.HTCI_url = HTStrAllocCopy(p);   /* Copy URL */
+	    p = q+1; 
+	    while (isspace(*p)) p++;              /* Skip whitespaces */
+	    q = p;
+	    while (q && !isspace(*q)) q++;
+	    if (q) *q = 0;         /* Null terminate the filename */
+
+EC( if (strlen(p) > 12) EC_WARNING(CORRUPTED_HTCACHE_INDEX_FILE);          )
+     
+            if (strlen(p) > 12) {  /* 8.3 DOS filename */
+		/* Correct corrupted index by ignoring the current item */
+		HTMemFree(cache.HTCI_url);
+		FileDelete(p);  /* Safe assumption: p is a cache filename */
+		continue;
+	    }
+
+	    strcpy(cache.HTCI_filename, p);
+	    
+	    /* Add the cache file size to totalSize */
+	    /* This is lame, I have to open the file to get its size !*/
+	    if ((ftemp = FileOpen(p, FILE_DENY_RW | FILE_ACCESS_R)) != NULL) {
+		
+		cache.HTCI_filesize = FileSize(ftemp);
+		totalSize += cache.HTCI_filesize;
+		FileClose(ftemp, FALSE);
+
+		/* Append the cache item to the queue */
+		addq(&cache);
+
+	    } else if (cache.HTCI_url) {
+		HTMemFree(cache.HTCI_url);
+	    }
+
+	    p = q+1;
+	    while (isspace(*p)) p++;  /* Next index entry */
 	}
 
-	p = (char *) HTMemAllocAndLockWID(HTMID_HTCACHE, &htmh, sz+5);
-	FileRead(fp, p, sz, FALSE);
-	/* Enforce cache consistency */
-	HTCacheEnforceConsistency(p);
-	ok = ParseIndex(p);
 	FileClose(fp, FALSE);
 	HTMemUnlockAndFree(htmh);
 
-	if (!ok) {
-	    HTCacheDeleteAllFiles();
-	}
-	
     } else {
 	/* No index file, so delete all files */
-	HTCacheDeleteAllFiles();
+	HTCacheDeleteAll();
     }
     
     FilePopDir();
-
 }	/* End of HTCacheInit.	*/
 
 
 /***********************************************************************
- *		HTCacheDeleteAllItems
+ *		HTCacheCleanup
  ***********************************************************************
  *
- * SYNOPSIS:	Delete all items in hash table.
+ * SYNOPSIS:	Cleanup before cache exit.
  * CALLED BY:	HTCacheLibraryEntry on LCT_DETACH.
  * RETURN:	Nothing
  *	
- * STRATEGY:
+ * STRATEGY:	Remove all items from queue.
  *	
  * REVISION HISTORY:
  *	Name		Date		Description
@@ -854,79 +869,23 @@ EC( ECCheckHTCache(NULL);                                                )
  *	
  ***********************************************************************/
 static void _pascal
-HTCacheDeleteAllItems (void)
+HTCacheCleanup (void)
 {
-    int i;
+    FileHandle fp;
+    HTMemHandle htmh;
+    MemHandle mh = OptrToHandle(@htCacheQueue);
+    HTCacheItem *cache;
 
-EC( ECCheckHTCache(NULL);                                               )
+    MemLockExcl(mh);
 
-    for (i=0; i<HTCACHE_HASH_TABLE_SIZE; i++) {
-	DeleteCacheList(htCacheHashTable[i], FALSE, 0);
-	htCacheHashTable[i] = 0;
-    }
-}	/* End of HTCacheDeleteAllItems.	*/
-
-
-/***********************************************************************
- *		HTCacheDeleteAllFiles
- ***********************************************************************
- *
- * SYNOPSIS:	Delete all items in hash table and on disk.
- * CALLED BY:	HTCacheLibraryEntry on LCT_DETACH.
- * RETURN:	Nothing
- *	
- * STRATEGY:	
- *	
- * REVISION HISTORY:
- *	Name		Date		Description
- *	----		----		-----------
- *	kkee    	11/16/97   	Initial Revision
- *	
- ***********************************************************************/
-static void _pascal
-HTCacheDeleteAllFiles (void)
-{
-    int i, count;
-    FEDosInfo *info;
-    MemHandle mh;
-    word remain;
-
-    FileEnumParams fep = {
-	FILE_ENUM_ALL_FILE_TYPES,
-	(FileExtAttrDesc *) (((dword)0 << 16) | (word)FESRT_DOS_INFO),
-	sizeof(FEDosInfo),
-	NULL,
-	FE_BUFSIZE_UNLIMITED,      /* Enum all files at once */
-	0,
-	0,
-	0,
-	0,
-	0,
-	0
-    };
-
-    HTCacheDeleteAllItems();
-
-    FilePushDir();
-    if (!FileSetCurrentPath(SP_PRIVATE_DATA, HTCACHE_ROOT)) {
-	FilePopDir();
-	return;
+    queue = (HTMemHandle *) LMemDeref(@htCacheQueue);
+    
+    while ((htmh = deleteq()) != NULL) {
+	HTCacheDeleteItem(htmh);
     }
 
-    /* Delete all files in the cache directory */
-    if ((count = FileEnum(&fep, &mh, &remain)) > 0) {
-	info = (FEDosInfo *) MemLock(mh);
-	for (i=0; i<count; i++) {
-	    FileDelete(info->DFIS_name);
-	    info += 1;
-	}
-	MemFree(mh);
-    }
-
-    FilePopDir();
-
-}	/* End of HTCacheDeleteAllFiles.	*/
-
+    MemUnlockExcl(mh);
+}	/* End of HTCacheCleanup.	*/
 
 
 /***********************************************************************
@@ -936,8 +895,6 @@ HTCacheDeleteAllFiles (void)
  * SYNOPSIS:	Update index file by flushing data in queue to 
  *              HTCACHE_INDEX. We call this after creating a new cache
  *              file is created to make sure the index is consistent.
- *              This also garbage collect all cache items marked to be
- *              garbage collected. Also does HTCacheDeleteAllItems.
  * CALLED BY:	HTCacheWriterCreate.
  * RETURN:	Nothing
  *	
@@ -952,63 +909,34 @@ HTCacheDeleteAllFiles (void)
 static void _pascal
 HTCacheUpdateIndex (void)
 {
-    int i;
-    HTMemHandle cache, next;
     FileHandle findex;
-    HTCacheItem item;
-    char *c, str[32];
+    HTCacheItem *item;
+    char *url, str[20];
+    int localfront = front;
     
     FilePushDir();
     FileSetCurrentPath(SP_PRIVATE_DATA, HTCACHE_ROOT);
     FileDelete(HTCACHE_INDEX);       /* So that FileCreate would work */
     findex = FileCreate(HTCACHE_INDEX, FCF_NATIVE | FILE_CREATE_TRUNCATE |
-			FILE_DENY_W | FILE_ACCESS_W, FILE_ATTR_NORMAL);
-
-    if (!findex) {
-	FilePopDir();
-	return;
-    }
-
-EC( ECCheckHTCache(NULL);                                                )
-
-    /* Flush (and then delete) htCacheHashTable to HTCACHE_INDEX */
-    for(i=0; i<HTCACHE_HASH_TABLE_SIZE; i++) {
-	int j, count;
-	if (htCacheHashTable[i]) {
-	    count = HTListGetCount(htCacheHashTable[i]);
-	    for (j=0; j<count; j++) {
-		HTListRemoveItem(htCacheHashTable[i], 0,
-				 &item, sizeof(HTCacheItem));
-
-		if (item.HTCI_ctype == HTCACHE_INTERSESSION) {
-		    c = (char *) HTMemLock(item.HTCI_url);
-		    FileWrite(findex, c, strlen(c), FALSE);
-		    HTMemUnlock(item.HTCI_url);
-
-		    if (item.HTCI_expires) {
-			sprintf(str, "\t%s\t", item.HTCI_filename);
-			FileWrite(findex, str, strlen(str), FALSE);
-
-			c = (char *) HTMemLock(item.HTCI_expires);
-			FileWrite(findex, c, strlen(c), FALSE);
-			HTMemUnlock(item.HTCI_expires);
-			FileWrite(findex, "\n", 1, FALSE);
-		    } else {
-			sprintf(str, "\t%s\n", item.HTCI_filename);
-			FileWrite(findex, str, strlen(str), FALSE);
-		    }
-		    HTCacheDeleteItem(&item);
-		} else {
-		    /* Non intersession cache is temp and must be deleted */
-		    HTCacheDeleteItemAndFile(&item);
-		}
-	    }
-	    HTListDelete(htCacheHashTable[i]);
-	    htCacheHashTable[i] = 0;
-	}
-    }
-
+			FILE_DENY_RW | FILE_ACCESS_RW, FILE_ATTR_NORMAL);
     FilePopDir();
+
+    if (!findex) return;
+
+    /* Flush all data in queue to HTCACHE_INDEX */
+    while (localfront != rear) {
+	localfront = (localfront + 1) % HTCACHE_MAX_FILES;
+	
+	item = (HTCacheItem *) HTMemLock(queue[localfront]);
+	url = (char *) HTMemLock(item->HTCI_url);
+
+	FileWrite(findex, url, strlen(url), FALSE);
+	sprintf(str, " %s\n", item->HTCI_filename);
+	FileWrite(findex, str, strlen(str), FALSE);
+	
+	HTMemUnlock(item->HTCI_url);
+	HTMemUnlock(queue[localfront]);
+    }
 
     if (findex) FileClose(findex, FALSE);
 }	/* End of HTCacheUpdateIndex.	*/
@@ -1044,10 +972,10 @@ HTCacheMakeWWWName (const char *name)
     HTMemHandle ret = NULL;
 
     /* Cache filename is relative to SP_TOP */
-    ret = HTStrAllocCopyWID(HTMID_HTCACHE, "file://privdata/");
-    ret = HTStrAllocCatWID(HTMID_HTCACHE, ret, HTCACHE_ROOT);
-    ret = HTStrAllocCatWID(HTMID_HTCACHE, ret, "/");
-    ret = HTStrAllocCatWID(HTMID_HTCACHE, ret, name);
+    ret = HTStrAllocCopy("file://privdata/");
+    ret = HTStrAllocCat(ret, HTCACHE_ROOT);
+    ret = HTStrAllocCat(ret, "/");
+    ret = HTStrAllocCat(ret, name);
 
     return ret;
 }	/* End of HTCacheMakeWWWName.	*/
@@ -1061,6 +989,7 @@ HTCacheMakeWWWName (const char *name)
  *
  * SYNOPSIS:	Get a unique cache filename. Assume we are in
  *              SP_PRIVATE_DATA/HTCACHE_ROOT directory. 
+ *              cache->HTCI_fileext is optional.
  * CALLED BY:	HTCacheNewItem
  * RETURN:	TRUE if generated, else FALSE. If TRUE, fills in 
  *              cache->HTCI_filename.
@@ -1070,7 +999,10 @@ HTCacheMakeWWWName (const char *name)
  *              Fortunately we guarantee this by locking HTCACHE_INDEX
  *              file.
  *	
- * STRATEGY:   
+ * STRATEGY:   Filenumber is any positive integer less than 8 digits. 
+ *             We randomize a filenumber and see if that file already
+ *             exist. If yes, we try again. We limit maximum filenumber
+ *             to 99999. 
  *	
  * REVISION HISTORY:
  *	Name	Date		Description
@@ -1081,14 +1013,19 @@ HTCacheMakeWWWName (const char *name)
 static Boolean _pascal
 HTCacheRandomFilename (HTCacheItem *cache)
 {
+    int filenumber;
     FileAttrs fattrs;
+
     while (1) {
-	fileNumber = (fileNumber + 1) % 65535;
-	if (cache->HTCI_ctype == HTCACHE_INTERSESSION) {
-	    sprintf(cache->HTCI_filename, "%d", fileNumber);
-	} else {
-	    /* Session only cache filename starts with ~ */
-	    sprintf(cache->HTCI_filename, "~%d", fileNumber);
+	htCacheSeed = (htCacheSeed * 5821) % 65535;
+	if (htCacheSeed < 0) htCacheSeed *= -1;
+	filenumber = htCacheSeed * 99999 / 65535; /* Max number is 99999 */
+	if (filenumber < 0) filenumber *= -1;
+
+	sprintf(cache->HTCI_filename, "%d", filenumber);
+	if (cache->HTCI_fileext[0]) {          /* Optional file extension */
+	    strcat(cache->HTCI_filename, ".");
+	    strcat(cache->HTCI_filename, cache->HTCI_fileext);
 	}
 	fattrs = FileGetAttributes(cache->HTCI_filename);
 	if (fattrs == 0xff || !fattrs)   /* error, file does not exist */
@@ -1097,6 +1034,13 @@ HTCacheRandomFilename (HTCacheItem *cache)
     
     return TRUE;
 }	/* End of HTCacheRandomFilename.	*/
+
+
+/* ------------------------------------------------------------------------- 
+ *  				 MEMORY CACHE				    
+ * ------------------------------------------------------------------------- */
+
+/* @@@ Will not be implemented @@@ */
 
 
 /* -------------------------------------------------------------------------
@@ -1110,8 +1054,7 @@ HTCacheRandomFilename (HTCacheItem *cache)
  ***********************************************************************
  *
  * SYNOPSIS:	Initialize a cache item by filling the cache data
- *              structure. If passed in rptr is NULL, then related 
- *              fields will left NULL.
+ *              structure.
  * CALLED BY:	HTCacheNewItem
  * RETURN:	TRUE if initialized, else FALSE.
  * SIDE EFFECTS:
@@ -1124,22 +1067,19 @@ HTCacheRandomFilename (HTCacheItem *cache)
  *	kkee	1/23/97   	Initial Revision
  *
  ***********************************************************************/
-void _pascal
-HTCacheInitItem (HTRequest *rptr, HTCacheItem *cache, 
-		 const char *fileType, HTCacheType ctype)
+static Boolean _pascal
+HTCacheInitItem (HTRequest *rptr, HTCacheItem *cache)
 {
     /* 
      * Filenumber and filename cannot be determined here.
      */
-    if (rptr) {
-	cache->HTCI_url = HTAnchorAddress(rptr->HTR_anchor);
-    } else {
-	cache->HTCI_url = 0;
-    }
-    cache->HTCI_ctype = ctype;
+
+    cache->HTCI_inUse = 1;            /* Initially lock the cache file */
+    cache->HTCI_url = HTAnchorAddress(rptr->HTR_anchor);
     cache->HTCI_filename[0] = 0;
-    cache->HTCI_filesize = 0;
-    cache->HTCI_expires = 0;
+    /* cache->HTCI_expires = HTAnchorExpires(rptr->HTR_anchor); */
+
+    return TRUE;
 }	/* End of HTCacheInitItem.	*/
 
 
@@ -1166,39 +1106,47 @@ HTCacheInitItem (HTRequest *rptr, HTCacheItem *cache,
  *	kkee	1/20/97   	Initial Revision
  *
  ***********************************************************************/
-static Boolean _pascal
-HTCacheNewItem (HTRequestHandle request, HTCacheItem *cache, 
-		const char *fileType, HTCacheType ctype)
+static HTMemHandle _pascal
+HTCacheNewItem (HTRequestHandle request, HTCacheItem *cache, Boolean *reuse)
 {
-    HTCacheItem item;
+    HTMemHandle htmh;
+    HTCacheItem *item;
     HTRequest *rptr;
-    Boolean ret = FALSE;
+    Boolean ret = TRUE;
 
     rptr = (HTRequest *) MemThreadGrab(request);
+    *reuse = FALSE;
 
-    /* Fills in fields */
-    HTCacheInitItem(rptr, cache, fileType, ctype);
+    /* Allocates URL, and fills in other fields */
+    HTCacheInitItem(rptr, cache);
 
-    /* Removes cache item if it already exists */
-    if (HTCacheGetItem(cache, HTCACHE_CMP_URL, TRUE, &item)) {
+    if ((htmh = HTCacheFindItem(cache, HTCACHE_CMP_URL)) == NULL) {
 	/* 
-	 * Document is already cached. Delete old one.
+	 * Document is not already cached. Create a new one here.
 	 */
-	HTCacheDeleteItemAndFile(&item);
-    }
+	if (HTCacheEnforceLimit(HTAnchorContentLength(rptr->HTR_anchor))) {
+	    HTCacheRandomFilename(cache);
+	    item = (HTCacheItem *) HTMemAllocAndLock(&htmh, 
+						     sizeof(HTCacheItem));
+	    memcpy(item, cache, sizeof(HTCacheItem));
+	    HTMemUnlock(htmh);
 
-    /* Reserve room to cache new item */
-    if (HTCacheEnforceLimit(HTAnchorContentLength(rptr->HTR_anchor))) {
-	HTCacheRandomFilename(cache);
-	ret = TRUE;
-    } 
+	} else
+	    HTMemFree(cache->HTCI_url);
+
+    } else {
+	/* 
+	 * Since the document referred by the request URL is already cached, 
+	 * we reuse (hence overwrite) the cache file. Hence we don't need a
+	 * new one.
+	 */
+	*reuse = TRUE;
+	HTMemFree(cache->HTCI_url);
+    }
 
     MemThreadRelease(request);
-    
-    if (!ret) {
-	HTCacheDeleteItemAndFile(cache);
-    }
-    return ret;
+
+    return htmh;
 }	/* End of HTCacheNewItem.	*/
 
 
@@ -1221,44 +1169,17 @@ HTCacheNewItem (HTRequestHandle request, HTCacheItem *cache,
  *	kkee	1/23/97   	Initial Revision
  *
  ***********************************************************************/
-void _pascal
-HTCacheDeleteItem (HTCacheItem *item)
-{
-    if (item->HTCI_url) {
-	HTMemFree(item->HTCI_url);
-    } 
-    if (item->HTCI_expires) {
-	HTMemFree(item->HTCI_expires);
-    }
-}	/* End of HTCacheDeleteItem.	*/
-
-
-
-/***********************************************************************
- *		HTCacheDeleteItemAndFile
- ***********************************************************************
- *
- * SYNOPSIS:	Delete a cache item and the disk file.
- * CALLED BY:	HTCacheWriterCreate.
- * RETURN:	Nothing
- * SIDE EFFECTS:
- *	
- * STRATEGY:    
- *	
- * REVISION HISTORY:
- *	Name	Date		Description
- *	----	----		-----------
- *	kkee	1/23/97   	Initial Revision
- *
- ***********************************************************************/
 static void _pascal
-HTCacheDeleteItemAndFile (HTCacheItem *item)
+HTCacheDeleteItem (HTMemHandle cache)
 {
-    HTCacheDeleteItem(item);
-    if (item->HTCI_filename[0]) {
-	FileDelete(item->HTCI_filename);
-    }
-}	/* End of HTCacheDeleteItemAndFile.	*/
+    HTCacheItem *item;
+
+EC( ECCheckHTMemHandle(cache);                                         )
+
+    item = (HTCacheItem *) HTMemLock(cache);
+    if (item->HTCI_url) HTMemFree(item->HTCI_url);
+    HTMemUnlockAndFree(cache);
+}	/* End of HTCacheDeleteItem.	*/
 
 
 
@@ -1269,9 +1190,7 @@ HTCacheDeleteItemAndFile (HTCacheItem *item)
  *
  * SYNOPSIS:	Check to see if a cache data object exists for this URL.
  *              It does not check that the data object has expired.
- *              Pass expires != NULL if you want to know the GMT expiration
- *              of the cache copy. Caller is responsible for deleting 
- *              expires.
+ *
  * CALLED BY:	Client.
  * RETURN:      filename if OK (must be freed by caller).
  *              NULL if no cache object found.
@@ -1287,10 +1206,12 @@ HTCacheDeleteItemAndFile (HTCacheItem *item)
  *
  ***********************************************************************/
 HTMemHandle _far _pascal
-HTCACHEGETREFERENCE (HTMemHandle url, HTMemHandle *expires)
+HTCACHEGETREFERENCE (HTMemHandle url)
 {
-    HTMemHandle ret = NULL;
-    HTCacheItem cache, found;
+    MemHandle mh = OptrToHandle(@htCacheQueue);
+    HTMemHandle htmh,  ret = NULL;
+    HTCacheItem cache, *item;
+    FileHandle fp;
 
     if (!url) return NULL;
 
@@ -1299,20 +1220,19 @@ EC( ECCheckHTMemHandle(url);                                           )
     PUSHDS;
     SET_DS_LIB_DGROUP;
 
-    ThreadPSem(cacheSem);
+    MemLockExcl(mh);
+    queue = (HTMemHandle *) LMemDeref(@htCacheQueue);
 
-    HTCacheInitItem(0, &cache, 0, HTCACHE_INTERSESSION);
     cache.HTCI_url = url;
 
-    if (HTCacheGetItem(&cache, HTCACHE_CMP_URL, FALSE, &found)) {
-	ret = HTCacheMakeWWWName(found.HTCI_filename);
-	if (expires) {
-	    *expires = HTStrHTMemAllocCopyWID(HTMID_HTCACHE, 
-					      found.HTCI_expires);
-	}
+    if (cache.HTCI_url && 
+	((htmh = HTCacheFindItem(&cache, HTCACHE_CMP_URL)) != NULL)) {
+	item = (HTCacheItem *) HTMemLock(htmh);
+	ret = HTCacheMakeWWWName(item->HTCI_filename);
+	HTMemUnlock(htmh);
     }
     
-    ThreadVSem(cacheSem);
+    MemUnlockExcl(mh);
     POPDS;
     return ret;
 }	/* End of HTCACHEGETREFERENCE.	*/
@@ -1355,7 +1275,9 @@ EC( ECCheckHTMemHandle(url);                                           )
  ***********************************************************************/
 @method HTCacheWriterClass, MSG_HT_CACHE_SET_INFO
 {
-EC( ECCheckHTCache(cache);                                              )
+    HTCacheItem *item;
+
+EC( ECCheckHTMemHandle(cache);                                          )
 
     FilePushDir();
 
@@ -1364,24 +1286,23 @@ EC( ECCheckHTCache(cache);                                              )
     FileSetCurrentPath(SP_PRIVATE_DATA, HTCACHE_ROOT);
     POPDS;
 
-    memcpy(&(@self->HTCI_cache), cache, sizeof(HTCacheItem));
+    item = (HTCacheItem *) HTMemLock(cache);
 
-@ifdef PRODUCT_RESPONDER
-	pself = ObjDeref(oself, 0);
-@endif
-    FileDelete(cache->HTCI_filename);
-    @self->HTCI_fileHandle = FileCreate(cache->HTCI_filename,
+    FileDelete(item->HTCI_filename); /* So FileCreate would succeed */
+
+    @self->HTCI_fileHandle = FileCreate(item->HTCI_filename,
 			FCF_NATIVE | FILE_CREATE_TRUNCATE |
 			FILE_DENY_RW | FILE_ACCESS_RW, FILE_ATTR_NORMAL);
 
     FilePopDir();
 
-@ifdef PRODUCT_RESPONDER
-	pself = ObjDeref(oself,0);
-@endif
+    item->HTCI_inUse = 1;              /* Lock it down */
+    HTMemUnlock(cache);
+
     if (!@self->HTCI_fileHandle)
 	return FALSE; 
     
+    @self->HTCI_cache = cache;
     return TRUE;
 }	/* End of MSG_HT_CACHE_SET_INFO.	*/
 
@@ -1393,13 +1314,14 @@ EC( ECCheckHTCache(cache);                                              )
  ***********************************************************************
  *
  * SYNOPSIS:	    Free and cleanup.
- * PARAMETERS:	    int (int status)
+ * PARAMETERS:	    int (void)
  * SIDE EFFECTS:    
  *
  * STRATEGY:        Update global variable totalSize.
  *                  Mark the cache file unused and update its size.
  *                  Flush the HTCACHE_INDEX file.
- *                  We synch access to a cache item.
+ *                  We synch access to a cache item by locking down
+ *                  the queue.
  *
  * REVISION HISTORY:
  *	Name	Date		Description
@@ -1409,68 +1331,25 @@ EC( ECCheckHTCache(cache);                                              )
  ***********************************************************************/
 @method HTCacheWriterClass, MSG_HT_STREAM_ABORT
 {
-    ThreadPSem(cacheSem);
+    HTCacheItem *item;
+
+    MemLockExcl(OptrToHandle(@htCacheQueue));
 
     if (@self->HTCI_fileHandle) {
 
-	@self->HTCI_cache.HTCI_filesize = FileSize(@self->HTCI_fileHandle);
+	item = (HTCacheItem *) HTMemLock(@self->HTCI_cache);
+
+	item->HTCI_inUse = 0;
+	item->HTCI_filesize = FileSize(@self->HTCI_fileHandle);
+	totalSize += item->HTCI_filesize;  /* Tally up total cache size */
+
+	HTMemUnlock(@self->HTCI_cache);
+
 	FileClose(@self->HTCI_fileHandle, FALSE);
 
-	if (status == HT_LOADED || status == HT_CONNECTION_CLOSED) {
-	    HTMemHandle date;
-	    const char *fileext;
-	    HTRequest *rptr = MemThreadGrab(@self->HTSI_request);
-	    /* 
-	     * Anchor information is only available after the data object
-	     * is downloaded. Get expiration.
-	     */
-	    date = HTAnchorLastModified(rptr->HTR_anchor);
-	    if (!date) date = HTAnchorExpires(rptr->HTR_anchor);
-	    if (!date) date = HTAnchorDate(rptr->HTR_anchor);
-	    @self->HTCI_cache.HTCI_expires = date;
-
-	    /* 
-	     * If there was no fileext, we could figure out from 
-	     * the content type or URL.
-	     */
-	    fileext = HTPolicyContentTypeToFileExt(
-			HTAnchorContentType(rptr->HTR_anchor));
-
-	    FilePushDir();
-	    FileSetCurrentPath(SP_PRIVATE_DATA, HTCACHE_ROOT);
-
-	    if (fileext) {
-		char oldfile[13];
-		strcpy(oldfile, @self->HTCI_cache.HTCI_filename);
-		strcat(@self->HTCI_cache.HTCI_filename, ".");
-		strcat(@self->HTCI_cache.HTCI_filename, fileext);
-		FileRename(oldfile, @self->HTCI_cache.HTCI_filename);
-	    } else {
-		/* No file ext? Get it from url */
-	    }
-	    FilePopDir();
-				
-	    MemThreadRelease(@self->HTSI_request);
-
-	    /* Tally up total cache size */
-	    totalSize += @self->HTCI_cache.HTCI_filesize;
-
-	    /* Enter in queue only if the object was completely downloaded */
-	    HTCacheAppendItem(&(@self->HTCI_cache));
-
-	} else {
-	    /* 
-	     * Incomplete download; e.g., interrupted.
-	     */
-	    HTCacheDeleteItemAndFile(&(@self->HTCI_cache));
-	}
-
-    } else {
-	HTCacheDeleteItem(&(@self->HTCI_cache));
     }
 
-EC( ECCheckHTCache(NULL);                                               )
-    ThreadVSem(cacheSem);
+    MemUnlockExcl(OptrToHandle(@htCacheQueue));
 
     return @callsuper();
 }	/* End of MSG_HT_STREAM_ABORT.	*/
@@ -1499,11 +1378,18 @@ EC( ECCheckHTCache(NULL);                                               )
  ***********************************************************************/
 @method HTCacheWriterClass, MSG_HT_STREAM_PUT_BLOCK
 {
-    if (FileWrite(@self->HTCI_fileHandle, data, len, FALSE) != len) {
-	return HT_NO;
-    }
-
-    return HT_OK;    
+    FileWrite(@self->HTCI_fileHandle, data, len, FALSE);
+    return HT_OK;      /* 
+			* IF we decide to check cache limit on every
+			* put block (but I won't for efficiency sake),
+			* we can't return HT_NO even if cache is full 
+			* because we are a target of a Tee stream.
+			* If we return HT_NO, the Tee stream will get
+			* aborted, which in turn will abort the other
+			* target of Tee stream. As it turns out, the
+			* other target of the Tee stream goes to the
+			* converter/parser/uigenerator.
+                        */
 }	/* End of MSG_HT_STREAM_PUT_BLOCK.	*/
 
 
@@ -1530,15 +1416,17 @@ EC( ECCheckHTCache(NULL);                                               )
 HTStreamHandle _far _pascal
 HTCACHEWRITERCREATE (HTStringHandle inputFormat, 
 		     HTStreamHandle target,
-		     HTRequestHandle request,
-		     HTCacheType ctype)
+		     HTRequestHandle request)
 {
-#define RETURN_STREAM ThreadVSem(cacheSem); POPDS; return stream
+#define RETURN_STREAM MemUnlockExcl(mh); POPDS; return stream
 
     HTStreamHandle stream = NULL;
     HTCacheItem cache;
+    Boolean reuse;
+    HTMemHandle htmh;
+    MemHandle mh = OptrToHandle(@htCacheQueue);
 
-EC( if (inputFormat) ECCheckHTString(inputFormat);                      )
+EC( ECCheckHTString(inputFormat);                                       )
 EC( if (target) ECCheckStream(target);                                  )
 EC( ECCheckRequest(request);                                            )
 EC( if (!HTCacheIsEnabled()) EC_ERROR(-1);                              )
@@ -1546,38 +1434,48 @@ EC( if (!HTCacheIsEnabled()) EC_ERROR(-1);                              )
     PUSHDS;
     SET_DS_LIB_DGROUP;
 
-    ThreadPSem(cacheSem);
+    MemLockExcl(mh);
+    queue = (HTMemHandle *) LMemDeref(@htCacheQueue);
     
-EC( ECCheckHTCache(NULL);                                               )
-
     /* 
      * Use inputFormat to determine file extension.
      */
-    if (!HTCacheNewItem(request, &cache, 0, ctype)) {
+    if (inputFormat == HT_WWW_MIME) {
+	strcpy(cache.HTCI_fileext, "mim");
+    } else {
+	strcpy(cache.HTCI_fileext, "txt");
+    }
+
+    if ((htmh = HTCacheNewItem(request, &cache, &reuse)) == NULL) {
 	RETURN_STREAM;
     }
 
     /* Set up a cache stream for caller thread */
-    stream = HTObjInstantiateForThread(0, &HTCacheWriterClass);
+    stream = ObjInstantiateForThread(0, &HTCacheWriterClass);
 
     if (!stream) {
-	HTCacheDeleteItem(&cache);
+	HTCacheDeleteItem(htmh);
 	RETURN_STREAM;
     }
 
     /* Cache stream specific initialization */
-    if (@call stream::MSG_HT_CACHE_SET_INFO(&cache)) {
+    if (@call stream::MSG_HT_CACHE_SET_INFO(htmh)) {
+	/* Success */
+	if (!reuse) addqhtmh(htmh);
+
 	/* 
 	 * Standard initialization that must be done on every newly
 	 * created stream.
 	 */
 	@call stream::MSG_HT_STREAM_SET_REQUEST(request);
 	@call stream::MSG_HT_STREAM_SET_TARGET(target);
+	HTCacheUpdateIndex();   /* Update only if queue is modified */
 
     } else {
 	/* Failed to initialize, so abort */
-	ThreadVSem(cacheSem);     /* Abort is going to P it */
-	@call stream::MSG_HT_STREAM_ABORT(HT_OUT_OF_MEMORY);
+	HTCacheDeleteItem(htmh);	
+	MemUnlockExcl(mh);      /* Abort is going to MemLockExcl */
+	@call stream::MSG_HT_STREAM_ABORT();
 	POPDS;
 	return NullOptr;
     }

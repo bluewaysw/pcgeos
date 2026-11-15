@@ -20,7 +20,7 @@ REVISION HISTORY:
 DESCRIPTION:
 	This file contains the stream container class declarations.
 
-	$Id: htstream.goc,v 1.12.1.2 97/10/06 23:56:02 kkee Exp $
+	$Id: htstream.goc,v 1.1 97/04/07 11:48:46 newdeal Exp $
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
 
@@ -241,8 +241,7 @@ EC( ECCheckOD(target);                                                  )
  ***********************************************************************
  *
  * SYNOPSIS:	    Make a stream transparent.
- * PARAMETERS:	    void (Boolean mode). mode = TRUE to set it 
- *                  transparent and FALSE to set it nontransparent.
+ * PARAMETERS:	    void (void)
  * SIDE EFFECTS:    
  *
  * STRATEGY:
@@ -255,7 +254,7 @@ EC( ECCheckOD(target);                                                  )
  ***********************************************************************/
 @method HTStreamClass, MSG_HT_STREAM_SET_TRANSPARENT
 {
-    @self->HTSI_transparent = mode;
+    @self->HTSI_transparent = TRUE;
 }	/* End of MSG_HT_STREAM_SET_TRANSPARENT.	*/
 
 
@@ -349,16 +348,16 @@ EC ( ECCheckLibraryHandle(libraryHandle);                               )
  ***********************************************************************
  * SYNOPSIS:	    Abort the current stream and the target stream 
  * 		    object.
- * PARAMETERS:	    int (int status)
+ * PARAMETERS:	    int (void)
  * SIDE EFFECTS:    Nothing.
  *
- * STRATEGY:	    Abort the target, and then free oself. For this to 
- *                  work, a stream object must not be the target of 
- *                  multiple stream objects. If it is, it must be able 
- *                  to handle multiple abort messages. Must use @call 
- *                  as we must abort the stream pipes before returning. 
- *                  The client depends on it as the request may be 
- *                  changed/deleted.
+ * STRATEGY:	    Flush all input to target, abort the target, and
+ *                  then free oself. For this to work, a stream object
+ *                  must not be the target of multiple stream objects.
+ *                  If it is, it must be able to handle multiple abort
+ *                  messages. Must use @call as we must abort the 
+ *                  stream pipes before returning. The client depends
+ *                  on it as the request may be changed/deleted.
  *
  * REVISION HISTORY:
  *	Name	Date		Description
@@ -368,25 +367,16 @@ EC ( ECCheckLibraryHandle(libraryHandle);                               )
  ***********************************************************************/
 @method HTStreamClass, MSG_HT_STREAM_ABORT
 {
+    @call oself::MSG_HT_STREAM_FLUSH();
 
-    int ret = HT_OK;
-@ifdef PRODUCT_RESPONDER
-	pself = ObjDeref(oself,0);
-@endif
     if (@self->HTSI_target != NullOptr) {
-	ret = @call @self->HTSI_target::MSG_HT_STREAM_ABORT(status);
-@ifdef PRODUCT_RESPONDER
-	pself = ObjDeref(oself,0);
-@endif
+	@call @self->HTSI_target::MSG_HT_STREAM_ABORT();
 	@self->HTSI_target = NullOptr;
     }
 
     /*
      * Now we are safe to unload the Library of this stream.
      */
-@ifdef PRODUCT_RESPONDER
-	pself = ObjDeref(oself,0);
-@endif
     if (@self->HTSI_libraryHandle)
 	@send,forceQueue oself::
 	    MSG_HT_STREAM_UNLOAD_LIBRARY(@self->HTSI_libraryHandle);
@@ -401,7 +391,7 @@ EC ( ECCheckLibraryHandle(libraryHandle);                               )
     /* Finally free the object */
     ObjIncInUseCount(OptrToHandle(oself));
     @send, forceQueue oself::MSG_META_FINAL_OBJ_FREE();
-    return ret;
+    return HT_OK;
 }	/* End of MSG_HT_STREAM_ABORT.	*/
 
 
@@ -413,6 +403,7 @@ EC ( ECCheckLibraryHandle(libraryHandle);                               )
  * SYNOPSIS:	    Unload the Library associated with this stream.
  * PARAMETERS:	    void (GeodeHandle libraryHandle) 
  *                      - must pass libraryHandle, can't use 
+ *                         @self->HTSI_libraryHandle as this is 
  *                         invalidated by MSG_HT_STREAM_ABORT when it
  *                         calls HTUtilChangeClass.
  * SIDE EFFECTS:
@@ -483,6 +474,94 @@ EC( ECCheckOD(stream);                                                  )
 
     return HT_OK;
 }	/* End of HTSTREAMGROWINPUTSTREAMSTACK.	*/
+
+
+
+
+/***********************************************************************
+ *		HTSTREAMSHRINKSTREAMSTACK
+ ***********************************************************************
+ * SYNOPSIS:	Remove a stream object from a stream stack.
+ *              Does not flush data down the stream stack before 
+ *              aborting the stream object. This is done by severing 
+ *              the target of the stream object to abort. And then call
+ *              the stream object to abort using MSG_HT_STREAM_ABORT.
+ *              The concept of stream stacks prevents us from removing
+ *              the first and last stream objects.
+ * CALLED BY:	Client.
+ * RETURN:	HT_OK if ok, else HT_ERROR.
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:    Head points to the first stream object. We traverse the
+ *              stream stack via each stream's target. 
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	kkee	8/12/96   	Initial Revision
+ *
+ ***********************************************************************/
+int _far _pascal
+HTSTREAMSHRINKSTREAMSTACK (HTStreamHandle *head, HTStreamHandle *tail,
+			   HTStreamHandle stream)
+{
+
+    HTStreamHandle next, prev, current;
+
+EC( ECCheckStream(*head);                                               )
+EC( ECCheckStream(stream);                                              )
+EC( ECCheckOD(*tail);                                                   )
+
+#ifdef ERROR_CHECK
+    if (*tail == stream) 
+	EC_ERROR(CANNOT_REMOVE_FIRST_STREAM_OBJECT_IN_STREAM_STACK);
+    if (*head == stream)
+	EC_ERROR(CANNOT_REMOVE_LAST_STREAM_OBJECT_IN_STREAM_STACK);
+#endif
+
+    prev = NullOptr;
+    current = *head;
+    if (current)
+	next = @call current::MSG_HT_STREAM_GET_TARGET();
+    else 
+	next = NullOptr;
+
+    /* Traverse the stream stack */
+    while (current) {
+
+	if (current == stream) {
+	    /* Found the stream to remove */
+
+	    /* 
+	     * We have EC code that prevents these two statements
+	     * from being executed...because you simply cannot remove
+	     * the first and last stream objects in a stream pipe!
+	     * as you would have no stream to input data and no
+	     * stream to output data!
+	     */
+	    if (current == *head) *head = next;
+
+	    if (current == *tail) *tail = prev;
+
+	    /* Remove current from the stream stack. */
+	    if (prev) @call prev::MSG_HT_STREAM_SET_TARGET(next);
+	    @call current::MSG_HT_STREAM_SET_TARGET(NullOptr);
+	    @call current::MSG_HT_STREAM_ABORT();
+
+	    return HT_OK;  /* The only place to return HT_OK */
+	}
+
+	/* Move to the next stream object */
+	prev = current;
+	current = next;
+	if (current)
+	    next = @call current::MSG_HT_STREAM_GET_TARGET();
+	else 
+	    next = NullOptr;
+    }
+
+    return HT_NO;  /* Stream not found! */
+}	/* End of HTSTREAMSHRINKSTREAMSTACK.	*/
 
 
 

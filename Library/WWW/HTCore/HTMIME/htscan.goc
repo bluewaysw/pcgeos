@@ -22,7 +22,7 @@ DESCRIPTION:
 
 	MIME parser/scanner
 
-	$Id: htscan.goc,v 1.13.1.3 97/11/18 22:30:27 kkee Exp $
+	$Id: htscan.goc,v 1.1 97/04/07 11:48:24 newdeal Exp $
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
 
@@ -30,7 +30,6 @@ DESCRIPTION:
 @include <stdapp.goh>
 @include <WWW/HTCore/htreq.goh>
 @include <WWW/HTCore/htscan.goh>
-@include <WWW/HTCore/htutils.goh>
 @include <Ansi/string.h>
 @include <sem.h>
 
@@ -45,7 +44,7 @@ typedef struct {
 } HTReservedWord;
 
 
-#define HTMIME_RESERVED_WORDS      17           /* Number of reserved words */
+#define HTMIME_RESERVED_WORDS      10           /* Number of reserved words */
 static HTReservedWord reservedWords[] = {
     /* 
      * **MUST** be organized in strcmp order.
@@ -58,17 +57,10 @@ static HTReservedWord reservedWords[] = {
     {"CONTENT-LENGTH",                    HTST_CONTENT_LENGTH},
     {"CONTENT-RANGE",                     HTST_CONTENT_RANGE},
     {"CONTENT-TYPE",                      HTST_CONTENT_TYPE},
-    {"DATE",                              HTST_DATE},
-    {"DOMAIN",                            HTST_DOMAIN},
     {"EXPIRES",                           HTST_EXPIRES},
     {"LAST-MODIFIED",                     HTST_LAST_MODIFIED},
     {"LOCATION",                          HTST_LOCATION},
-    {"PATH",                              HTST_PATH},
-    {"PRAGMA",                            HTST_PRAGMA},
-    {"SECURE",                            HTST_SECURE},
-    {"SET-COOKIE",                        HTST_SET_COOKIE},
     {"WWW-AUTHENTICATE",                  HTST_WWW_AUTHENTICATE},
-    {"X-IMAGE-SCALE",                     HTST_XIMAGE_SCALE},
     {0,0}
 };
 
@@ -98,7 +90,7 @@ static HTReservedWord reservedWords[] = {
 static Boolean _pascal
 IsDelimiter (char chr)
 {
-    if (ISWHITE(chr) || (chr == ':') || (chr == ';') || (chr == '"') || 
+    if (isspace(chr) || (chr == ':') || (chr == ';') || (chr == '"') || 
 	(chr == '=') || (chr == ','))
 	return TRUE;
     else 
@@ -124,7 +116,7 @@ IsDelimiter (char chr)
  *	kkee	7/ 2/96   	Initial Revision
  *
  ***********************************************************************/
-HTScanToken _pascal
+static HTScanToken _pascal
 HTScanSearchReservedWord (char *wordBuffer)
 {
     int result, i, lower = 0;
@@ -175,12 +167,13 @@ HTScanSearchReservedWord (char *wordBuffer)
  *
  ***********************************************************************/
 HTScannerHandle _far _pascal
-HTScanNew (HTRequestHandle request)
+HTScanNew (HTRequestHandle request, HTStreamHandle target)
 {
     HTScannerHandle scanner;
     HTScanner *sptr;
 
 EC( ECCheckRequest(request);                                            )
+EC( ECCheckOD(target);                                                  )
 
     /* Allocate and lock, thread safe */
     scanner = MemAlloc(sizeof(HTScanner), HF_SHARABLE | HF_SWAPABLE,
@@ -190,6 +183,7 @@ EC( ECCheckRequest(request);                                            )
 	sptr = (HTScanner *) MemDeref(scanner);
 
 	sptr->HTS_request = request;
+	sptr->HTS_target = target;
 	sptr->HTS_state = HTSS_EOL_BEGIN;
 
 	MemUnlock(scanner);
@@ -346,14 +340,14 @@ HTScanGobbleSym (HTScanner *sptr)
     }
 
     while (1) {
-	if (ISALPHA(chr)) {
+	if (isalpha(chr)) {
 	    /* 
 	     * Build up a word.
 	     */
 	    sptr->HTS_thisWord[0] = '\0';
 	    i = 0;
 	    do {
-		if (i < HTSCAN_MAX_WORD_LENGTH-1) {
+		if (i < HTSCAN_MAX_WORD_LENGTH) {
 		    sptr->HTS_thisWord[i++] = chr;
 		    sptr->HTS_thisWord[i] = '\0'; 
 
@@ -370,7 +364,7 @@ EC( EC_WARNING(SCANNED_IDENTIFIER_LONGER_THAN_MAX_RESERVED_WORD_LENGTH);   )
 	    /*
 	     * We have read one char ahead, need to rewind.
 	     */
-	    if (chr != '\0' && !ISWHITE(chr))
+	    if (chr != '\0' && !isspace(chr))
 		HTScanUngetChar(sptr, chr);
 
 	    /* 
@@ -380,14 +374,14 @@ EC( EC_WARNING(SCANNED_IDENTIFIER_LONGER_THAN_MAX_RESERVED_WORD_LENGTH);   )
 		HTScanSearchReservedWord(sptr->HTS_thisWord);
 	    return;
 
-	} else if (ISDIGIT(chr)) {
+	} else if (isdigit(chr)) {
 	    /* 
 	     * Only recognizes positive integers. Build up a word of digits.
 	     */
 	    sptr->HTS_thisWord[0] = '\0';
 	    i = 0;
 	    do {
-		if (i< HTSCAN_MAX_WORD_LENGTH-1) {
+		if (i< HTSCAN_MAX_WORD_LENGTH) {
 		    sptr->HTS_thisWord[i++] = chr;
 		    sptr->HTS_thisWord[i] = '\0'; /* Null-terminated */
 
@@ -396,12 +390,12 @@ EC( EC_WARNING(SCANNED_IDENTIFIER_LONGER_THAN_MAX_RESERVED_WORD_LENGTH);  )
 		}
 
 		chr = HTScanGetChar(sptr);
-	    } while (chr != '\0' && ISDIGIT(chr));
+	    } while (chr != '\0' && isdigit(chr));
 
 	    /* 
 	     * We have read one char ahead, need to rewind.
 	     */
-	    if (chr != '\0' && !ISWHITE(chr)) 
+	    if (chr != '\0' && !isspace(chr)) 
 		HTScanUngetChar(sptr, chr);
 
 	    UtilAsciiToHex32(sptr->HTS_thisWord, 
@@ -425,7 +419,7 @@ EC( EC_WARNING(SCANNED_IDENTIFIER_LONGER_THAN_MAX_RESERVED_WORD_LENGTH);  )
 	    chr = HTScanGetChar(sptr);
 	    i = 0;
 	    do {
-		if (i < HTSCAN_MAX_WORD_LENGTH-1) {
+		if (i < HTSCAN_MAX_WORD_LENGTH) {
 		    sptr->HTS_thisWord[i++] = chr;
 		    sptr->HTS_thisWord[i] = '\0'; 
 
@@ -451,7 +445,7 @@ EC( EC_WARNING(SCANNED_IDENTIFIER_LONGER_THAN_MAX_RESERVED_WORD_LENGTH);   )
 	     * Ignore other char codes since we must be tolerant.
 	     */
 #if ERROR_CHECK
-	    if (!ISWHITE(chr))
+	    if (!isspace(chr))
 		EC_WARNING(SCANNER_IGNORE_A_CHARACTER);
 #endif
 	    chr = HTScanGetChar(sptr);

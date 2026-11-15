@@ -22,7 +22,7 @@ DESCRIPTION:
 
 	SGML parser.
 
-	$Id: sgml.goh,v 1.9.3.6 97/11/11 15:23:44 grisco Exp $
+	$Id: sgml.goh,v 1.1 97/04/04 15:55:22 newdeal Exp $
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
 
@@ -70,9 +70,6 @@ typedef enum {
 		         Also deprecated! So, *don't* use!!!! */
     ,SGMLC_MIXED      /* Elements and PCDATA. Recognize all markup */
 
-    ,SGMLC_IGNORE     /* Anything between the start and end tag will
-                         be ignored. To use this, end tag is required */
-
 /*  ,SGMLC_ELEMENT */ /* Any data found is returned as error,
                          but currently ignored. */
 } SGMLContent;
@@ -85,11 +82,6 @@ typedef struct {
     word SGMLA_token;         /* e.g., HTML_ATTR_<name> */
 } SGMLAttr;
 
-/* 
- * Tags that can be gargabe collected if the parser is deperate for 
- * space.
- */
-#define SGMLT_GARBAGE_COLLECT 1000 /* Largest positive integer value */
 
 /*
  * A tag structure describes an SGML element.
@@ -114,21 +106,6 @@ typedef struct {
 				      yet use binary search. This an
 				      optimization we can implement later */
     SGMLContent SGMLT_content;     /* SGML data content model */
-    int  SGMLT_endScope;           /* The scope for delaying correcting 
-				      mistmatch end tags. When an end tag
-				      is encountered, if its scope is greater
-				      than the current start tag on elementStack,
-				      it is delayed. Whenever the element on
-				      the current stack is popped, try the
-				      delayed element(s) again. At that point,
-				      the element will either be rejected, 
-				      accepted, or delayed again. The idea
-				      is to prevent less important tags 
-				      (e.g., FONT) from correcting important 
-				      tags (e.g., TABLE). If endScope is 
-				      SGMLT_GARBAGE_COLLECTABLE, then it will
-				      be thrown aaway if parser is desparate
-				      for room */
 } SGMLTag;
 
 
@@ -143,8 +120,10 @@ typedef struct {
      * SGMLTag *SGMLD_tagList; 
      * word     SGMLD_numOfTags; 
      * char   **SGMLD_entityList; 
+     * char   **SGMLD_characterList;
      * char   **SGMLD_entityTranslate;
      * char   **SGMLD_characterTranslate;
+     * word     SGMLD_numOfEntities;
      */
 
     /* In the wonderful Geos memory model, we use ... */
@@ -155,8 +134,10 @@ typedef struct {
     optr     SGMLD_entityTranslate; /* Translation table for entityList */
     word     SGMLD_numOfEntities;  /* Length of SGMLD_entityList */
 
+    optr     SGMLD_characterList; /* Character references */
     optr     SGMLD_characterTranslate; /* Translation table for 
 					  characaterList */
+    word     SGMLD_numOfCharacters; /* Length of SGMLD_characterList */
 } SGMLDTD;
 
 /*

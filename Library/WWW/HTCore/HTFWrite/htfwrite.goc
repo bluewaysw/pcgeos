@@ -22,53 +22,13 @@ DESCRIPTION:
 
 	File writer. Write data pushed to it to a disk file.
 
-	$Id: htfwrite.goc,v 1.6.3.2 97/11/26 22:45:00 mzhu Exp $
+	$Id: htfwrite.goc,v 1.1 97/04/07 11:49:13 newdeal Exp $
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
 
 @include <stdapp.goh>
 @include <WWW/HTCore/htreq.goh>
 @include <WWW/HTCore/htfwrite.goh>
-@include <WWW/HTCore/htobj.goh>
-@include "htfatals.goh"
-
-/***********************************************************************
- *		HTFWRITENEW
- ***********************************************************************
- *
- * SYNOPSIS:	Create a new file writer stream.
- * CALLED BY:	Client.
- * RETURN:	HTStreamHandle or NULL.
- *	
- * STRATEGY:	
- *	
- * REVISION HISTORY:
- *	Name		Date		Description
- *	----		----		-----------
- *	kkee    	6/ 9/97   	Initial Revision
- *	
- ***********************************************************************/
-HTStreamHandle _far _pascal
-HTFWRITENEW (const char *filename, ThreadHandle thread)
-{
-    FileHandle fhandle;
-    HTStreamHandle stream;
-
-EC( if (thread) ECCheckThreadHandle(thread);                            )
-
-    FileDelete(filename);       /* So that FileCreate would work */
-    fhandle = FileCreate(filename, FCF_NATIVE | FILE_CREATE_TRUNCATE |
-			 FILE_DENY_W | FILE_ACCESS_RW, FILE_ATTR_NORMAL);
-    if (!fhandle) return 0;
-    PUSHDS;
-    SET_DS_LIB_DGROUP;       /* To use HTFWriteClass */
-    stream = HTObjInstantiateForThread(thread, &HTFWriteClass);
-    POPDS;
-    if (!stream) return 0;
-    @call stream::MSG_HT_STREAM_SET_TARGET((optr)fhandle);
-    return stream;
-}	/* End of HTFWRITENEW.	*/
-
 
 
 /***********************************************************************
@@ -80,39 +40,6 @@ EC( if (thread) ECCheckThreadHandle(thread);                            )
 /***********************************************************************
 		Message Handlers
 ***********************************************************************/
-
-
-
-/***********************************************************************
- *		MSG_HT_STREAM_SET_TARGET for HTFWriteClass
- ***********************************************************************
- *
- * SYNOPSIS:	    Instead of setting stream as a target, we set a
- *                  FileHandle.
- * PARAMETERS:	    void (FileHandle fhandle); this will have to be 
- *                  cast into a FileHandle.
- * SIDE EFFECTS:    Make sure that sizeof(FileHandle) <= sizeof(optr).
- *
- * STRATEGY:	    Don't call super.
- *
- * REVISION HISTORY:
- *	Name		Date		Description
- *	----		----		-----------
- *	kkee    	6/ 9/97   	Initial Revision
- *	
- ***********************************************************************/
-@method HTFWriteClass, MSG_HT_STREAM_SET_TARGET
-{
-     if (!target) return;
-
-EC(  if (sizeof(FileHandle) > sizeof(optr))                             )
-EC(      EC_ERROR(INVALID_DATA_AND_LENGTH);                             )
-
-EC(  ECCheckFileHandle((FileHandle)target);                             )
-
-     @self->HTFWI_fileHandle = (FileHandle) target;
-}	/* End of MSG_HT_STREAM_SET_TARGET.	*/
-
 
 
 
@@ -136,7 +63,6 @@ EC(  ECCheckFileHandle((FileHandle)target);                             )
 {
     if (@self->HTFWI_fileHandle) {
 	FileClose(@self->HTFWI_fileHandle, FALSE);
-        @self->HTFWI_fileHandle = 0;
     }
 
     return @callsuper();
@@ -149,8 +75,8 @@ EC(  ECCheckFileHandle((FileHandle)target);                             )
  *		MSG_HT_STREAM_FLUSH for HTFWriteClass
  ***********************************************************************
  *
- * SYNOPSIS:	    Flush data in file to disk.
- * PARAMETERS:	    int (void)
+ * SYNOPSIS:	    Flush buffered data.
+ * PARAMETERS:	    void (void)
  * SIDE EFFECTS:    
  *
  * STRATEGY:
@@ -163,12 +89,9 @@ EC(  ECCheckFileHandle((FileHandle)target);                             )
  ***********************************************************************/
 @method HTFWriteClass, MSG_HT_STREAM_FLUSH
 {
-    if (@self->HTFWI_fileHandle) {
-	FileCommit(@self->HTFWI_fileHandle, FALSE);
-    }
-
-    return @callsuper();
+    return HT_OK;   /* As we do not buffer any data */
 }	/* End of MSG_HT_STREAM_FLUSH.	*/
+
 
 
 
@@ -177,7 +100,7 @@ EC(  ECCheckFileHandle((FileHandle)target);                             )
  ***********************************************************************
  *
  * SYNOPSIS:	    Save data to a disk file.
- * PARAMETERS:	    int (const byte *data, word len)
+ * PARAMETERS:	    int (byte *data, word len)
  * SIDE EFFECTS:    
  *
  * STRATEGY:
@@ -190,20 +113,48 @@ EC(  ECCheckFileHandle((FileHandle)target);                             )
  ***********************************************************************/
 @method HTFWriteClass, MSG_HT_STREAM_PUT_BLOCK
 {
-    if (!len || !data) return HT_OK;
+    char *filename;
+    int ret = HT_OK;
+
+    /* Create a file for writing */
+    if (!@self->HTFWI_fileHandle) {
+	
+	FilePushDir();
+	FileSetStandardPath(SP_TOP);
+
+	MemLock(OptrToHandle(@self->HTFWI_filename));
+	filename = (char *) LMemDeref(@self->HTFWI_filename);
+
+	@self->HTFWI_fileHandle = 
+	    FileCreate(filename, 
+		       FCF_NATIVE | FILE_CREATE_TRUNCATE |
+		       FILE_DENY_RW | FILE_ACCESS_RW, 
+		       FILE_ATTR_NORMAL);
+
+	MemUnlock(OptrToHandle(@self->HTFWI_filename));
+
+	FilePopDir();
+
+	if (!@self->HTFWI_fileHandle)
+	    return HT_CANNOT_OPEN_FILE;
+    }
 
     if (FileWrite(@self->HTFWI_fileHandle, 
 		  (void *) data, len, FALSE) == -1) {
 	
 	/* Failed to write */
-@ifdef PRODUCT_RESPONDER
-	pself = ObjDeref(oself,0);
-@endif
 	FileClose(@self->HTFWI_fileHandle, FALSE);
 	
-	return HT_CANNOT_WRITE_FILE;
+	FilePushDir();
+	FileSetStandardPath(SP_TOP);
+	
+	FileDelete(filename);
+	
+	FilePopDir();
+	
+	ret = HT_CANNOT_WRITE_FILE;
     }
 
-    return HT_OK;
+    return ret;
 }	/* End of MSG_HT_STREAM_PUT_BLOCK.	*/
 

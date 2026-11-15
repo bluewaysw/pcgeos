@@ -20,7 +20,7 @@ REVISION HISTORY:
 DESCRIPTION:
 	The Request Manager is used for maintaining requests.
 
-	$Id: htreq.goh,v 1.29.1.8 97/11/18 22:32:43 kkee Exp $
+	$Id: htreq.goh,v 1.1 97/04/04 15:54:34 newdeal Exp $
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
 
@@ -29,11 +29,10 @@ DESCRIPTION:
 @define __HT_REQ_GOH
 
 @include <stdapp.goh>
-@include <WWW/HTCore/htconst.goh>
+@include <WWW/HTCore/htutils.goh>
 @include <WWW/HTCore/htlist.goh>
 @include <WWW/HTCore/htstring.goh>
 @include <WWW/HTCore/htanchor.goh>
-@include <WWW/HTCore/htcbf.goh>
 #include <library.h>				/* LibraryCallType */
 
 /* --------------------------------------------------------------------------
@@ -82,7 +81,8 @@ typedef enum {
     HTRH_ACCEPT_CHARSET            = 0x2,
     HTRH_ACCEPT_ENCODING           = 0x4,
     HTRH_ACCEPT_LANGUAGE           = 0x8,
-    HTRH_XIMAGE_SIZE               = 0x20  /* Header extension */
+    HTRH_PROXY_AUTHORIZATION       = 0x10,
+    HTRH_USER_AGENT                = 0x20
 } HTReqHd;
 
 #define DEFAULT_REQUEST_HEADERS  0x0  /* None */
@@ -94,20 +94,12 @@ typedef enum {
 typedef enum {
     HTEH_CONTENT_ENCODING           = 0x1,
     HTEH_CONTENT_LANGUAGE           = 0x2,
+    HTEH_CONTENT_LENGTH             = 0x4,
+    HTEH_CONTENT_TYPE               = 0x8,
     HTEH_TRANSFER_ENCODING          = 0x10
 } HTEntityHd;
 
 #define DEFAULT_ENTITY_HEADERS   0x0    /* None */
-
-
-/*
- * Account on the data being pushed, put, and read.
- */
-typedef enum {
-    HTBS_CONTENT,             /* Account of bytes in content body */
-    HTBS_PUT_TO_SERVER,       /* .. put to server */
-    HTBS_PUSHED_TO_CLIENT     /* .. pushed from server to client */
-} HTBytesStream;
 
 
 /* --------------------------------------------------------------------------
@@ -133,58 +125,6 @@ typedef enum {
  * --------------------------------------------------------------------------*/
 
 /*
- * A client library environment. Each client has one environment
- * obtained through call to HTRegister and used for garbage collection
- * in HTUnregister. All these information are session-based and applies
- * to ALL requests issued by the same client. Memory allocated for HTLibEnv
- * (e.g., HTLE_userAgent) will be freed by the library in HTUnregister.
- */
-typedef struct {
-    /*
-     * Unique client GeodeHandle. This is the same handle passed to 
-     * HTRequestSubmit and HTRequestKillAll.
-     */
-    GeodeHandle HTLE_client;
-
-    /*
-     * User Agent name. If provided, if will be used as the identify
-     * for communicating with server.
-     */
-    HTMemHandle HTLE_userAgent;
-
-    /* Socket accessPoint, e.g. 1 for [accessPoint001] */
-    word HTLE_accessPoint;
-
-    /* Notifications for: */
-    /* HT_SOCKET_CONNECT_NOTIFICATION */
-    /* HT_SOCKET_DISCONNECT_NOTIFICATION */
-    HTNotificationCallback HTLE_notification;
-
-    /* 
-     * Callback for content handlers for handling MIME types. Return 
-     * NULL if you do not wish to handle a MIME type. In which case, the 
-     * Library will use defaults. If no defaults, then 
-     * HTLE_errorStreamCbf will be called.
-     */
-    HTPolicyContentCallback HTLE_contentCbf;
-    
-    /*
-     * Callback for error stream to handle MIME types not handled by
-     * HTLE_contentCbf and Library defaults. Normally, you would
-     * prompt the user and/or provide a stream to save the output to file.
-     */
-    HTPolicyContentCallback HTLE_errorStreamCbf;
-
-    /* 
-     * Disk Caching option. To completely bypass cache, set FALSE. 
-     * If FALSE, all responses of a client will not be cached to disk.
-     */
-    Boolean HTLE_useCache;
-
-} HTLibEnv;
-
-
-/*
  * HTTP request and response.
  */
 typedef enum {
@@ -192,9 +132,6 @@ typedef enum {
 				   range checking. Not to be used. */
 	HTTPT_REQUEST 	= 0x1,
 	HTTPT_RESPONSE	= 0x2,
-	HTTPT_SMTP      = 0x3,  /* Local extension */
-	HTTPT_IMAP      = 0x4,  /* Local extension */
-	HTTPT_POP3      = 0x5,  /* Local extension */
 	HTTPT_NULL     		/* Must be the last. Not to be used. */
 } HTTPType;
 
@@ -244,12 +181,11 @@ typedef enum {
     HTRELOAD_INVALID        = 0x0,      /* Must be first for range checking */
                                         /* Default: also indicates by local
 					   cache completely */
-    HTRELOAD_ANY_VERSION    = 0x1,      /* Use any version available. May
-					   come from local cache or network */
-    HTRELOAD_FORCE_RELOAD   = 0x2,      /* Update from network */ 
-    HTRELOAD_CACHE_ONLY     = 0x3,      /* Load from disk cache only. If not
-	                                   found, doesn't load from network */
-    HTRELOAD_NULL           = 0x4       /* Must be last for range checking */
+    HTRELOAD_ANY_VERSION    = 0x1,      /* Use any version available */
+    HTRELOAD_MEMORY_VERSION = 0x2,      /* Reload from file cache network */
+    HTRELOAD_CACHE_REFRESH  = 0x4,      /* Update from nework with IMS */
+    HTRELOAD_FORCE_RELOAD   = 0x8,      /* Update from network with no-cache */
+    HTRELOAD_NULL           = 0x10      /* Must be last for range checking */
 } HTReload;
 
 
@@ -263,15 +199,6 @@ typedef enum {
 #define	HT_ERROR  		-1	/* Generic error code */
 #define	HT_OK 			0	/* Generic success */
 #define	HT_NO 			1	/* Operation denied */
-
-/*
-**      SYSTEM NOTIFICATION codes
-**      -------------------------
-**
-** Socket Notifications.
-*/
-#define HT_SOCKET_CONNECT_NOTIFICATION     498
-#define HT_SOCKET_DISCONNECT_NOTIFICATION  499
 
 /*
 **      REQUEST CALLBACK codes
@@ -294,34 +221,14 @@ typedef enum {
 #define HT_CONNECTION_CLOSED            504   /* Closed prematurely before 
 						 we got all data */
 #define HT_WAITING_FOR_REPLY            505
-
-/* For loading data from server, e.g., HTTP, IMAP */
 #define HT_LOADING_DATA                 506   /* Getting entity data for 
 						the first time. This status
 						is returned when the Lib
-						first starts entity data
-						For browser, this is 
-						displayable data */
+						first starts loading data */
 #define HT_MORE_DATA                    507   /* Got a chunk of data, more
 						 data to follow. This status
 						 is returned when the lib is
-					         loading data; includes 
-						 headers and entity data */
-#define HT_NEEDS_AA                     508   /* Request needs access auth */
-#define HT_HEADER_DONE                  509   /* Done parsing headers */
-
-/* For sending data to server, e.g., SMTP */
-#define HT_SENDING_DATA	                510   /* Before sending data for the 
-						 first time. This status is 
-	                                         returned when lib is about
-	                                         to send the first block of
-	                                         data. Does not include 
-						 protocol commands etc. */
-#define HT_SENDING_MORE_DATA            511   /* Sent a chunk of data. This 
-	                                         status is returned when the 
-	                                         lib is sending data. Does 
-						 not include protocol 
-						 commands etc. */
+					         loading data */
 
 /*
 **     AFTER CALLBACK codes
@@ -358,21 +265,12 @@ typedef enum {
 #define HT_CANNOT_WRITE_FILE            1009    /* Failed to write to a local
 						   file */
 #define HT_SOCKET_ERROR		        1010    /* Networking problems */
-#define HT_SHUT_DOWN                    1011    /* HTShutDown was called */
-#define HT_SENT                         1019    /* Sent successfully */
-#define	HT_LOADED 			1020	/* Loaded successfully */
+#define	HT_LOADED 			1020	
 #define	HT_UNAUTHORIZED			1021
-#define HT_PROXY_UNAUTHORIZED           1022
-#define	HT_PAYMENT_REQUIRED		1023
-#define HT_DOCUMENT_MOVED               1024    /* New URL provided by
+#define	HT_PAYMENT_REQUIRED		1022
+#define HT_DOCUMENT_MOVED               1023    /* New URL provided by
 						 * Library in the request URL.
 						 */
-#define HT_SERVER_OUT_OF_MEMORY         1025    /* Client might want to try
-						 * again later as server is
-						 * running out of space.
-						 */
-#define	HT_LOADED_FROM_CACHE 		1026	/* Loaded from mem cache */
-
 /*
  * If "request" callback, any of the request callback codes.
  * If "after" callback, any of the after callback codes.
@@ -392,47 +290,27 @@ typedef enum {
 #define HT_WOULD_BLOCK                  2001    /* An operation would block. */
 #define HT_ASYNCH_LOAD                  2002    /* A protocol is doing an 
 						   asynch load */
-#define HT_TEE_ABORT_TARGET1            2003    /* Tell a Tee stream to
-	                                           abort target1 passed in
-					           HTTeeCreate and return the
-					           return code of target2 in
-						   MSG_HT_STREAM_PUT_BLOCK */
-#define HT_TEE_ABORT_TARGET2            2004    /* See HT_TEE_ABORT_TARGET1 */
 
-#define HT_KILL_AND_RESUBMIT_INTERNALLY 2005    /* Kill & Resubmit request 
-						   internally */
 
-#define HT_NOT_CACHEABLE                2006    /* Data object not cachable */
-
+/*
+ * Function prototype that you use to create post callback functions and
+ * register them to Request Manager. Must return HT_OK or code from 
+ * pushing data using MSG_HT_PUSH_BLOCK. Postcallbacks are used to push 
+ * extra data to the network. Must NOT modify the request.
+ */
+typedef int _far _pascal (*HTPostCallback)(HTRequestHandle request, 
+					   HTStreamHandle stream);	
 
 /* --------------------------------------------------------------------------
- * 		Public APIs
+ * 		III. Client Public Function Prototypes
  * --------------------------------------------------------------------------*/
 
-extern void _far _pascal
-	ECCheckRequestNotLocked(HTRequestHandle request);
-
-/*
- * Session-based APIs, applicable to a client for all requests.
- */
 extern int _far _pascal
-	HTRegister(HTLibEnv *env);
+	HTRegister(GeodeHandle geodeHandle, word accessPoint);
 
 extern int _far _pascal
-	HTUnregister(GeodeHandle client);
+	HTUnregister(GeodeHandle geodeHandle);
 
-extern Boolean _far _pascal
-	HTSessionUseCache(GeodeHandle client);
-
-extern HTMemHandle _far _pascal
-        HTSessionLookup (GeodeHandle client);
-
-extern HTMemHandle _far _pascal
-        HTSessionLookupRequest (HTRequestHandle request);
-
-/*
- * Request-specific APIs, applicable to each request.
- */
 extern HTRequestHandle _far _pascal 
 	HTRequestCreate(HTTPType ty);
 
@@ -484,36 +362,24 @@ extern int _far _pascal
 	HTRequestSetPostCallback(HTRequestHandle request,
 		HTPostCallback cbf);
 
-/*
- * Convert local chars to std when we are putting data to server 
- * and std to local when we are saving server data to local
- * files. These conversions are not needed for HTTP clients.
- * But maybe needed by IMAP, POP3, and SMTP clients as the data
- * are viewed or created specific to the local display.
- */
-extern int _far _pascal
-	HTRequestSetCharCbf(HTRequestHandle request,
-		CharConverterCallback toLocalCbf,
-		CharConverterCallback toStandardCbf);
-
 extern int _far _pascal 
 	HTRequestSetProxy(HTRequestHandle request, 
-		const char *proxyName, word portNumber,
-		const char *username, const char *password);
+		const char *proxyName, word portNumber);
 
 extern int _far _pascal
 	HTRequestSetDataSource(HTRequestHandle request, HTAnchorHandle anchor);
 
-extern void _far _pascal
-	HTRequestAddHeader(HTRequestHandle request, const char *name,
-	                   const char *value);
+extern int _far _pascal
+	HTRequestSetGeneralHeaderMask(HTRequestHandle request,
+		HTGenHd mask);
 
-extern void _far _pascal
-	HTRequestAddRequestHeader(HTRequestHandle request,
-		HTReqHd mask, const char *str);
+extern int _far _pascal
+	HTRequestSetRequestHeaderMask(HTRequestHandle request,
+		HTReqHd mask);
 
-extern void _far _pascal
-	HTRequestSendData(HTRequestHandle request, HTMemHandle data);
+extern int _far _pascal
+	HTRequestSetEntityHeaderMask(HTRequestHandle request,
+		HTEntityHd mask);
 
 extern int _far _pascal
 	HTRequestSubmit(HTRequestHandle request, GeodeHandle client);
@@ -522,10 +388,13 @@ extern int _far _pascal
 	HTRequestKill(HTRequestHandle request);
 
 extern void _far _pascal
-	HTRequestKillAll(GeodeHandle client);
+	HTRequestKillAll(GeodeHandle geode);
+
+extern void _far _pascal
+        HTRequestShutDown(void);  /* GLOBAL */
 
 extern dword _far _pascal
-	HTRequestGetBytes(HTRequestHandle request, HTBytesStream kind);
+	HTRequestGetBytesRead(HTRequestHandle request);
 
 extern word _far _pascal 
 	HTRequestGetResponseStatusCode(HTRequestHandle request);
@@ -533,30 +402,13 @@ extern word _far _pascal
 extern dword _far _pascal
 	HTRequestGetResponseContentLength(HTRequestHandle request);
 
-extern HTMemHandle _far _pascal 
-        HTRequestGetResponseLastModified(HTRequestHandle request);
-
-HTMemHandle _far _pascal
-	HTRequestGetResponseHeader(HTRequestHandle request, const char *name);
-
-extern void _far _pascal
-        HTRequestSetCacheHit(HTRequestHandle request,
-			     Boolean hit);
-
-extern Boolean _far _pascal
-        HTRequestCacheHit(HTRequestHandle request);
-
-extern HTAnchorHandle _far _pascal
-        HTRequestAnchor(HTRequestHandle request);
-
+extern Boolean _far _pascal 
+        HTRequestGetResponseLastModified(HTRequestHandle request,
+					 TimerDateAndTime *dateTime);
 
 #ifdef __HIGHC__
-pragma Alias(ECCheckRequestNotLocked, "ECCHECKREQUESTNOTLOCKED");
 pragma Alias(HTRegister, "HTREGISTER");
 pragma Alias(HTUnregister, "HTUNREGISTER");
-pragma Alias(HTSessionUseCache, "HTSESSIONUSECACHE");
-pragma Alias(HTSessionLookup, "HTSESSIONLOOKUP");
-pragma Alias(HTSessionLookupRequest, "HTSESSIONLOOKUPREQUEST");
 pragma Alias(HTRequestCreate, "HTREQUESTCREATE");
 pragma Alias(HTRequestDelete, "HTREQUESTDELETE");
 pragma Alias(HTRequestSetRequestLine, "HTREQUESTSETREQUESTLINE");
@@ -569,24 +421,21 @@ pragma Alias(HTRequestSetBeforeCallbackList, "HTREQUESTSETBEFORECALLBACKLIST");
 pragma Alias(HTRequestSetAfterCallbackList, "HTREQUESTSETAFTERCALLBACKLIST");
 pragma Alias(HTRequestSetProtocolList, "HTREQUESTSETPROTOCOLLIST");
 pragma Alias(HTRequestSetPostCallback, "HTREQUESTSETPOSTCALLBACK");
-pragma Alias(HTRequestSetCharCbf, "HTREQUESTSETCHARCBF");
 pragma Alias(HTRequestSetRequestCallbackList, "HTREQUESTSETREQUESTCALLBACKLIST");
 pragma Alias(HTRequestSetResponseParser, "HTREQUESTSETRESPONSEPARSER");
 pragma Alias(HTRequestSetProxy, "HTREQUESTSETPROXY");
-pragma Alias(HTRequestAddHeader, "HTREQUESTADDHEADER");
-pragma Alias(HTRequestAddRequestHeader, "HTREQUESTADDREQUESTHEADER");
-pragma Alias(HTRequestSendData, "HTREQUESTSENDDATA");
+pragma Alias(HTRequestSetGeneralHeaderMask, "HTREQUESTSETGENERALHEADERMASK");
+pragma Alias(HTRequestSetRequestHeaderMask, "HTREQUESTSETREQUESTHEADERMASK");
+pragma Alias(HTRequestSetEntityHeaderMask, "HTREQUESTSETENTITYHEADERMASK");
+pragma Alias(HTRequestSetDataSource, "HTREQUESTSETDATASOURCE");
 pragma Alias(HTRequestSubmit, "HTREQUESTSUBMIT");
 pragma Alias(HTRequestKill, "HTREQUESTKILL");
 pragma Alias(HTRequestKillAll, "HTREQUESTKILLALL");
+pragma Alias(HTRequestShutDown, "HTREQUESTSHUTDOWN");
 pragma Alias(HTRequestGetResponseStatusCode, "HTREQUESTGETRESPONSESTATUSCODE");
 pragma Alias(HTRequestGetResponseContentLength, "HTREQUESTGETRESPONSECONTENTLENGTH");
 pragma Alias(HTRequestGetResponseLastModified, "HTREQUESTGETRESPONSELASTMODIFIED");
-pragma Alias(HTRequestGetResponseHeader, "HTREQUESTGETRESPONSEHEADER");
-pragma Alias(HTRequestGetBytes, "HTREQUESTGETBYTES");
-pragma Alias(HTRequestSetCacheHit, "HTREQUESTSETCACHEHIT");
-pragma Alias(HTRequestCacheHit, "HTREQUESTCACHEHIT");
-pragma Alias(HTRequestAnchor, "HTREQUESTANCHOR");
+pragma Alias(HTRequestGetBytesRead, "HTREQUESTGETBYTESREAD");
 #endif
 
 @endif /* __HT_REQ_GOH */

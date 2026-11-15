@@ -1,0 +1,1593 @@
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Geoworks 1996.  All rights reserved.
+	GEOWORKS CONFIDENTIAL
+
+PROJECT:	Geos WWW Library
+MODULE:		htcache
+FILE:		htcache.goc
+
+AUTHOR:		Kok Kin Kee, Nov  2, 1996
+
+ROUTINES:
+	Name			Description
+	----			-----------
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	kkee	11/ 2/96   	Initial version.
+
+DESCRIPTION:
+
+	The Hypertext disk cache manager. Memory cache is not 
+	implemented, yet. 
+
+	$Id: htcache.goc,v 1.22.2.5 97/11/19 18:10:57 kkee Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+
+@include <WWW/htcache.goh>
+@include <WWW/HTCore/htreqMan.goh>
+@include <WWW/HTCore/htlist.goh>
+@include <WWW/HTCore/hturi.goh>
+@include <WWW/HTCore/htutils.goh>
+@include <WWW/HTCore/htstring.goh>
+@include <WWW/HTCore/htpolicy.goh>
+@include <WWW/HTCore/htobj.goh>
+#include <Ansi/string.h>
+#include <library.h>
+#include <timedate.h>
+#include <system.h>
+#include <file.h>
+#include <fileEnum.h>
+#include <sem.h>
+#include <Ansi/stdio.h>
+#include <Ansi/stdlib.h>
+
+@include "htfatals.goh"
+@include "cache.goh"
+
+
+#if ERROR_CHECK
+FatalErrors htcacheFatalErrors;
+Warnings    htcacheWarnings;
+#endif 
+
+/*
+**      Disk Cache Location and Information
+**      -----------------------------------
+** Since there is only one disk cache being shared by multiple clients,
+** these are the default information about the cache. Some can be 
+** altered at runtime, such as the cache limit. 
+**
+** Disk cache is divided into inter-session cache and session cache.
+** Inter-session cache persists through multiple sessions, and session
+** cache is used only for the current session. Once the session ended,
+** session cache is removed.
+**
+*/
+#define HTCACHE_LIMIT 10000000       /* Default to 10MEG */
+#define HTCACHE_ROOT  "wwwcache"     /* Directory relative to SP_PRIVATE_DATA */
+#define HTCACHE_INDEX "_index.000"   /* Directory index for cached files */
+#define HTCACHE_TEMP  "_temp.000"    /* Temp file for updating HTCACHE_INDEX */
+
+static Boolean      htCacheEnabled = FALSE;
+static dword        htCacheLimit = HTCACHE_LIMIT; /* In units of bytes */
+
+static HTExpiresMode htExpMode = HT_EXPIRES_IGNORE;
+
+
+/*
+**  Indicates what components of a cache item we want to read. These
+**  only cover components that require allocating memory. All others
+**  are read by default. This is passed to HTCacheGetItem.
+*/
+#define HTCACHE_READ_URL                  0x0001
+
+/*
+**  Indicates what components of a cache item to compare in 
+**  HTCacheGetItem.
+*/
+
+#define HTCACHE_CMP_FILENAME             0x0002   /* compare filename */
+#define HTCACHE_CMP_URL                  0x0004   /* compare URL */
+
+static void _pascal
+    HTCacheInit();
+static void _pascal
+    HTCacheUpdateIndex();
+static void _pascal
+    HTCacheEnforceConsistency(char *indexFile);
+static HTMemHandle _pascal
+    HTCacheMakeWWWName(const char *name);
+static Boolean _pascal
+    HTCacheGetItem(HTCacheItem *cache, word compareAttrs, Boolean remove,
+		   HTCacheItem *found);
+void _pascal
+    HTCacheAppendItem(HTCacheItem *item);
+void _pascal
+    HTCacheDeleteItem(HTCacheItem *cache);
+static void _pascal
+    HTCacheDeleteItemAndFile(HTCacheItem *cache);
+static void _pascal
+    HTCacheDeleteAllItems();
+static void _pascal
+    HTCacheDeleteAllFiles();
+static word _pascal
+    HashString (HTMemHandle urlStr);
+static void _pascal
+    DeleteCacheList (HTListHandle list, Boolean deleteFile, dword *size);
+
+extern Boolean _pascal ParseIndex (char *p);
+
+/* -------------------------------------------------------------------------
+ *  			      PRIVATE DATA
+ * ------------------------------------------------------------------------- */
+
+word fileNumber = 1;            /* Largest is 65535 */
+dword totalSize = 0;            /* Current total cache size used */
+HTListHandle htCacheHashTable[HTCACHE_HASH_TABLE_SIZE] = {0};
+SemaphoreHandle cacheSem = 0;   /* Synch access to queue */
+static int htCacheGarbageCollectIndex = 0; /* 1 to HTCACHE_HASH_TABLE_SIZE */
+
+/* -------------------------------------------------------------------------
+ *  			      ERROR CHECKING OF QUEUE
+ * ------------------------------------------------------------------------- */
+
+#ifdef ERROR_CHECK
+/***********************************************************************
+ *		ECCheckHTCache
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Check that the cache is consistent. Assumes that:
+ *                    1. htCacheSem is P.
+ *                    2. DS is Library dgroup.
+ *              Uses global vars head and tail.
+ * CALLED BY:	Internal.
+ * RETURN:	
+ *	
+ * STRATEGY:	
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	kkee    	4/ 3/97   	Initial Revision
+ *	
+ ***********************************************************************/
+static void _pascal
+ECCheckHTCache (HTCacheItem *item)
+{
+    int i;
+    for (i=0; i<HTCACHE_HASH_TABLE_SIZE; i++) {
+	if (htCacheHashTable[i]) {
+	    ECCheckHTList(htCacheHashTable[i]);
+	}
+    }
+
+    if (item) {
+	if (item->HTCI_url) ECCheckHTMemHandle(item->HTCI_url);
+    	if (item->HTCI_expires) ECCheckHTMemHandle(item->HTCI_expires);
+    }
+}	/* End of ECCheckHTCache.	*/
+#endif
+
+
+/***********************************************************************
+ *		HashString
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Find the has value of a URL string.
+ * CALLED BY:	
+ * RETURN:	hash value.
+ *	
+ * STRATEGY:	
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	kkee    	11/15/97   	Initial Revision
+ *	
+ ***********************************************************************/
+static word _pascal
+HashString (HTMemHandle urlStr)
+{
+    word hash;
+    char *b, *string = HTMemLock(urlStr);
+
+    for(b=string, hash=0; *b; b++) {
+	hash =  (hash * 3 + (*(unsigned char *) b)) % 
+	    HTCACHE_HASH_TABLE_SIZE;
+    }
+    HTMemUnlock(urlStr);
+
+    return hash;
+}	/* End of HashString.	*/
+
+
+/***********************************************************************
+ *		DeleteCacheList
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Delete a list of cache items. Pass deleteFile TRUE if 
+ *              you want the file to be deleted. Pass size = NULL if you 
+ *              do not want to know the total disk space claimed from 
+ *              deleting the list.
+ * CALLED BY:	
+ * RETURN:	HTListHandle, updated list, may be NULL and not the 
+ *              same as the passed in list. size is the total size
+ *              claimed from deleting the cache list.
+ *	
+ * STRATEGY:	
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	kkee    	11/15/97   	Initial Revision
+ *	
+ ***********************************************************************/
+static void _pascal
+DeleteCacheList (HTListHandle list, Boolean deleteFile, dword *size)
+{
+    HTCacheItem item;
+    
+    if (size) {
+	*size = 0;
+    }
+
+    if (list) {
+	int j;
+	int count = HTListGetCount(list);
+	for (j=0; j<count; j++) {
+	    HTListRemoveItem(list, 0, &item, sizeof(HTCacheItem));
+	    if (size) {
+		*size += item.HTCI_filesize;
+	    }
+	    if (deleteFile) {
+		HTCacheDeleteItemAndFile(&item);
+	    } else {
+		HTCacheDeleteItem(&item);
+	    }
+	}
+	HTListDelete(list);
+    }
+}	/* End of DeleteCacheList.	*/
+
+
+/* -------------------------------------------------------------------------
+ *  			      CACHE PARAMETERS				    
+ * ------------------------------------------------------------------------- */
+
+
+
+/***********************************************************************
+ *		HTCACHELIBRARYENTRY
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Initialize HTCache Library component.
+ * CALLED BY:	Kernel
+ * RETURN:	0, required by kernel.
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:    
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	kkee	1/20/97   	Initial Revision
+ *
+ ***********************************************************************/
+int _far _pascal
+HTCACHELIBRARYENTRY (LibraryCallType ty, GeodeHandle client)
+{
+    if (ty == LCT_ATTACH) {
+	PUSHDS;
+	SET_DS_LIB_DGROUP;
+
+	cacheSem = ThreadAllocSem(1);  /* Only one thread can grab */
+	HandleModifyOwner(cacheSem, GeodeGetCodeProcessHandle());
+	HTCacheInit();
+	POPDS;
+
+    } else if (ty == LCT_DETACH) {
+	PUSHDS;
+	SET_DS_LIB_DGROUP;
+
+	/* Do a disk cache consistency check here before beginning 
+	 * a new session.
+	 */
+	HTCacheUpdateIndex();        /* Write back to disk */
+	HTCacheDisable();
+	ThreadFreeSem(cacheSem);
+
+	POPDS;
+	
+    }
+
+    return 0;   /* required by kernel */
+}	/* End of HTCACHELIBRARYENTRY.	*/
+
+
+
+/***********************************************************************
+ *		HTCACHESETLIMIT
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Set the file caching limit.
+ * CALLED BY:	Client.
+ * RETURN:	Nothing
+ *	
+ * STRATEGY:	
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	kkee    	1/29/97   	Initial Revision
+ *	
+ ***********************************************************************/
+void _far _pascal
+HTCACHESETLIMIT (dword limit)
+{
+    PUSHDS;
+    SET_DS_LIB_DGROUP;
+    htCacheLimit = limit;
+    POPDS;
+}	/* End of HTCACHESETLIMIT.	*/
+
+
+
+/***********************************************************************
+ *		HTCACHECLEAR
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Clear the cache.
+ * CALLED BY:	Client.
+ * RETURN:	Nothing.
+ *	
+ * STRATEGY:	
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	kkee    	7/22/97   	Initial Revision
+ *	
+ ***********************************************************************/
+void _far _pascal
+HTCACHECLEAR (void)
+{
+    PUSHDS;
+    SET_DS_LIB_DGROUP;
+    ThreadPSem(cacheSem);
+
+    /* Remove memory list of cached items and files */
+    HTCacheDeleteAllFiles();
+
+    ThreadVSem(cacheSem);
+    POPDS;
+}	/* End of HTCACHECLEAR.	*/
+
+
+
+
+/***********************************************************************
+ *		HTCACHEENABLE
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Enable shared disk cache. WARNING: This call will affect
+ *              all clients of HTCache.
+ * CALLED BY:	Client.
+ * RETURN:	Nothing
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:    At the same time, initialize cache parameters.
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	kkee	11/14/96   	Initial Revision
+ *
+ ***********************************************************************/
+void _far _pascal
+HTCACHEENABLE (void)
+{
+    PUSHDS;
+    SET_DS_LIB_DGROUP;
+    
+    if (htCacheEnabled) { 
+	POPDS;
+	return;
+    }
+
+    /* 
+     * Create the index file for maintaining cache files.
+     */
+    FilePushDir();
+    FileSetCurrentPath(SP_PRIVATE_DATA, HTCACHE_ROOT);
+    if (!ThreadGetError())   /* No error */
+	    htCacheEnabled = TRUE;
+    else {
+	FileSetStandardPath(SP_PRIVATE_DATA);
+	if (!FileCreateDir(HTCACHE_ROOT))  /* No error */
+	    htCacheEnabled = TRUE;
+    }
+
+    FilePopDir();
+
+    POPDS;
+}	/* End of HTCACHEENABLE.	*/
+
+
+
+
+/***********************************************************************
+ *		HTCACHEDISABLE
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Disable shared disk cache. WARNING:: This call will affect 
+ *              all clients of HTCache.
+ * CALLED BY:	Client.
+ * RETURN:	Nothing
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	kkee	11/14/96   	Initial Revision
+ *
+ ***********************************************************************/
+void _far _pascal
+HTCACHEDISABLE (void)
+{
+    PUSHDS;
+    SET_DS_LIB_DGROUP;
+    htCacheEnabled = FALSE;
+    POPDS;
+}	/* End of HTCACHEDISABLE.	*/
+
+
+
+
+/***********************************************************************
+ *		HTCACHEISENABLED
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Check if the shared disk cache is enabled.
+ * CALLED BY:	Client.
+ * RETURN:	TRUE if enabled, else FALSE.
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	kkee	11/14/96   	Initial Revision
+ *
+ ***********************************************************************/
+Boolean _far _pascal
+HTCACHEISENABLED (void)
+{
+    Boolean ret;
+    PUSHDS;
+    SET_DS_LIB_DGROUP;
+    ret = htCacheEnabled;
+    POPDS;
+    return ret;
+}	/* End of HTCACHEISENABLED.	*/
+
+
+
+/* -------------------------------------------------------------------------
+ *  			      GARBAGE COLLECTOR				     
+ * ------------------------------------------------------------------------- */
+
+
+
+/***********************************************************************
+ *		HTCacheGetItem
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Get a cache item. compareAttrs indicates what attrs of 
+ *              the cache to compare for a match. remove is true if the
+ *              found item were to be remove from htCacheHashTable.
+ *              If passed in found != NULL, it will contain the item 
+ *              gotten else NULL.
+ * CALLED BY:	
+ * RETURN:	TRUE if found.
+ *
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	kkee	1/24/97   	Initial Revision
+ *
+ ***********************************************************************/
+static Boolean _pascal
+HTCacheGetItem (HTCacheItem *cache, word compareAttrs, Boolean remove,
+		HTCacheItem *found)
+{
+    int i, count; 
+    HTCacheItem item;
+    Boolean ret = FALSE;
+    char *c;
+    word hash;
+    FileHandle fh;
+
+EC( if (compareAttrs & HTCACHE_CMP_URL)                                  )
+EC(    ECCheckHTMemHandle(cache->HTCI_url);                              )
+EC( ECCheckHTCache(NULL);                                                )
+
+    FilePushDir();
+    FileSetCurrentPath(SP_PRIVATE_DATA, HTCACHE_ROOT);
+
+    hash = HashString(cache->HTCI_url);
+
+    c = HTMemLock(cache->HTCI_url);
+
+    if (htCacheHashTable[hash]) {
+	count = HTListGetCount(htCacheHashTable[hash]);
+    } else {
+	count = 0;
+    }
+
+    for (i=0; i<count; i++) {
+
+	HTListGetItem(htCacheHashTable[hash], i, &item, sizeof(HTCacheItem));
+
+	if ((compareAttrs & HTCACHE_CMP_FILENAME) &&
+	    (!strcasecmp(cache->HTCI_filename, item.HTCI_filename))) {
+
+	    if((fh=FileOpen(item.HTCI_filename, 
+			    FILE_DENY_RW | FILE_ACCESS_R)) != 0) {
+		FileClose(fh, FALSE);
+		if (found) {
+		    memcpy(found, &item, sizeof(HTCacheItem));
+		}
+		ret = TRUE;
+		if (remove) {
+		    HTListRemoveItem(htCacheHashTable[hash], i, NULL,
+				     sizeof(HTCacheItem));
+		}
+	    } else {
+		HTListRemoveItem(htCacheHashTable[hash], i, NULL,
+				 sizeof(HTCacheItem));
+		HTCacheDeleteItem(&item);
+	    }
+	    break; /* done */
+	    
+	} else if ((compareAttrs & HTCACHE_CMP_URL) && (item.HTCI_url) &&
+		   !strcasecmpHTMemHandle(item.HTCI_url, c)) {
+	    if((fh=FileOpen(item.HTCI_filename, 
+			    FILE_DENY_RW | FILE_ACCESS_R)) != 0) {
+		FileClose(fh, FALSE);
+		if (found) {
+		    memcpy(found, &item, sizeof(HTCacheItem));
+		}
+		ret = TRUE;
+		if (remove) {
+		    HTListRemoveItem(htCacheHashTable[hash], i, NULL,
+				     sizeof(HTCacheItem));
+		}
+	    } else {
+		HTListRemoveItem(htCacheHashTable[hash], i, NULL,
+				 sizeof(HTCacheItem));
+		HTCacheDeleteItem(&item);
+	    }
+	    break; /* done */
+	}
+    }
+
+    HTMemUnlock(cache->HTCI_url);
+
+    FilePopDir();
+    return ret;
+}	/* End of HTCacheGetItem.	*/
+
+
+
+/***********************************************************************
+ *		HTCacheAppendItem
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Append an item to cache list.
+ * CALLED BY:	MSG_HT_STREAM_ABORT
+ * RETURN:	Nothing
+ *	
+ * STRATEGY:	
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	kkee    	11/16/97   	Initial Revision
+ *	
+ ***********************************************************************/
+void _pascal
+HTCacheAppendItem (HTCacheItem *cache)
+{
+    word hash;
+
+EC( ECCheckHTCache(cache);                                              )
+
+    hash = HashString(cache->HTCI_url);
+    if (!htCacheHashTable[hash]) {
+	htCacheHashTable[hash] = HTListNewWID(HTMID_HTCACHE);
+    }
+    HTListAppend(htCacheHashTable[hash], cache, sizeof(HTCacheItem));
+}	/* End of HTCacheAppendItem.	*/
+
+
+
+
+/***********************************************************************
+ *		HTCacheEnforceLimit
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Enforce cache limit. If necessary, remove files to meet
+ *              the preset limit. Uses library vars, make sure DS is 
+ *              setup to Lib dgroup.
+ * CALLED BY:	HTCacheNewItem
+ * RETURN:	TRUE if there is enough space to accomodate len bytes
+ *              in the cache space, else FALSE.
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:    The amount of space taken by all cache files must not
+ *              exceed the preset limit. 
+ *              Files are deleted in FIFO order.
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	kkee	1/14/97   	Initial Revision
+ *
+ ***********************************************************************/
+static Boolean _pascal
+HTCacheEnforceLimit (dword len)
+{
+    int i, currentIndex;
+    dword size;
+
+EC( ECCheckHTCache(NULL);                                               )
+
+    if (totalSize+len < htCacheLimit) return TRUE;
+
+    /* 
+     * Claim space by removing the files in FIFO order.
+     * The file must NOT be locked.
+     * Do this until we have enough space or until we fail 
+     * to claim more space.
+     */
+
+    FilePushDir();
+    FileSetCurrentPath(SP_PRIVATE_DATA, HTCACHE_ROOT);
+
+    /* Delete cache items not in use */
+    currentIndex = htCacheGarbageCollectIndex;
+    htCacheGarbageCollectIndex = (htCacheGarbageCollectIndex + 1) %
+	HTCACHE_HASH_TABLE_SIZE;
+
+    for (i=0; i<HTCACHE_HASH_TABLE_SIZE; i++) {
+	if (htCacheHashTable[currentIndex]) {
+	    DeleteCacheList(htCacheHashTable[currentIndex], TRUE, &size);
+	    htCacheHashTable[currentIndex] = 0;
+	    totalSize = (size < totalSize) ? (totalSize - size) : 0;
+	}
+	currentIndex = (currentIndex + 1) % HTCACHE_HASH_TABLE_SIZE;
+	if (totalSize+len < htCacheLimit) break;
+    }
+
+    FilePopDir();
+
+EC( ECCheckHTCache(NULL);                                                )
+
+    if (totalSize+len < htCacheLimit) return TRUE;
+    return FALSE;
+}	/* End of HTCacheEnforceLimit.	*/
+
+
+/***********************************************************************
+ *		HTCacheEnforceConsistency
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Enforce cache consistency. This should be done at least
+ *              once every session. For example, we do it when the cache
+ *              library is first attached so that any inconsistency
+ *              in the previous session is all fixed up before a new 
+ *              session begin.
+ * CALLED BY:	HTCacheLibraryEntry
+ * RETURN:	Nothing
+ *	
+ * STRATEGY:	Delete all files that are not listed in the HTCACHE_INDEX
+ *              file and also per session cache files; files that begin
+ *              with ~.
+ *              
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	kkee    	2/20/97   	Initial Revision
+ *	
+ ***********************************************************************/
+static void _pascal
+HTCacheEnforceConsistency (char *indexFile)
+{
+    int i, count;
+    FEDosInfo *info;
+    MemHandle mh;
+    word remain;
+    FileEnumParams fep = {
+	FILE_ENUM_ALL_FILE_TYPES,
+	(FileExtAttrDesc *) (((dword)0 << 16) | (word)FESRT_DOS_INFO),
+	sizeof(FEDosInfo),
+	NULL,
+	FE_BUFSIZE_UNLIMITED,      /* Enum all files at once */
+	0,
+	0,
+	0,
+	0,
+	0,
+	0
+    };
+
+EC( ECCheckHTCache(NULL);                                                )
+
+    FilePushDir();
+    if (!FileSetCurrentPath(SP_PRIVATE_DATA, HTCACHE_ROOT)) {
+	FilePopDir();
+	return;
+    }
+
+    /* For each file, check that it is in queue, else delete it */
+    /* And if the filename begins with ~, delete it */
+    if ((count = FileEnum(&fep, &mh, &remain)) > 0) {
+	info = (FEDosInfo *) MemLock(mh);
+	for (i=0; i<count; i++) {
+	    if (info->DFIS_name[0] == '~') {
+		/* Session only cache file, delete it */
+		FileDelete(info->DFIS_name);
+	    } else if (!strcasestr(indexFile, info->DFIS_name)) {
+		FileDelete(info->DFIS_name);
+	    }
+	    info += 1;
+	}
+	MemFree(mh);
+    }
+
+    FilePopDir();
+
+EC( ECCheckHTCache(NULL);                                                )
+}	/* End of HTCacheEnforceConsistency.	*/
+
+
+/***********************************************************************
+ *		HTCacheInit
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Initialize file cache.
+ * CALLED BY:	HTCacheLibraryEntry on LCT_ATTACH.
+ * RETURN:	Nothing
+ *	
+ * STRATEGY:	The indices are loaded into memory for efficiency.
+ *              The current cache size is tallied and stored in global
+ *              variable totalSize.
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	kkee    	3/ 7/97   	Initial Revision
+ *	
+ ***********************************************************************/
+static void _pascal
+HTCacheInit (void)
+{
+    HTMemHandle htmh;
+    FileHandle fp;
+    char *p;
+    int sz;
+
+EC( ECCheckHTCache(NULL);                                                )
+
+    for (sz=0; sz<HTCACHE_HASH_TABLE_SIZE; sz++) {
+	htCacheHashTable[sz] = 0;
+    }
+
+    FilePushDir();
+    if (!FileSetCurrentPath(SP_PRIVATE_DATA, HTCACHE_ROOT)) {
+	FilePopDir();
+	return;
+    }
+    fp = FileOpen(HTCACHE_INDEX, FILE_DENY_RW | FILE_ACCESS_R);
+
+    /* Read all data in HTCACHE_INDEX into htCacheHashTable */
+    if (fp) {
+	Boolean ok;
+	sz = FileSize(fp);
+
+	if (!sz) {
+	    FileClose(fp, FALSE);
+	    HTCacheDeleteAllFiles();
+	    FilePopDir();
+	    return;
+	}
+
+	p = (char *) HTMemAllocAndLockWID(HTMID_HTCACHE, &htmh, sz+5);
+	FileRead(fp, p, sz, FALSE);
+	/* Enforce cache consistency */
+	HTCacheEnforceConsistency(p);
+	ok = ParseIndex(p);
+	FileClose(fp, FALSE);
+	HTMemUnlockAndFree(htmh);
+
+	if (!ok) {
+	    HTCacheDeleteAllFiles();
+	}
+	
+    } else {
+	/* No index file, so delete all files */
+	HTCacheDeleteAllFiles();
+    }
+    
+    FilePopDir();
+
+}	/* End of HTCacheInit.	*/
+
+
+/***********************************************************************
+ *		HTCacheDeleteAllItems
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Delete all items in hash table.
+ * CALLED BY:	HTCacheLibraryEntry on LCT_DETACH.
+ * RETURN:	Nothing
+ *	
+ * STRATEGY:
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	kkee    	3/ 7/97   	Initial Revision
+ *	
+ ***********************************************************************/
+static void _pascal
+HTCacheDeleteAllItems (void)
+{
+    int i;
+
+EC( ECCheckHTCache(NULL);                                               )
+
+    for (i=0; i<HTCACHE_HASH_TABLE_SIZE; i++) {
+	DeleteCacheList(htCacheHashTable[i], FALSE, 0);
+	htCacheHashTable[i] = 0;
+    }
+}	/* End of HTCacheDeleteAllItems.	*/
+
+
+/***********************************************************************
+ *		HTCacheDeleteAllFiles
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Delete all items in hash table and on disk.
+ * CALLED BY:	HTCacheLibraryEntry on LCT_DETACH.
+ * RETURN:	Nothing
+ *	
+ * STRATEGY:	
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	kkee    	11/16/97   	Initial Revision
+ *	
+ ***********************************************************************/
+static void _pascal
+HTCacheDeleteAllFiles (void)
+{
+    int i, count;
+    FEDosInfo *info;
+    MemHandle mh;
+    word remain;
+
+    FileEnumParams fep = {
+	FILE_ENUM_ALL_FILE_TYPES,
+	(FileExtAttrDesc *) (((dword)0 << 16) | (word)FESRT_DOS_INFO),
+	sizeof(FEDosInfo),
+	NULL,
+	FE_BUFSIZE_UNLIMITED,      /* Enum all files at once */
+	0,
+	0,
+	0,
+	0,
+	0,
+	0
+    };
+
+    HTCacheDeleteAllItems();
+
+    FilePushDir();
+    if (!FileSetCurrentPath(SP_PRIVATE_DATA, HTCACHE_ROOT)) {
+	FilePopDir();
+	return;
+    }
+
+    /* Delete all files in the cache directory */
+    if ((count = FileEnum(&fep, &mh, &remain)) > 0) {
+	info = (FEDosInfo *) MemLock(mh);
+	for (i=0; i<count; i++) {
+	    FileDelete(info->DFIS_name);
+	    info += 1;
+	}
+	MemFree(mh);
+    }
+
+    FilePopDir();
+
+}	/* End of HTCacheDeleteAllFiles.	*/
+
+
+
+/***********************************************************************
+ *		HTCacheUpdateIndex
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Update index file by flushing data in queue to 
+ *              HTCACHE_INDEX. We call this after creating a new cache
+ *              file is created to make sure the index is consistent.
+ *              This also garbage collect all cache items marked to be
+ *              garbage collected. Also does HTCacheDeleteAllItems.
+ * CALLED BY:	HTCacheWriterCreate.
+ * RETURN:	Nothing
+ *	
+ * STRATEGY:	
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	kkee    	3/ 8/97   	Initial Revision
+ *	
+ ***********************************************************************/
+static void _pascal
+HTCacheUpdateIndex (void)
+{
+    int i;
+    HTMemHandle cache, next;
+    FileHandle findex;
+    HTCacheItem item;
+    char *c, str[32];
+    
+    FilePushDir();
+    FileSetCurrentPath(SP_PRIVATE_DATA, HTCACHE_ROOT);
+    FileDelete(HTCACHE_INDEX);       /* So that FileCreate would work */
+    findex = FileCreate(HTCACHE_INDEX, FCF_NATIVE | FILE_CREATE_TRUNCATE |
+			FILE_DENY_W | FILE_ACCESS_W, FILE_ATTR_NORMAL);
+
+    if (!findex) {
+	FilePopDir();
+	return;
+    }
+
+EC( ECCheckHTCache(NULL);                                                )
+
+    /* Flush (and then delete) htCacheHashTable to HTCACHE_INDEX */
+    for(i=0; i<HTCACHE_HASH_TABLE_SIZE; i++) {
+	int j, count;
+	if (htCacheHashTable[i]) {
+	    count = HTListGetCount(htCacheHashTable[i]);
+	    for (j=0; j<count; j++) {
+		HTListRemoveItem(htCacheHashTable[i], 0,
+				 &item, sizeof(HTCacheItem));
+
+		if (item.HTCI_ctype == HTCACHE_INTERSESSION) {
+		    c = (char *) HTMemLock(item.HTCI_url);
+		    FileWrite(findex, c, strlen(c), FALSE);
+		    HTMemUnlock(item.HTCI_url);
+
+		    if (item.HTCI_expires) {
+			sprintf(str, "\t%s\t", item.HTCI_filename);
+			FileWrite(findex, str, strlen(str), FALSE);
+
+			c = (char *) HTMemLock(item.HTCI_expires);
+			FileWrite(findex, c, strlen(c), FALSE);
+			HTMemUnlock(item.HTCI_expires);
+			FileWrite(findex, "\n", 1, FALSE);
+		    } else {
+			sprintf(str, "\t%s\n", item.HTCI_filename);
+			FileWrite(findex, str, strlen(str), FALSE);
+		    }
+		    HTCacheDeleteItem(&item);
+		} else {
+		    /* Non intersession cache is temp and must be deleted */
+		    HTCacheDeleteItemAndFile(&item);
+		}
+	    }
+	    HTListDelete(htCacheHashTable[i]);
+	    htCacheHashTable[i] = 0;
+	}
+    }
+
+    FilePopDir();
+
+    if (findex) FileClose(findex, FALSE);
+}	/* End of HTCacheUpdateIndex.	*/
+
+
+
+/* -------------------------------------------------------------------------
+ *  				 NAMING SCHEME				    
+ * ------------------------------------------------------------------------- */
+
+
+/***********************************************************************
+ *		HTCacheMakeWWWName
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Make a URL string from a cache filename. The URL string
+ *              must be freed by caller. Assumes DS is setup to library
+ *              dgroup.
+ * CALLED BY:	HTCacheGetReference
+ * RETURN:	Returns the URL if ok, else NULL.
+ *	
+ * STRATEGY:	URL = "file://privdata/" + HTCACHE_ROOT + "/" + name
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	kkee    	2/ 1/97   	Initial Revision
+ *	
+ ***********************************************************************/
+static HTMemHandle _pascal
+HTCacheMakeWWWName (const char *name)
+{
+    HTMemHandle ret = NULL;
+
+    /* Cache filename is relative to SP_TOP */
+    ret = HTStrAllocCopyWID(HTMID_HTCACHE, "file://privdata/");
+    ret = HTStrAllocCatWID(HTMID_HTCACHE, ret, HTCACHE_ROOT);
+    ret = HTStrAllocCatWID(HTMID_HTCACHE, ret, "/");
+    ret = HTStrAllocCatWID(HTMID_HTCACHE, ret, name);
+
+    return ret;
+}	/* End of HTCacheMakeWWWName.	*/
+
+
+
+
+/***********************************************************************
+ *		HTCacheRandomFilename
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Get a unique cache filename. Assume we are in
+ *              SP_PRIVATE_DATA/HTCACHE_ROOT directory. 
+ * CALLED BY:	HTCacheNewItem
+ * RETURN:	TRUE if generated, else FALSE. If TRUE, fills in 
+ *              cache->HTCI_filename.
+ *
+ * SIDE EFFECTS:Noone should be creating new files in HTCACHE_ROOT
+ *              directory while HTCacheRandomFilename is being called.
+ *              Fortunately we guarantee this by locking HTCACHE_INDEX
+ *              file.
+ *	
+ * STRATEGY:   
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	kkee	1/23/97   	Initial Revision
+ *
+ ***********************************************************************/
+static Boolean _pascal
+HTCacheRandomFilename (HTCacheItem *cache)
+{
+    FileAttrs fattrs;
+    while (1) {
+	fileNumber = (fileNumber + 1) % 65535;
+	if (cache->HTCI_ctype == HTCACHE_INTERSESSION) {
+	    sprintf(cache->HTCI_filename, "%d", fileNumber);
+	} else {
+	    /* Session only cache filename starts with ~ */
+	    sprintf(cache->HTCI_filename, "~%d", fileNumber);
+	}
+	fattrs = FileGetAttributes(cache->HTCI_filename);
+	if (fattrs == 0xff || !fattrs)   /* error, file does not exist */
+	    break;                         /* found a new filename */
+    }
+    
+    return TRUE;
+}	/* End of HTCacheRandomFilename.	*/
+
+
+/* -------------------------------------------------------------------------
+ *    			      DISK CACHE MANAGER			    
+ * ------------------------------------------------------------------------- */
+
+
+
+/***********************************************************************
+ *		HTCacheInitItem
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Initialize a cache item by filling the cache data
+ *              structure. If passed in rptr is NULL, then related 
+ *              fields will left NULL.
+ * CALLED BY:	HTCacheNewItem
+ * RETURN:	TRUE if initialized, else FALSE.
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:   Most data is copied from a request to cache.
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	kkee	1/23/97   	Initial Revision
+ *
+ ***********************************************************************/
+void _pascal
+HTCacheInitItem (HTRequest *rptr, HTCacheItem *cache, 
+		 const char *fileType, HTCacheType ctype)
+{
+    /* 
+     * Filenumber and filename cannot be determined here.
+     */
+    if (rptr) {
+	cache->HTCI_url = HTAnchorAddress(rptr->HTR_anchor);
+    } else {
+	cache->HTCI_url = 0;
+    }
+    cache->HTCI_ctype = ctype;
+    cache->HTCI_filename[0] = 0;
+    cache->HTCI_filesize = 0;
+    cache->HTCI_expires = 0;
+}	/* End of HTCacheInitItem.	*/
+
+
+
+
+/***********************************************************************
+ *		HTCacheNewItem
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Create a new cache item or reuse an old one. If reuse,
+ *              then reuse becomes TRUE, else it is set to FALSE.
+ *              The item maintains all information about a cached file. 
+ *               Uses library vars, make sure DS is setup to Lib dgroup.
+ * CALLED BY:	HTCacheWriterCreate
+ * RETURN:	HTMemHandle of new item, else NULL.
+ *
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:    
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	kkee	1/20/97   	Initial Revision
+ *
+ ***********************************************************************/
+static Boolean _pascal
+HTCacheNewItem (HTRequestHandle request, HTCacheItem *cache, 
+		const char *fileType, HTCacheType ctype)
+{
+    HTCacheItem item;
+    HTRequest *rptr;
+    Boolean ret = FALSE;
+
+    rptr = (HTRequest *) MemThreadGrab(request);
+
+    /* Fills in fields */
+    HTCacheInitItem(rptr, cache, fileType, ctype);
+
+    /* Removes cache item if it already exists */
+    if (HTCacheGetItem(cache, HTCACHE_CMP_URL, TRUE, &item)) {
+	/* 
+	 * Document is already cached. Delete old one.
+	 */
+	HTCacheDeleteItemAndFile(&item);
+    }
+
+    /* Reserve room to cache new item */
+    if (HTCacheEnforceLimit(HTAnchorContentLength(rptr->HTR_anchor))) {
+	HTCacheRandomFilename(cache);
+	ret = TRUE;
+    } 
+
+    MemThreadRelease(request);
+    
+    if (!ret) {
+	HTCacheDeleteItemAndFile(cache);
+    }
+    return ret;
+}	/* End of HTCacheNewItem.	*/
+
+
+
+
+/***********************************************************************
+ *		HTCacheDeleteItem
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Delete a cache item.
+ * CALLED BY:	HTCacheWriterCreate.
+ * RETURN:	Nothing
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:    
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	kkee	1/23/97   	Initial Revision
+ *
+ ***********************************************************************/
+void _pascal
+HTCacheDeleteItem (HTCacheItem *item)
+{
+    if (item->HTCI_url) {
+	HTMemFree(item->HTCI_url);
+    } 
+    if (item->HTCI_expires) {
+	HTMemFree(item->HTCI_expires);
+    }
+}	/* End of HTCacheDeleteItem.	*/
+
+
+
+/***********************************************************************
+ *		HTCacheDeleteItemAndFile
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Delete a cache item and the disk file.
+ * CALLED BY:	HTCacheWriterCreate.
+ * RETURN:	Nothing
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:    
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	kkee	1/23/97   	Initial Revision
+ *
+ ***********************************************************************/
+static void _pascal
+HTCacheDeleteItemAndFile (HTCacheItem *item)
+{
+    HTCacheDeleteItem(item);
+    if (item->HTCI_filename[0]) {
+	FileDelete(item->HTCI_filename);
+    }
+}	/* End of HTCacheDeleteItemAndFile.	*/
+
+
+
+
+/***********************************************************************
+ *		HTCACHEGETREFERENCE
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Check to see if a cache data object exists for this URL.
+ *              It does not check that the data object has expired.
+ *              Pass expires != NULL if you want to know the GMT expiration
+ *              of the cache copy. Caller is responsible for deleting 
+ *              expires.
+ * CALLED BY:	Client.
+ * RETURN:      filename if OK (must be freed by caller).
+ *              NULL if no cache object found.
+ *              
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	kkee	11/ 3/96   	Initial Revision
+ *
+ ***********************************************************************/
+HTMemHandle _far _pascal
+HTCACHEGETREFERENCE (HTMemHandle url, HTMemHandle *expires)
+{
+    HTMemHandle ret = NULL;
+    HTCacheItem cache, found;
+
+    if (!url) return NULL;
+
+EC( ECCheckHTMemHandle(url);                                           )
+
+    PUSHDS;
+    SET_DS_LIB_DGROUP;
+
+    ThreadPSem(cacheSem);
+
+    HTCacheInitItem(0, &cache, 0, HTCACHE_INTERSESSION);
+    cache.HTCI_url = url;
+
+    if (HTCacheGetItem(&cache, HTCACHE_CMP_URL, FALSE, &found)) {
+	ret = HTCacheMakeWWWName(found.HTCI_filename);
+	if (expires) {
+	    *expires = HTStrHTMemAllocCopyWID(HTMID_HTCACHE, 
+					      found.HTCI_expires);
+	}
+    }
+    
+    ThreadVSem(cacheSem);
+    POPDS;
+    return ret;
+}	/* End of HTCACHEGETREFERENCE.	*/
+
+
+
+/* ------------------------------------------------------------------------- 
+ *  			     CACHE WRITER STREAM			    
+ * ------------------------------------------------------------------------- */
+
+/***********************************************************************
+		Class Declaration
+***********************************************************************/
+
+@classdecl	HTCacheWriterClass;
+
+/***********************************************************************
+		Message Handlers
+***********************************************************************/
+
+
+
+/***********************************************************************
+ *		MSG_HT_CACHE_SET_INFO for HTCacheWriterClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    Setup a cache file and lock it down for writing.
+ * PARAMETERS:	    Boolean (HTMemHandle cache). Return TRUE if success
+ *                  else return FALSE.
+ *                 
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:       
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	kkee	1/14/97   	Initial Revision
+ *
+ ***********************************************************************/
+@method HTCacheWriterClass, MSG_HT_CACHE_SET_INFO
+{
+EC( ECCheckHTCache(cache);                                              )
+
+    FilePushDir();
+
+    PUSHDS;
+    SET_DS_LIB_DGROUP;             /* To use HTCACHE_ROOT */
+    FileSetCurrentPath(SP_PRIVATE_DATA, HTCACHE_ROOT);
+    POPDS;
+
+    memcpy(&(@self->HTCI_cache), cache, sizeof(HTCacheItem));
+
+@ifdef PRODUCT_RESPONDER
+	pself = ObjDeref(oself, 0);
+@endif
+    FileDelete(cache->HTCI_filename);
+    @self->HTCI_fileHandle = FileCreate(cache->HTCI_filename,
+			FCF_NATIVE | FILE_CREATE_TRUNCATE |
+			FILE_DENY_RW | FILE_ACCESS_RW, FILE_ATTR_NORMAL);
+
+    FilePopDir();
+
+@ifdef PRODUCT_RESPONDER
+	pself = ObjDeref(oself,0);
+@endif
+    if (!@self->HTCI_fileHandle)
+	return FALSE; 
+    
+    return TRUE;
+}	/* End of MSG_HT_CACHE_SET_INFO.	*/
+
+
+
+
+/***********************************************************************
+ *		MSG_HT_STREAM_ABORT for HTCacheWriterClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    Free and cleanup.
+ * PARAMETERS:	    int (int status)
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:        Update global variable totalSize.
+ *                  Mark the cache file unused and update its size.
+ *                  Flush the HTCACHE_INDEX file.
+ *                  We synch access to a cache item.
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	kkee	1/23/97   	Initial Revision
+ *
+ ***********************************************************************/
+@method HTCacheWriterClass, MSG_HT_STREAM_ABORT
+{
+    ThreadPSem(cacheSem);
+
+    if (@self->HTCI_fileHandle) {
+
+	@self->HTCI_cache.HTCI_filesize = FileSize(@self->HTCI_fileHandle);
+	FileClose(@self->HTCI_fileHandle, FALSE);
+
+	if (status == HT_LOADED || status == HT_CONNECTION_CLOSED) {
+	    HTMemHandle date;
+	    const char *fileext;
+	    HTRequest *rptr = MemThreadGrab(@self->HTSI_request);
+	    /* 
+	     * Anchor information is only available after the data object
+	     * is downloaded. Get expiration.
+	     */
+	    date = HTAnchorLastModified(rptr->HTR_anchor);
+	    if (!date) date = HTAnchorExpires(rptr->HTR_anchor);
+	    if (!date) date = HTAnchorDate(rptr->HTR_anchor);
+	    @self->HTCI_cache.HTCI_expires = date;
+
+	    /* 
+	     * If there was no fileext, we could figure out from 
+	     * the content type or URL.
+	     */
+	    fileext = HTPolicyContentTypeToFileExt(
+			HTAnchorContentType(rptr->HTR_anchor));
+
+	    FilePushDir();
+	    FileSetCurrentPath(SP_PRIVATE_DATA, HTCACHE_ROOT);
+
+	    if (fileext) {
+		char oldfile[13];
+		strcpy(oldfile, @self->HTCI_cache.HTCI_filename);
+		strcat(@self->HTCI_cache.HTCI_filename, ".");
+		strcat(@self->HTCI_cache.HTCI_filename, fileext);
+		FileRename(oldfile, @self->HTCI_cache.HTCI_filename);
+	    } else {
+		/* No file ext? Get it from url */
+	    }
+	    FilePopDir();
+				
+	    MemThreadRelease(@self->HTSI_request);
+
+	    /* Tally up total cache size */
+	    totalSize += @self->HTCI_cache.HTCI_filesize;
+
+	    /* Enter in queue only if the object was completely downloaded */
+	    HTCacheAppendItem(&(@self->HTCI_cache));
+
+	} else {
+	    /* 
+	     * Incomplete download; e.g., interrupted.
+	     */
+	    HTCacheDeleteItemAndFile(&(@self->HTCI_cache));
+	}
+
+    } else {
+	HTCacheDeleteItem(&(@self->HTCI_cache));
+    }
+
+EC( ECCheckHTCache(NULL);                                               )
+    ThreadVSem(cacheSem);
+
+    return @callsuper();
+}	/* End of MSG_HT_STREAM_ABORT.	*/
+
+
+
+
+
+/***********************************************************************
+ *		MSG_HT_STREAM_PUT_BLOCK for HTCacheWriterClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    Save data block to a cache file.
+ * PARAMETERS:	    int (const byte *data, word len)
+ *                  - return HT_OK if sucessful
+ *                  - return HT_NO otherwise
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:       
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	kkee	1/ 5/97   	Initial Revision
+ *
+ ***********************************************************************/
+@method HTCacheWriterClass, MSG_HT_STREAM_PUT_BLOCK
+{
+    if (FileWrite(@self->HTCI_fileHandle, data, len, FALSE) != len) {
+	return HT_NO;
+    }
+
+    return HT_OK;    
+}	/* End of MSG_HT_STREAM_PUT_BLOCK.	*/
+
+
+
+
+/***********************************************************************
+ *		HTCACHEWRITERCREATE
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Create a cache writer stream. Caller thread will be used
+ *              to create the stream object.
+ * CALLED BY:	Client.
+ * RETURN:	HTStreamHandle, cache stream if created, else NullOptr.
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	kkee	11/14/96   	Initial Revision
+ *
+ ***********************************************************************/
+HTStreamHandle _far _pascal
+HTCACHEWRITERCREATE (HTStringHandle inputFormat, 
+		     HTStreamHandle target,
+		     HTRequestHandle request,
+		     HTCacheType ctype)
+{
+#define RETURN_STREAM ThreadVSem(cacheSem); POPDS; return stream
+
+    HTStreamHandle stream = NULL;
+    HTCacheItem cache;
+
+EC( if (inputFormat) ECCheckHTString(inputFormat);                      )
+EC( if (target) ECCheckStream(target);                                  )
+EC( ECCheckRequest(request);                                            )
+EC( if (!HTCacheIsEnabled()) EC_ERROR(-1);                              )
+
+    PUSHDS;
+    SET_DS_LIB_DGROUP;
+
+    ThreadPSem(cacheSem);
+    
+EC( ECCheckHTCache(NULL);                                               )
+
+    /* 
+     * Use inputFormat to determine file extension.
+     */
+    if (!HTCacheNewItem(request, &cache, 0, ctype)) {
+	RETURN_STREAM;
+    }
+
+    /* Set up a cache stream for caller thread */
+    stream = HTObjInstantiateForThread(0, &HTCacheWriterClass);
+
+    if (!stream) {
+	HTCacheDeleteItem(&cache);
+	RETURN_STREAM;
+    }
+
+    /* Cache stream specific initialization */
+    if (@call stream::MSG_HT_CACHE_SET_INFO(&cache)) {
+	/* 
+	 * Standard initialization that must be done on every newly
+	 * created stream.
+	 */
+	@call stream::MSG_HT_STREAM_SET_REQUEST(request);
+	@call stream::MSG_HT_STREAM_SET_TARGET(target);
+
+    } else {
+	/* Failed to initialize, so abort */
+	ThreadVSem(cacheSem);     /* Abort is going to P it */
+	@call stream::MSG_HT_STREAM_ABORT(HT_OUT_OF_MEMORY);
+	POPDS;
+	return NullOptr;
+    }
+
+    RETURN_STREAM;
+}	/* End of HTCACHEWRITERCREATE.	*/
+
+
+
+
+
+
+

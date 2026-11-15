@@ -21,7 +21,7 @@ DESCRIPTION:
 	The HTTP protocol class, inherited from HTProtocolClass
         in file htstream.goh{goc}.
 
-	$Id: http.goh,v 1.6.2.2 97/10/18 14:57:34 kkee Exp $
+	$Id: http.goh,v 1.1 97/04/04 15:55:16 newdeal Exp $
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
 
@@ -80,28 +80,37 @@ DESCRIPTION:
 typedef enum {
     HTTP_GOT_DATA  		= -1,
     HTTP_BEGIN     		= 0,
-    HTTP_PERSISTENT_BEGIN,
-    HTTP_NONPERSISTENT_BEGIN,
     HTTP_NEED_CONNECTION,
+    HTTP_CHECK_CONNECTION,
     HTTP_NEED_REQUEST,
     HTTP_CHECK_RESPONSE,
+    HTTP_LOAD_DATA,
     HTTP_ERROR,
     HTTP_RETRY,
     HTTP_NOT_MODIFIED,
     HTTP_AA,                              /* Access Authentication */
-    HTTP_PROXY_AUTH,                      /* Proxy Authentication */
     HTTP_PERM_REDIRECT,
     HTTP_TEMP_REDIRECT,
-    HTTP_NO_DATA,
-    HTTP_STREAM_ERROR_DATA,               /* Stream until no more error data */
-	                                  /* If no data to stream, generate 
-	                                     our own error data */
-    HTTP_STREAM_ALL_DATA,                 /* Stream until no more data */
-    HTTP_INVALID_STATE
+    HTTP_NO_DATA
 } HTTPState;
 
 
 @class HTTPClass, HTProtocolClass;
+
+/*
+ * Deal with exceptional situations resulting from writing HTSocket.
+ *
+ * Context:	Push data.
+ * Source:	MSG_HT_PROTOCOL_LOAD.
+ * Destination:	Unrestricted.
+ * Interception:No need as this is specific to protocol. Write your own
+ *              exception handler instead.
+ * Pass:        status - the status after writing to HTSocket.
+ * Return:      HT_OK if the exceptional has been dealt with, else 
+ *	        the passed in status.
+ */
+@message int MSG_HTTP_AFTER_SOCKET_WRITE(int status);
+
 
 /*
  * Create a stream stack to handle output stream. HTTP checks what the 
@@ -115,6 +124,18 @@ typedef enum {
  * Return:      HT_OK or HT_ERROR.
  */
 @message int MSG_HTTP_STREAM_PIPE();
+
+
+/*
+ * Cleanup before after we are done.
+ *
+ * Context:	Internal cleanup.
+ * Source:	self
+ * Destination: self
+ * Interception:No.
+ */
+@message void MSG_HTTP_CLEANUP();
+
 
 
 /* --------------------------------------------------------------------------
@@ -141,20 +162,6 @@ typedef enum {
 @instance int HTTPI_bufferLength;
 @instance int HTTPI_parseState;
 @instance int HTTPI_reason; /* Index into HTTPI_buffer. Don't use pointer! */
-
-/*
- * Buffer for data while HTTP decides whether to push the data to 
- * target or not.
- */
-@instance HTMemHandle HTTPI_data;
-@instance word HTTPI_len;
-
-/*
- * HTTP_STREAM_ALL_DATA return code. If we get into state HTTP_STREAM_ALL_DATA,
- * the return code must be provided. If HT_OK, then return code from 
- * stream data is used.
- */
-@instance int HTTPI_streamDataRet;
 
 @endc
 
