@@ -115,19 +115,19 @@ if not "%GM%"=="E" goto ENVFAIL
 rem A file check cannot detect an empty drive or a drive without media.
 %1\gsetup.exe /CHECKDRIVE %2
 if errorlevel 1 goto BUSY
-emudrv %2 %1\
+%1\gsetup.exe /QUIET emudrv %2 %1\
 goto VERIFY
 
 :TRYSUB
 set GM=S
 if not "%GM%"=="S" goto ENVFAIL
-subst %2 %1\
+%1\gsetup.exe /QUIET subst %2 %1\
 goto VERIFY
 
 :TRYSW
 set GM=W
 if not "%GM%"=="W" goto ENVFAIL
-swsubst %2 %1\
+%1\gsetup.exe /QUIET swsubst %2 %1\
 
 rem Test real source files. Mapper exit codes differ between DOS versions.
 :VERIFY

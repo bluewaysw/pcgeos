@@ -40,6 +40,8 @@ write_file('probe.c', <<'C');
 #include <assert.h>
 #include <i86.h>
 #include <dos.h>
+#include <io.h>
+#include <process.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -131,9 +133,17 @@ int main(int argc, char **argv)
     int remove;
     char *args[] = { "gsetup", "install", "extra" };
     char *check[] = { "gsetup", "/CHECKDRIVE", "d:" };
+    char *quiet[] = { "gsetup", "/QUIET", "C:\\PROBE.EXE", "noise", NULL };
     const char *tail = "/C C:\\DIST\\gsetup.bat C:\\DIST D: install extra";
 
     if (argc == 1) {
+        assert(LauncherMain(2, quiet) == 1);
+        quiet[2] = "";
+        assert(LauncherMain(3, quiet) == 1);
+        memset(command, 'X', sizeof(command) - 1);
+        command[sizeof(command) - 1] = 0;
+        quiet[2] = command;
+        assert(LauncherMain(3, quiet) == 1);
         errors[3] = 15;
         assert(FindFreeDrive() == 'D');
         assert(CheckDrive(3) == 1); /* Assigned, regardless of media. */
@@ -210,6 +220,35 @@ int main(int argc, char **argv)
         return 0;
     }
 
+    if (strcmp(argv[1], "noise") == 0 || strcmp(argv[1], "/C") == 0) {
+        file = fopen("NOISE.RUN", "w");
+        assert(file != NULL);
+        fclose(file);
+        puts("PROBE STDOUT");
+        fputs("PROBE STDERR\n", stderr);
+        return 37;
+    }
+
+    if (strcmp(argv[1], "quiet") == 0) {
+        /* Capture both inherited handles, without shell-specific syntax. */
+        assert(dup2(1, 2) == 0);
+        assert(spawnl(P_WAIT, "C:\\GSETUP.EXE", "gsetup", "/QUIET",
+                      "C:\\PROBE.EXE", "noise", (void*)0) >= 0);
+        file = fopen("NOISE.RUN", "r");
+        assert(file != NULL);
+        fclose(file);
+        assert(spawnl(P_WAIT, "C:\\GSETUP.EXE", "gsetup", "/QUIET",
+                      "NOSUCHXX", (void*)0) >= 0);
+        /* The emulator shell returns zero. Use a shell stub for status. */
+        assert(putenv("COMSPEC=C:\\PROBE.EXE") == 0);
+        assert(spawnl(P_WAIT, "C:\\GSETUP.EXE", "gsetup", "/QUIET",
+                      "test", (void*)0) == 37);
+        puts("PASS: quiet stdout");
+        fflush(stdout);
+        fputs("PASS: quiet stderr\n", stderr);
+        return 0;
+    }
+
     if (strcmp(argv[1], "readonly") == 0) {
         assert(_dos_setfileattr("GFS.INI", _A_RDONLY) == 0);
         return 0;
@@ -244,6 +283,8 @@ int main(int argc, char **argv)
             return 0;
         sprintf(command, "z:\\subst %s /D", drive);
     } else {
+        puts("PROBE STDOUT");
+        fputs("PROBE STDERR\n", stderr);
         if (strcmp(mode, "NONE") == 0)
             return 0;
         if (strcmp(mode, "S") == 0 && argv[1][0] != 'S')
@@ -372,7 +413,8 @@ my @cases = (
     ['NOGFS', 'E', '', 'Cannot generate GFS.INI.', 'EE', 1, 'D'],
     ['REAL', 'E', '', 'Install complete.', '', 0, 'D'],
 );
-my $runner = "\@echo off\nc:\\probe.exe >c:\\NATIVE.LOG\n";
+my $runner = "\@echo off\nc:\\probe.exe >c:\\NATIVE.LOG\n" .
+    "c:\\probe.exe quiet >c:\\QUIET.LOG\n";
 for my $case (@cases) {
     my ($name, $mode, $invocation) = @$case;
     make_path("$tmp/$name");
@@ -432,11 +474,16 @@ $result == 0 or die read_file('emulator.log');
 -e "$tmp/NATIVE.LOG" or die read_file('emulator.log');
 read_file('NATIVE.LOG') =~ /^PASS:/ or die read_file('NATIVE.LOG');
 print read_file('NATIVE.LOG');
+read_file('QUIET.LOG') eq "PASS: quiet stdout\r\nPASS: quiet stderr\r\n"
+    or die "Quiet probe output or handle restore failed: " . read_file('QUIET.LOG');
+print "PASS: quiet commands, child exit code and parent output handles\n";
 
 for my $case (@cases) {
     my ($name, $mode, $invocation, $message, $calls, $marker, $drive) = @$case;
     my $output = read_file("$name/RESULT.LOG");
     index($output, $message) >= 0 or die "$name: $output\n";
+    $output !~ /PROBE (?:STDOUT|STDERR)|Illegal command|Bad command/i
+        or die "$name: mapping probe output: $output\n";
     my $log = -e "$tmp/$name/MAP.LOG" ? read_file("$name/MAP.LOG") : '';
     my $actual = join '', $log =~ /^([ESW]) /mg;
     $actual eq $calls or die "$name: wrong mapper sequence: $log\n";

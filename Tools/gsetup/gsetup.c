@@ -41,6 +41,30 @@ static int _pascal WriteGfsIni(const char *iniNameP);
 int main(int argc, char *argv[])
 {
     int exitCode;
+    int i;
+
+    /* Silence one probe. Only this process and its child inherit NUL. */
+    if (argc > 1 && strcmp(argv[1], "/QUIET") == 0) {
+        if (argc < 3 || argv[2][0] == '\0') {
+            return 1;
+        }
+        cmdTail[0] = '\0';
+        if (!appendCmdText(slashC)) {
+            return 1;
+        }
+        for (i = 2; i < argc; i++) {
+            if ((i > 2 && !appendCmdChar(' ')) ||
+                !appendCmdText(argv[i])) {
+                return 1;
+            }
+        }
+        if (freopen("NUL", "w", stdout) == (void*)0 ||
+            freopen("NUL", "w", stderr) == (void*)0) {
+            return 1;
+        }
+        exitCode = execComspec();
+        return exitCode < 0 ? 1 : exitCode;
+    }
 
     /* Internal batch check: 0 = free, 1 = occupied, 2 = unknown. */
     if (argc > 1 && strcmp(argv[1], "/CHECKDRIVE") == 0) {
