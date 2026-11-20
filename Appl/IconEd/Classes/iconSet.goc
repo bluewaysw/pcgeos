@@ -1,0 +1,667 @@
+/**************************************************************************
+ *
+ * PROJECT:	Icon Editor	(GOC Version)
+ * FILE:	iconSet.goc
+ *
+ *		This project is inspired by the Icon Editor by Steve Yegge, 1992 - 1994
+ *
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	stevey	6/17/94		Initial revision (viewerVisIcon.asm)
+ *	RainerB 7/24/2025	Ported to GOC
+ *
+ *
+ * DESCRIPTION:	Implementation of VisISet class.
+ *	 	VisISetClass - displays a representative icon of an
+ *			       icon set in the IconDBView object
+ *
+ **************************************************************************/
+
+
+/*  Standard include files */
+@include <stdapp.goh>
+@include <Ansi/stdlib.h>
+@include <Ansi/stdio.h>
+@include <Ansi/string.h>
+
+@include "iconed.goh"
+@include "lmacros.goh"
+@include "UI/appui.goh"
+
+
+@include "token.h"
+
+extern GlobalStruct global;
+
+@classdecl VisISetClass;
+
+/*--------------------- Local Headers ---------------------
+ ---------------------------------------------------------------------------*/
+int SetVisISetHighlightBounds(VMFileHandle vmFile, int width, int height, VisISetInstance *pself);
+void AlignText(int maxWidth, GStateHandle gstate, VisISetInstance *pself);
+void VisISetDrawBitmap(GStateHandle gstate, VMFileHandle, optr oself);
+void VisISetDrawName(GStateHandle gstate, VMFileHandle, VisISetInstance *pself);
+
+
+/*--------------------- MSG_VIS_DRAW ---------------------
+ *  Purpose:
+ *	Draw method for VisISetClass.
+ *  Context:
+ *  Strategy:
+	- draw a background-colored rectangle first, to clear greebles
+	- get the parent's icon database file handle
+	- query the database for our moniker
+	- draw the bitmap
+	- if we're selected, draw an inverted rectangle
+ *  Parameters:	void (DrawFlags drawFlags, GStateHandle gstate);
+ *  Return:
+ ---------------------------------------------------------------------------*/
+@method VisISetClass, MSG_VIS_DRAW	{
+int x0, y0, w, h, color;
+VMFileHandle	vmFile;
+optr 	obj;
+
+
+    x0 = pself->VI_bounds.R_left;
+    y0 = pself->VI_bounds.R_top;
+    w = pself->VI_bounds.R_right-pself->VI_bounds.R_left;
+    h = pself->VI_bounds.R_bottom-pself->VI_bounds.R_top;
+
+	/*
+	 * Get view background color
+	 * MSG_GEN_VIEW_GET_COLOR returns a dword, where the least
+	 * significant byte contains the color index.
+	 */
+    obj = ConstructOptr(OptrToHandle(oself), ChunkOf(@IconDBView));
+    color = @call obj::MSG_GEN_VIEW_GET_COLOR();
+
+	/*
+	 * Clear out the background area
+	 * Add two pixels to make sure to erase the "selected" Border
+	 */
+    GrSetAreaColor(gstate, CF_INDEX, color, 0, 0);
+    GrFillRect(gstate, x0-2, y0-2, x0+w+2, y0+h+2);
+
+	/*
+	 * Draw other parts of the VisISet object
+	 */
+    vmFile = @call @visParent::MSG_DB_VIEWER_GET_DATABASE();
+    if (!vmFile) return;
+    VisISetDrawBitmap(gstate, vmFile, oself);
+    VisISetDrawName(gstate, vmFile, pself);
+
+}
+
+
+/*--------------------- VisISetDrawBitmap ---------------------
+ *  Purpose:	Draws the bitmap part of the VisISet object.
+ *  Context:
+ *  Strategy:
+	- if the icon set currently being edited, draw a red frame around
+	  the VisISet moniker
+	- if selected, draw an inverted rectangle
+	- draw the bitmap starting at the bitmap upper-left corner
+	  (as specified in instance data).
+	  Drawing the bitmap as last operation prevents the non-transparent
+	  part of the bitmap from beeing inverted - this looks nicer
+
+ *  Parameters:
+ *  Return:
+ ---------------------------------------------------------------------------*/
+void VisISetDrawBitmap(GStateHandle gstate, VMFileHandle vmFile, optr oself) {
+int x0, y0;
+VMBlockHandle   bmp;
+int curISet;
+VisISetInstance *pself;
+
+    pself = ObjDerefVis(oself);
+    x0 = pself->VI_bounds.R_left;
+    y0 = pself->VI_bounds.R_top;
+
+    /*
+     *  If we're the current icon (that is the one being edited in the fatbits,
+     *  not the one selected in the DBViewer) draw a red rectangle
+     *  around the VisISet
+     */
+    curISet = @call @visParent::MSG_DB_VIEWER_GET_CURRENT_ISET();
+    if (pself->VICSI_iSetNumber == curISet) {
+	/*
+	* red frame around then whole icon
+	*/
+	GrSaveState(gstate);
+	GrSetLineColor(gstate, CF_INDEX, 220, 0,0);
+	GrDrawRect(gstate, x0  - 2,
+		y0 +  - 2,
+		pself->VI_bounds.R_right + 1,
+		pself->VI_bounds.R_bottom + 1);
+	GrRestoreState(gstate);
+    }
+
+
+
+    /*
+     * If we're selected draw an rectangle as bitmap background.
+     * We use a colored rectangle, not an inverted (MM_INVERT) because
+     * black-and-white images may be hard to recognize on some view colors.
+     */
+    if (pself->VICSI_selected) {
+    	int vColor;
+    	GrSaveState(gstate);
+
+    	vColor = @call ViewColorGroup::MSG_GEN_ITEM_GROUP_GET_SELECTION();
+    	if (vColor == VC_BLUE) {
+    	    GrSetAreaColor(gstate, CF_INDEX, VC_YELLOW_BACKGROUND, 0, 0);
+    	} else {
+    	    GrSetAreaColor(gstate, CF_INDEX, VC_BLUE_BACKGROUND, 0, 0);
+    	}
+
+
+	GrFillRect(gstate, x0 + pself->VICSI_bitmapBounds.R_left,
+			y0 + pself->VICSI_bitmapBounds.R_top,
+			x0 + pself->VICSI_bitmapBounds.R_right,
+			y0 + pself->VICSI_bitmapBounds.R_bottom);
+
+    	GrRestoreState(gstate);
+    }
+
+    /*
+     *  Just get the first icon's bitmap from the database
+     *  Draw the bitmap starting at our upper-left corner, if bitmap is valid
+     */
+
+    bmp =IdGetEntryBitmap(vmFile, pself->VICSI_iSetNumber, 0);
+    if (!bmp) return;
+    GrDrawHugeBitmap(gstate, x0 + pself->VICSI_bitmapBounds.R_left ,
+    			y0 + pself->VICSI_bitmapBounds.R_top,
+    			vmFile, bmp);
+
+}
+
+/*--------------------- VisISetDrawName ---------------------
+ *  Purpose:	Draws the name of the icon set under the bitmap.
+ *  Context:
+ *  Strategy:
+	- set the font in the gstate
+	- draw the text starting at the text upper-left corner, as
+	  specified in instance data.
+	- if selected, draw an inverted rectangle over the text.
+ *  Parameters:
+ *  Return:
+ ---------------------------------------------------------------------------*/
+void VisISetDrawName(GStateHandle gstate, VMFileHandle vmFile, VisISetInstance *pself) {
+int x0, y0;
+
+    x0 = pself->VI_bounds.R_left;
+    y0 = pself->VI_bounds.R_top;
+
+    GrSaveState(gstate);
+
+
+    /*
+     *  Set the text font  (same as GeoManager uses)
+     *  Draw the text
+     *  If necessary, draw the ellipsis
+     */
+    GrSetFont(gstate, VIS_ISET_FONT_ID, MakeWWFixed(VIS_ISET_FONT_SIZE) );
+    GrDrawText(gstate, x0 + pself->VICSI_textBounds.R_left ,
+        			y0 + pself->VICSI_textBounds.R_top,
+        			pself->VICSI_iSetName,
+    				pself->VICSI_numChars);
+    if (pself->VICSI_ellipsis) GrDrawChar(gstate,
+    			x0 + pself->VICSI_ellipsis ,
+    			y0 + pself->VICSI_textBounds.R_top,
+    			C_ELLIPSIS);
+
+    /*
+     *  If we're selected, draw a rectangle over the text.
+     *  4 pixels wider, looks better
+     */
+    if ( pself->VICSI_selected) {
+
+    	GrSetMixMode(gstate, MM_INVERT);
+	GrFillRect(gstate, x0 + pself->VICSI_textBounds.R_left - 2 ,
+			y0 + pself->VICSI_textBounds.R_top,
+			x0 + pself->VICSI_textBounds.R_right + 2,
+			y0 + pself->VICSI_textBounds.R_bottom);
+	}
+
+
+
+    GrRestoreState(gstate);
+}
+
+
+/*--------------------- MSG_VIS_ISET_INITIALIZE ---------------------
+ *  Purpose:
+ *	Sets up all the instance data.
+ *  Context:
+ *  Strategy:
+	- set the icon set number in instance data
+	- figure out how long the icon set name is (in points)
+	- figure out how big the bitmap is
+	- initialize the instance data appropriately
+ *  Parameters:	iSet:	icon set number
+ *  Return:
+ ---------------------------------------------------------------------------*/
+@method VisISetClass, MSG_VIS_ISET_INITIALIZE	{
+VMFileHandle	vmFile;
+int	iconWidth, width, height;
+GStateHandle	gstate;
+
+    pself->VICSI_iSetNumber = iSet;
+    vmFile = @call @visParent::MSG_DB_VIEWER_GET_DATABASE();
+
+    /*
+     *  Get the bitmap bounds and use them to set up the highlights.
+     */
+    IdGetEntryDimensions(vmFile, iSet, 0, &width, &height);
+    iconWidth = SetVisISetHighlightBounds(vmFile, width, height, pself);
+
+
+    /*
+     * Calculate all data needed to draw the icon set name
+     */
+    IdGetISetName(vmFile, iSet, pself->VICSI_iSetName);
+    gstate = @call oself::MSG_VIS_VUP_CREATE_GSTATE();
+    EC( if(!gstate) { ProgError("VUP_GET_GSTATE failes"); return; } )
+    GrSetFont(gstate, VIS_ISET_FONT_ID, MakeWWFixed(VIS_ISET_FONT_SIZE) );
+    AlignText(iconWidth, gstate, pself);
+    GrDestroyState(gstate);
+
+
+    /*
+     * Finally set own size and force an update of our visual selves.
+     */
+    @send oself::MSG_VIS_SET_SIZE(iconWidth, pself->VICSI_textBounds.R_bottom);
+    @call oself::MSG_VIS_MARK_INVALID(VOF_GEOMETRY_INVALID | VOF_IMAGE_INVALID, VUM_NOW);
+
+}
+
+
+/*--------------------- SetVisISetHighlightBounds ---------------------
+ *  Purpose:
+ *	Sets instance data for drawing highlight(s).
+ *  Context:
+ *  Strategy:
+ *  Parameters:
+ *  Return:	width to use for calculating text bounds
+ * 		set: VICSI_bitmapBounds (all)
+ *		     VICSI_textBounds   (R_bottom and R_top only)
+ ---------------------------------------------------------------------------*/
+int SetVisISetHighlightBounds(VMFileHandle vmFile, int width, int height, VisISetInstance *pself) {
+int retVal, x;
+
+	/*
+	*  Examine passed width.  If it's wider than the minimum
+	*  VisISet object width, we start drawing the bitmap at the
+	*  upper-left corner of the VisISet.
+	*/
+    if ( width < VIS_ISET_MINIMUM_WIDTH ) {
+	/*
+	*  The bitmap is narrower than the minimum.  Center the
+	*  bitmap between the left & right vis-bounds.
+	*/
+	x = (VIS_ISET_MINIMUM_WIDTH - width)/2;
+	pself->VICSI_bitmapBounds.R_left = x;
+	pself->VICSI_bitmapBounds.R_right = x + width;
+	retVal = VIS_ISET_MINIMUM_WIDTH;
+    	}
+    else {
+	/*
+	*  The bitmap is wider than the minimum.  The VisISet object will
+	*  be as wide as the bitmap, so clear the left offset and use
+	*  the bitmap's width for the right one.
+	*/
+	pself->VICSI_bitmapBounds.R_left = 0;
+	pself->VICSI_bitmapBounds.R_right = width;
+	retVal = width;
+	}
+
+    if ( height < VIS_ISET_MINIMUM_HEIGHT) {
+	/*
+	*  The bitmap is shorter than the minimum height.  Subtract
+	*  the bitmap height from the minimum-height line to get
+	*  the y-offset for drawing the bitmap.  Set the text y-
+	*  offset to the (minimum bitmap height + the spacer).
+	*/
+	pself->VICSI_bitmapBounds.R_top = VIS_ISET_MINIMUM_HEIGHT - height;
+	pself->VICSI_bitmapBounds.R_bottom = VIS_ISET_MINIMUM_HEIGHT;
+
+	pself->VICSI_textBounds.R_top = VIS_ISET_MINIMUM_HEIGHT + VIS_ISET_SPACER;
+	pself->VICSI_textBounds.R_bottom = pself->VICSI_textBounds.R_top + VIS_ISET_TEXT_HEIGHT;
+    	}
+    else {
+	/*
+	*  The bitmap is taller than the minimum.  The bitmap height
+	*  will determine the text offset.
+	*/
+	pself->VICSI_bitmapBounds.R_top = 0;
+	pself->VICSI_bitmapBounds.R_bottom = height;
+
+	pself->VICSI_textBounds.R_top = height + VIS_ISET_SPACER;
+	pself->VICSI_textBounds.R_bottom = pself->VICSI_textBounds.R_top + VIS_ISET_TEXT_HEIGHT;
+    	}
+
+    return retVal;
+}
+
+/*--------------------- AlignText ---------------------
+ *  Purpose:
+ 		Aligns the text if it is smaller than the max length so it
+		will appear centered.  The function will also truncate any
+		text that is longer than the max length and return the
+		position at which to draw an ellipsis (...)
+ *  Context:
+ 		Initialze VisISet instance variables
+ *  Strategy:
+ 		Do anything needed in this single routine
+ *  Parameters:
+ *		maxWith	Space available (in pixels)
+ *		pself	VisISet instanve data
+ *  Return:
+ * 		set: VICSI_textBounds   (R_left and R_right only)
+		     VICSI_ellipsis;	 where to draw the ellipsis (0 if none)
+		     VICSI_numChars;
+ ---------------------------------------------------------------------------*/
+void AlignText(int maxWidth, GStateHandle gstate, VisISetInstance *pself) {
+int nameWidth, curWidth;	// in pixels
+int n, numChars;
+char buf[3];
+int ew;
+
+
+    /*
+     * See, if the text must be truncated
+     */
+    nameWidth = GrTextWidth(gstate, pself->VICSI_iSetName, 0);
+    if (nameWidth <= maxWidth ) {
+    	/*
+    	 * No truncation needed. Center text.
+    	 */
+    	pself->VICSI_textBounds.R_left = (maxWidth - nameWidth + 1)/2;
+    	pself->VICSI_textBounds.R_right = pself->VICSI_textBounds.R_left + nameWidth;
+    	pself->VICSI_ellipsis = 0;	/* no ellipis */
+    	pself->VICSI_numChars = 0;	/* all chars */
+    	return;
+    }
+
+    /*
+     * Find out how many characters to draw so that the name
+     * plus ellipse fits into the available space.
+     * This is not time critical, so we use a simple loop.
+     *
+     * Note: we use GrTextWidth() but (GrCharWidth() >> 16) will also work
+     */
+    buf[0] = C_ELLIPSIS; buf[1] = 0;
+    ew = GrTextWidth(gstate,buf, 0);
+
+    maxWidth -= ew;
+    numChars = strlen(pself->VICSI_iSetName);
+
+    for ( n = 1; n <= numChars; n++ ) {
+    	curWidth = GrTextWidth(gstate, pself->VICSI_iSetName, n);
+    	if (curWidth > maxWidth ) {
+    	    /* This is one character to much */
+    	    break;
+        }
+
+    }
+
+    /*
+     * Setup instance variables. Remember that n is too big.
+     * Be save for the improbable case that n is still equal to strlen(name)
+     */
+     n--;
+     curWidth = GrTextWidth(gstate, pself->VICSI_iSetName, n);
+     pself->VICSI_textBounds.R_left = 1;				// why? looks better.
+     pself->VICSI_textBounds.R_right = 1 + curWidth + ew;
+     pself->VICSI_ellipsis = curWidth + 2;
+     pself->VICSI_numChars = n;
+
+     if ( n == numChars ) {	/* should not occur, however */
+	pself->VICSI_ellipsis = 0;
+	pself->VICSI_numChars = 0;
+	pself->VICSI_textBounds.R_right = curWidth;
+	}
+
+}
+
+/*--------------------- MSG_VIS_ISET_GET_NUMBER ---------------------
+ *  Purpose:
+ *	Returns the icon set-number for the VisISet object.
+ *  Context:
+ *  Strategy:
+ *  Parameters:	void
+ *  Return:	number
+ ---------------------------------------------------------------------------*/
+@method VisISetClass, MSG_VIS_ISET_GET_NUMBER {
+
+    return pself->VICSI_iSetNumber;
+
+}
+/*--------------------- MSG_VIS_ISET_SET_SELECTION ---------------------
+ *  Purpose:
+ *	Turns the VisISet object on or off.
+ *  Context:
+ *  Strategy:
+ *  Parameters:	select	nonzero if selecting
+ *			zero if deselecting
+ *  Return:
+ ---------------------------------------------------------------------------*/
+@method VisISetClass, MSG_VIS_ISET_SET_SELECTION	 {
+GStateHandle gstate;
+
+    pself->VICSI_selected = select;
+    gstate = @call oself::MSG_VIS_VUP_CREATE_GSTATE();
+    @call oself::MSG_VIS_DRAW(0, gstate);
+    GrDestroyState(gstate);
+
+}
+/*--------------------- MSG_VIS_ISET_SET_SELECTED_STATE ---------------------
+ *  Purpose:
+ *	Sets the VisISet object selected (if not already) and redraws.
+ *	This message is only sent when the VisISet is selected
+ * 	via MSG_META_START_SELECT to the parent, not if it was
+ *	selected with the rubberband.
+ *
+ *	Pass:	child	= number of child to set (if it's
+ *			  not the child's number it will
+ *			  deselect.
+ *		uiFunctions = UIFunctionsActive (if the control
+ *			  key is down, the object ignores
+ *			  the message).
+ *
+ *  Context:
+ *  Strategy:
+	- if the control key is down, let the end-select handler
+	  take care of things.  (DBViewerEndSelect)
+
+	- if we aren't selected already, select ourselves, redraw,
+	  and call the content (our parent) back and mention it.
+ *  Parameters:	void (word child,  word uiFunctions)
+
+ child = cx
+ uiFunctions = bp.high
+
+ *  Return:	-
+ ---------------------------------------------------------------------------*/
+@method VisISetClass, MSG_VIS_ISET_SET_SELECTED_STATE	 {
+GStateHandle 	gstate;
+
+    if ( uiFunctions & UIFA_ADJUST) return; 	/* control key pressed? */
+
+    if ( child != pself->VICSI_iSetNumber ) {
+	/*
+	*  We're getting a de-select message.  Are we already deselected? Then bail.
+	*/
+	if ( !(pself->VICSI_selected) ) return;
+	pself->VICSI_selected = FALSE;
+    } else {
+    	/*
+    	 * select me. bail if already
+    	 */
+    	if (pself->VICSI_selected ) return;
+    	pself->VICSI_selected = TRUE;
+    }
+
+    /*
+     *  redraw ourselves immediately to prevent rubberband greebles.
+     */
+    gstate = @call oself::MSG_VIS_VUP_CREATE_GSTATE();
+    @call oself::MSG_VIS_DRAW(0, gstate);
+    GrDestroyState(gstate);
+
+    /*
+     *  Our state changed.  Call the content.
+     */
+    @send @visParent::MSG_DB_VIEWER_ISET_TOGGLED(pself->VICSI_selected);
+
+}
+
+/*--------------------- MSG_VIS_ISET_CHECK_IN_RECTANGLE ---------------------
+ *  Purpose:
+ *	See if the VisISet object is selected by the rubberband, and redraw
+ *	the VisISet object if it's selected.
+ *  Context:
+ *  Strategy:
+	- make sure that in the passed rubberband rectangle, the
+	  top, left corner is in R_left and R_top.
+	- see if the rubberband is selecting us:
+		* if we are completely outside of the rubberband's rectangle
+		  we are not selected
+		* otherwise we are selected
+		  --> Toggle selected state, inform content and redraw
+ *  Parameters:	void (Rectangle rubberband)
+ *  Return:	-
+ ---------------------------------------------------------------------------*/
+@method VisISetClass, MSG_VIS_ISET_CHECK_IN_RECTANGLE	 {
+GStateHandle	gstate;
+
+    /*
+     * First make sure the Rectangle points are in the correct
+     * order (R_top is really R_top, etc).
+     */
+    if (  rubberband.R_top >  rubberband.R_bottom ) {
+    	word tmp = rubberband.R_top;
+    	rubberband.R_top = rubberband.R_bottom;
+    	rubberband.R_bottom = tmp;
+    	}
+    if (  rubberband.R_right <  rubberband.R_left ) {
+    	word tmp = rubberband.R_right;
+    	rubberband.R_right = rubberband.R_left;
+    	rubberband.R_left = tmp;
+    	}
+
+
+    /*
+     * Check if we are outside of the rubberband. If yes: break; and exit
+     */
+    do {
+    	/*
+    	 * We are completely on the left side (means: outside) of the rubberband
+    	 * when our right side is on the left of the left side of the rubberband
+    	 */
+    	if ( pself->VI_bounds.R_right < rubberband.R_left ) break;
+
+    	/*
+    	 * The same for
+    	 *  	- our left side is on the right of the rubberband
+    	 *  	- our bottom is above of the top rubberband
+    	 *  	- our top is below the bottom of the rubberband
+    	 */
+    	if ( pself->VI_bounds.R_left > rubberband.R_right ) break;
+    	if ( pself->VI_bounds.R_bottom < rubberband.R_top ) break;
+    	if ( pself->VI_bounds.R_top > rubberband.R_bottom ) break;
+
+
+	/*
+	 * Now we are complete or partially in the rubberbands rectangle
+	 * Toggle selection, inform content and redraw
+	 */
+	pself->VICSI_selected = pself->VICSI_selected ? FALSE : TRUE;
+	@call @visParent::MSG_DB_VIEWER_ISET_TOGGLED(pself->VICSI_selected);
+
+	gstate = @call oself::MSG_VIS_VUP_CREATE_GSTATE();
+	@call oself::MSG_VIS_DRAW(0, gstate);
+	GrDestroyState(gstate);
+
+    } while (FALSE);
+
+}
+
+
+
+
+/*--------------------- MSG_VIS_ISET_GET_SELECTION ---------------------
+ *  Purpose:
+ *	Returns whether the VisISet object is selected or not.
+ *
+ *  Context:
+ *  Strategy:
+	- return whether we're selected or not (from instance data)
+ *  Parameters:	(void)
+ *  Return:	TRUE if selected
+ ---------------------------------------------------------------------------*/
+@method VisISetClass, MSG_VIS_ISET_GET_SELECTION {
+
+    return pself->VICSI_selected;
+}
+
+
+/*--------------------- MSG_META_START_SELECT ---------------------
+ *  Purpose:	Handle left mouse click.
+ *		Causes the selection of this symbol and/or the editing of this symbol
+ *  Context:
+ *  Strategy:
+ 	- if the control key is down only toggle the selection state and redraw. Then bail.
+	- select this icon set and edit it.
+ *  Parameters:void (MouseReturnParams *retVal,
+ *		sword xPosition, sword yPosition,
+ *		word inputState)
+ *      	inputState: lowByte: ButtonInfo
+ *			    highByte: UIFunctionsActive
+ *  Return:
+ ---------------------------------------------------------------------------*/
+@method VisISetClass, MSG_META_START_SELECT {
+GStateHandle gstate;
+
+    /*
+     * control key down? just toggle selected state and redraw.
+     * Ignore double clicks.
+     */
+    if ( (inputState >> 8) & UIFA_ADJUST ) {
+    	if (inputState & BI_DOUBLE_PRESS ) goto done;
+
+	pself->VICSI_selected = pself->VICSI_selected ? FALSE : TRUE;
+	@call @visParent::MSG_DB_VIEWER_ISET_TOGGLED(pself->VICSI_selected);
+
+	gstate = @call oself::MSG_VIS_VUP_CREATE_GSTATE();
+	@call oself::MSG_VIS_DRAW(0, gstate);
+	GrDestroyState(gstate);
+	goto done;
+	}
+
+    /*
+     * select and edit iSet on single click on it
+     */
+    @call @visParent::MSG_DB_VIEWER_SET_SINGLE_SELECTION(pself->VICSI_iSetNumber);
+    @call @visParent::MSG_DB_VIEWER_EDIT_ISET(TRUE);
+
+done:
+    retVal->flags = MRF_PROCESSED;
+}
+
+
+/*---------------------  ---------------------
+ *  Purpose:
+ *  Context:
+ *  Strategy:
+ *  Parameters:
+ *  Return:
+ ---------------------------------------------------------------------------*/
+
+/* *********** End of file iconSet.goc ********************/
+
+

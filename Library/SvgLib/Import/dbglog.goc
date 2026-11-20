@@ -1,0 +1,152 @@
+#include <geos.h>
+
+#if ERROR_CHECK
+
+#include <Ansi/stdio.h>
+#include <Ansi/string.h>
+#include <file.h>
+#include <localize.h>
+#include <stdarg.h>
+#include <timedate.h>
+
+#include "Import/dbglog.h"
+
+#define SVG_LOG_FILENAME "dbglog.txt"
+
+static void
+SvgLogWrite(SvgImportContext *contextP, const char *value, word length)
+{
+    if ((contextP->logFile != NullHandle) && value && length)
+        FileWrite(contextP->logFile, (void *)value, length, FALSE);
+}
+
+static void
+SvgLogNewLine(SvgImportContext *contextP)
+{
+    SvgLogWrite(contextP, "\r\n", 2);
+}
+
+static void
+SvgLogLabel(SvgImportContext *contextP, const char *label)
+{
+    if (label && *label)
+    {
+        SvgLogWrite(contextP, label, (word)strlen(label));
+        SvgLogWrite(contextP, ": ", 2);
+    }
+}
+
+void _pascal
+SvgLogInit(SvgImportContext *contextP)
+{
+    if (contextP->logFile != NullHandle)
+        FileClose(contextP->logFile, FALSE);
+    FilePushDir();
+    FileSetStandardPath(SP_PRIVATE_DATA);
+    contextP->logFile = FileCreate(SVG_LOG_FILENAME,
+        FILE_CREATE_TRUNCATE | FCF_NATIVE | FILE_ACCESS_RW | FILE_DENY_W, 0);
+    FilePopDir();
+}
+
+void _pascal
+SvgLogStart(SvgImportContext *contextP)
+{
+    TimerDateAndTime now;
+
+    TimerGetDateAndTime(&now);
+    LocalFormatDateTime(contextP->logTime, DTF_HMS_24HOUR, &now);
+    SvgLogWrite(contextP, "=== LOG START: ", 15);
+    SvgLogWrite(contextP, contextP->logTime,
+                (word)strlen(contextP->logTime));
+    SvgLogWrite(contextP, " ===", 4);
+    SvgLogNewLine(contextP);
+}
+
+void _pascal
+SvgLogEnd(SvgImportContext *contextP)
+{
+    SvgLogWrite(contextP, "=== LOG END ===", 15);
+    SvgLogNewLine(contextP);
+    if (contextP->logFile != NullHandle)
+    {
+        FileClose(contextP->logFile, FALSE);
+        contextP->logFile = NullHandle;
+    }
+}
+
+void _cdecl
+SvgLogPrintf(SvgImportContext *contextP, const char *label,
+             const char *format, ...)
+{
+    va_list arguments;
+
+    if (!format) return;
+    va_start(arguments, format);
+    (void)vsprintf(contextP->logBuffer, format, arguments);
+    va_end(arguments);
+    SvgLogLabel(contextP, label);
+    SvgLogWrite(contextP, contextP->logBuffer,
+                (word)strlen(contextP->logBuffer));
+    SvgLogNewLine(contextP);
+}
+
+void _cdecl
+SvgLogPrintfPlain(SvgImportContext *contextP, const char *format, ...)
+{
+    va_list arguments;
+
+    if (!format) return;
+    va_start(arguments, format);
+    (void)vsprintf(contextP->logBuffer, format, arguments);
+    va_end(arguments);
+    SvgLogWrite(contextP, contextP->logBuffer,
+                (word)strlen(contextP->logBuffer));
+    SvgLogNewLine(contextP);
+}
+
+void _pascal
+SvgLogValue(SvgImportContext *contextP, const char *label, sdword value,
+            Boolean signedValue, Boolean hexValue)
+{
+    if (hexValue)
+        (void)sprintf(contextP->logBuffer, "0x%08lx", (dword)value);
+    else if (signedValue)
+        (void)sprintf(contextP->logBuffer, "%ld", value);
+    else
+        (void)sprintf(contextP->logBuffer, "%lu", (dword)value);
+    SvgLogLabel(contextP, label);
+    SvgLogWrite(contextP, contextP->logBuffer,
+                (word)strlen(contextP->logBuffer));
+    SvgLogNewLine(contextP);
+}
+
+void _pascal
+SvgLogStr(SvgImportContext *contextP, const char *label, const char *value)
+{
+    SvgLogLabel(contextP, label);
+    SvgLogWrite(contextP, "\"", 1);
+    if (value) SvgLogWrite(contextP, value, (word)strlen(value));
+    SvgLogWrite(contextP, "\"", 1);
+    SvgLogNewLine(contextP);
+}
+
+void _pascal
+SvgLogStrSegment(SvgImportContext *contextP, const char *label,
+                 const char *value, word from, word to)
+{
+    word length;
+    word count;
+
+    length = value ? (word)strlen(value) : 0;
+    if (from > length) from = 0;
+    if (to > length) to = length;
+    count = (to > from) ? (word)(to - from) : 0;
+    if (count > 255) count = 255;
+    SvgLogLabel(contextP, label);
+    SvgLogWrite(contextP, "\"", 1);
+    if (count) SvgLogWrite(contextP, value + from, count);
+    SvgLogWrite(contextP, "\"", 1);
+    SvgLogNewLine(contextP);
+}
+
+#endif

@@ -8,6 +8,8 @@
 #include "IMPBMP/impgif.h"
 #include "IMPBMP/impjpeg.h"
 #include "IMPBMP/imppng.h"
+#include "IMPBMP/impwebp.h"
+#include <svgLib.h>
 
 @include <impex.goh>
 #include <Ansi/string.h>
@@ -336,6 +338,91 @@ ImpBmpStatus ImpPNG(TCHAR *file, VMFileHandle vmf, ImageAdditionalData *iad,
     return status;
 }
 
+/*****************************************************************************
+ *  SVG import - main routine                                                *
+ *****************************************************************************/
+
+#if PROGRESS_DISPLAY
+ImpBmpStatus _pascal ImpSVG(TCHAR *file, VMFileHandle vmf, ImageAdditionalData *iad,
+          MimeRes resolution, AllocWatcherHandle watcher, dword *usedMem,
+          Boolean doCompress, ImpBmpParams *params, Boolean *isCompacted,
+          VMBlockHandle *bmVMBlock, ImportProgressData *importProgressDataP,
+          MimeStatus *mimeStatus)
+#else
+ImpBmpStatus _pascal ImpSVG(TCHAR *file, VMFileHandle vmf, ImageAdditionalData *iad,
+          MimeRes resolution, AllocWatcherHandle watcher, dword *usedMem,
+          Boolean doCompress, ImpBmpParams *params, Boolean *isCompacted,
+          VMBlockHandle *bmVMBlock,
+          MimeStatus *mimeStatus)
+#endif
+{
+    FileHandle srcFile;
+    VMChain gstringChain;
+    RectDWord bounds;
+    sdword width;
+    sdword height;
+    TransError error;
+
+    (void)resolution;
+    (void)watcher;
+    (void)doCompress;
+#if PROGRESS_DISPLAY
+    (void)importProgressDataP;
+#endif
+
+    params->IBP_bitmap = NullHandle;
+    params->IBP_dest = vmf;
+    params->IBP_status = 0;
+    *bmVMBlock = NullHandle;
+    *isCompacted = FALSE;
+    iad->IAD_completeGraphic = FALSE;
+    *usedMem = 0;
+
+    srcFile = FileOpen(file, FILE_ACCESS_R | FILE_DENY_W);
+    if (!srcFile)
+    {
+        return IBS_UNKNOWN_FORMAT;
+    }
+
+    /* ATTENTION: Boolean is sword; MS_mimeFlags is word with only ABORT.
+     * If other flags are added, supply a separate live Boolean. */
+    error = SvgImport(srcFile, vmf, &gstringChain, &bounds,
+                      (SvgProgressCallback *)0,
+                      (const volatile Boolean *)&mimeStatus->MS_mimeFlags);
+    if (error != TE_NO_ERROR)
+    {
+        FileClose(srcFile, TRUE);
+        if (mimeStatus->MS_mimeFlags & MIME_STATUS_ABORT)
+            return IBS_IMPORT_STOPPED;
+        return (error == TE_OUT_OF_MEMORY) ? IBS_NO_MEMORY : IBS_UNKNOWN_FORMAT;
+    }
+
+    width = bounds.RD_right - bounds.RD_left;
+    height = bounds.RD_bottom - bounds.RD_top;
+    if (bounds.RD_left < -32768L || bounds.RD_left > 32767L ||
+        bounds.RD_top < -32768L || bounds.RD_top > 32767L ||
+        width <= 0 || width > 32767L ||
+        height <= 0 || height > 32767L)
+    {
+        VMFreeVMChain(vmf, gstringChain);
+        FileClose(srcFile, TRUE);
+        return IBS_UNKNOWN_FORMAT;
+    }
+
+    iad->IAD_size.XYS_width = (word)width;
+    iad->IAD_size.XYS_height = (word)height;
+
+    FileClose(srcFile, TRUE);
+    *bmVMBlock = VMCHAIN_GET_VM_BLOCK(gstringChain);
+    params->IBP_bitmap = *bmVMBlock;
+    iad->IAD_type = IAD_TYPE_GSTRING;
+    iad->IAD_origin.P_x = (sword)bounds.RD_left;
+    iad->IAD_origin.P_y = (sword)bounds.RD_top;
+    iad->IAD_completeGraphic = TRUE;
+
+    return IBS_NO_ERROR;
+}
+
 
 /*****************************************************************************
  *  Common code for GIF and JPEG formats                                     *
@@ -391,6 +478,9 @@ VMBlockHandle _pascal _export MimeDrvGraphicEx(_MimeGraphicParams_, dword extFla
 
     InitGlobals();                      /* Handled cached INI entries */
 
+    iad->IAD_type = IAD_TYPE_BITMAP;
+    iad->IAD_origin.P_x = iad->IAD_origin.P_y = 0;
+
 	locAllowAnimations = allowAnimations;
 	locCompress = doCompress;
 
@@ -441,6 +531,12 @@ VMBlockHandle _pascal _export MimeDrvGraphicEx(_MimeGraphicParams_, dword extFla
 #define IMP_PNG_PARAMS file, vmf, iad, resolution, watcher, usedMem, \
           locCompress, &params, &isCompacted, &bmVMBlock IMP_PROGRESS_PARAM \
           , mimeStatus
+#define IMP_WEBP_PARAMS file, vmf, iad, watcher, usedMem, &params, \
+          &isCompacted, &bmVMBlock IMP_PROGRESS_PARAM, mimeStatus
+#define IMP_SVG_PARAMS file, vmf, iad, resolution, watcher, usedMem, \
+          locCompress, &params, &isCompacted, &bmVMBlock IMP_PROGRESS_PARAM \
+          , mimeStatus
+
 
 
     if (strcmp(mimeType, _TEXT("image/gif")) == 0)
@@ -450,8 +546,10 @@ VMBlockHandle _pascal _export MimeDrvGraphicEx(_MimeGraphicParams_, dword extFla
             status = ImpJPG(IMP_JPG_PARAMS);
         if (status == IBS_UNKNOWN_FORMAT)
             status = ImpPNG(IMP_PNG_PARAMS);
+        if (status == IBS_UNKNOWN_FORMAT)
+            status = ImpWebP(IMP_WEBP_PARAMS);
     }
-    else if (strcmp(mimeType, _TEXT("image/jpeg")) == 0 || 
+    else if (strcmp(mimeType, _TEXT("image/jpeg")) == 0 ||
 	     strcmp(mimeType, _TEXT("image/jpg")) == 0)
     {
         status = ImpJPG(IMP_JPG_PARAMS);
@@ -459,6 +557,8 @@ VMBlockHandle _pascal _export MimeDrvGraphicEx(_MimeGraphicParams_, dword extFla
             status = ImpGIF(IMP_GIF_PARAMS);
         if (status == IBS_UNKNOWN_FORMAT)
             status = ImpPNG(IMP_PNG_PARAMS);
+        if (status == IBS_UNKNOWN_FORMAT)
+            status = ImpWebP(IMP_WEBP_PARAMS);
     }
     else if (strcmp(mimeType, _TEXT("image/png")) == 0)
     {
@@ -467,15 +567,32 @@ VMBlockHandle _pascal _export MimeDrvGraphicEx(_MimeGraphicParams_, dword extFla
             status = ImpJPG(IMP_JPG_PARAMS);
         if (status == IBS_UNKNOWN_FORMAT)
             status = ImpGIF(IMP_GIF_PARAMS);
+        if (status == IBS_UNKNOWN_FORMAT)
+            status = ImpWebP(IMP_WEBP_PARAMS);
+    }
+    else if (strcmp(mimeType, _TEXT("image/webp")) == 0)
+    {
+        status = ImpWebP(IMP_WEBP_PARAMS);
+        if (status == IBS_UNKNOWN_FORMAT)
+            status = ImpJPG(IMP_JPG_PARAMS);
+        if (status == IBS_UNKNOWN_FORMAT)
+            status = ImpPNG(IMP_PNG_PARAMS);
+        if (status == IBS_UNKNOWN_FORMAT)
+            status = ImpGIF(IMP_GIF_PARAMS);
+    }
+    else if (strcmp(mimeType, _TEXT("image/svg+xml")) == 0)
+    {
+        status = ImpSVG(IMP_SVG_PARAMS);
     }
 
 
     if (bmVMBlock)                       /* check if import successful */
     {
-      /* Compress and convert the bitmap to a GString if not an animation */
+      /* Compact static bitmaps. GStrings are already ready for the cache. */
       if (!isAnimation)  {
 	  /* Compact the bitmap if not already */
-	  if (!isCompacted && locCompress)  {
+	  if (iad->IAD_type == IAD_TYPE_BITMAP &&
+	      !isCompacted && locCompress)  {
 	      VMBlockHandle bmCompacted;
 
 	      bmCompacted = GrCompactBitmap(vmf, bmVMBlock, vmf);
@@ -491,12 +608,10 @@ VMBlockHandle _pascal _export MimeDrvGraphicEx(_MimeGraphicParams_, dword extFla
 	  }
 
 	  dataVMBlock = bmVMBlock;
-	  iad->IAD_type = IAD_TYPE_BITMAP;
       } else {
           iad->IAD_type = IAD_TYPE_ANIMATION; /* returned data is an animation */
           dataVMBlock = bmVMBlock ;
       }
-      iad->IAD_origin.P_x = iad->IAD_origin.P_y = 0;
     }
     else
       dataVMBlock = 0;                  /* import did not succeed */
@@ -517,6 +632,12 @@ char * _pascal _export MimeDrvInfo(_MimeInfoParams_)
                       _TEXT("\0") \
                     _TEXT("image/png\0") \
                       _TEXT("PNG\0") \
+                      _TEXT("\0") \
+                    _TEXT("image/webp\0") \
+                      _TEXT("WEBP\0") \
+                      _TEXT("\0") \
+                    _TEXT("image/svg+xml\0") \
+                      _TEXT("SVG\0") \
                       _TEXT("\0") \
                     _TEXT("\0")                /* end of format list */
 

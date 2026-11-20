@@ -1,0 +1,428 @@
+/***********************************************************************
+ * svgTransform.goc - CTM (affine) parsing and application (WWFixed 16.16)
+ ***********************************************************************/
+@include <stdapp.goh>
+
+#include <Ansi/string.h>
+#include <Ansi/stdlib.h>
+#include <Ansi/stdio.h>
+#include <Ansi/ctype.h>
+#include <file.h>
+#include <system.h>
+#include <graphics.h>
+#include <gstring.h>
+#include "Import/svg.h"
+#include "Import/dbglog.h"
+
+Boolean SvgXformStackInit(SvgImportContext *contextP)
+{
+    SvgMatrix *stack;
+    word bytes;
+
+    contextP->transformDepth = 0;
+    bytes = (word)(SVG_XFORM_GSTACK_MAX * sizeof(SvgMatrix));
+
+    if (contextP->transformStackH == NullHandle) {
+        contextP->transformStackH = MemAlloc(bytes, HF_DYNAMIC, 0);
+        if (contextP->transformStackH == NullHandle) {
+            return FALSE;
+        }
+    }
+
+    stack = (SvgMatrix *)MemLock(contextP->transformStackH);
+    if (stack == NULL) {
+        SvgXformStackFree(contextP);
+        return FALSE;
+    }
+
+    memset(stack, 0, bytes);
+    MemUnlock(contextP->transformStackH);
+    return TRUE;
+}
+
+void SvgXformStackFree(SvgImportContext *contextP)
+{
+    if (contextP->transformStackH != NullHandle) {
+        MemFree(contextP->transformStackH);
+        contextP->transformStackH = NullHandle;
+    }
+    contextP->transformDepth = 0;
+}
+
+static SvgMatrix* SvgXformStackLock(SvgImportContext *contextP)
+{
+    if (contextP->transformStackH == NullHandle) {
+        return NULL;
+    }
+    return (SvgMatrix *)MemLock(contextP->transformStackH);
+}
+
+static void SvgXformStackUnlock(SvgImportContext *contextP, SvgMatrix *stack)
+{
+    if (stack != NULL && contextP->transformStackH != NullHandle) {
+        MemUnlock(contextP->transformStackH);
+    }
+}
+
+static void SvgMatIdentity(SvgMatrix *m);
+
+static void SvgMatMul(const SvgMatrix *m1, const SvgMatrix *m2, SvgMatrix *r);
+
+static Boolean SvgXformGroupPeek(SvgImportContext *contextP, SvgMatrix *out)
+{
+    SvgMatrix *stack;
+
+    if (contextP->transformDepth == 0) {
+        return FALSE;
+    }
+
+    stack = SvgXformStackLock(contextP);
+    if (stack == NULL) {
+        return FALSE;
+    }
+
+    *out = stack[contextP->transformDepth-1];
+    SvgXformStackUnlock(contextP, stack);
+    return TRUE;
+}
+
+/* ---- constructors ---- */
+
+static void SvgMatIdentity(SvgMatrix *m)
+{
+    m->a = m->d = WWFIXED_ONE;
+    m->b = m->c = m->e = m->f = MakeWWFixed(0);
+}
+
+static void SvgMatTranslate(SvgMatrix *m, WWFixedAsDWord tx, WWFixedAsDWord ty)
+{
+    SvgMatIdentity(m);
+    m->e = tx; m->f = ty;
+}
+
+static void SvgMatScale(SvgMatrix *m, WWFixedAsDWord sx, WWFixedAsDWord sy)
+{
+    SvgMatIdentity(m);
+    m->a = sx; m->d = sy;
+}
+
+static void SvgMatRotateDeg(SvgMatrix *m, WWFixedAsDWord deg)
+{
+    WWFixedAsDWord c, s;
+    c = GrQuickCosine(deg);
+    s = GrQuickSine(deg);
+    m->a = c;  m->c = (WWFixedAsDWord)(-(sdword)s);
+    m->b = s;  m->d = c;
+    m->e = MakeWWFixed(0);
+    m->f = MakeWWFixed(0);
+}
+
+static void SvgMatSkewX(SvgMatrix *m, WWFixedAsDWord deg)
+{
+    WWFixedAsDWord t;
+    WWFixedAsDWord c, s;
+    c = GrQuickCosine(deg);
+    s = GrQuickSine(deg);
+    t = (sdword)c ? GrSDivWWFixed(s, c) : MakeWWFixed(0);
+    SvgMatIdentity(m);
+    m->c = t; /* x' = x + tan(a)*y */
+}
+
+static void SvgMatSkewY(SvgMatrix *m, WWFixedAsDWord deg)
+{
+    WWFixedAsDWord t;
+    WWFixedAsDWord c, s;
+    c = GrQuickCosine(deg);
+    s = GrQuickSine(deg);
+    t = (sdword)c ? GrSDivWWFixed(s, c) : MakeWWFixed(0);
+    SvgMatIdentity(m);
+    m->b = t; /* y' = y + tan(a)*x */
+}
+
+/* r = m2 composed with m1 (apply m1 then m2) */
+static void SvgMatMul(const SvgMatrix *m1, const SvgMatrix *m2, SvgMatrix *r)
+{
+    WWFixedAsDWord a, b, c, d, e, f;
+
+    a = GrAddWWFixed(GrMulWWFixed(m2->a, m1->a), GrMulWWFixed(m2->c, m1->b));
+    b = GrAddWWFixed(GrMulWWFixed(m2->b, m1->a), GrMulWWFixed(m2->d, m1->b));
+    c = GrAddWWFixed(GrMulWWFixed(m2->a, m1->c), GrMulWWFixed(m2->c, m1->d));
+    d = GrAddWWFixed(GrMulWWFixed(m2->b, m1->c), GrMulWWFixed(m2->d, m1->d));
+    e = GrAddWWFixed(GrAddWWFixed(GrMulWWFixed(m2->a, m1->e), GrMulWWFixed(m2->c, m1->f)), m2->e);
+    f = GrAddWWFixed(GrAddWWFixed(GrMulWWFixed(m2->b, m1->e), GrMulWWFixed(m2->d, m1->f)), m2->f);
+
+    r->a = a; r->b = b; r->c = c; r->d = d; r->e = e; r->f = f;
+}
+
+/* apply to a POSITION (includes translation) */
+void SvgXformApplyPoint(sword *xP, sword *yP, const SvgMatrix *m)
+{
+    WWFixedAsDWord X, Y, xw, yw;
+
+    X = ((WWFixedAsDWord)((sdword)(*xP))) << 16;
+    Y = ((WWFixedAsDWord)((sdword)(*yP))) << 16;
+
+    xw = GrAddWWFixed(GrAddWWFixed(GrMulWWFixed(m->a, X), GrMulWWFixed(m->c, Y)), m->e);
+    yw = GrAddWWFixed(GrAddWWFixed(GrMulWWFixed(m->b, X), GrMulWWFixed(m->d, Y)), m->f);
+
+    *xP = SvgGeomWWFixedToSWordRound(xw);
+    *yP = SvgGeomWWFixedToSWordRound(yw);
+}
+
+/* ---- parse transform attribute into USER-SPACE matrix ---- */
+
+static Boolean SvgXformParseNumber(const char **sPP, WWFixedAsDWord *out,
+                                   Boolean allowComma)
+{
+    const char *startP;
+    const char *s;
+    Boolean hadSpace;
+
+    s = *sPP;
+    hadSpace = FALSE;
+    while (*s == ' ' || *s == '\t' || *s == '\r' || *s == '\n')
+    {
+        hadSpace = TRUE;
+        s++;
+    }
+    if (allowComma && *s == ',')
+    {
+        s = SvgParserSkipWS(s + 1);
+    }
+    else if (allowComma && !hadSpace && *s != '+' && *s != '-')
+    {
+        return FALSE;
+    }
+    startP = s;
+    s = SvgUtilParseWWFixed16_16(s, out);
+    if (s == startP) return FALSE;
+    *sPP = s;
+    return TRUE;
+}
+
+/* outUser gets the element's matrix in USER units (no viewBox). */
+Boolean SvgXformParseAttrUser(SvgImportContext *contextP, const char *tag, SvgMatrix *outUser)
+{
+    char *buf;
+    const char *s;
+    SvgMatrix acc;
+    SvgAttrResult attrResult;
+    const char *valueP;
+    word valueLength;
+
+    buf = contextP->work1;
+    SvgMatIdentity(&acc);
+
+    attrResult = SvgParserGetAttrSpan(tag, "transform", &valueP, &valueLength,
+                                      sizeof(contextP->work1));
+    if (attrResult == SVG_ATTR_MISSING) {
+        *outUser = acc;
+        return TRUE;
+    }
+    if (attrResult != SVG_ATTR_VALID) return FALSE;
+    if (valueLength != 0) memcpy(buf, valueP, valueLength);
+    buf[valueLength] = 0;
+
+    LOG_STR(contextP, "[XFORM] attr", buf);
+
+    s = buf;
+    while (*s) {
+        WWFixedAsDWord v1, v2, v3;
+        SvgMatrix t;
+        const char *p;
+
+        s = SvgParserSkipWS(s);
+        if (!*s) break;
+
+        if (!strncmp(s, "matrix(", 7)) {
+            WWFixedAsDWord a,b,c,d,e,f;
+            p = s + 7;
+            if (!SvgXformParseNumber(&p, &a, FALSE) ||
+                !SvgXformParseNumber(&p, &b, TRUE) ||
+                !SvgXformParseNumber(&p, &c, TRUE) ||
+                !SvgXformParseNumber(&p, &d, TRUE) ||
+                !SvgXformParseNumber(&p, &e, TRUE) ||
+                !SvgXformParseNumber(&p, &f, TRUE)) return FALSE;
+            p = SvgParserSkipWS(p);
+            if (*p != ')') return FALSE;
+            p++;
+            t.a=a; t.b=b; t.c=c; t.d=d; t.e=e; t.f=f;
+            SvgMatMul(&t, &acc, &acc);  /* SVG post-multiplies transform lists */
+            LOGF(("[XFORM]", "matrix a=%ld b=%ld c=%ld d=%ld e=%ld f=%ld",
+                    (sdword)a,(sdword)b,(sdword)c,(sdword)d,(sdword)e,(sdword)f));
+            s = p;
+        } else if (!strncmp(s, "translate(", 10)) {
+            p = s + 10;
+            if (!SvgXformParseNumber(&p, &v1, FALSE)) return FALSE;
+            if (*SvgParserSkipWS(p) != ')') {
+                if (!SvgXformParseNumber(&p, &v2, TRUE)) return FALSE;
+            } else { v2 = MakeWWFixed(0); }
+            p = SvgParserSkipWS(p);
+            if (*p != ')') return FALSE;
+            p++;
+            SvgMatTranslate(&t, v1, v2);
+            SvgMatMul(&t, &acc, &acc);
+            LOGF(("[XFORM]", "translate %ld,%ld", (sdword)v1, (sdword)v2));
+            s = p;
+        } else if (!strncmp(s, "scale(", 6)) {
+            p = s + 6;
+            if (!SvgXformParseNumber(&p, &v1, FALSE)) return FALSE;
+            if (*SvgParserSkipWS(p) != ')') {
+                if (!SvgXformParseNumber(&p, &v2, TRUE)) return FALSE;
+            } else { v2 = v1; }
+            p = SvgParserSkipWS(p);
+            if (*p != ')') return FALSE;
+            p++;
+            SvgMatScale(&t, v1, v2);
+            SvgMatMul(&t, &acc, &acc);
+            LOGF(("[XFORM]", "scale %ld,%ld", (sdword)v1, (sdword)v2));
+            s = p;
+        } else if (!strncmp(s, "rotate(", 7)) {
+            p = s + 7;
+            if (!SvgXformParseNumber(&p, &v1, FALSE)) return FALSE;
+            v2 = MakeWWFixed(0);
+            v3 = MakeWWFixed(0);
+            if (*SvgParserSkipWS(p) != ')') {
+                /* rotate(a, cx, cy) == T(cx,cy) * R(a) * T(-cx,-cy) */
+                SvgMatrix T1, R, T2, tmp;
+                if (!SvgXformParseNumber(&p, &v2, TRUE) ||
+                    !SvgXformParseNumber(&p, &v3, TRUE))
+                    return FALSE;
+                p = SvgParserSkipWS(p);
+                if (*p != ')') return FALSE;
+                p++;
+
+                SvgMatTranslate(&T1, v2, v3);
+                SvgMatRotateDeg(&R, v1);
+                SvgMatTranslate(&T2, (WWFixedAsDWord)(-(sdword)v2), (WWFixedAsDWord)(-(sdword)v3));
+
+                /* Need T1, R, T2; SvgMatMul(m1,m2,r) applies m1 then m2. */
+                SvgMatMul(&T2, &R, &tmp);   /* tmp = R after T2 */
+                SvgMatMul(&tmp, &T1, &t);   /* t = T1 after tmp */
+            } else {
+                p = SvgParserSkipWS(p);
+                if (*p == ')') p++;
+                SvgMatRotateDeg(&t, v1);
+            }
+            SvgMatMul(&t, &acc, &acc);
+            LOGF(("[XFORM]", "rotate deg=%ld cx=%ld cy=%ld",
+                    (sdword)v1, (sdword)v2, (sdword)v3));
+            s = p;
+        } else if (!strncmp(s, "skewX(", 6)) {
+            p = s + 6;
+            if (!SvgXformParseNumber(&p, &v1, FALSE))
+                return FALSE;
+            p = SvgParserSkipWS(p);
+            if (*p != ')') return FALSE;
+            p++;
+            SvgMatSkewX(&t, v1);
+            SvgMatMul(&t, &acc, &acc);
+            s = p;
+        } else if (!strncmp(s, "skewY(", 6)) {
+            p = s + 6;
+            if (!SvgXformParseNumber(&p, &v1, FALSE))
+                return FALSE;
+            p = SvgParserSkipWS(p);
+            if (*p != ')') return FALSE;
+            p++;
+            SvgMatSkewY(&t, v1);
+            SvgMatMul(&t, &acc, &acc);
+            s = p;
+        } else {
+            return FALSE;
+        }
+    }
+    *outUser = acc;
+    return TRUE;
+}
+
+/* ------- group stuff -----------*/
+
+/* Called on <g ...> */
+Boolean SvgXformGroupPush(SvgImportContext *contextP, const char *tag)
+{
+    SvgMatrix parent;
+    SvgMatrix self;
+    SvgMatrix out;
+    SvgMatrix *stack;
+
+    stack = SvgXformStackLock(contextP);
+    if (stack == NULL)
+    {
+        return FALSE;
+    }
+    if (contextP->transformDepth > 0) {
+        parent = stack[contextP->transformDepth-1];
+    } else {
+        SvgMatIdentity(&parent);
+    }
+
+    if (!SvgXformParseAttrUser(contextP, tag, &self))
+    {
+        SvgXformStackUnlock(contextP, stack);
+        return FALSE;
+    }
+    SvgMatMul(&self, &parent, &out);           /* apply self, then parent */
+    if (contextP->transformDepth >= SVG_XFORM_GSTACK_MAX)
+    {
+        SvgXformStackUnlock(contextP, stack);
+        return FALSE;
+    }
+
+    stack[contextP->transformDepth++] = out;
+    SvgXformStackUnlock(contextP, stack);
+    return TRUE;
+}
+
+/* Called on </g> */
+void SvgXformGroupPop(SvgImportContext *contextP)
+{
+    if (contextP->transformDepth > 0) contextP->transformDepth--;
+}
+
+/* Build WORLD-SPACE CTM from ViewMatrix, Parent, and Element.
+   If parentCTM==NULL, use current group CTM (if any). */
+Boolean SvgXformBuildWorld(SvgImportContext *contextP, const char *tag, const SvgMatrix *parentCTM,
+                           SvgMatrix *outWorld)
+{
+    SvgMatrix vm, elem, tmp;
+    const SvgMatrix *par;
+    SvgMatrix stackParent;
+
+    SvgViewGetMatrix(contextP, &vm.a, &vm.b, &vm.c, &vm.d, &vm.e, &vm.f);
+    if (!SvgXformParseAttrUser(contextP, tag, &elem)) return FALSE;
+
+    par = parentCTM;
+    if (!par) {
+        if (SvgXformGroupPeek(contextP, &stackParent)) {
+            par = &stackParent;
+        }
+    }
+
+    if (par)
+    {
+        SvgMatMul(&elem, par, &tmp);  /* apply element, then parent */
+        SvgMatMul(&tmp, &vm, outWorld);
+    }
+    else
+    {
+        SvgMatMul(&elem, &vm, outWorld);
+    }
+    return TRUE;
+}
+
+#ifdef SVG_XFORM_ENABLE_SELF_TEST
+Boolean SvgXformRunSelfTest(void)
+{
+    SvgMatrix m;
+    sword x;
+    sword y;
+
+    x = 8;
+    y = 4;
+    if (!SvgXformParseAttrUser(contextP,
+        "g transform=\"translate(18,0) scale(0.25)\"", &m)) return FALSE;
+    SvgXformApplyPoint(&x, &y, &m);
+    return (x == 20 && y == 1);
+}
+#endif

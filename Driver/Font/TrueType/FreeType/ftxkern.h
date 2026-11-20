@@ -114,31 +114,37 @@ extern "C" {
 
   /* kerning subtable */
 
-  struct  TT_Kern_Subtable_
-  {
-    TT_Bool    loaded;   /* boolean; indicates whether the table is   */
-                         /* loaded                                    */
-    TT_UShort  version;  /* table version number                      */
-    TT_Long    offset;   /* file offset of table                      */
-    TT_UShort  length;   /* length of table, _excluding_ header       */
-    TT_Byte    coverage; /* lower 8 bit of the coverage table entry   */
-    TT_Byte    format;   /* the subtable format, as found in the      */
-                         /* higher 8 bits of the coverage table entry */
+struct TT_Kern_Subtable_
+{
+    /* Keep the frequently accessed byte fields first. */
+    TT_Byte  loaded;
+    TT_Byte  format;
+
+#ifdef TT_CONFIG_OPTION_SUPPORT_OPTIONAL_FIELDS
+    TT_UShort  version;
+    TT_Byte    coverage;
+#endif
+
+    TT_Long  offset;
+
     union
     {
-      TT_Kern_0  kern0;
+        TT_Kern_0  kern0;
+
 #ifdef TT_CONFIG_OPTION_SUPPORT_KERN2
-      TT_Kern_2  kern2;
+        TT_Kern_2  kern2;
 #endif
     } t;
-  };
+};
 
   typedef struct TT_Kern_Subtable_  TT_Kern_Subtable;
 
 
   struct  TT_Kerning_
   {
+#ifdef TT_CONFIG_OPTION_SUPPORT_OPTIONAL_FIELDS
     TT_UShort          version;  /* kern table version number. starts at 0 */
+#endif
     TT_UShort          nTables;  /* number of tables                       */
 
     TT_Kern_Subtable*  tables;   /* the kerning sub-tables                 */
@@ -148,7 +154,7 @@ extern "C" {
 
 
 
-  /***************** high-level API extension **************************/
+  /***************** high-level API extension ***************************/
 
 
   /* Note on the implemented mechanism:                                 */

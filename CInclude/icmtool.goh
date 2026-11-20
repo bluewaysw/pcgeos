@@ -1,0 +1,354 @@
+/******************************************************************************
+ *
+ * PROJECT:	Icon Editor and more Tool Library
+ *  FILE:       icmtool.goh
+ *
+ *  AUTHOR:     Rainer Bettsteller 07/2026
+ *
+ *  REVISION HISTORY:
+ *      Name    Date        Description
+ *      ----    ----        -----------
+ *	RainerB 09/07/2026  initial revision
+ *	RainerB 10/17/2026  version 1.0
+ *
+ *
+ * DESCRIPTION:	This library has two parts.
+ *		Part 1: Generally useful classes and utility routines.
+ *
+ *			WordValueClass		-- Enter-word sized value
+ *			SeparationLineClass	-- Draw a thin colored line in the UI
+ *			SmartTextClass		-- Intelligent text class
+ *			PaletteColorItemGroupClass -- Able to create colored
+ *						vis-monikers for its children.
+ *
+ *		  	ITDrawFullPalette 	-- Draw a palette as colored squares
+ *		  	ITPaletteIndexFromMousePos -- Find palette index for a palette,
+ *		  				drawn with ITDrawFullPalette()
+ *
+ *		  	ITGetHSV8BitFromColor 	-- Convert RGB values to HSV
+ *		  	ITGetColorFromHSV8Bit	-- Convert HSV values to RGB
+ *
+ *		Part 2: Specialized tool routines for the Icon Editor
+ *
+ *		  	ITWriteIconAsm 	-- Write VisMoniker data as ui-code to a file
+ *		  	ITWriteIconGOC 	-- Write VisMoniker data as GOC code to a file
+ *		  	ITWritePtrAsm 	-- Write the .ui source code for a mouse pointer to a file
+ *		  	ITWritePtrGOC 	-- Write the GOC source code for a mouse pointer to a file
+ *
+ *****************************************************************************/
+
+@deflib icmtool
+
+@include "bmptools.goh"		/* we need the PaletteEntry structure, but no routines from this library */
+
+#define RS_EXPORT _export _pascal
+
+/* ===================================================================================== *
+ * Exported Classes
+/* ===================================================================================== */
+
+/*---------------------------------------------------------------------------
+  Class definition WordValueClass
+
+    Objects of this class support positive integers up to the word limit,
+    required for entering the token ID.
+    Initial release.
+
+  The object works with fixed values for minimum and maximum.
+  Only the lower part of the dword sized GVLI_value instance variable is used
+  Attention!
+  	Use MSG_xx_GET_VALUE / SET_VALUE to set and read the values.
+    	MSG_xx_GET_INTEGER_VALUE / SET_INTEGER_VALUE does not work in this inital implementation.
+ ---------------------------------------------------------------------------*/
+@class	WordValueClass, GenValueClass;
+	@default	GVLI_maximum = (dword) 0xFFFF;
+	@default	GVLI_increment = (dword)1;
+@endc
+
+/*---------------------------------------------------------------------------
+ 	Definition of SeparationLineClass
+ 	Objects of this class draw a colored one-pixel line for a better UI look
+
+ Typical UI definition
+ @object SeparationLineClass DemoColorLine = {
+     HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+     HINT_INITIAL_SIZE = { SST_PIXELS | 1, SST_PIXELS | 1, 1};
+     HINT_MAXIMUM_SIZE = { (SST_PCT_OF_FIELD_WIDTH | PCT_100), SST_PIXELS | 1, 1};
+ }
+
+  ---------------------------------------------------------------------------*/
+@class SeparationLineClass, GenInteractionClass;
+    @instance int SLI_color = C_BLUE;
+    			/* color of the line. May be changed in UI code */
+
+    @message void MSG_SL_SET_COLOR(int color);
+    @message int  MSG_SL_GET_COLOR();
+@endc
+
+/*---------------------------------------------------------------------------
+ 	Definition of SmartTextClass
+ 	- monitors it's own empty status
+ 	- monitors text changes
+ 	- Intercepts Ctrl-C, Ctrl-V and Ctrl-X to work with the clipboard
+  ---------------------------------------------------------------------------*/
+@class SmartTextClass, GenTextClass;
+    @instance optr STI_enableObj = 0;
+    	/* This object becomes enabled when the object contains text
+    	 * and not enabled when the text field is empty */
+
+    @instance optr STI_textChangeOutput = 0;
+    @instance Message STI_textChangeMsg = 0;
+    @prototype void SMART_TEXT_CHANGE_MSG();
+    	/* The object specified in STI_textChangeOutput receives the message
+    	 * specified in STI_textChangeMsg when the user enters something via
+    	 * the keyboard. Drag-and-drop with the mouse is not recognized.
+	 * The STI_textChangeMsg message should be defined using the
+	 * prototype SMART_TEXT_CHANGE_MSG. */
+
+
+    @message void MSG_STXT_SET_ENABLE_OBJECT(optr obj);
+    	/* The new object will be enabled or disabled accordingly.
+ 	 * The old object (if any) remains unaffected. */
+    @message optr MSG_STXT_GET_ENABLE_OBJECT();
+
+    @message void MSG_STXT_SET_TEXT_CHANGE_OUTPUT_OBJECT(optr obj);
+    @message optr MSG_STXT_GET_TEXT_CHANGE_OUTPUT_OBJECT();
+
+    @message void MSG_STXT_SET_TEXT_CHANGE_OUTPUT_MSG(Message msg);
+    @message Message MSG_STXT_GET_TEXT_CHANGE_OUTPUT_MSG();
+
+@endc
+
+
+/*---------------------------------------------------------------------------
+ 	Definition of PaletteColorItemGroupClass
+ 	This class can create colored vis-monikers for its children. These are
+ 	areas, lines, ellipses (or circles) or a short text whose color depends
+ 	on the current palette. The identifier of the item is used as
+ 	palette index.
+  ---------------------------------------------------------------------------*/
+@class PaletteColorItemGroupClass, GenItemGroupClass;
+
+    @message void MSG_PCIG_CREATE_VIS_MONIKERS(int type, int w, int h, PaletteEntry *palPtr);
+	/*  Set new visMoniker for all of the children.
+ 	 *  The items will be resized according to the parameters w and h.
+ 	 *  The identifier of the item is used as palette index to specify the monikers color.
+	 *  Parameters:	type: PCIG_MONIKER_~value, see below
+	 *		w, h: new width and height of the items
+	 *		palPtr: pointer to the palette (a list of PaletteEntries)
+	 *			pass zero to use the GEOS standard palette
+	 */
+
+    	#define PCIG_MONIKER_LINE	1	/* diagonal line, fills full item  */
+    	#define PCIG_MONIKER_LINE_45	2	/* 45° line  - does not fill the whole item
+    						 * if width != height */
+    	#define PCIG_MONIKER_AREA	3	/* full sized rectangle */
+    	#define PCIG_MONIKER_SQUARE	4	/* square - does not fill the whole item
+    						 * if width != height */
+    	#define PCIG_MONIKER_ELLIPSE	5	/* full sized ellipse */
+    	#define PCIG_MONIKER_CIRCLE	6	/* circle - does not fill the whole item
+    						 * if width != height */
+    	#define PCIG_MONIKER_TEXT	7	/* Text "Tt", centered */
+@endc
+
+
+/* ===================================================================================== *
+ * 	Drawing a palette
+/* ===================================================================================== */
+
+
+/*--------------------- ITDrawFullPalette ---------------------
+ *	Purpose:	Draw the colors of a palette with 256 colors.
+ *	Concept:	The colors are drawn as two blocks of squares:
+ *			First 16 colors are drawn centered on top, the next 240 colors
+ *			are drawn as a 24x10 block below.
+ *			Between the blocks is a space of bottomBlockSize/2 height.
+ *
+ *	Parameters:	gstate:	 GState to draw to
+ *			palette: Palette (pointer to a list of PaletteEntry values)
+ *			numColors: number of valid entries in the palette, usually 16
+ *				   or 256, but other values are allowed too.
+ *				   Colors with a greater index were drawn in gray.
+ *		        highlightIndex: highlight this palette index
+ *			topBlockSize:   size of the squares for the first 16 colors
+ *			bottomBlockSize:size of the squares for the other 240 colors
+ *			marginSize:     space around all blocks
+ *
+ *	Hint:		Use ITPaletteIndexFromMousePos() to find out the corresponding
+ *			index for given (mouse) coordinates.
+ *
+ *	Return:	-
+ ---------------------------------------------------------------------------*/
+extern void RS_EXPORT ITDrawFullPalette(GStateHandle gstate, PaletteEntry *palette, int numColors, int highlightIndex,
+				int topBlockSize, int bottomBlockSize, int marginSize);
+
+/*--------------------- ITPaletteIndexFromMousePos ---------------------
+ *  Purpose:	This routine works togehter with ITDrawFullPalette():
+ *		It translates given mouse coordinates to an index for the case
+ *		that the palette has been drawn with ITDrawFullPalette()
+ *  Context:
+ *  Parameters:	xPosition, yPosition: mouse position
+ *	The next parameters must fit to the same parameters, given to ITDrawFullPalette:
+ *		topBlockSize:   size of the squares for the first 16 colors
+ *		bottomBlockSize:size of the squares for the other 240 colors
+ *		marginSize:     space around all blocks
+ *  Return:	index of the color at the mouse coordinates
+ *		(-1) if there was no colored square at the mouse coordinates
+ ---------------------------------------------------------------------------*/
+extern int RS_EXPORT ITPaletteIndexFromMousePos(int xPosition, int yPosition, int topBlockSize,
+					int bottomBlockSize, int marginSize);
+
+
+/*===========================================================================
+	Conversion RGB <-> HSV
+ ===========================================================================*/
+
+
+/*--------------------- ITGetHSV8BitFromColor ------------------------------------------------------
+ *  Purpose:	Convert RGB values to HSV - HSV as 8-bit integer value
+ *  Context:	Algorithm from: Introduction to CompuTer Graphics by James Foley
+ *		German: "Grundlagen der Computergraphik", S. 467ff
+ *		It can also be found all over the web.
+ *  Strategy:
+ *	Typically, the value for h ranges from 0° to 360°, where 0° and 360° are identical.
+ *	However, our value range is 0 to 256, where 256 corresponds to zero. Similarly,
+ *	s and v typically range from 0 to 1, but in our case they range from zero to 255.
+ *	The algorithm has been adjusted accordingly and implemented completely using integer arithmetic.
+ *	The routine has been runtime optimized.
+ *  Note:
+ *	Repeatedly converting back and forth between RGB and HSV may result in different values
+ *	because the precision of the input and output values is limited to 8 bits, which leads to
+ *	rounding errors.
+ *  Parameters:	h_ptr:	return: hue value		(0 ... 255)
+ *		s_ptr:	return: saturation value	(0 ... 255)
+ *		v_ptr:	return: brightness value	(0 ... 255)
+ *		color:	Color to convert		(PaletteEntry)
+ *  Return:	-
+ ---------------------------------------------------------------------------*/
+extern void RS_EXPORT ITGetHSV8BitFromColor(word *h, word *s, word *v, PaletteEntry color );
+
+/*--------------------- ITGetColorFromHSV8Bit ---------------------
+ *  Purpose:	Convert HSV value (integer, 0..255) to RGB (0..255)
+ *  Context:	Algorithm from: Introduction to Compuer Graphics by James Foley
+ *		German: "Grundlagen der Computergraphik", S. 467ff
+ *		It can also be found all over the web.
+ *  Strategy:
+ *	Typically, the value for h ranges from 0° to 360°, where 0° and 360° are identical.
+ *	However, our value range is 0 to 256, where 256 corresponds to zero. Similarly,
+ *	s and v typically range from 0 to 1, but in our case they range from zero to 255.
+ *	The algorithm has been adjusted accordingly and implemented completely using integer arithmetic.
+ *	The routine has been runtime optimized.
+ *  Note:
+ *	Repeatedly converting back and forth between RGB and HSV may result in different values
+ *	because the precision of the input and output values is limited to 8 bits, which leads to
+ *	rounding errors.
+ *  Parameters:	h:	hue value		(0 ... 255)
+ *		s:	saturation value	(0 ... 255)
+ *		v:	brightness value	(0 ... 255)
+ *		color:	return: RGB color	(PaletteEntry)
+ *  Return:	-
+ ---------------------------------------------------------------------------*/
+extern void RS_EXPORT ITGetColorFromHSV8Bit(PaletteEntry *color, word h, word s, word v);
+
+
+/* ===================================================================================== *
+ * 	Part 2: Support routines for the Icon Editor
+ *		These are very specialized routines for writing icons as
+ *		source code (GOC or Asm) to a file.
+ *		These routines and their associated chunks were moved to this library
+ *		because, otherwise, the Icon Editor would not compile due to a
+ *		(currently 09/2026 unfixed) glue problem.
+/* ===================================================================================== */
+
+
+typedef WordFlags WriteSourceHeaderType;
+	/*
+	 * Constants for the 'headerFormat' parameter of
+	 * ITWriteIconAsm and ITWriteIconGOC and to use as
+	 * identifier for GenItems.
+	 */
+    #define WSHT_VIS_MONIKER	1
+    #define WSHT_BITMAP		2
+    #define WSHT_GSTRING	3
+    #define WSHT_PTR_IMAGE	4
+    #define WSHT_DEFAULT_HEADER		WSHT_VIS_MONIKER
+
+/*--------------------- ITWriteIconAsm ---------------------
+ *  Purpose:	Write Vismoniker data as ui-code (should be placed in a *.ui file)
+ *		The moniker must be a VisMonikerWithGString and the
+ *		GString must be a bitmap
+ *  Context:	This routine is essentially a support routine for
+ *		the IconEditor. See IconEditor code for detailed
+ *		information and an example of how to use it.
+ *  Strategy:	See code
+ *  Parameters:	fh:	destination file
+ *		dataPtr:pointer to VisMonikerWithGString structure
+ *		monikerName: name of the moniker, like AppVGAMoniker
+ *		monikerSize: byte size of the whole moniker
+ *		vmlet:	VisMonikerListEntryType record
+ *		headerFormat: pass
+ *			WSHT_VIS_MONIKER: write a @visMoniker structure
+ *			WSHT_GSTRING:	  write a @chunk with a GString
+ *			WSHT_BITMAP:	  write a @chunk with a bitmap
+ *			Do not pass WSHT_PTR_IMAGE - use ITWritePtrAsm instead
+ *  Return:	-
+ ---------------------------------------------------------------------------*/
+extern void RS_EXPORT ITWriteIconAsm(FileHandle fh, byte *dataPtr, char *monikerName,
+		VisMonikerListEntryType vmlet, int monikerSize, WriteSourceHeaderType headerFormat);
+
+
+/*--------------------- ITWriteIconGOC ---------------------
+ *  Purpose:	Write Vismoniker data as GOC code to a file
+ *		The moniker must be a VisMonikerWithGString and the
+ *		GString must be a bitmap
+ *  Context:	This routine is essentially a support routine for
+ *		the IconEditor. See IconEditor code for detailed
+ *		information and an example of how to use it.
+ *  Strategy:	See code
+ *  Parameters:	fh:	destination file
+ *		dataPtr:pointer to VisMonikerWithGString structure
+ *		monikerName: name of the moniker, like AppVGAMoniker
+ *		monikerSize: byte size of the whole moniker
+ *		vmlet:	VisMonikerListEntryType record
+ *		headerFormat: pass
+ *			WSHT_VIS_MONIKER: write a @visMoniker structure
+ *			WSHT_GSTRING:	  write a @chunk with a GString
+ *			WSHT_BITMAP:	  write a @chunk with a bitmap
+ *			Do not pass WSHT_PTR_IMAGE - use ITWritePtrGOC instead
+ *  Return:	-
+ ---------------------------------------------------------------------------*/
+extern void RS_EXPORT ITWriteIconGOC(FileHandle fh, byte *dataPtr, char *monikerName,
+		VisMonikerListEntryType vmlet, int monikerSize, WriteSourceHeaderType headerFormat);
+
+
+/*--------------------- ITWritePtrGOC ---------------------
+ *  Purpose:	Write the GOC source code for a mouse pointer to a file
+ *  Context:	This routine is essentially a support routine for
+ *		the IconEditor. See IconEditor code for detailed
+ *		information and an example of how to use it.
+ *  Strategy:	See code
+ *  Parameters:	fh:	file to write to
+ *		dataPtr: pointer to binary data of the mouse pointer
+ *		pointerName: name for the pointer chunk
+ *		size:	size of one plane of the pointer image
+ *  Return:	-
+ ---------------------------------------------------------------------------*/
+extern void RS_EXPORT ITWritePtrGOC(FileHandle fh, byte *dataPtr, char *pointerName, int size);
+
+
+/*--------------------- ITWritePtrAsm ---------------------
+ *  Purpose:	Write the .ui source code for a mouse pointer to a file
+ *  Context:	This routine is essentially a support routine for
+ *		the IconEditor. See IconEditor code for detailed
+ *		information and an example of how to use it.
+ *  Strategy:	See code
+ *  Parameters:	fh:	file to write to
+ *		dataPtr: pointer to binary data of the mouse pointer
+ *		pointerName: name for the pointer chunk
+ *		size:	size of one plane of the pointer image
+ *  Return:	-
+ ---------------------------------------------------------------------------*/
+extern void RS_EXPORT ITWritePtrAsm(FileHandle fh, byte *dataPtr, char *pointerName, int size);
+
+
+@endlib

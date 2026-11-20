@@ -1,0 +1,616 @@
+/**************************************************************************
+ *
+ * PROJECT:	Icon Editor	(GOC Version)
+ * FILE:	impex.goc
+ *
+ *		This file deal with import/export of icon set via clipboard
+ *
+ *		This project is inspired by the Icon Editor by Steve Yegge, 1992 - 1994
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	RainerB 06/17/2026	Initial revision
+ *
+ * Description of clipboard formats
+ * --------------------------------
+ * We copy three formats into the clipboard:
+ *	- A GString that holds the image for the current icon (CIF_GRAPHICS_STRING)
+ *	- An ISetTransferTree in a format that the old icon editor can read (CIF_ICON_LIST)
+ *        This tree does not contain the extra blocks for the iSet and the icons
+ *	- An ISetTransferTree that contains all information from the current icon
+ *	  editor (CIF_EXT_ICON_LIST)
+ *
+ *  The old icon editor copies the first two formats to the clipboard. It can read
+ *  the CIF_ICON_LIST format.
+ *  We can read CIF_EXT_ICON_LIST from the clipboard and, if there is no CIF_EXT_ICON_LIST
+ *  format present, we can read the old CIF_ICON_LIST format.
+ *
+ * Structure of the ISetTransferTree:
+ * ----------------------------------
+ *
+ *                 +---------------------+---------+---------+---------+
+ *   Head block:   | VMChainTree header  | VMChain | VMChain | VMChain |
+ *                 | VMCT_count = nISets | iSet 1  | iSet 2  | iSet 3  |
+ *		   | No extra data       |         |         |         |
+ *                 +---------------------+---------+---------+---------+
+ *                             nISet = Number of iSets to copy
+ *                             Every iSet is stored in it's own VMChain
+ *
+ *   iSet VMChain for CIF_ICON_LIST:
+ *   +---------------------+-------------+------------+----------+----------+----------+
+ *   | VMChainTree header  | data:       | data for   | VMChain  | VMChain  | VMChain  |
+ *   | VMCT_count = nIcons | ISetHeader� | each icon: | Bitmap 1 | Bitmap 2 | Bitmap 3 |
+ *   |                     | 	         | IconEntry� |          |          |          |
+ *   +---------------------+-------------+------------+----------+----------+----------+
+ *           nIcons = Number of icons in that iSet
+ *           For every icon there is a VMChain that points to the bitmap
+ *           � the _extraBlock and _bitmap fields are cleared
+ *
+ *   iSet VMChain for CIF_EXT_ICON_LIST:
+ *                    THis differs from CIF_ICON_LIST by adding new VMChain enries for
+ *                    the extra blocks. This also requires VMCT_count to be updated.
+ *   +---------------------+-------------+------------+------------+----------+------------+----------+------------+
+ *   | VMChainTree header  | data:       | data for   | VMChain    | VMChain  | VMChain    | VMChain  | VMChain    |
+ *   | VMCT_count =        | ISetHeader� | each icon: | ISetHeader | Bitmap 1 | extraBlock | Bitmap 2 | extraBlock |
+ *   |        2*nIcons + 1 | 	         | IconEntry� | extraBlock |          | Icon 1     |          | Icon 2     |
+ *   +---------------------+-------------+------------+------------+----------+------------+----------+------------+
+ *           nIcons = Number of icons in that iSet
+ *           For every icon there two VMChains; one points to the bitmap, the other to the extra Block
+ *           � the _extraBlock and _bitmap fields are cleared
+ *
+
+ **************************************************************************/
+
+/*  Standard include files */
+@include <stdapp.goh>
+@include <Ansi/stdlib.h>
+@include <Ansi/stdio.h>
+@include <Ansi/string.h>
+
+@include "iconed.goh"
+@include "UI/appui.goh"
+@include "rsftool.goh"
+@include "initfile.h"
+
+
+/*---------------------------------------------------------------------------
+	Global Variables and local headers
+ ---------------------------------------------------------------------------*/
+GlobalStruct global;
+
+
+/*+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+	Export Icon Sets to TokenDB File
+ +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++*/
+
+/*-------------------- MSG_DB_VIEWER_GET_MULTIPLE_SELECTIONS ---------------------
+ *  Purpose:	Create a memory block that holds a list of all elected icons
+ *  Context:
+ *  Strategy:
+ *  Parameters:
+ *  Return:	Handle of the block
+ *		Zero if there is no icon selected
+ ---------------------------------------------------------------------------*/
+@extern method IconDBViewerClass, MSG_DB_VIEWER_GET_MULTIPLE_SELECTIONS {
+MemHandle mh;
+int count, n;
+word *table;
+optr child;
+
+    /*
+     * See if there are selected iSets
+     */
+    if (pself->DBVI_numSelected == 0) return 0;
+    count = @call oself::MSG_VIS_COUNT_CHILDREN();
+    if (!count) return 0;
+
+    /*
+     * create table
+     */
+    mh = MemAlloc(sizeof(word) * pself->DBVI_numSelected, HF_SHARABLE | HF_SWAPABLE, HAF_ZERO_INIT);
+    table = MemLock(mh);
+
+    for ( n = 0; n < count; n++ ) {
+        child = @call oself::MSG_VIS_FIND_CHILD_AT_POSITION(n);
+        if ( @call child::MSG_VIS_ISET_GET_SELECTION() ) {
+            *table = n;
+            table++;
+        }
+    }
+
+    MemUnlock(mh);
+    return mh;
+}
+
+/*-------------------- MSG_DB_VIEWER_COPY_ISETS ---------------------
+ *  Purpose:	Copy all selected iSets to the clipboard
+ *  Context:
+ *  Strategy:	We register two (or three) formats
+ *		- An ISetTransferTree in a format that the old icon editor can read (CIF_ICON_LIST)
+ *	          This tree does not contain the extra blocks for the iSet and the icons
+ *		- An ISetTransferTree that contains all information from the current icon
+ *		  editor (CIF_EXT_ICON_LIST)
+ *		- A GString that holds the image for the current icon (CIF_GRAPHICS_STRING)
+ *  Parameters:
+ *  Return:
+ ---------------------------------------------------------------------------*/
+@extern method IconDBViewerClass, MSG_DB_VIEWER_COPY_ISETS {
+TransferBlockID transferItem;
+VMFileHandle	clipboardFile;
+VMBlockHandle 	header;
+MemHandle	mh;
+ClipboardItemHeader	ciHeader, *hPtr;
+ClipboardItemFormatInfo	formatInfo;
+GeodeToken tok = { "ICON", 0 };
+
+
+    /*
+     * Set up ClipboardItemHeader
+     */
+    memset(&ciHeader, 0, sizeof(ClipboardItemHeader));
+    ciHeader.CIH_owner = oself;
+    ciHeader.CIH_flags = TIF_NORMAL;
+    ciHeader.CIH_formatCount = 2;
+@if @COPY_ISET_CREATES_A_GSTRING
+    ciHeader.CIH_formatCount += 1;
+@endif
+    ciHeader.CIH_sourceID = oself;
+
+    MemLock(OptrToHandle(@IconSetClpName));
+    strcpy(ciHeader.CIH_name, LMemDeref(@IconSetClpName));
+    MemUnlock(OptrToHandle(@IconSetClpName));
+
+
+    /*
+     * Set up ClipboardItemFormatInfo array
+     */
+    memset(&formatInfo, 0, sizeof(ClipboardItemFormatInfo));
+    formatInfo.CIFI_renderer = tok;
+
+
+    formatInfo.CIFI_format = FormatIDFromManufacturerAndType(0, CIF_ICON_LIST);
+    formatInfo.CIFI_vmChain = @call oself::MSG_DB_VIEWER_CREATE_ISET_TRANSFER_TREE(CIF_ICON_LIST);
+    ciHeader.CIH_formats[0] = formatInfo;
+
+    formatInfo.CIFI_format = FormatIDFromManufacturerAndType(0, CIF_EXT_ICON_LIST);
+    formatInfo.CIFI_vmChain = @call oself::MSG_DB_VIEWER_CREATE_ISET_TRANSFER_TREE(CIF_EXT_ICON_LIST);
+    ciHeader.CIH_formats[1] = formatInfo;
+
+@if @COPY_ISET_CREATES_A_GSTRING
+    formatInfo.CIFI_format = FormatIDFromManufacturerAndType(0, CIF_GRAPHICS_STRING);
+    formatInfo.CIFI_vmChain = @call oself::MSG_DB_VIEWER_CREATE_TRANSFER_GSTRING();
+    ciHeader.CIH_formats[2] = formatInfo;
+@endif
+
+
+    /*
+     * Alloc header vm block and fill it in
+     * Then register clipboard item
+     */
+    clipboardFile = ClipboardGetClipboardFile();
+    header = VMAlloc(clipboardFile, sizeof(ClipboardItemHeader), 0);
+    hPtr = VMLock(clipboardFile, header, &mh);
+    *hPtr = ciHeader;
+    VMDirty(mh);
+    VMUnlock(mh);
+
+    transferItem = BlockIDFromFileAndBlock(clipboardFile, header);
+    ClipboardRegisterItem(transferItem, TIF_NORMAL);
+
+}
+
+/*-------------------- MSG_DB_VIEWER_CREATE_ISET_TRANSFER_TREE ---------------------
+ *  Purpose:	Convert an iSet to a VMChain for use with clipboard
+ *  Context:
+ *  Strategy:
+ *  Parameters:	format: CIF_ICON_LIST | CIF_EXT_ICON_LIST
+ *  Return:	VMChain containing the complete iSet
+ ---------------------------------------------------------------------------*/
+@extern method IconDBViewerClass, MSG_DB_VIEWER_CREATE_ISET_TRANSFER_TREE {
+MemHandle tableMh, vmMh;
+int *iSetTable, n, size;
+FileHandle	clpFile;
+VMBlockHandle	hBlk;
+VMChainTree	*treePtr;
+VMChain 	chain, *chainTable;
+
+    /*
+     * Get list of selected iSets
+     */
+    tableMh = @call oself::MSG_DB_VIEWER_GET_MULTIPLE_SELECTIONS();
+    if (!tableMh) return 0;
+
+    /*
+     * Create and initialize header block - one VMChain (4 bytes) for each iSet
+     */
+    clpFile = ClipboardGetClipboardFile();
+    size = sizeof(VMChainTree) + sizeof(VMChain) * pself->DBVI_numSelected;
+    hBlk = VMAlloc(clpFile, size, 0);
+
+    treePtr = VMLock(clpFile, hBlk, &vmMh);
+    memset(treePtr, 0, size);
+
+    treePtr->VMCT_meta.VMC_next = VM_CHAIN_TREE;
+    treePtr->VMCT_offset = sizeof(VMChainTree);		// no extra data
+    treePtr->VMCT_count = pself->DBVI_numSelected;
+
+    /*
+     * Create transfer items for each iSet
+     */
+    iSetTable = MemLock(tableMh);
+    chainTable = (VMChain*) (treePtr+1);	/* points directly behind the header */
+
+    for ( n = 0; n < pself->DBVI_numSelected; n++) {
+	chain = @call oself::MSG_DB_VIEWER_CREATE_ISET_VMCHAIN(iSetTable[n], format);
+	chainTable[n] = chain;
+    }
+
+    VMDirty(vmMh);
+    VMUnlock(vmMh);
+    MemFree(tableMh);
+
+    return VMCHAIN_MAKE_FROM_VM_BLOCK(hBlk);
+
+}
+
+
+
+/*-------------------- MSG_DB_VIEWER_CREATE_ISET_VMCHAIN ---------------------
+ *  Purpose:	Convert an iSet to a VMChain for use with clipboard
+ *  Context:
+ *  Strategy:
+ *  Parameters:	iSet:	iSet to convert
+ *		format: CIF_ICON_LIST | CIF_EXT_ICON_LIST
+ *  Return:	VMChain containing the complete iSet
+ *
+ *   iSet VMChain for CIF_ICON_LIST:
+ *   +---------------------+-------------+------------+----------+----------+----------+
+ *   | VMChainTree header  | data:       | data for   | VMChain  | VMChain  | VMChain  |
+ *   | VMCT_count = nIcons | ISetHeader� | each icon: | Bitmap 1 | Bitmap 2 | Bitmap 3 |
+ *   |                     | 	         | IconEntry� |          |          |          |
+ *   +---------------------+-------------+------------+----------+----------+----------+
+ *           nIcons = Number of icons in that iSet
+ *           For every icon there is a VMChain that points to the bitmap
+ *           � the _extraBlock and _bitmap fields are cleared
+ *
+ ---------------------------------------------------------------------------*/
+@extern method IconDBViewerClass, MSG_DB_VIEWER_CREATE_ISET_VMCHAIN {
+VMBlockHandle 	treeBlock;
+MemHandle	vmMh;
+VMFileHandle	clpFile, vmFile;
+int		nIcons, size, dataSize, icon;
+byte		*bPtr;
+VMChainTree	*treePtr;
+VMChain 	*chainTable;
+ISetHeader	*headerPtr;
+IconEntry	*entryPtr;
+
+    /*
+     * Get required information
+     */
+    vmFile = pself->DBVI_vmFile;
+    nIcons = IdGetEntryCount(vmFile, iSet);
+    clpFile = ClipboardGetClipboardFile();
+
+
+    /*
+     * Create Tree Block for the iSet
+     * The block contains:	VMChainTree as header
+     *				The iSet header
+     *				All IconEntries for the set
+     *				A list of pointers (VMChains) to
+     *				   - the iSet extra block (for CIF_EXT_ICON_LIST)
+     *				   - the bitmap for each icon
+     *				   - the icons extra block (for CIF_EXT_ICON_LIST)
+     */
+
+    /*
+     * Set up tree block and VMChainTree structure (initially for CIF_ICON_LIST format)
+     * Update value for CIF_EXT_ICON_LIST format
+     */
+    dataSize = sizeof(ISetHeader) + nIcons*sizeof(IconEntry);
+    size = sizeof(VMChainTree) + dataSize + nIcons*sizeof(VMChain);
+    if ( format == CIF_EXT_ICON_LIST) {
+	size = sizeof(VMChainTree) + dataSize + (2*nIcons+1)*sizeof(VMChain);
+    }
+    treeBlock = VMAlloc(clpFile, size, 0);
+    bPtr = VMLock(clpFile, treeBlock, &vmMh);
+    memset(bPtr, 0, size);
+
+    treePtr = (VMChainTree*)bPtr;
+    treePtr->VMCT_meta.VMC_next = VM_CHAIN_TREE;
+    treePtr->VMCT_offset = sizeof(VMChainTree) + dataSize;
+    treePtr->VMCT_count = nIcons;
+    if ( format == CIF_EXT_ICON_LIST) {
+	treePtr->VMCT_count = 2*nIcons + 1;
+    }
+
+
+    /*
+     * Set up data pointers
+     */
+    bPtr += sizeof(VMChainTree);
+    headerPtr = (ISetHeader*)bPtr;
+    entryPtr = (IconEntry*)(bPtr + sizeof(ISetHeader));
+    bPtr += dataSize;
+    chainTable = (VMChain*)bPtr;
+
+
+    /*
+     * Get ISetHeader.
+     * For CIF_EXT_ICON_LIST formt: copy ISH_extraBlock
+     * Set ISH_extraBlock to zero for downward compatibility
+     */
+    IdGetISetHeader(vmFile, iSet, headerPtr);
+
+    if ( format == CIF_EXT_ICON_LIST) {
+    	if (headerPtr->ISH_extraBlock) {
+	    *chainTable = VMCHAIN_MAKE_FROM_VM_BLOCK(SecureCopyVMBlock(vmFile, headerPtr->ISH_extraBlock, clpFile));
+        }
+	chainTable++;
+    }
+
+    headerPtr->ISH_extraBlock = 0;
+
+    /*
+     * Get all IconEntries and copy icon bitmaps to cliboard file
+     * Set IE_extraBlock to zero for downward compatibility
+     */
+    for ( icon = 0; icon < nIcons; icon++ ) {
+	IdGetEntry(vmFile, iSet, icon, entryPtr);
+
+	*chainTable = VMCHAIN_MAKE_FROM_VM_BLOCK(BTCopyBitmap(vmFile, clpFile, entryPtr->IE_bitmap));
+	entryPtr->IE_bitmap = 0;	/* no invalid block handle, please */
+	chainTable++;
+
+	/*
+	 * copy IE_extraBlock, if we have one (only for CIF_EXT_ICON_LIST format)
+	 */
+	if ( format == CIF_EXT_ICON_LIST) {
+	    if (entryPtr->IE_extraBlock)  {
+		*chainTable = VMCHAIN_MAKE_FROM_VM_BLOCK(SecureCopyVMBlock(vmFile, entryPtr->IE_extraBlock, clpFile));
+	    }
+	    chainTable++;
+	}
+	entryPtr->IE_extraBlock = 0;	/* no invalid block handle, please */
+	entryPtr++;
+    }
+
+    VMDirty(vmMh);
+    VMUnlock(vmMh);
+    return VMCHAIN_MAKE_FROM_VM_BLOCK(treeBlock);
+
+}
+
+/*-------------------- MSG_DB_VIEWER_CREATE_TRANSFER_GSTRING ---------------------
+ *  Purpose:	Copy the current icon to a GString in the clipboard file and return
+ *		the associated VMChain.
+ *  Context:	This message is used only if the flag COPY_ISET_CREATES_A_GSTRING
+ *		is set to '1'
+ *  Strategy:
+ *  Parameters:	-
+ *  Return:	VMChain containing the
+ ---------------------------------------------------------------------------*/
+@if @COPY_ISET_CREATES_A_GSTRING
+@extern method IconDBViewerClass, MSG_DB_VIEWER_CREATE_TRANSFER_GSTRING {
+GStateHandle 	gstate;
+VMBlockHandle	gsBlock;
+VMBlockHandle iconBmp;
+
+     gstate =  GrCreateGString(ClipboardGetClipboardFile(),GST_VMEM, &gsBlock);
+     if ( !gstate ) return 0;
+
+     iconBmp = IdGetEntryBitmap(pself->DBVI_vmFile, pself->DBVI_currentISet, pself->DBVI_currentIcon);
+     GrDrawHugeBitmap(gstate, 0, 0, pself->DBVI_vmFile, iconBmp);
+     GrEndGString(gstate);
+
+     GrDestroyGString(gstate,0,GSKT_LEAVE_DATA);
+
+     return VMCHAIN_MAKE_FROM_VM_BLOCK(gsBlock);
+}
+@endif
+
+/*+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+	Import Icon Sets from TokenDB File
+ +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++*/
+
+/*-------------------- MSG_DB_VIEWER_PASTE_ISETS ---------------------
+ *  Purpose:	Read some icon sets from clipboard
+ *  Context:
+ *  Strategy:	prefer CIF_EXT_ICON_LIST from older CIF_ICON_LIST
+ *  Parameters:
+ *  Return:
+ ---------------------------------------------------------------------------*/
+@extern method IconDBViewerClass, MSG_DB_VIEWER_PASTE_ISETS {
+Boolean pasteable;
+
+    pasteable = ToolTestClipboardItem( 0, CIF_EXT_ICON_LIST, TIF_NORMAL);
+    if (pasteable) {
+    	@call oself::MSG_DB_VIEWER_PASTE_ISET_TREE(CIF_EXT_ICON_LIST);
+    	return;
+    }
+
+    pasteable = ToolTestClipboardItem( 0, CIF_ICON_LIST, TIF_NORMAL);
+    if (pasteable) {
+    	@call oself::MSG_DB_VIEWER_PASTE_ISET_TREE(CIF_ICON_LIST);
+    	return;
+    }
+
+    EC( ProgError("No icon list found in DB_VIEWER_PASTE_ISETS"); )
+
+}
+
+/*-------------------- MSG_DB_VIEWER_PASTE_ISET_TREE ---------------------
+ *  Purpose:	Read all icon sets, available in the clipboard and paste them
+ *		into our database file
+ *  Context:
+ *  Strategy:
+ *		format: structure info about the clipboard data to use
+ *			CIF_EXT_ICON_LIST | CIF_ICON_LIST
+ *  Return:
+ ---------------------------------------------------------------------------*/
+@extern method IconDBViewerClass, MSG_DB_VIEWER_PASTE_ISET_TREE {
+dword formatID = FormatIDFromManufacturerAndType(0, format);
+ClipboardQueryArgs	query;
+ClipboardRequestArgs	request;
+Boolean found, ok = FALSE;
+VMChain	*chainTable;
+int	iSet, nISets;
+VMBlockHandle	headerBlock;
+MemHandle	mh;
+byte		*bPtr;
+
+
+    /*
+     * query Clipboard Infos
+     */
+    ClipboardQueryItem(TIF_NORMAL, &query);
+    do {
+    	if ( ! query.CQA_numFormats ) break;
+        found = ClipboardTestItemFormat(query.CQA_header, formatID );
+        if (!found) break;
+        ok = TRUE;
+
+        /*
+         * fetch header block
+         */
+	ClipboardRequestItemFormat(formatID, query.CQA_header, &request);
+	headerBlock = VMCHAIN_GET_VM_BLOCK(request.CRA_data);
+
+        /*
+         * lock header block, fetch data and create all iSets
+         */
+	bPtr = VMLock(ClipboardGetClipboardFile(), headerBlock, &mh);
+	chainTable = (VMChain*)(bPtr + sizeof(VMChainTree));
+	nISets = ((VMChainTree*)(bPtr))->VMCT_count;
+
+	for ( iSet = 0; iSet < nISets; iSet++ ) {
+	    @call oself::MSG_DB_VIEWER_PASTE_SINGLE_ISET(chainTable[iSet], format);
+	}
+
+	VMUnlock(mh);
+
+    } while(FALSE);
+
+    ClipboardDoneWithItem(query.CQA_header);
+
+    if (!ok) { ErrorBoxOptr(@NoItemInClipboard); }
+    else {
+    	/*
+    	 * Update dbViewer and select the last iSet
+    	 */
+        iSet = IdGetISetCount(pself->DBVI_vmFile) - 1;
+    	@call oself::MSG_DB_VIEWER_ISET_ADDED(iSet);
+    }
+
+}
+
+
+/*-------------------- MSG_DB_VIEWER_PASTE_SINGLE_ISET ---------------------
+ *  Purpose:	Create a new iSet from passed vmChain
+ *  Context:
+ *  Strategy:
+ *  Parameters:	vmChain: VMChain, holding the whole iSet
+ *		format: structure info about the vmChain
+ *			CIF_EXT_ICON_LIST | CIF_ICON_LIST
+ *  Return:
+ *   iSet VMChain for CIF_ICON_LIST:
+ *   +---------------------+-------------+------------+----------+----------+----------+
+ *   | VMChainTree header  | data:       | data for   | VMChain  | VMChain  | VMChain  |
+ *   | VMCT_count = nIcons | ISetHeader� | each icon: | Bitmap 1 | Bitmap 2 | Bitmap 3 |
+ *   |                     | 	         | IconEntry� |          |          |          |
+ *   +---------------------+-------------+------------+----------+----------+----------+
+ ---------------------------------------------------------------------------*/
+@extern method IconDBViewerClass, MSG_DB_VIEWER_PASTE_SINGLE_ISET {
+int	iSet, numIcons, icon;
+VMFileHandle	vmFile, clpFile;
+MemHandle	mh;
+byte		*bPtr;
+ISetHeader	*headerPtr;
+IconEntry	*entryPtr;
+VMChain		*chainTable;
+
+
+    /*
+     * lock VMChain block and initialize pointers
+     */
+    vmFile = pself->DBVI_vmFile;
+    clpFile = ClipboardGetClipboardFile();
+
+    bPtr = VMLock(clpFile, VMCHAIN_GET_VM_BLOCK(vmChain), &mh);
+    numIcons = ((VMChainTree*)(bPtr))->VMCT_count;
+    if ( format == CIF_EXT_ICON_LIST) {
+    	numIcons = (numIcons-1)/2;	/* see top of file for details */
+    }
+
+    headerPtr = (ISetHeader*)(bPtr + sizeof(VMChainTree));
+    entryPtr = (IconEntry*)(bPtr + sizeof(VMChainTree) + sizeof(ISetHeader));
+    chainTable = (VMChain*)(bPtr + ((VMChainTree*)(bPtr))->VMCT_offset);
+
+
+    /*
+     * Create an empty icon set.
+     * Initialize the set with data from clipboard
+     */
+    iSet = IdAddISet(vmFile, numIcons);
+    IdSetEntryCount(vmFile, iSet , numIcons);
+    headerPtr->ISH_extraBlock = 0;
+
+    /*
+     * Copy ISH_extraBlock, if we have one
+     */
+    if ( format == CIF_EXT_ICON_LIST) {
+	if (*chainTable) {
+	    headerPtr->ISH_extraBlock = SecureCopyVMBlock(clpFile, VMCHAIN_GET_VM_BLOCK(*chainTable), vmFile);
+            }
+    	chainTable++;
+        }
+
+
+    IdSetISetHeader(vmFile, iSet, headerPtr);
+
+    /*
+     * Initialize all icons
+     */
+    for ( icon = 0; icon < numIcons; icon++ ) {
+    	/*
+    	 * Copy bitmap and, if available, the extra block.
+    	 */
+    	entryPtr->IE_bitmap = BTCopyBitmap(clpFile, vmFile, VMCHAIN_GET_VM_BLOCK(*chainTable));
+    	chainTable++;
+
+    	entryPtr->IE_extraBlock = 0;
+
+	/*
+	 * Copy ISH_extraBlock, if we have one
+	 */
+	if ( format == CIF_EXT_ICON_LIST) {
+	    if (*chainTable) {
+	    entryPtr->IE_extraBlock = SecureCopyVMBlock(clpFile, VMCHAIN_GET_VM_BLOCK(*chainTable), vmFile);
+	    }
+	chainTable++;
+	}
+
+    	/*
+    	 * Replace entry
+    	 */
+    	IdSetEntry(vmFile, iSet, icon, *entryPtr);
+    	entryPtr++;
+
+    }
+
+    VMUnlock(mh);
+
+}
+
+/*--------------------  ---------------------
+ *  Purpose:
+ *  Context:
+ *  Strategy:
+ *  Parameters:
+ *  Return:
+ ---------------------------------------------------------------------------*/
+
+/* *********** End of file impex.goc ********************/
+

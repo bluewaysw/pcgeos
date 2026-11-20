@@ -956,7 +956,7 @@ GetICBuffCommon	proc	near		uses	ax
 	je	5$
 	mov	bx, offset SpellInitNoUserDictString
 	cmp	ax, IC_RET_NO_USER_DICT
-	je	5$
+	je	dismiss		; OpenSpell already reported SP-12, 13 or 14.
 	mov	bx, offset SpellInitBadLangString
 	cmp	ax, IC_RET_BAD_LANG
 	je	5$
@@ -965,6 +965,7 @@ GetICBuffCommon	proc	near		uses	ax
 	mov	ax, (CDT_ERROR shl offset CDBF_DIALOG_TYPE or GIT_NOTIFICATION shl offset CDBF_INTERACTION_TYPE or mask CDBF_SYSTEM_MODAL)
 	call	SpellPutupBox
 
+dismiss:
 	push	bp
 	mov	ax, MSG_GEN_GUP_INTERACTION_COMMAND
 	mov	cx, IC_DISMISS
@@ -2724,6 +2725,8 @@ endif
 
 	cmp	ax, IC_RET_OK
 	je	continue
+	cmp	dx, UR_SER
+	je	exit			; OpenSpell already reported SP-11.
 	mov	bx, offset SpellUserDictFullString
 	cmp	dx, UR_USER_DICT_FULL
 	je	30$
@@ -3420,21 +3423,22 @@ SpellControlGenerateUI	method	SpellControlClass, MSG_GEN_CONTROL_GENERATE_UI
 	.enter
 ifdef GPC_SPELL
 	;
-	; If dialog, display spell window at bottom of screen to make
-	; room to show misspelled word in document. Note that I added
-	; a total hack to attempt to center the dialog box horizontally
-	; in the CUI - it looks good there :) -Don 10/2/00
+	; Center this dialog using the normal window-placement policy.
+	; A persistent ratio position triggers a CommonUI reopen defect:
+	; OpenWinPrepForReOpen converts left/top to ratios but leaves
+	; absolute right/bottom bounds where the next open expects size.
+	; The second spell check then grows the outer frame toward the
+	; screen edges. Centering avoids that mixed bounds representation
+	; without changing the shared UI or imposing a fixed dialog size.
 	;
 	mov	di, ds:[si]
 	add	di, ds:[di].Gen_offset
 	cmp	ds:[di].GII_visibility, GIV_DIALOG
 	jne	notDialog
 	push	ax
-	mov	ax, HINT_POSITION_WINDOW_AT_RATIO_OF_PARENT
-	mov	cx, size SpecWinSizePair
+	mov	ax, HINT_CENTER_WINDOW
+	clr	cx			; This placement hint has no data.
 	call	ObjVarAddData
-	mov	ds:[bx].SWSP_x, mask SWSS_RATIO or (PCT_5 - 10)
-	mov	ds:[bx].SWSP_y, mask SWSS_RATIO or PCT_90	; auto bump up
 	mov	ax, MSG_SPEC_SCAN_GEOMETRY_HINTS
 	mov	cl, mask VOF_GEOMETRY_INVALID
 	mov	dl, VUM_MANUAL

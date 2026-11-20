@@ -27,6 +27,7 @@ typedef enum {
 
 typedef word ThumbSourceType ;
 #define TST_HUGE_BITMAP	1
+#define TST_GSTRING		2
 
 typedef byte ThumbHorizontalJustification ;
 #define THJ_CENTER				1

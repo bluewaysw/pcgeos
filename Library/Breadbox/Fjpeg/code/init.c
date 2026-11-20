@@ -439,8 +439,9 @@ void jinit_d_coef_controller (j_decompress_ptr cinfo, Boolean need_full_buffer)
 
 void jinit_d_main_controller (j_decompress_ptr cinfo, Boolean need_full_buffer)
 {
-  int ci, rgroup, ngroups;
-  jpeg_component_info *compptr;
+    int ci, rgroup, ngroups;
+    jpeg_component_info *compptr;
+    dword arraySize;
 
   if (need_full_buffer)   {      /* shouldn't happen */
     set_error(cinfo,JERR_BAD_BUFFER_MODE);
@@ -463,11 +464,19 @@ void jinit_d_main_controller (j_decompress_ptr cinfo, Boolean need_full_buffer)
 			 (JDIMENSION) (rgroup * ngroups));
 
 */
-    cinfo->main.buffer[ci] = smallocarr( cinfo,
-                                           compptr->width_in_blocks
-                                         * compptr->DCT_scaled_size,
-                                         (rgroup * ngroups)
-                                       );
+    arraySize = ((dword) compptr->width_in_blocks *
+                 compptr->DCT_scaled_size + sizeof(JSAMPROW)) *
+                (rgroup * ngroups);
+    if (arraySize == 0 || arraySize > 0xffffUL) {
+        set_error(cinfo, JERR_MEMFULL);
+        return;
+    }
+    cinfo->main.bufferH[ci] = MemAlloc((word) arraySize, HF_SWAPABLE,
+                                     HAF_ZERO_INIT);
+    if (cinfo->main.bufferH[ci] == NullHandle) {
+        set_error(cinfo, JERR_MEMFULL);
+        return;
+    }
   }
 }
 

@@ -499,10 +499,12 @@
   #endif
   }
 
-  LOCAL_FUNC
-  TT_Int32  Sqrt64( TT_Int64*  l )
-  {
-  #ifdef TT_CONFIG_OPTION_USE_ASSEMBLER_IMPLEMENTATION
+
+LOCAL_FUNC
+TT_Int32  Sqrt64( TT_Int64*  l )
+{
+#ifdef TT_CONFIG_OPTION_USE_ASSEMBLER_IMPLEMENTATION
+
     __asm {
         push    es
 
@@ -510,15 +512,18 @@
         mov     eax, dword ptr es:[si]    ; edx:eax = l
         mov     edx, dword ptr es:[si+4]
 
-        test    edx, edx                  ; handle 0 and 1
+        ; handle 0 and 1.
+        test    edx, edx
         jnz     sqrt_start
+
         test    eax, eax
         jz      sqrt_done
+
         cmp     eax, 1
         je      sqrt_done
 
-  sqrt_start:
-        ; determine floor(log2(l))
+sqrt_start:
+        ; determine floor(log2(l)).
         test    edx, edx
         jnz     sqrt_guess_hi
 
@@ -530,9 +535,24 @@ sqrt_guess_hi:
         add     ecx, 32
 
 sqrt_set_guess:
+        ; initial approximation:
         shr     ecx, 1
         inc     ecx
 
+        cmp     ecx, 32
+        jne     sqrt_normal_guess
+
+        cmp     edx, 0FFFFFFFFh
+        jne     sqrt_max_guess
+
+        mov     eax, 0FFFFFFFFh
+        jmp     sqrt_done
+
+sqrt_max_guess:
+        mov     ebx, 0FFFFFFFFh
+        jmp     sqrt_loop
+
+sqrt_normal_guess:
         mov     ebx, 1
         shl     ebx, cl
 
@@ -546,8 +566,10 @@ sqrt_loop:
         add     eax, ebx
         rcr     eax, 1
 
+        ; newton iteration converged when the next value
         cmp     eax, ebx
         jae     sqrt_finished
+
         mov     ebx, eax
         jmp     sqrt_loop
 
@@ -557,9 +579,11 @@ sqrt_finished:
 sqrt_done:
         pop     es
 
-        mov     edx, eax      ; store result in dx:ax
+        ; return result in DX:AX.
+        mov     edx, eax
         shr     edx, 16
     }
+
 #else
 	  long  x = l->hi ? l->hi >> 1 : l->lo >> 1;
 	

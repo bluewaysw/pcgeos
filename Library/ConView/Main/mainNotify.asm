@@ -452,6 +452,7 @@ EC <		call	AssertIsCGV				>
 	; routine, so that it doesn't lock the search text object's
 	; name array...  
 	;
+		push	ds, si				;save ContentGenView
 		call	MNLockNameArray			;*ds:si<- name array
 
 		push	ax
@@ -464,6 +465,12 @@ EC <		ERROR_C ILLEGAL_CONTEXT_ELEMENT_NUMBER			>
 		call	MNGetPrevNextStatusCommon	;ax<- NNCC_flags
 		mov	cx, ds:[di].PNAE_pageNumber	;cx<-page
 		call	MNUnlockNameArray
+		pop	ds, si				;*ds:si <- ContentGenView
+	;
+	; On the first/last page of a file, prev/next may still lead
+	; to the previous/next content file of the book.
+	;
+		call	MNAdjustPrevNextForBook		;ax <- updated flags
 
 done:
 		.leave
@@ -515,6 +522,66 @@ done:
 	.leave
 	ret
 MNGetPrevNextStatusCommon	endp
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		MNAdjustPrevNextForBook
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Enable "Prev" on the first page of a file if the book
+		has a previous content file, and "Next" on the last
+		page of a file if the book has a next content file.
+
+CALLED BY:	MNGetPrevNextStatusGivenName
+PASS:		*ds:si	- ContentGenView instance
+		ax	- NotifyNavContextChangeFlags
+RETURN:		ax	- NotifyNavContextChangeFlags, with
+			  NNCCF_prevEnabled/NNCCF_nextEnabled
+			  possibly set
+DESTROYED:	nothing
+
+PSEUDO CODE/STRATEGY:
+	Only does any work (opening the book file) when one of the
+	two flags is still clear, i.e. on the first or last page
+	of a content file.
+KNOWN BUGS/SIDE EFFECTS/IDEAS:
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+MNAdjustPrevNextForBook	proc	near
+		uses	bx, dx, bp
+		.enter
+EC <		call	AssertIsCGV				>
+
+		mov	bx, ax
+		andnf	bx, mask NNCCF_prevEnabled or mask NNCCF_nextEnabled
+		cmp	bx, mask NNCCF_prevEnabled or mask NNCCF_nextEnabled
+		je	done				;both already enabled
+
+		sub	sp, (size ContentTextRequest)
+		mov	bp, sp
+
+		test	ax, mask NNCCF_prevEnabled
+		jnz	checkNext
+		mov	dx, -1
+		call	MLFindAdjacentBookFile		;carry set if none
+		jc	checkNext
+		ornf	ax, mask NNCCF_prevEnabled
+checkNext:
+		test	ax, mask NNCCF_nextEnabled
+		jnz	freeRequest
+		mov	dx, 1
+		call	MLFindAdjacentBookFile		;carry set if none
+		jc	freeRequest
+		ornf	ax, mask NNCCF_nextEnabled
+freeRequest:
+		add	sp, (size ContentTextRequest)
+done:
+		.leave
+		ret
+MNAdjustPrevNextForBook	endp
 
 
 

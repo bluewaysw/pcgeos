@@ -1,0 +1,2017 @@
+/******************************************************************************
+ *
+ * PROJECT:	Icon Editor	(GOC Version)
+ * FILE:	database.goc
+ *
+ * AUTHOR:	Steve Yegge, Nov 2, 1992
+ *
+ *	REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	stevey	11/2/92		Initial revision
+ *	RainerB 7/18/2025	Ported to GOC
+ *
+ *
+ * DESCRIPTION:	This file holds the routines for accessing the icon database.
+ *
+ROUTINES:
+=============================================================================
+Name				Description
+=============================================================================
+
+*--- common routines ---*
+
+IdGetHugeArray()		-- returns the handle of the HugeArray
+IdShiftIcon			-- Shift an icon up or down in the set
+IdShiftISet			-- Shift an iSet up or down in the database's iSet list
+				   containing the ISetHeader for the icon sets
+
+*--- deal with icon sets (ISetHeader structure) ---*
+
+IdLockIconHeader()		-- returns a pointer to the icon set
+IdUnlockIconHeader()		-- unlocks the icon set
+IdDirtyISet()			-- indicates the icon set has been modified
+IdGetISetName()			-- returns the name field for an icon set
+IdSetISetName()			-- sets the name field for an icon set
+
+IdAddISet()			-- adds an icon set to the database
+IdCreateEntries()		-- creates blank icons in an icon set
+IdGetISetCount()		-- returns the number of icon sets in the database
+
+IdClearAndSetEntry		-- sets new bitmap & frees old one (safely)
+IdDeleteISet			-- deletes an icon set from the database
+IdFreeEntries			-- deletes all icons for an icon set
+
+
+IdGetISetHeader			-- returns entire header for an icon set
+IdSetISetHeader			-- sets most of the header for the icon set
+IdGetFlags			-- gets ISH_flags record from iSet header
+IdSetFlags			-- sets ISH_flags record in iSet header
+
+IdGetEntryCount()		-- returns number of valid icons for an icon set
+IdSetEntryCount()		-- sets the number of valid icons for an icon set
+
+IdSetPreviewObject		-- sets the preview object field for an icon set (for compatibility only)
+IdSetPreviewColors		-- sets the preview colors for an icon set (for compatibility only)
+
+IdGetISetExtraBlock		-- Get the ISH_extraBlock for an icon set.
+ 				   Ensure that the block exists.
+IdSetToken			-- Store initial token, used for export to tokenDB file,  for an icon set
+IdGetToken			-- Retrive initial token, used for export to tokenDB file,  for an icon set
+
+IdGetWriteSourceData		-- Read options and settings that are used when writing
+				   the icon set as source code from iSet extra block
+IdSetWriteSourceData		-- Store options and settings that are used when writing
+				   the icon set as source code.
+
+*--- deal with icons (IconEntry structure) ---*
+
+IdLockEntryList()		-- locks the vm block with iconEntry ChunkArray
+				   (referred by ISH_iEntryListxxx)
+IdUnlockEntryList()		-- unlocks the ISH_entryList
+IdGetEntryName()		-- returns the name field for an icon
+IdSetEntryName()		-- sets the name field for an icon
+
+IdSetEntryBitmapNoCopy()	-- sets a bitmap in the iconEntry list (bitmap
+				   must already	be copied to the database,
+				   and icon must be created).
+
+IdGetEntry			-- Returns the entire IconEntry structure
+				   for an icon
+IdSetEntry			-- Set the entire IconEntry structure for
+				   an icon set icon. The icon must already
+				   exist (use -IdCreateEntries).
+
+IdIncEntryCount()		-- increments the icon count for an icon set
+IdDecEntryCount()		-- decrements the icon count for an icon set
+IdDeleteEntry()			-- deletes a iconEntry and compacts list
+
+IdGetEntryBitmap()		-- returns a icon bitmap from an icon set
+IdGetEntryDimensions		-- returns width & height of a icon
+
+IdSetEntryParameters		-- sets the VisMonikerListEntryType value for the icon
+				   Parameters: IconParameters z.B. IP_STANDARD_VGA_FILE
+IdGetEntryType			-- returns a VisMonikerListEntryType value
+IdSetEntryType			-- set the VisMonikerListEntryType value
+
+IdGetIconExtraBlock		-- Get the IE_extraBlock for an icon.
+ 				   Ensure that the block exists.
+IdSetLineAttrs			-- Store line drawing attributs for an icon
+IdSetAreaAttrs			-- Store area drawing attributs for an icon
+IdGetLineOrAreaAttrs		-- Line and/or area drawing attributs for an icon
+
+
+
+*--- Pointer image support  ---*
+IdSetHotspot			-- set hotspot coordiantes
+IdGetHotspot			-- retrive hotspot coordiantes
+
+============================================================================= */
+
+
+
+/*  Standard include files */
+@include <stdapp.goh>
+@include <Ansi/stdlib.h>
+@include <Ansi/stdio.h>
+@include <Ansi/string.h>
+
+@include "iconed.goh"
+@include "UI/appui.goh"
+
+@include "token.h"
+
+extern GlobalStruct global;
+
+
+/* ###############################################################################
+ * 	Local defs
+/* ###############################################################################*/
+
+#define  AssignVisMonikerListEntry(vmlet, size, style, aspect, color) \
+	vmlet = 0x40;	/* GSting Bit set */ \
+	vmlet |= size   << VMLET_GS_SIZE_OFFSET; \
+	vmlet |= style  << VMLET_STYLE_OFFSET; \
+	vmlet |= aspect << VMLET_GS_ASPECT_RATIO_OFFSET; \
+	vmlet |= color  << VMLET_GS_COLOR_OFFSET;
+
+/* ###############################################################################
+ * 	Common routines
+/* ###############################################################################*/
+
+/*--------------------- SecureVMFree ---------------------
+ *  Purpose:	Test if the vmBlock is valid an free a valid block
+ *  Context:	Due to a bug in the first beta release, the same VMBlock
+ *		(IE_extraBlock, ISH_extraBlock) may be used by multiple
+ *		icons or icon sets respectively. This causes
+ *		the application to crash when the icons (or sets) are deleted.
+ *		The safety check using VMInfo() prevents this.
+ *  Strategy:
+ *  Parameters:
+ *  Return:	The handle or zero if error
+ ---------------------------------------------------------------------------*/
+void SecureVMFree(VMFileHandle vmFile, VMBlockHandle vmBlock) {
+VMInfoStruct info;
+
+    // VMInfo checks if the block is valid
+    // returns TRUE, if valid (checked with swat)
+    if ( VMInfo (vmFile, vmBlock, &info) ) { VMFree(vmFile, vmBlock); }
+    EC( else { DebugInfo("\r  *** Skip freeining invalid VMBlock"); } )
+}
+
+
+/*--------------------- IdGetHugeArray ---------------------
+ *  Purpose:	Get the Handle of the HugeArray with the list of icon sets
+ *  Context:
+ *  Strategy:
+ *  Parameters:
+ *  Return:	The handle or zero if error
+ ---------------------------------------------------------------------------*/
+VMBlockHandle IdGetHugeArray(VMFileHandle vmFile) {
+MemHandle	mh;
+IconMapBlockStruct 	*mapPtr;
+VMBlockHandle	mBlock, mainArray;
+
+
+    mBlock = VMGetMapBlock(vmFile);
+    EC(  if (!mBlock) { ProgError("\r** mBlock=0 **"); return 0; } )
+
+    mapPtr = VMLock(vmFile, mBlock ,&mh);
+    mainArray = mapPtr->IMBS_mainArray;
+    EC(  if (!mainArray) { ProgError(" ** IMBS_mainArray NULL **");  VMUnlock(mh); return 0; } )
+
+    VMUnlock(mh);
+    return mainArray;
+
+}
+
+
+/* ###############################################################################
+ * 	Deal with the icon sets (ISetHeader structure)
+/* ###############################################################################*/
+
+/*--------------------- IdLockIconHeader ---------------------
+ *  Purpose:	Lock the requested icon header
+ *  Context:
+ *  Strategy:	Check number of icon sets first
+ *  Parameters:
+ *  Return:	Pointer to locked icon header
+ *		NULL if iSet is invalid
+ ---------------------------------------------------------------------------*/
+ISetHeader *IdLockIconHeader(VMFileHandle vmFile, int iSet) {
+VMBlockHandle mainArray;
+int	count;
+word 	size;
+ISetHeader *header;
+
+    if ( iSet < 0) return NULL;
+    mainArray = IdGetHugeArray(vmFile);
+    EC (if (!mainArray ) return NULL; )
+
+    count = HugeArrayGetCount(vmFile, mainArray);
+    if ( iSet >= count ) return NULL;	// index in HugeArrays are zero-based
+
+    HugeArrayLock(vmFile, mainArray, iSet, (void**)&header, &size);
+    return header;
+}
+
+/*--------------------- IdUnlockIconHeader ---------------------
+ *  Purpose:	Unlock an icon header that was previously locked by IdLockIconHeader
+ *  Context:
+ *  Strategy:	May be faster if replaced by an macro.
+ *		But macros have no type checking.
+ *  Parameters:
+ *  Return:	-
+ ---------------------------------------------------------------------------*/
+void IdUnlockIconHeader(ISetHeader *iHeader, Boolean makeDirty) {
+    if (makeDirty) HugeArrayDirty(iHeader);
+    HugeArrayUnlock(iHeader);
+}
+
+/*--------------------- IdDirtyISet ---------------------
+ *  Purpose:	Dirties the entry for the icon set.
+ *  Context:
+ *  Strategy:	May be faster if replaced by an macro.
+ *		But macros have no type checking.
+ *  Parameters:
+ *  Return:	-
+ ---------------------------------------------------------------------------*/
+void IdDirtyISet(ISetHeader *iHeader) {
+    HugeArrayDirty(iHeader);
+}
+
+
+
+/*--------------------- IdGetISetName ---------------------
+ *  Purpose:	Returns the name of the icon set
+ *  Context:
+ *  Strategy:	Because ISH_name is declard as ISH_name[MAX_ISET_NAME_LENGTH]
+ *		there may be no zero terminator if the name is 32 chars long.
+ *
+ *  Parameters:	vmFile, iSet: icon set
+ *		name: return buffer, at least ISET_NAME_BUFFER_SIZE bytes
+ *  Return:	FALSE
+ *		TRUE if error
+ ---------------------------------------------------------------------------*/
+Boolean IdGetISetName(VMFileHandle vmFile, int iSet, char *name) {
+ISetHeader *iHeader;
+
+    name[0] = 0;
+    iHeader = IdLockIconHeader(vmFile, iSet);
+    if (!iHeader) return TRUE;
+
+    memset(name, 0, ISET_NAME_BUFFER_SIZE);
+    memcpy(name, iHeader->ISH_name, MAX_ISET_NAME_LENGTH);
+
+    IdUnlockIconHeader(iHeader, FALSE);
+    return FALSE;
+}
+
+/*--------------------- IdSetISetName ---------------------
+ *  Purpose:	Set the name of the icon set
+ *  Context:
+ *  Strategy:	Because ISH_name is declard as ISH_name[MAX_ISET_NAME_LENGTH]
+ *		there may be no zero terminator if the name is 32 chars long.
+ *
+ *  Parameters:	vmFile, iSet: icon set
+ *		name: new name, max MAX_ISET_NAME_LENGTH charcters
+ *  Return:	FALSE
+ *		TRUE if error
+ ---------------------------------------------------------------------------*/
+Boolean IdSetISetName(VMFileHandle vmFile, int iSet, char *name) {
+ISetHeader *iHeader;
+int 	len;
+
+    len = strlen(name);
+    EC( if (len > MAX_ISET_NAME_LENGTH) { DebugInfo1("\rIdSetISetName: name too long (%u chars)", len); return TRUE; } )
+
+    iHeader = IdLockIconHeader(vmFile, iSet);
+    if (!iHeader) return TRUE;
+
+    memset(iHeader->ISH_name, 0, MAX_ISET_NAME_LENGTH);
+    memcpy(iHeader->ISH_name, name, len);
+
+    IdUnlockIconHeader(iHeader, TRUE);
+    return FALSE;
+}
+
+/*--------------------- IdGetFlags ---------------------
+ *  Purpose:	Returns the ISH_flags record from the icon set header.
+ *  Context:
+ *  Strategy:
+ *  Parameters:	vmFile,
+ *		iSet: icon set
+ *  Return:	ISH_flags record
+ *		TRUE if error
+ ---------------------------------------------------------------------------*/
+word IdGetFlags(VMFileHandle vmFile, int iSet) {
+ISetHeader *iHeader;
+word	flags;
+
+    iHeader = IdLockIconHeader(vmFile, iSet);
+    EC ( if (!iHeader) { ProgError("IdGetFlags invalid icon set"); return 0; } )
+
+    flags = iHeader->ISH_flags;
+
+    IdUnlockIconHeader(iHeader, FALSE);
+    return flags;
+}
+
+/*--------------------- IdSetFlags ---------------------
+ *  Purpose:	Sets the ISH_flags record in the icon set header.
+ *  Context:
+ *  Strategy:	Because ISH_name is declard as ISH_name[MAX_ISET_NAME_LENGTH]
+ *		there may be no zero terminator if the name is 32 chars long.
+ *
+ *  Parameters:	vmFile, iSet: icon set
+ *		flags: new flags (overwrite old flags)
+ *  Return:	-
+ ---------------------------------------------------------------------------*/
+void IdSetFlags(VMFileHandle vmFile, int iSet, word flags) {
+ISetHeader *iHeader;
+
+    iHeader = IdLockIconHeader(vmFile, iSet);
+    EC ( if (!iHeader) { ProgError("IdSetFlags invalid icon set"); return; } )
+
+    iHeader->ISH_flags = flags;
+    IdUnlockIconHeader(iHeader, TRUE);
+
+}
+
+/*--------------------- IdGetISetHeader ---------------------
+ *  Purpose:	Returns the entire header for an icon set.
+
+ *  Context:
+ *  Strategy:
+ *  Parameters:	vmFile,
+ *		iSet: icon set
+ 		header: pointer to ISetHeader buffer
+ *  Return:	header is filles in
+ ---------------------------------------------------------------------------*/
+void IdGetISetHeader(VMFileHandle vmFile, int iSet, ISetHeader *header) {
+ISetHeader *iHeader;
+
+    iHeader = IdLockIconHeader(vmFile, iSet);
+    EC ( if (!iHeader) { ProgError("IdGetISetHeader invalid icon set"); return; } )
+    *header = *iHeader;
+    IdUnlockIconHeader(iHeader, FALSE);
+
+}
+
+/*--------------------- IdSetISetHeader ---------------------
+ *  Purpose:	Sets the header from a buffer, EXCEPT for the iconEntry
+		list, which is unchanged.
+ *  Context:
+ *  Strategy:
+ *  Parameters:	vmFile,
+ *		iSet: icon set
+ 		header: pointer to ISetHeader buffer
+ *  Return:	-
+ ---------------------------------------------------------------------------*/
+void IdSetISetHeader(VMFileHandle vmFile, int iSet, ISetHeader *header) {
+ISetHeader *iHeader;
+ChunkHandle 	iEntryListArray;
+VMBlockHandle 	iEntryListBlock;
+
+    iHeader = IdLockIconHeader(vmFile, iSet);
+    EC ( if (!iHeader) { ProgError("IdSetISetHeader invalid icon set"); return; } )
+
+    /*
+     * Save the iconEntry list and restore it afterwards
+     */
+    iEntryListArray = iHeader->ISH_iEntryListArray;
+    iEntryListBlock = iHeader->ISH_iEntryListBlock;
+    *iHeader = *header;
+    iHeader->ISH_iEntryListArray = iEntryListArray;
+    iHeader->ISH_iEntryListBlock = iEntryListBlock;
+
+    IdUnlockIconHeader(iHeader, TRUE);
+
+}
+
+/* ###############################################################################
+ * 	Deal with the icon (IconEntry structure)
+/* ###############################################################################*/
+
+/*--------------------- IdLockEntryList ---------------------
+ *  Purpose:	Locks the ChunkArray (stored in a vm block) with the icons
+ *  Context:
+ *  Strategy:
+ *  Parameters:	vmFile	database file
+ *		iSet	icon set number
+ *  Return:	optr of the locked ChunkArray
+ *		zero if any error;
+ ---------------------------------------------------------------------------*/
+optr	IdLockEntryList(VMFileHandle vmFile, int iSet) {
+ISetHeader 	*iHeader;
+VMBlockHandle	arrayBlock;
+ChunkHandle 	arrayChunk;
+MemHandle	mh;
+optr		list;
+
+	/*
+	 * Find out the VMBlock for the icon list
+	 */
+    iHeader =IdLockIconHeader(vmFile, iSet);
+    EC( if (!iHeader) { ProgError("\rIdLockEntryList invalid icon set");  } )
+    if (!iHeader) return 0;
+
+    arrayBlock = iHeader->ISH_iEntryListBlock;
+    arrayChunk = iHeader->ISH_iEntryListArray;
+    IdUnlockIconHeader(iHeader, FALSE);
+
+    	/*
+    	 * lock the block and construct optr
+    	 */
+    VMLock(vmFile, arrayBlock, &mh);
+    list = ConstructOptr(mh, arrayChunk);
+
+    return list;
+
+}
+
+/*--------------------- IdUnlockEntryList ---------------------
+ *  Purpose:	Unlock the list, loced by IdLockEntryList
+ *  Context:
+ *  Strategy:
+ *  Parameters:	optr of the list (ChunkArray)
+ *  Return:
+ ---------------------------------------------------------------------------*/
+void IdUnlockEntryList(optr list, Boolean makeDirty) {
+     if (makeDirty) VMDirty(OptrToHandle(list));
+     VMUnlock( OptrToHandle(list) );
+}
+
+/*--------------------- ToolFixNameIfInvalid ---------------------
+ *  Purpose:	Ensure that an entry name is never empty and has no spaces
+ *  Context:	Empty names may occur if the database file was created
+ *		by an older version of the IconEditor.
+ *		Spaces should neve occur, but we want to be sure
+ *  Parameters:	name: name to check and fix
+ ---------------------------------------------------------------------------*/
+void ToolFixNameIfInvalid(char *name) {
+int n;
+
+    /*
+     * never have an empty name
+     */
+    if ( strlen(name) == 0) {
+	MemLock(OptrToHandle(@IconUntitledName));
+	strcpy(name, LMemDeref(@IconUntitledName));
+	MemUnlock(OptrToHandle(@IconUntitledName));
+    }
+
+    /*
+     * check and replace spaces
+     */
+    for ( n = 0; n < strlen(name); n++ ) {
+    	if ( name[n] == ' ' ) name[n] = '_';
+    }
+}
+
+/*--------------------- IdGetEntryName ---------------------
+ *  Purpose:	Returns the name of a icon
+ *  Context:
+ *  Strategy:	Because IE_name is declard as ISH_name[MAX_ICON_NAME_LENGTH]
+ *		there may be no zero terminator if the name is 32 chars long.
+ *		-> Ensure terminator
+ *
+ *  Parameters:	vmFile
+ *		iSet: 	icon set number
+ *		icon:	icon number
+ *		name: 	return buffer, at least ICON_NAME_BUFFER_SIZE bytes
+ *  Return:	FALSE
+ *		TRUE if error
+ ---------------------------------------------------------------------------*/
+Boolean IdGetEntryName(VMFileHandle vmFile, int iSet, int icon, char *name) {
+IconEntry *iconEntry;
+optr	iEntryList;
+word	count, size;
+
+    name[0] = 0;
+    iEntryList = IdLockEntryList(vmFile, iSet);
+    if (!iEntryList) return TRUE;
+
+    count = ChunkArrayGetCount(iEntryList);
+    EC( if ( icon >= count ) { DebugInfo1("\rIdGetEntryName wrong icon %d", icon); } )
+    if ( icon >= count ) {
+    	IdUnlockEntryList(iEntryList, FALSE);
+    	return FALSE;
+    }
+
+    iconEntry = ChunkArrayElementToPtr(iEntryList, icon, &size);
+    memset(name, 0, ICON_NAME_BUFFER_SIZE);
+    memcpy(name, iconEntry->IE_name, MAX_ICON_NAME_LENGTH);
+    ToolFixNameIfInvalid(name);
+
+    IdUnlockEntryList(iEntryList, FALSE);
+    return FALSE;
+}
+
+/*--------------------- IdSetEntryName ---------------------
+ *  Purpose:	Set the name of the icon
+ *  Context:
+ *  Strategy:	- Because IE_name is declard as ISH_name[MAX_ICON_NAME_LENGTH]
+ *		  there may be no zero terminator if the name is 32 chars long.
+ *		- Also ensure that the name is not empty and has no spaces
+ *  Parameters:	vmFile
+ *		iSet: 	icon set number
+ *		icon:	icon number
+ *		name: 	new name, max MAX_ICON_NAME_LENGTH charcters
+ *  Return:	FALSE
+ *		TRUE if error
+ ---------------------------------------------------------------------------*/
+Boolean IdSetEntryName(VMFileHandle vmFile, int iSet, int icon, char *name) {
+IconEntry *iconEntry;
+optr	iEntryList;
+int 	len;
+word count, size;
+
+    len = strlen(name);
+    EC( if (len > MAX_ICON_NAME_LENGTH) { DebugInfo1("I\rdSetEntryName: name too long (%u chars)", len); return TRUE; } )
+
+    iEntryList = IdLockEntryList(vmFile, iSet);
+    if (!iEntryList) return TRUE;
+
+    count = ChunkArrayGetCount(iEntryList);
+    EC( if ( icon >= count ) { DebugInfo1("\rIdSetEntryName wrong icon %d", icon); } )
+    if ( icon >= count ) {
+    	IdUnlockEntryList(iEntryList, FALSE);
+    	return FALSE;
+    }
+
+    iconEntry = ChunkArrayElementToPtr(iEntryList, icon, &size);
+    memset(iconEntry->IE_name, 0, MAX_ICON_NAME_LENGTH);
+    memcpy(iconEntry->IE_name, name, len);
+    ToolFixNameIfInvalid(iconEntry->IE_name);
+
+    IdUnlockEntryList(iEntryList, TRUE);
+    return FALSE;
+}
+
+/*--------------------- IdAddISet ---------------------
+ *  Purpose:	Adds a new set of icons to the database
+ *  Context:
+ *  Strategy:	- see code
+ *		- ISH_extraBlock is not allocted, this will be done
+ *		  when the block is first accessed
+ *  Parameters:	vmFile	database file
+ *		count	number of new icons
+ *  Return:	index of new icon set (just created)
+ ---------------------------------------------------------------------------*/
+int IdAddISet(VMFileHandle vmFile, int count) {
+VMBlockHandle	iconArray;
+ISetHeader *iHeader;
+word	idx, size;
+MemHandle   mh;
+ChunkHandle arrayChunk;
+VMBlockHandle	blk;
+
+	/*
+	 * Add new icon set to HugeArray
+	 * Index is zero based, so 'idx' will be the new Index
+	 */
+    iconArray = IdGetHugeArray(vmFile);
+    idx = HugeArrayGetCount(vmFile, iconArray);
+    HugeArrayAppend(vmFile, iconArray, 1, NULL);
+
+    	/*
+    	 * Create a chunk array for the IconEntry list.
+    	 * Attach the block to our database
+    	 */
+    mh= MemAllocLMem(LMEM_TYPE_GENERAL,0);
+    MemLock(mh);
+    arrayChunk = ChunkArrayCreate(mh, sizeof(IconEntry), 0, OCF_DIRTY);
+    MemUnlock(mh);
+    blk = VMAttach(vmFile, 0, mh);
+
+
+    	/*
+    	 * Save the chunk array in ISH_iEntryListxxx.
+    	 * Clear out ISetHeader structure for savety first
+    	 */
+    HugeArrayLock(vmFile, iconArray, idx, (void**)&iHeader, &size);
+    memset(iHeader, 0, sizeof(ISetHeader));
+    iHeader->ISH_iEntryListBlock = blk;
+    iHeader->ISH_iEntryListArray = arrayChunk;
+    HugeArrayDirty(iHeader);
+    HugeArrayUnlock(iHeader);
+
+    	/*
+    	 * Create some blank icons.
+    	 */
+    IdCreateEntries(vmFile, idx, count);
+
+    return idx;
+
+}
+
+/*--------------------- IdCreateEntries ---------------------
+ *  Purpose:	Creates blank icons for an icon set
+ *  Context:
+ *  Strategy:
+ *  Parameters:	vmFile	database file
+ *		iSet	icon set (number)
+ *		count	number of new icons
+ *  Return:
+ ---------------------------------------------------------------------------*/
+void IdCreateEntries(VMFileHandle vmFile, int iSet, int count) {
+optr  iEntryList;
+int n;
+IconEntry *iconEntry;
+
+    if (!count) return;
+
+    iEntryList = IdLockEntryList(vmFile, iSet);
+    for ( n = 0; n < count; n++) {
+    	iconEntry = ChunkArrayAppend(iEntryList, sizeof(IconEntry));
+    	memset(iconEntry, 0, sizeof(IconEntry));
+    	}
+    IdUnlockEntryList(iEntryList, TRUE);
+}
+
+/*--------------------- IdGetISetCount ---------------------
+ *  Purpose:	Returns the number of icon sets in the database.
+ *  Context:
+ *  Strategy:
+ 	  We always assume the database has fewer than 64k icon sets in it,
+	  so we always return the low word from HugeArrayGetCount.
+ *  Parameters:	vmFile	database file
+ *  Return:
+ ---------------------------------------------------------------------------*/
+word IdGetISetCount(VMFileHandle vmFile) {
+VMBlockHandle	iconArray;
+word count;
+
+    iconArray = IdGetHugeArray(vmFile);
+    count = HugeArrayGetCount(vmFile, iconArray);
+    return count;
+
+}
+
+/*--------------------- IdSetEntryBitmapNoCopy ---------------------
+ *  Purpose:	Sets a bitmap in the iconEntry list (bitmap
+ *		must already be copied to the database,
+ *		and icon must be created).
+ *  Context:
+ *  Strategy:
+ *  Parameters:	vmFile	database file
+ *		iSet	icon set (number)
+ *		icon	icon number
+ *  Return:
+ ---------------------------------------------------------------------------*/
+void IdSetEntryBitmapNoCopy(VMFileHandle vmFile, int iSet, int icon, VMBlockHandle bmp) {
+optr  iEntryList;
+IconEntry *iconEntry;
+word size;
+
+    iEntryList = IdLockEntryList(vmFile, iSet);
+    iconEntry = ChunkArrayElementToPtr(iEntryList, icon, &size);
+    iconEntry->IE_bitmap = bmp;
+    IdUnlockEntryList(iEntryList, TRUE);
+}
+
+/*--------------------- IdSetEntryCount ---------------------
+ *  Purpose:	Update the number of valid icons for an icon set
+ *  Context:
+ *  Strategy:
+ *  Parameters:	vmFile	database file
+ *		iSet	icon set (number)
+ *		count	number of icons
+ *  Return:
+ ---------------------------------------------------------------------------*/
+void IdSetEntryCount(VMFileHandle vmFile, int iSet, int count) {
+ISetHeader	*iHeader;
+
+    iHeader = IdLockIconHeader(vmFile, iSet);
+    iHeader->ISH_entryCount = count;
+    IdUnlockIconHeader(iHeader, TRUE);
+}
+
+
+/*--------------------- IdGetEntryCount ---------------------
+ *  Purpose:	returns number of valid icons for an icon set
+ *  Context:
+ *  Strategy:
+ *  Parameters:	vmFile	database file
+ *		iSet	icon set (number)
+ *  Return:
+ ---------------------------------------------------------------------------*/
+int IdGetEntryCount(VMFileHandle vmFile, int iSet) {
+int count;
+ISetHeader	*iHeader;
+
+    if (iSet < 0 ) return 0;	/* usually NO_CURRENT_ISET passend */
+    iHeader = IdLockIconHeader(vmFile, iSet);
+    count = iHeader->ISH_entryCount;
+    IdUnlockIconHeader(iHeader, FALSE);
+
+    return count;
+}
+
+/*--------------------- IdSetEntryParameters ---------------------
+ *  Purpose:	Build the VisMonikerListEntryType value for the icon.
+ *  Context:
+ *  Strategy:
+
+ *  Parameters:	vmFile	database file
+ *		iSet	icon set (number)
+ *		icon	icon number
+ *		params	icon parameters ... an IP_xx constant
+ *		colorScheme	Color depth, if the icon is colored
+ *				pass BMF_4BIT, BMF_8BIT or BMF_24BIT
+ *  Return:
+ ---------------------------------------------------------------------------*/
+void IdSetEntryParameters(VMFileHandle vmFile, int iSet, int icon, IconParameters params) {
+word	vmlet;		/* typedef WordFlags VisMonikerListEntryType; */
+IconEntry *iconEntry;
+optr	iEntryList;
+word	size;
+
+    switch (params) {
+
+    case IP_STANDARD_SVGA_FILE_256:
+	AssignVisMonikerListEntry(vmlet, DS_LARGE,    VMS_ICON, DAR_NORMAL,   DC_COLOR_8); 	// SVGA file
+    	break;
+    case IP_STANDARD_SVGA_FILE:
+	AssignVisMonikerListEntry(vmlet, DS_LARGE,    VMS_ICON, DAR_NORMAL,   DC_COLOR_4); 	// SVGA file
+    	break;
+    case IP_STANDARD_SVGA_FILE_MONO:
+	AssignVisMonikerListEntry(vmlet, DS_LARGE,    VMS_ICON, DAR_NORMAL,   DC_GRAY_1); 	// SVGA file
+    	break;
+    case IP_CGA_PREF_MODULE:
+	AssignVisMonikerListEntry(vmlet, DS_LARGE,    VMS_ICON, DAR_VERY_SQUISHED,   DC_GRAY_1); 	// SVGA file
+    	break;
+
+
+    case IP_STANDARD_VGA_FILE_256:
+	AssignVisMonikerListEntry(vmlet, DS_STANDARD, VMS_ICON, DAR_NORMAL,   DC_COLOR_8); 	// VGA file
+    	break;
+    case IP_STANDARD_VGA_FILE:
+	AssignVisMonikerListEntry(vmlet, DS_STANDARD, VMS_ICON, DAR_NORMAL,   DC_COLOR_4); 	// VGA file
+    	break;
+    case IP_STANDARD_MCGA_FILE:
+	AssignVisMonikerListEntry(vmlet, DS_STANDARD, VMS_ICON, DAR_NORMAL,   DC_GRAY_1); 	// MCGA file
+    	break;
+    case IP_STANDARD_CGA_FILE:
+	AssignVisMonikerListEntry(vmlet, DS_STANDARD, VMS_ICON, DAR_VERY_SQUISHED, DC_GRAY_1);	// CGA file
+    	break;
+
+
+    case IP_TINY_COLOR_FILE_256:
+	AssignVisMonikerListEntry(vmlet, DS_TINY,     VMS_ICON, DAR_NORMAL,   DC_COLOR_8);	// TC file
+    	break;
+    case IP_TINY_COLOR_FILE:
+	AssignVisMonikerListEntry(vmlet, DS_TINY,     VMS_ICON, DAR_NORMAL,   DC_COLOR_4);	// TC file
+    	break;
+    case IP_TINY_MONO_FILE:
+	AssignVisMonikerListEntry(vmlet, DS_TINY,     VMS_ICON, DAR_NORMAL,   DC_GRAY_1); 	// TM file
+    	break;
+
+
+    case IP_TINY_COLOR_TOOL_256:
+	AssignVisMonikerListEntry(vmlet, DS_TINY,     VMS_TOOL, DAR_NORMAL,   DC_COLOR_8); 	// TC tool
+    	break;
+    case IP_TINY_COLOR_TOOL:
+	AssignVisMonikerListEntry(vmlet, DS_TINY,     VMS_TOOL, DAR_NORMAL,   DC_COLOR_4); 	// TC tool
+    	break;
+    case IP_TINY_MONO_TOOL:
+	AssignVisMonikerListEntry(vmlet, DS_TINY,     VMS_TOOL, DAR_NORMAL,   DC_GRAY_1); 	// TM tool
+    	break;
+    case IP_STANDARD_CGA_TOOL:
+	AssignVisMonikerListEntry(vmlet, DS_STANDARD, VMS_TOOL, DAR_VERY_SQUISHED, DC_GRAY_1); 	// CGA tool
+    	break;
+
+    default: // unknown value
+    	ProgError("IdSetEntryParameters: param noch nicht implementiert");
+    	AssignVisMonikerListEntry(vmlet, DS_STANDARD, VMS_ICON, DAR_NORMAL,   DC_COLOR_4); 	// Savety value
+    EC ( ProgError("IdSetEntryParameters: invalid params"); )
+    }
+
+
+ 	/*
+	 * Assign VisMonikerListEntryType value
+	 *
+	 */
+    iEntryList = IdLockEntryList(vmFile, iSet);
+    iconEntry = ChunkArrayElementToPtr(iEntryList, icon, &size);
+    iconEntry->IE_type = vmlet;
+    IdUnlockEntryList(iEntryList, TRUE);
+
+}
+
+/*--------------------- GetEntryDefaultNameOptr ---------------------
+ *  Purpose:
+ *  Context:
+ *  Strategy:
+ *  Parameters:
+ *  Return:
+ ---------------------------------------------------------------------------*/
+optr GetEntryDefaultNameOptr(IconParameters params) {
+optr defaultNameOp = 0;
+
+    switch (params) {
+    case IP_STANDARD_SVGA_FILE_256:
+	defaultNameOp = @DefaultNameSVGAFile256;
+    	break;
+    case IP_STANDARD_SVGA_FILE:
+	defaultNameOp = @DefaultNameSVGAFile;
+    	break;
+    case IP_STANDARD_SVGA_FILE_MONO:
+	defaultNameOp = @DefaultNameSVGAFileMono;
+    	break;
+    case IP_CGA_PREF_MODULE:
+	defaultNameOp = @DefaultNameCGAPrefModule;
+    	break;
+
+    case IP_STANDARD_VGA_FILE_256:
+	defaultNameOp = @DefaultNameVGAFile256;
+    	break;
+    case IP_STANDARD_VGA_FILE:
+	defaultNameOp = @DefaultNameVGAFile;
+    	break;
+    case IP_STANDARD_MCGA_FILE:
+	defaultNameOp = @DefaultNameMCGAFile;
+    	break;
+    case IP_STANDARD_CGA_FILE:
+	defaultNameOp = @DefaultNameCGAFile;
+    	break;
+
+
+    case IP_TINY_COLOR_FILE_256:
+	defaultNameOp = @DefaultNameTinyCFile256;
+    	break;
+    case IP_TINY_COLOR_FILE:
+	defaultNameOp = @DefaultNameTinyCFile;
+    	break;
+    case IP_TINY_MONO_FILE:
+	defaultNameOp = @DefaultNameTinyMFile;
+    	break;
+
+    case IP_TINY_COLOR_TOOL_256:
+	defaultNameOp = @DefaultNameTinyCTool256;
+    	break;
+    case IP_TINY_COLOR_TOOL:
+	defaultNameOp = @DefaultNameTinyCTool;
+    	break;
+    case IP_TINY_MONO_TOOL:
+	defaultNameOp = @DefaultNameTinyMTool;
+    	break;
+
+    case IP_STANDARD_CGA_TOOL:
+	defaultNameOp = @DefaultNameCGATool;
+    	break;
+
+    default: // hm ..new FP value added?
+	defaultNameOp = @DefaultNameCustomCommon;
+    EC ( ProgError("GetEntryDefaultNameOptr: invalid params"); )
+    }
+
+    return defaultNameOp;
+}
+
+
+/*--------------------- IdGetEntryType ---------------------
+ *  Purpose: 	Returns the VisMonikerListEntryType value (IE_type field) for an icon
+ *  Context:
+ *  Strategy:
+ *  Parameters:
+ *  Return:	VisMonikerListEntryType	(typedef WordFlags VisMonikerListEntryType)
+ ---------------------------------------------------------------------------*/
+word IdGetEntryType(VMFileHandle vmFile, int iSet, int icon) {
+EC (int count;)
+IconEntry *iconEntry;
+optr	iEntryList;
+word 	size;
+word 	retVal;
+
+    // Check icon number (note: first icon number is zero!)
+    EC ( count = IdGetEntryCount(vmFile, iSet); )
+    EC ( if (icon >= count) { ProgError("IdGetEntryType: wrong icon number"); MessageNumberBox(icon); return 0; } )
+
+    iEntryList = IdLockEntryList(vmFile, iSet);
+    iconEntry = ChunkArrayElementToPtr(iEntryList, icon, &size);
+    retVal = iconEntry->IE_type;
+    IdUnlockEntryList(iEntryList, FALSE);
+
+    return retVal;
+}
+
+/*--------------------- IdSetEntryType ---------------------
+ *  Purpose: 	Set the (already build) VisMonikerListEntryType value
+ *		(IE_type field) for an icon.
+ *  Context:
+ *  Strategy:
+ *  Parameters:	vmFile, iSet, icon: icon to modify
+ *		vmlet: VisMonikerListEntryType (wordflags)
+ *  Return: 	-
+ ---------------------------------------------------------------------------*/
+void IdSetEntryType(VMFileHandle vmFile, int iSet, int icon, word vmlet) {
+EC (int count;)
+IconEntry *iconEntry;
+optr	iEntryList;
+word 	size;
+
+    // Check icon number (note: first icon number is zero!)
+    EC ( count = IdGetEntryCount(vmFile, iSet); )
+    EC ( if (icon >= count) { ProgError("IdGetEntryType: wrong icon number"); MessageNumberBox(icon); return; } )
+
+    iEntryList = IdLockEntryList(vmFile, iSet);
+    iconEntry = ChunkArrayElementToPtr(iEntryList, icon, &size);
+    iconEntry->IE_type = vmlet;
+    IdUnlockEntryList(iEntryList, TRUE);
+
+}
+
+
+
+/*--------------------- IdSetPreviewObject ---------------------
+ *  Purpose:	Sets the preview object field for an icon set
+ *  Context:	This routine is provided for downward compatibility only.
+ *  Strategy:
+ *  Parameters:
+ *  Return:
+ ---------------------------------------------------------------------------*/
+void IdSetPreviewObject(VMFileHandle vmFile, int iSet, PreviewGroupInteractionObject obj) {
+ISetHeader *iHeader;
+
+    iHeader = IdLockIconHeader(vmFile, iSet);
+    if (!iHeader) return;
+    iHeader->ISH_preview_unused.PST_object = obj;
+    IdUnlockIconHeader(iHeader, TRUE);
+}
+
+
+/*--------------------- IdSetPreviewColors ---------------------
+ *  Purpose:	sets the preview colors for an icon set
+ *  Context:	This routine is provided for downward compatibility only.
+ *  Strategy:
+ *  Parameters:
+ *  Return:
+ ---------------------------------------------------------------------------*/
+void IdSetPreviewColors(VMFileHandle vmFile, int iSet, int onFirstC, int onSecondC, int offFirstC, int offSecondC) {
+ISetHeader *iHeader;
+
+    iHeader = IdLockIconHeader(vmFile, iSet);
+    if (!iHeader) return;
+    iHeader->ISH_preview_unused.PST_onColor.CP_firstColor = onFirstC;
+    iHeader->ISH_preview_unused.PST_onColor.CP_secondColor = onSecondC;
+    iHeader->ISH_preview_unused.PST_offColor.CP_firstColor = offFirstC;
+    iHeader->ISH_preview_unused.PST_offColor.CP_secondColor = offSecondC;
+    IdUnlockIconHeader(iHeader, TRUE);
+}
+
+
+/*--------------------- IdGetEntryDimensions ---------------------
+ *  Purpose:	returns width & height of a icon bitmap
+ *  Context:
+ *  Strategy:
+ *  Parameters:
+ *  Return:
+ ---------------------------------------------------------------------------*/
+void IdGetEntryDimensions(VMFileHandle vmFile, int iSet, int icon, int *width, int *height) {
+VMBlockHandle bmpHandle;
+
+     bmpHandle = IdGetEntryBitmap(vmFile, iSet, icon);
+     if(!bmpHandle) {
+     	*width = 0;
+     	*height = 0;
+     	return;
+     	}
+
+     BTGetMoreBitmapInfos(vmFile, bmpHandle, width, height, 0);
+
+}
+
+/*--------------------- IdGetEntryBitmap ---------------------
+ *  Purpose: 	returns the icon's bitmap handle from an icon entry
+ *  Context:
+ *  Strategy:
+ *  Parameters:
+ *  Return:
+ ---------------------------------------------------------------------------*/
+VMBlockHandle IdGetEntryBitmap(VMFileHandle vmFile, int iSet, int icon) {
+EC (int count;)
+IconEntry *iconEntry;
+optr	iEntryList;
+word 	size;
+VMBlockHandle bmp;
+
+    // Check icon number (note: first icon number is zero!)
+    EC ( count = IdGetEntryCount(vmFile, iSet); )
+    EC ( if (icon >= count) { ProgError("IdGetEntryBitmap: wrong icon number"); MessageNumberBox(icon); return 0; } )
+
+    iEntryList = IdLockEntryList(vmFile, iSet);
+    iconEntry = ChunkArrayElementToPtr(iEntryList, icon, &size);
+    bmp = iconEntry->IE_bitmap;
+    IdUnlockEntryList(iEntryList, FALSE);
+
+    return bmp;
+}
+
+/*--------------------- IdGetEntry ---------------------
+ *  Purpose: 	Returns the entire IconEntry structure for an icon
+ *  Context:
+ *  Strategy:
+ *  Parameters:
+ *  Return:
+ ---------------------------------------------------------------------------*/
+void IdGetEntry(VMFileHandle vmFile, int iSet, int icon, IconEntry *retEntry) {
+EC (int count;)
+IconEntry *iconEntry;
+optr	iEntryList;
+word 	size;
+
+    // Check icon number (note: first icon number is zero!)
+    EC ( count = IdGetEntryCount(vmFile, iSet); )
+    EC ( if (icon >= count) { ProgError("IdGetEntry: wrong icon number"); MessageNumberBox(icon)} )
+
+    iEntryList = IdLockEntryList(vmFile, iSet);
+    iconEntry = ChunkArrayElementToPtr(iEntryList, icon, &size);
+    *retEntry = *iconEntry;
+    IdUnlockEntryList(iEntryList, FALSE);
+
+}
+
+/*--------------------- IdSetEntry ---------------------
+ *  Purpose: 	Set (replace) the entire IconEntry structure for an icon.
+ *		The icon must already exist (use IdCreateEntries).
+ *		iEntry.IE_bitmap may be zero or may point to a valid bitmap.
+ *		This bitmap must already be stored in the database file.
+ *		If iEntry.IE_bitmap is zero, re-use the existing bitmap.
+ *  Context:
+ *  Strategy:
+ *	- get a pointer to passed icon
+ *	- check if passed iEntry.IE_bitmap is zero or not
+ *	  + if it is zero there is no new bitmap. Re-use the existing one
+ *	  + if iEntry.IE_bitmap is not zero, it is the new bitmap to use.
+ *	    free the existing bitmap in this case
+ *	- handle IE_extraBlock in the same way
+ *	- replace existing icon entry structure.
+ *  Parameters:
+ *  Return:
+ ---------------------------------------------------------------------------*/
+void IdSetEntry(VMFileHandle vmFile, int iSet, int icon, IconEntry iEntry) {
+EC (int count;)
+IconEntry *iconEntry;
+optr	iEntryList;
+word 	size;
+
+    // Check icon number (note: first icon number is zero!)
+    EC ( count = IdGetEntryCount(vmFile, iSet); )
+    EC ( if (icon >= count) { ProgError("IdGetEntry: wrong icon number"); MessageNumberBox(icon)} )
+
+    iEntryList = IdLockEntryList(vmFile, iSet);
+    iconEntry = ChunkArrayElementToPtr(iEntryList, icon, &size);
+
+    /*
+     * if iEntry.IE_bitmap is not zero, free the old bitmap
+     *	  be sure, that the bitmap exists. it may be zero for a newly created entry
+     * if iEntry.IE_bitmap is zero, still use the existing bitmap
+     */
+    if ( iEntry.IE_bitmap ) {
+    	if (iconEntry->IE_bitmap) HugeArrayDestroy(vmFile, iconEntry->IE_bitmap);
+    } else {
+    	iEntry.IE_bitmap = iconEntry->IE_bitmap;	/* save old bitmap */
+    }
+
+    /*
+     * do the same for iEntry.IE_extraBlock
+     */
+    if ( iEntry.IE_extraBlock ) {
+    	if (iconEntry->IE_extraBlock) SecureVMFree(vmFile, iconEntry->IE_extraBlock);
+    } else {
+    	iEntry.IE_extraBlock = iconEntry->IE_extraBlock;	/* save old extra block */
+    }
+
+
+    /*
+     * Now copy data over.
+     */
+    *iconEntry = iEntry;
+    IdUnlockEntryList(iEntryList, TRUE);
+
+}
+
+/*--------------------- IdClearAndSetEntryBitmap ---------------------
+ *  Purpose: 	Replaces the icon's bitmap from an icon entry
+ *		The bitmap must already be stored in the database file.
+ *  Context:
+ *  Strategy:
+ 	- get & save the old bitmap's block handle
+	- set the new bitmap into the database
+	- free the old bitmap
+
+	This prevents the format list from ever containing
+	handles to freed blocks (this actually caused deaths,
+	believe it or not).
+*  Parameters:
+ *  Return:
+ ---------------------------------------------------------------------------*/
+void IdClearAndSetEntryBitmap(VMFileHandle vmFile, int iSet, int icon, VMBlockHandle newBmp) {
+EC (int count;)
+IconEntry *iconEntry;
+optr	iEntryList;
+word 	size;
+VMBlockHandle oldBmp;
+
+    // Check icon number (note: first icon number is zero!)
+    EC ( count = IdGetEntryCount(vmFile, iSet); )
+    EC ( if (icon >= count) { ProgError("IdClearAndSetEntryBitmap: wrong icon number"); MessageNumberBox(icon); return; } )
+
+    /*
+     * Replace the bitmap handle. Mark entry dirty!
+     */
+    iEntryList = IdLockEntryList(vmFile, iSet);
+    iconEntry = ChunkArrayElementToPtr(iEntryList, icon, &size);
+    oldBmp = iconEntry->IE_bitmap;
+    iconEntry->IE_bitmap = newBmp;
+    IdUnlockEntryList(iEntryList, TRUE);
+
+
+    /*
+     * free old bitmap
+     */
+    HugeArrayDestroy(vmFile, oldBmp);
+}
+
+/*--------------------- IdDeleteEntry ---------------------
+ *  Purpose:	Deletes the passed iconEntry & updates the count
+ *  Context:
+ *  Strategy:
+	- get the icon bitmap and free it
+	- compact the iconEntry list to get rid of the hole
+	- decrements the icon count for the icon set
+ *  Parameters:
+ *  Return:
+ ---------------------------------------------------------------------------*/
+void IdDeleteEntry(VMFileHandle vmFile, int iSet, int icon) {
+EC (int count;)
+optr	iEntryList;
+IconEntry fullEntry, *iconEntry;
+word	size;
+VMBlockHandle bmp, blk;
+
+    /*
+     * Destroy bitmap and extra block.
+     */
+    IdGetEntry(vmFile, iSet, icon, &fullEntry);
+    bmp = fullEntry.IE_bitmap;
+    if (!bmp) return;
+
+    EC ( if (CheckVMBlockValid(vmFile, bmp) ) { ProgError("IdDeleteEntry: invalid Bitmap"); return; } )
+    HugeArrayDestroy(vmFile, bmp);
+
+
+    /* An invalid extra block may occur due to an bug in the first beta release.
+     * SecureVMFree() handles this correctly */
+    blk = fullEntry.IE_extraBlock;
+    // if (!blk) return;
+    EC ( if (CheckVMBlockValid(vmFile, blk) ) { ProgError("IdDeleteEntry: IE_extraBlock invaild or zero"); /*return;*/ } )
+    SecureVMFree(vmFile, blk);
+
+
+    /*
+     * Compact iEntryList. All errors here are fatal.
+     */
+    iEntryList = IdLockEntryList(vmFile, iSet);
+    if (!iEntryList) return;
+
+    // Check icon number (note: first icon number is zero!)
+    EC ( count = IdGetEntryCount(vmFile, iSet); )
+    EC ( if (icon >= count) { ProgError("IdDeleteEntry: wrong icon number"); MessageNumberBox(icon); return; } )
+
+    iconEntry = ChunkArrayElementToPtr(iEntryList, icon, &size);
+    ChunkArrayDelete(iEntryList, iconEntry);
+    IdUnlockEntryList(iEntryList, TRUE);
+
+    /*
+     * Dec icon count
+     */
+    IdDecEntryCount(vmFile, iSet);
+}
+
+/*--------------------- IdIncEntryCount ---------------------
+ *  Purpose:	Increments ISH_entryCount for the icon set.
+ *  Context:
+ *  Strategy:
+ *  Parameters:
+ *  Return:
+ ---------------------------------------------------------------------------*/
+void IdIncEntryCount(VMFileHandle vmFile, int iSet) {
+ISetHeader	*iHeader;
+
+    iHeader = IdLockIconHeader(vmFile, iSet);
+    iHeader->ISH_entryCount += 1;
+    IdUnlockIconHeader(iHeader, TRUE);
+}
+/*--------------------- IdDecEntryCount ---------------------
+ *  Purpose:	Decrements ISH_entryCount for the icon set.
+ *  Context:
+ *  Strategy:
+ *  Parameters:
+ *  Return:
+ ---------------------------------------------------------------------------*/
+void IdDecEntryCount(VMFileHandle vmFile, int iSet) {
+ISetHeader	*iHeader;
+
+    iHeader = IdLockIconHeader(vmFile, iSet);
+    iHeader->ISH_entryCount -= 1;
+    IdUnlockIconHeader(iHeader, TRUE);
+}
+
+/*--------------------- IdFreeEntries ---------------------
+ *  Purpose:	Frees all VM blocks (bitmaps) associated with an icon set.
+ *  Context:
+ *  Strategy:
+ 	- for each icon entry:
+ 		+ if the icon bitmap is nonzero, free it.
+ 		+ free extraBlock (if it is valid)
+ *  Parameters:
+ *  Return:
+ ---------------------------------------------------------------------------*/
+void IdFreeEntries(VMFileHandle vmFile, int iSet) {
+IconEntry *iconEntry;
+optr	iEntryList;
+word	n, count, size;
+
+    iEntryList = IdLockEntryList(vmFile, iSet);
+    if (!iEntryList) return;
+
+    count = ChunkArrayGetCount(iEntryList);
+    if (!count) goto unlock;
+
+    for ( n = 0; n < count; n++) {
+    	iconEntry = ChunkArrayElementToPtr(iEntryList, n, &size);
+    	if ( iconEntry->IE_bitmap ) {
+    	    /*
+    	     * free the bitmap
+    	     */
+    	    HugeArrayDestroy(vmFile, iconEntry->IE_bitmap);
+    	    iconEntry->IE_bitmap = 0;
+    	}
+    	/*
+    	 * free extra block
+    	 */
+    	SecureVMFree(vmFile, iconEntry->IE_extraBlock);
+    	iconEntry->IE_extraBlock = 0;
+    }
+
+unlock:
+    IdUnlockEntryList(iEntryList, FALSE);
+
+}
+
+/*--------------------- IdDeleteISet ---------------------
+ *  Purpose:	Deletes an icon set from the database.  Doesn't delete the
+		icons (call IdFreeEntries first).
+ *  Context:
+ *  Strategy:
+ *  Parameters:
+ *  Return:
+ ---------------------------------------------------------------------------*/
+void IdDeleteISet(VMFileHandle vmFile, int iSet) {
+ISetHeader *iHeader;
+VMBlockHandle	array;
+
+    /*
+     *  Delete the iconEntry list vm block.
+     */
+    iHeader = IdLockIconHeader(vmFile, iSet);
+    SecureVMFree(vmFile, iHeader->ISH_iEntryListBlock);
+    SecureVMFree(vmFile, iHeader->ISH_extraBlock);
+    IdUnlockIconHeader(iHeader, FALSE);
+
+    /*
+     *  Delete the icon set in the icon list
+     */
+    array = IdGetHugeArray(vmFile);
+    HugeArrayDelete(vmFile, array, 1, iSet);
+
+}
+
+
+/*---------------------------------------------------------------------------
+ *  11/2025  - 	store extra data for an icon
+ * ---------------------------------------------------------------------------*/
+
+/*--------------------- ToolInitializeDrawAttrs ---------------------
+ *  Purpose:	Set up initial line attrs and area attrs
+ *  Parameters:
+ *  Return:	structures filled in
+ ---------------------------------------------------------------------------*/
+void ToolInitializeDrawAttrs(IconLineAttrs *lineAttrs, IconAreaAttrs *areaAttrs) {
+
+    if ( lineAttrs) {
+    	memset(lineAttrs, 0, sizeof(IconLineAttrs));		// ensure unused fields to be zero
+	lineAttrs->lineWidth.WWF_int = 1;
+	lineAttrs->lineWidth.WWF_frac = 0;
+	lineAttrs->lineStyle = LS_SOLID;
+	lineAttrs->lineDrawMask = SDM_100;
+	lineAttrs->lineMixMode = MM_COPY;
+	lineAttrs->lineColor.rt = 0;	/* default black */
+	lineAttrs->lineColor.gn = 0;
+	lineAttrs->lineColor.bl = 0;
+    }
+
+    if ( areaAttrs) {
+    	memset(areaAttrs, 0, sizeof(IconAreaAttrs));		// ensure unused fields to be zero
+	areaAttrs->areaDrawMask = SDM_100;
+	areaAttrs->areaPattern.HP_type = PT_SOLID ;
+	areaAttrs->areaPattern.HP_data = 0;
+	areaAttrs->areaMixMode = MM_COPY;
+	areaAttrs->areaColor.rt = 0;	/* default black */
+	areaAttrs->areaColor.gn = 0;
+	areaAttrs->areaColor.bl = 0;
+    }
+}
+
+
+
+/*--------------------- ToolCreateIconExtraBlock ---------------------
+ *  Purpose:	Creata a VM block to store additional data for the con
+ *  Context:
+ *  Strategy:
+ 	- Alloc the vm block
+ 	- clear the block and set (initial) version number
+ *  Parameters:	vmFile:  database file
+ *		bitmap:	 icon bitmap
+ *  Return:
+ ---------------------------------------------------------------------------*/
+VMBlockHandle ToolCreateIconExtraBlock(VMFileHandle vmFile, VMBlockHandle bitmap) {
+VMBlockHandle 	extraBlock;
+MoreIconData	*dataPtr;
+MemHandle	mh;
+word	format;
+PaletteEntry	color;
+
+    extraBlock = VMAlloc(vmFile, sizeof(MoreIconData), 0);
+    dataPtr = VMLock(vmFile, extraBlock, &mh);
+
+    memset(dataPtr, 0, sizeof(MoreIconData));
+    dataPtr->MID_version = MID_CURRENT_VERSION;
+    ToolInitializeDrawAttrs(&(dataPtr->MID_lineAttrs), &(dataPtr->MID_areaAttrs));
+
+    if ( bitmap ) {
+    	/*
+    	 * If the icons bitmap has a palette, the color black may not be part of the
+    	 * palette. That is why we always use the color of the first palette index.
+    	 */
+    	format = BTGetMoreBitmapInfos(vmFile, bitmap, NULL, NULL, NULL);
+    	if ( format & BMT_PALETTE ) {
+    	    BTGetBitmapPalette(vmFile, bitmap, &color, 1);
+    	    dataPtr->MID_lineAttrs.lineColor = color;
+    	    dataPtr->MID_areaAttrs.areaColor = color;
+    	}
+    }
+
+    VMDirty(mh);
+    VMUnlock(mh);
+
+    return extraBlock;
+}
+
+/*--------------------- IdGetIconExtraBlock ---------------------
+ *  Purpose:	Get the IE_extraBlock for an icon.
+ *		Ensure that the block exists.
+ *  Context:
+ *  Strategy:
+ 	- Lock icon list entry
+ 	- Read extra block. Create an empty block if it not extists.
+ *  Parameters:
+ *  Return:
+ ---------------------------------------------------------------------------*/
+VMBlockHandle IdGetIconExtraBlock( VMFileHandle vmFile, int iSet, int icon) {
+EC (int count;)
+VMInfoStruct info;
+IconEntry *iconEntry;
+optr	iEntryList;
+word 	size;
+VMBlockHandle	extraBlock;
+
+    // Check icon number (remember: first icon number is zero!)
+    EC ( count = IdGetEntryCount(vmFile, iSet); )
+    EC ( if (icon >= count) { DebugInfo2("\rIdGetExtraBlock icon=%u, count = %u", icon, count);
+    		ProgError("IdGetIconExtraBlock: wrong icon number"); MessageNumberBox(icon); return 0; } )
+
+    iEntryList = IdLockEntryList(vmFile, iSet);
+    iconEntry = ChunkArrayElementToPtr(iEntryList, icon, &size);
+
+    /*
+     * Ensure that there is an extra block. Older versions of
+     * the icon editor will not create an extra block.
+     * Due to a bug in the first beta release, the block may be invaild
+     * for files edited with this version. Therefore check this too.
+     * Then unlock IconEntry list.
+     */
+    extraBlock = iconEntry->IE_extraBlock;
+    if ( (!extraBlock) || (!VMInfo (vmFile, extraBlock, &info)) ) {
+        extraBlock = ToolCreateIconExtraBlock(vmFile, iconEntry->IE_bitmap);
+        iconEntry->IE_extraBlock = extraBlock;
+        IdUnlockEntryList(iEntryList, TRUE);
+    } else {
+    	IdUnlockEntryList(iEntryList, FALSE);
+    }
+
+    return extraBlock;
+}
+
+
+/*--------------------- IdSetLineAttrs ---------------------
+ *  Purpose:	Store line drawing attributs for an icon
+ *  Context:
+ *  Strategy:
+ *  Parameters:
+ *  Return:	-
+ ---------------------------------------------------------------------------*/
+void IdSetLineAttrs(VMFileHandle vmFile, int iSet, int icon, IconLineAttrs *lineAttrs) {
+VMBlockHandle	extraBlock;
+MoreIconData	*dataPtr;
+MemHandle	mh;
+
+    /*
+     * Get the extra block. The routine ensures the existence of this block.
+     */
+    extraBlock = IdGetIconExtraBlock(vmFile, iSet, icon);
+
+    /*
+     * store line attributes (only if changed)
+     */
+    dataPtr = VMLock(vmFile, extraBlock, &mh);
+    if ( memcmp(&(dataPtr->MID_lineAttrs), lineAttrs, sizeof(IconLineAttrs)) ) {
+	dataPtr->MID_lineAttrs = *lineAttrs;
+	VMDirty(mh);
+    }
+    VMUnlock(mh);
+
+}
+
+/*--------------------- IdSetAreaAttrs ---------------------
+ *  Purpose:	Store area drawing attributs for an icon
+ *  Context:
+ *  Strategy:
+ *  Parameters:
+ *  Return:	-
+ ---------------------------------------------------------------------------*/
+void IdSetAreaAttrs(VMFileHandle vmFile, int iSet, int icon, IconAreaAttrs *areaAttrs) {
+VMBlockHandle	extraBlock;
+MoreIconData	*dataPtr;
+MemHandle	mh;
+
+    /*
+     * Get the extra block. The routine ensures the existence of this block.
+     */
+    extraBlock = IdGetIconExtraBlock(vmFile, iSet, icon);
+
+    /*
+     * store area attributes (only if  changed)
+     */
+    dataPtr = VMLock(vmFile, extraBlock, &mh);
+    if ( memcmp(&(dataPtr->MID_areaAttrs), areaAttrs, sizeof(IconAreaAttrs)) ) {
+    	dataPtr->MID_areaAttrs = *areaAttrs;
+    	VMDirty(mh);
+    }
+    VMUnlock(mh);
+
+}
+
+
+/*--------------------- IdGetLineOrAreaAttrs ---------------------
+ *  Purpose:	Read line and/or area drawing attributs for an icon
+ *  Context:
+ *  Strategy:
+ *  Parameters: vmFile:	database file
+ *		iSet:	icon set number
+ *		icon:	icon number
+ *		lineAttrs:	pointer to IconLineAttrs
+ *				pass zero if you are not interested in
+ *		areaAttrs:	pointer to IconAreaAttrs
+ *				pass zero if you are not interested in
+ *  Return:	lineAttrs/areaAttrs is filled in
+ ---------------------------------------------------------------------------*/
+void IdGetLineOrAreaAttrs(VMFileHandle vmFile, int iSet, int icon, IconLineAttrs *lineAttrs, IconAreaAttrs *areaAttrs) {
+VMBlockHandle	extraBlock;
+MoreIconData	*dataPtr;
+MemHandle	mh;
+
+    /*
+     * Get the extra block. The routine ensures the existence of this block.
+     */
+    extraBlock = IdGetIconExtraBlock(vmFile, iSet, icon);
+
+    /*
+     * Copy requested attributes
+     */
+    dataPtr = VMLock(vmFile, extraBlock, &mh);
+    if (lineAttrs) *lineAttrs = dataPtr->MID_lineAttrs;
+    if (areaAttrs) *areaAttrs = dataPtr->MID_areaAttrs;
+    VMUnlock(mh);
+
+}
+
+/*--------------------- ToolCreateISetExtraBlock ---------------------
+ *  Purpose:	Create and initialize extra data block for an icon set
+ *  Context:
+ *  Strategy:
+ 	- create and lock block
+ 	- initialize data (version, token)
+ *  Parameters:
+ *  Return:	VMBlockHandle of the new block
+ ---------------------------------------------------------------------------*/
+VMBlockHandle ToolCreateISetExtraBlock(VMFileHandle vmFile, int iSet) {
+VMBlockHandle 	extraBlock;
+ISetExtraData	*dataPtr;
+MemHandle	mh;
+char 	tchars[5];
+
+    extraBlock = VMAlloc(vmFile, sizeof(ISetExtraData), 0);
+    dataPtr = VMLock(vmFile, extraBlock, &mh);
+
+    memset(dataPtr, 0, sizeof(ISetExtraData));
+    dataPtr->ISED_version = ISED_CURRENT_VERSION;
+
+    /* extra block version 1 data */
+    strcpy(tchars, "Tokn");
+    memcpy(dataPtr->ISED_token.GT_chars, tchars, 4);
+    dataPtr->ISED_token.GT_manufID = 0;
+
+    /* newly added fields since extra block version 2
+     * we must distingush between normal icons and pointer images
+     */
+    if ( IdGetFlags(vmFile, iSet) & IF_PTR_IMAGE ) {
+	dataPtr->ISED_textMonikerOptions = DEFAULT_TEXT_MONIKER_OPTIONS;
+	dataPtr->ISED_wsHeader = 	WSHT_PTR_IMAGE;
+	dataPtr->ISED_wsLanguage = 	WSLT_DEFAULT_LANGUAGE;	// WSLT_GOC;
+	dataPtr->ISED_wsOptions = 	COMPRESS_ICON_NEVER;
+    } else {
+	dataPtr->ISED_textMonikerOptions = DEFAULT_TEXT_MONIKER_OPTIONS;
+	dataPtr->ISED_wsHeader = 	WSHT_DEFAULT_HEADER; 	// WSHT_VIS_MONIKER;
+	dataPtr->ISED_wsLanguage = 	WSLT_DEFAULT_LANGUAGE;	// WSLT_GOC;
+	dataPtr->ISED_wsOptions = 	WRITE_TRANSPARENCY_MASK |
+    					USE_FILL_BITMAP_FOR_MONO |
+    					COMPRESS_ICON_AUTO;
+    }
+
+    VMDirty(mh);
+    VMUnlock(mh);
+
+    return extraBlock;
+}
+
+/*--------------------- ToolUpdateISetExtraBlock ---------------------
+ *  Purpose:	See if the block  needs an upadte
+ *  Context:
+ *  Strategy:	- if the version is the current version or newer, anything is ok
+ *		- if not, update "initial version" to "version 2"
+ *	          That means, if the current version is greater than version 2,
+ *		  addional updates are required
+ *		  AND update "version 2" to newer version is required too.
+ *  Parameters:
+ *  Return:	VMBlockHandle of the new block
+ ---------------------------------------------------------------------------*/
+VMBlockHandle ToolUpdateISetExtraBlock(VMFileHandle vmFile, int iSet, VMBlockHandle extraBlock){
+VMBlockHandle 	newBlock;
+ISetExtraData	*dataPtr, *newDataPtr;
+MemHandle	mh, mh2;
+
+    dataPtr = VMLock(vmFile, extraBlock, &mh);
+    if ( dataPtr->ISED_version >= ISED_CURRENT_VERSION ) {
+    	/*
+    	 * The block version is up to date or newer than the current version.
+    	 * We can handle both cases because we don't touch the newer data fields.
+    	 */
+    	VMUnlock(mh);
+	return extraBlock;
+    }
+
+    switch (dataPtr->ISED_version ) {
+    case ISED_INITIAL_VERSION:
+    	/*
+    	 * Update initial version to version 2
+    	 * The size of the block has been changed. Create a new block and copy
+    	 * old data (ISED_token in our case).
+    	 * Newly added fields are initialized by ToolCreateISetExtraBlock().
+    	 */
+	newBlock = ToolCreateISetExtraBlock(vmFile, iSet);
+
+	newDataPtr = VMLock(vmFile, extraBlock, &mh2);
+	newDataPtr->ISED_token = dataPtr->ISED_token;
+
+
+	VMDirty(mh2);
+	VMUnlock(mh2);
+
+	// free old block
+	VMUnlock(mh);
+	VMFree(vmFile, extraBlock);
+	break;
+
+    	/*
+    	 * The default branch should never be executed, because we have tested
+    	 * for ">=" current version above.
+    	 */
+EC( default: VMUnlock(mh); ProgError("Unhandled version in ToolUpdateISetExtraBlock"); return extraBlock; )
+
+    }
+
+    return newBlock;
+}
+
+/*--------------------- IdGetISetExtraBlock ---------------------
+ *  Purpose:	Get the ISH_extraBlock for an icon set.
+ *		Ensure that the block exists.
+ *  Context:
+ *  Strategy:
+ 	- Lock icon set header
+ 	- Read extra block. Create an empty block if it not extists.
+ *  Parameters:
+ *  Return:
+ ---------------------------------------------------------------------------*/
+VMBlockHandle IdGetISetExtraBlock( VMFileHandle vmFile, int iSet) {
+VMInfoStruct info;
+ISetHeader *iHeader;
+VMBlockHandle	extraBlock;
+
+    /*
+     * Lock header
+     */
+    iHeader = IdLockIconHeader(vmFile, iSet);
+    EC( if (!iHeader) { ProgError("IdGetISetExtraBlock: invaild iSet"); } )
+
+    /*
+     * Ensure that there is an extra block. Initially
+     * the icon editor does not create an extra block.
+     * Due to a bug in the first beta release, the block may be invaild
+     * for files edited with this version. Therefore check this too.
+     * Then unlock header and return.
+     */
+    extraBlock = iHeader->ISH_extraBlock;
+    if ( (!extraBlock) || (!VMInfo (vmFile, extraBlock, &info) ) ) {
+    	/*
+    	 * Create a new extra block
+    	 */
+        extraBlock = ToolCreateISetExtraBlock(vmFile, iSet);
+        iHeader->ISH_extraBlock = extraBlock;
+        IdUnlockIconHeader(iHeader, TRUE);
+    } else {
+    	/*
+    	 * The block exists.
+    	 * Check if the block needs an update and update it
+    	 */
+    	VMBlockHandle newBlock;
+    	newBlock = ToolUpdateISetExtraBlock(vmFile, iSet, extraBlock);
+    	if ( newBlock != extraBlock ) {
+            iHeader->ISH_extraBlock = newBlock;
+            IdUnlockIconHeader(iHeader, TRUE);
+            extraBlock = newBlock;
+    	} else {
+    	    IdUnlockIconHeader(iHeader, FALSE);
+    	}
+
+    }
+
+    return extraBlock;
+}
+
+
+/*--------------------- IdSetToken ---------------------
+ *  Purpose:	Store initial token, used for export to tokenDB file, for an icon set
+ *  Context:
+ *  Strategy:
+ *  Parameters:
+ *  Return:	-
+ ---------------------------------------------------------------------------*/
+void IdSetToken(VMFileHandle vmFile, int iSet, GeodeToken token) {
+VMBlockHandle	extraBlock;
+ISetExtraData	*dataPtr;
+MemHandle	mh;
+
+    /*
+     * Get the extra block. The routine ensures the existence of this block.
+     */
+    extraBlock = IdGetISetExtraBlock(vmFile, iSet);
+
+    /*
+     * store token, but only if is has been changed
+     */
+    dataPtr = VMLock(vmFile, extraBlock, &mh);
+    if ( memcmp(&(dataPtr->ISED_token), &token, sizeof(GeodeToken)) ) {
+    	memcpy(&(dataPtr->ISED_token), &token, sizeof(GeodeToken));
+    	VMDirty(mh);
+    }
+
+    VMUnlock(mh);
+
+}
+
+/*--------------------- IdGetToken ---------------------
+ *  Purpose:	Retrive initial token, used for export to tokenDB file,  for an icon set
+ *  Context:
+ *  Strategy:
+ *  Parameters:
+ *  Return:	token, stored in the extra block
+ ---------------------------------------------------------------------------*/
+GeodeToken IdGetToken(VMFileHandle vmFile, int iSet) {
+VMBlockHandle	extraBlock;
+ISetExtraData	*dataPtr;
+MemHandle	mh;
+GeodeToken 	token;
+
+    /*
+     * Get the extra block. The routine ensures the existence of this block.
+     */
+    extraBlock = IdGetISetExtraBlock(vmFile, iSet);
+
+    /*
+     * read token
+     */
+    dataPtr = VMLock(vmFile, extraBlock, &mh);
+    memcpy(&token, &(dataPtr->ISED_token), sizeof(GeodeToken));
+    VMUnlock(mh);
+
+    return token;
+}
+
+
+/*--------------------- IdShiftIcon ---------------------
+ *  Purpose:	Shift an icon up or down in the set
+ *  Context:	Core routine to sort icons
+ *  Strategy:
+ *  Parameters:	vmFile: database file
+ *		iSet: 	affected iSet
+ *		icon	icon (number) to move
+ *		delta	+1: shift icon one position up
+ *			-1 shift icon one position  down
+ *  Return:	TRUE if error
+ *		FALSE if ok
+ ---------------------------------------------------------------------------*/
+Boolean IdShiftIcon(VMFileHandle vmFile, int iSet, int icon, int delta) {
+IconEntry tempEntry, *sourceEntryPtr, *destEntryPtr;
+optr	iEntryList;
+int	icon2;
+word	count, size;
+Boolean isDirty = FALSE;
+
+    iEntryList = IdLockEntryList(vmFile, iSet);
+    if (!iEntryList) return TRUE;
+
+    /*
+     * get information and do error checking
+     */
+    count = ChunkArrayGetCount(iEntryList);
+    if (count < 2 ) {
+    	EC( ProgError("IdShiftIcon: too few icons"); )
+    	goto unlock;
+    }
+
+    EC ( if ( (delta < (-1)) || (delta > 1) ) { ProgError("IdShiftIcon: invalid delta value"); goto unlock; } )
+    icon2 = icon + delta;
+    if ( icon2 < 0 ) {
+    	EC(ProgError("IdShiftIcon: icon2 < 0: BAD!");)
+        goto unlock;
+    }
+    if ( icon2 >= count ) {
+    	EC(ProgError("IdShiftIcon: icon2 to large: BAD!");)
+        goto unlock;
+    }
+
+    /*
+     * swap icon and icon2. Mark database as dirty
+     */
+    sourceEntryPtr = ChunkArrayElementToPtr(iEntryList, icon, &size);
+    destEntryPtr = ChunkArrayElementToPtr(iEntryList, icon2, &size);
+    tempEntry = *destEntryPtr;
+    *destEntryPtr = *sourceEntryPtr;
+    *sourceEntryPtr = tempEntry;
+
+    isDirty = TRUE;
+
+unlock:
+    IdUnlockEntryList(iEntryList, isDirty);
+
+    return !isDirty;	/* on error, isDirty is still FALSE */
+}
+
+/*--------------------- IdShiftISet ---------------------
+ *  Purpose:	Shift an iSet up or down in the database's iSet list
+ *  Context:	Core routine to sort iSets
+ *  Strategy:
+ *  Parameters:	vmFile: database file
+ *		iSet: 	iSet to move
+ *		delta	+1: shift iSet one position up
+ *			-1 shift iSet one position  down
+ *  Return:	TRUE if error
+ *		FALSE if ok
+ ---------------------------------------------------------------------------*/
+Boolean IdShiftISet(VMFileHandle vmFile, int iSet, int delta) {
+int	iSet2;
+word	count, size;
+ISetHeader *iHeader, tempHeader1, tempHeader2;
+VMBlockHandle	array;
+
+
+    EC ( if ( (delta < (-1)) || (delta > 1) ) { ProgError("IdShiftISet: invalid delta value"); return TRUE; } )
+
+    array = IdGetHugeArray(vmFile);
+    count = HugeArrayGetCount(vmFile, array);
+
+    iSet2 = iSet + delta;
+    if ( iSet2 < 0 ) {
+    	EC(ProgError("IdShiftISet: Set2 < 0: BAD!");)
+        return TRUE;
+    }
+    if ( iSet2 >= count ) {
+    	EC(ProgError("IdShiftISet: Set2 to large: BAD!");)
+        return TRUE;
+    }
+
+    /*
+     * Swap iSet and iSet2. Mark database as dirty
+     * We cannot lock two huge array elements at the same time.
+     */
+    HugeArrayLock(vmFile, array, iSet, (void**)&iHeader, &size);
+    tempHeader1 = *iHeader;
+    HugeArrayUnlock(iHeader);
+
+    HugeArrayLock(vmFile, array, iSet2, (void**)&iHeader, &size);
+    tempHeader2 = *iHeader;
+    *iHeader = tempHeader1;
+    HugeArrayDirty(iHeader);
+    HugeArrayUnlock(iHeader);
+
+    HugeArrayLock(vmFile, array, iSet, (void**)&iHeader, &size);
+    *iHeader = tempHeader2;
+    HugeArrayDirty(iHeader);
+    HugeArrayUnlock(iHeader);
+
+    return FALSE;
+}
+
+
+/*--------------------- IdSetWriteSourceData ---------------------
+ *  Purpose:	Store options and settings that are used when writing
+ *		the icon set as source code.
+ *  Context:
+ *  Strategy:
+ *  Parameters:	vmFile: database file
+ *		iSet: 	affected iSet
+ *	identifier, used for the options in the WriteSourceDialog:
+ *		compressOptions: compression flag bits
+ *		maskOptions:	 transparency flag bits etc
+ *		language:	GOC or UI code
+ *		header:		VisMoniker; BItmap; GString...
+ *  Return:	-
+ ---------------------------------------------------------------------------*/
+void IdSetWriteSourceData(VMFileHandle vmFile, int iSet,
+			int compressOptions, int maskOptions, int language, int header) {
+VMBlockHandle	extraBlock;
+ISetExtraData	*dataPtr;
+MemHandle	mh;
+Boolean markDirty = FALSE;
+
+
+    /*
+     * Get and lock the extra block. The routine ensures the existence of this block.
+     */
+    extraBlock = IdGetISetExtraBlock(vmFile, iSet);
+    dataPtr = VMLock(vmFile, extraBlock, &mh);
+
+    /*
+     * update values. Mark database dirty only if the values have been changed
+     * ISED_wsOptions stores compressOptions as well as maskOptions
+     */
+    if ( dataPtr->ISED_wsHeader != header) markDirty = TRUE;
+    dataPtr->ISED_wsHeader = header;
+
+    if ( dataPtr->ISED_wsLanguage != language) markDirty = TRUE;
+    dataPtr->ISED_wsLanguage = language;
+
+    compressOptions |= maskOptions;
+    if ( dataPtr->ISED_wsOptions != compressOptions) markDirty = TRUE;
+    dataPtr->ISED_wsOptions = compressOptions;
+
+    if ( markDirty) VMDirty(mh);
+    VMUnlock(mh);
+
+}
+
+/*--------------------- IdGetWriteSourceData ---------------------
+ *  Purpose:	Read options and settings that are used when writing
+ *		the icon set as source code from iSet extra blok
+ *  Context:
+ *  Strategy:
+ *  Parameters:	vmFile: database file
+ *		iSet: 	affected iSet
+ *	identifier, used for the options in the WriteSourceDialog:
+ *		compressOptions: compression flag bits
+ *		maskOptions:	 transparency flag bits etc
+ *		language:	GOC or UI code
+ *		header:		VisMoniker; BItmap; GString...
+ *  Return:	values ate filled in
+ ---------------------------------------------------------------------------*/
+void IdGetWriteSourceData(VMFileHandle vmFile, int iSet,
+			int *compressOptions, int *maskOptions, int *language, int *header) {
+VMBlockHandle	extraBlock;
+ISetExtraData	*dataPtr;
+MemHandle	mh;
+
+
+    /*
+     * Get and lock the extra block. The routine ensures the existence of this block.
+     */
+    extraBlock = IdGetISetExtraBlock(vmFile, iSet);
+    dataPtr = VMLock(vmFile, extraBlock, &mh);
+
+    /*
+     * read values.
+     * ISED_wsOptions stores compressOptions as well as maskOptions
+     */
+    *header = dataPtr->ISED_wsHeader;
+    *language = dataPtr->ISED_wsLanguage;
+
+    *compressOptions = dataPtr->ISED_wsOptions & ICON_COMPRESS_BITS;
+    *maskOptions = dataPtr->ISED_wsOptions & (~ICON_COMPRESS_BITS);
+
+    VMUnlock(mh);
+
+}
+
+
+/*--------------------- IdSetHotspot ---------------------
+ *  Purpose: 	Set hotspot coordinates for a pointer image
+ *  Context:	The hotspot is stored in the IE_type field because pointer images
+ *		have no type attributes like DisplayClass, IconType or display size
+ *  Strategy:	- x --> high byte
+ *		  y --> low byte
+ *		- set IE_type field
+ *  Parameters:	vmFile: database file
+ *		iSet: 	iSet to handle
+ *		icon:	affected pointer image
+ *		x,y:	Hotspot coordinates
+ *  Return:	VisMonikerListEntryType	(typedef WordFlags VisMonikerListEntryType)
+ ---------------------------------------------------------------------------*/
+void IdSetHotspot(VMFileHandle vmFile, int iSet, int icon, int x, int y) {
+EC (int count;)
+EC (int flags;)
+word 	value;
+
+    // Check icon number (note: first icon number is zero!)
+    EC ( count = IdGetEntryCount(vmFile, iSet); )
+    EC ( if (icon >= count) { ProgError("IdSetHotspot: wrong icon number"); MessageNumberBox(icon); return; } )
+
+    EC( flags = IdGetFlags(vmFile, iSet) );
+    EC( if ( 0 == (flags & IF_PTR_IMAGE) ) { ProgError("IdSetHotspot: iSet is not pointer_image"); MessageNumberBox(iSet); return; } )
+
+    value = x;
+    value = (value << 8) + y;
+    IdSetEntryType(vmFile, iSet, icon, value);
+}
+
+/*--------------------- IdGetHotspot ---------------------
+ *  Purpose: 	Retrive hotspot coordinates for a pointer image
+ *  Context:	The hotspot is stored in the IE_type field because pointer images
+ *		have no type attributes like DisplayClass, IconType or display size
+ *  Strategy:	- get IE_type field
+ *		- extract x and y values
+ *  Parameters:	vmFile: database file
+ *		iSet: 	iSet to handle
+ *		icon:	affected pointer image
+ *		x,y:	retrun: Hotspot coordinates
+ *  Return:	VisMonikerListEntryType	(typedef WordFlags VisMonikerListEntryType)
+ ---------------------------------------------------------------------------*/
+void IdGetHotspot(VMFileHandle vmFile, int iSet, int icon, int *x, int *y) {
+EC (int count; )
+EC (int flags;)
+word 	value;
+
+    // Check icon number (note: first icon number is zero!)
+    EC ( count = IdGetEntryCount(vmFile, iSet); )
+    EC ( if (icon >= count) { ProgError("IdGetHotspot: wrong icon number"); MessageNumberBox(icon); return; } )
+
+    EC( flags = IdGetFlags(vmFile, iSet) );
+    EC( if ( 0 == (flags & IF_PTR_IMAGE) ) { ProgError("IdGetHotspot: iSet is not pointer_image"); MessageNumberBox(iSet); return; } )
+
+    value = IdGetEntryType(vmFile, iSet, icon);
+    *x = (value>>8) & 0xFF;
+    *y = value & 0xFF;
+}
+
+
+/*---------------------  ---------------------
+ *  Purpose:
+ *  Context:
+ *  Strategy:
+ *  Parameters:
+ *  Return:
+ ---------------------------------------------------------------------------*/
+
+
+/*---------------------  ---------------------
+ *  Purpose:
+ *  Context:
+ *  Strategy:
+ *  Parameters:
+ *  Return:
+ ---------------------------------------------------------------------------*/
+
+

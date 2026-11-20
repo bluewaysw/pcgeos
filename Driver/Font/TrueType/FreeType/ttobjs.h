@@ -195,6 +195,7 @@
     Short          delta_shift;
 
     Byte           instruct_control;
+    Bool           scan_control;
     Int            scan_type;
 
     UShort         gep0;
@@ -367,60 +368,6 @@
   typedef TSubglyph_Record*         PSubglyph_Record;
   typedef TSubglyph_Record*         PSubglyph_Stack;
 
-  /* A note regarding non-squared pixels:                                */
-  /*                                                                     */
-  /* (This text will probably go into some docs at some time, for        */
-  /*  now, it is kept there to explain some definitions in the           */
-  /*  TIns_Metrics record).                                              */
-  /*                                                                     */
-  /* The CVT is a one-dimensional array containing values that           */
-  /* control certain important characteristics in a font, like           */
-  /* the height of all capitals, all lowercase letter, default           */
-  /* spacing or stem width/height.                                       */
-  /*                                                                     */
-  /* These values are found in FUnits in the font file, and must be      */
-  /* scaled to pixel coordinates before being used by the CVT and        */
-  /* glyph programs.  Unfortunately, when using distinct x and y         */
-  /* resolutions (or distinct x and y pointsizes), there are two         */
-  /* possible scalings.                                                  */
-  /*                                                                     */
-  /* A first try was to implement a 'lazy' scheme where all values       */
-  /* were scaled when first used.  However, while some values are always */
-  /* used in the same direction, and some other are used in many         */
-  /* different circumstances and orientations.                           */
-  /*                                                                     */
-  /* I have found a simpler way to do the same, and it even seems to     */
-  /* work in most of the cases:                                          */
-  /*                                                                     */
-  /* - all CVT values are scaled to the maximum ppem size                */
-  /*                                                                     */
-  /* - when performing a read or write in the CVT, a ratio factor        */
-  /*   is used to perform adequate scaling. Example:                     */
-  /*                                                                     */
-  /*    x_ppem = 14                                                      */
-  /*    y_ppem = 10                                                      */
-  /*                                                                     */
-  /*   we choose ppem = x_ppem = 14 as the CVT scaling size.  All cvt    */
-  /*   entries are scaled to it.                                         */
-  /*                                                                     */
-  /*    x_ratio = 1.0                                                    */
-  /*    y_ratio = y_ppem/ppem (< 1.0)                                    */
-  /*                                                                     */
-  /*   we compute the current ratio like:                                */
-  /*                                                                     */
-  /*     - if projVector is horizontal,                                  */
-  /*         ratio = x_ratio = 1.0                                       */
-  /*     - if projVector is vertical,                                    */
-  /*         ratop = y_ratio                                             */
-  /*     - else,                                                         */
-  /*         ratio = sqrt((proj.x*x_ratio)^2 + (proj.y*y_ratio)^2)       */
-  /*                                                                     */
-  /*   reading a cvt value returns      ratio * cvt[index]               */
-  /*   writing a cvt value in pixels    cvt[index] / ratio               */
-  /*                                                                     */
-  /*   the current ppem is simply       ratio * ppem                     */
-  /*                                                                     */
-
   /* metrics used by the instance and execution context objects */
   struct  TIns_Metrics_
   {
@@ -429,7 +376,6 @@
     UShort      resolution;  /* device resolution in dpi. */
     UShort      ppem;        /* maximum ppem size */
 
-    Long        ratio;       /* current ratio     */
     Long        scale1;
     Long        scale2;      /* scale for ppem */
   };
@@ -704,12 +650,11 @@
   PExecution_Context  New_Context( PFace  face );
 
   LOCAL_DEF
-  TT_Error  Done_Context( PExecution_Context  exec );
+  void      Done_Context( );
 
 
   LOCAL_DEF
   TT_Error  Context_Load( PExecution_Context  exec,
-                          PFace               face,
                           PInstance           ins );
 
   LOCAL_DEF

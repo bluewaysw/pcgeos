@@ -27,10 +27,12 @@
 #include <unicode.h>
 #include <Ansi/stdlib.h>
 
-#define NUM_CHARMAPENTRIES      ( sizeof(geosCharMap) / sizeof(word) )
 #define MIN_GEOS_CHAR           ( C_SPACE )
-#define MAX_GEOS_CHAR           ( NUM_CHARMAPENTRIES + MIN_GEOS_CHAR )
-#define GEOS_CHAR_INDEX( i )    ( i - MIN_GEOS_CHAR )
+#define FIRST_EXTENDED_CHAR     0x80
+#define MAX_GEOS_CHAR           0xff
+
+#define NUM_CHARMAPENTRIES      ( sizeof(geosCharMap) / sizeof(word) )
+#define NUM_GEOS_CHARS          ( MAX_GEOS_CHAR - MIN_GEOS_CHAR + 1 )
 
 
 /***********************************************************************
@@ -41,102 +43,6 @@
 word geosCharMap[] = 
 {
 /*      unicode */
-        C_SPACE,
-        C_EXCLAMATION_MARK,
-        C_QUOTATION_MARK,
-        C_NUMBER_SIGN,
-        C_DOLLAR_SIGN,
-        C_PERCENT_SIGN,
-        C_AMPERSAND,
-        C_APOSTROPHE_QUOTE,
-        C_OPENING_PARENTHESIS,
-        C_CLOSING_PARENTHESIS,
-        C_ASTERISK,
-        C_PLUS_SIGN,   
-        C_COMMA,   
-        C_HYPHEN_MINUS,   
-        C_PERIOD,  
-        C_SLASH,   
-        C_DIGIT_ZERO,  
-        C_DIGIT_ONE,   
-        C_DIGIT_TWO,   
-        C_DIGIT_THREE, 
-        C_DIGIT_FOUR,  
-        C_DIGIT_FIVE,  
-        C_DIGIT_SIX,   
-        C_DIGIT_SEVEN, 
-        C_DIGIT_EIGHT, 
-        C_DIGIT_NINE, 
-        C_COLON,   
-        C_SEMICOLON,   
-        C_LESS_THAN_SIGN, 
-        C_EQUALS_SIGN, 
-        C_GREATER_THAN_SIGN,   
-        C_QUESTION_MARK,  
-        C_COMMERCIAL_AT,  
-        C_LATIN_CAPITAL_LETTER_A, 
-        C_LATIN_CAPITAL_LETTER_B, 
-        C_LATIN_CAPITAL_LETTER_C, 
-        C_LATIN_CAPITAL_LETTER_D, 
-        C_LATIN_CAPITAL_LETTER_E, 
-        C_LATIN_CAPITAL_LETTER_F, 
-        C_LATIN_CAPITAL_LETTER_G, 
-        C_LATIN_CAPITAL_LETTER_H, 
-        C_LATIN_CAPITAL_LETTER_I, 
-        C_LATIN_CAPITAL_LETTER_J, 
-        C_LATIN_CAPITAL_LETTER_K, 
-        C_LATIN_CAPITAL_LETTER_L, 
-        C_LATIN_CAPITAL_LETTER_M, 
-        C_LATIN_CAPITAL_LETTER_N, 
-        C_LATIN_CAPITAL_LETTER_O, 
-        C_LATIN_CAPITAL_LETTER_P, 
-        C_LATIN_CAPITAL_LETTER_Q, 
-        C_LATIN_CAPITAL_LETTER_R, 
-        C_LATIN_CAPITAL_LETTER_S, 
-        C_LATIN_CAPITAL_LETTER_T, 
-        C_LATIN_CAPITAL_LETTER_U, 
-        C_LATIN_CAPITAL_LETTER_V, 
-        C_LATIN_CAPITAL_LETTER_W, 
-        C_LATIN_CAPITAL_LETTER_X, 
-        C_LATIN_CAPITAL_LETTER_Y, 
-        C_LATIN_CAPITAL_LETTER_Z, 
-        C_OPENING_SQUARE_BRACKET,   
-        C_BACKSLASH,   
-        C_CLOSING_SQUARE_BRACKET,   
-        C_SPACING_CIRCUMFLEX,  
-        C_SPACING_UNDERSCORE,  
-        C_SPACING_GRAVE,  
-        C_LATIN_SMALL_LETTER_A, 
-        C_LATIN_SMALL_LETTER_B, 
-        C_LATIN_SMALL_LETTER_C, 
-        C_LATIN_SMALL_LETTER_D, 
-        C_LATIN_SMALL_LETTER_E, 
-        C_LATIN_SMALL_LETTER_F, 
-        C_LATIN_SMALL_LETTER_G, 
-        C_LATIN_SMALL_LETTER_H, 
-        C_LATIN_SMALL_LETTER_I, 
-        C_LATIN_SMALL_LETTER_J, 
-        C_LATIN_SMALL_LETTER_K, 
-        C_LATIN_SMALL_LETTER_L, 
-        C_LATIN_SMALL_LETTER_M, 
-        C_LATIN_SMALL_LETTER_N, 
-        C_LATIN_SMALL_LETTER_O, 
-        C_LATIN_SMALL_LETTER_P, 
-        C_LATIN_SMALL_LETTER_Q, 
-        C_LATIN_SMALL_LETTER_R, 
-        C_LATIN_SMALL_LETTER_S, 
-        C_LATIN_SMALL_LETTER_T, 
-        C_LATIN_SMALL_LETTER_U, 
-        C_LATIN_SMALL_LETTER_V, 
-        C_LATIN_SMALL_LETTER_W, 
-        C_LATIN_SMALL_LETTER_X, 
-        C_LATIN_SMALL_LETTER_Y, 
-        C_LATIN_SMALL_LETTER_Z, 
-        C_OPENING_CURLY_BRACKET,    
-        C_VERTICAL_BAR,   
-        C_CLOSING_CURLY_BRACKET,    
-        C_TILDE,   
-        C_DELETE,  
         C_LATIN_CAPITAL_LETTER_A_DIAERESIS, 
         C_LATIN_CAPITAL_LETTER_A_RING,  
         C_LATIN_CAPITAL_LETTER_C_CEDILLA,   
@@ -294,10 +200,13 @@ word geosCharMap[] =
 
 word GeosCharToUnicode( const word  geosChar )
 {
-        if( geosChar < MIN_GEOS_CHAR || geosChar >= MAX_GEOS_CHAR )
+        if( geosChar < MIN_GEOS_CHAR || geosChar > MAX_GEOS_CHAR )
                 return 0;
 
-        return geosCharMap[ GEOS_CHAR_INDEX( geosChar ) ];
+        if( geosChar < FIRST_EXTENDED_CHAR )
+                return geosChar;
+
+        return geosCharMap[ geosChar - FIRST_EXTENDED_CHAR ];
 }
 
 
@@ -338,26 +247,29 @@ word GeosCharToUnicode( const word  geosChar )
 #pragma code_seg(ttcmap_TEXT)
 word CountValidGeosChars( const TT_CharMap  map, char*  firstChar, char*  lastChar )
 {
-        word  charIndex;
-        word  firstFound = NUM_CHARMAPENTRIES;
+        word  geosChar;
+        word  unicode;
+        word  firstFound = 0x100;
         word  lastFound  = 0;
 
 
-        for( charIndex = 0; charIndex < NUM_CHARMAPENTRIES; ++charIndex )
+        for( geosChar = MIN_GEOS_CHAR; geosChar <= MAX_GEOS_CHAR; ++geosChar )
         {
-                if( geosCharMap[charIndex] == 0 )
+                unicode = GeosCharToUnicode( geosChar );
+
+                if( unicode == 0 )
                         continue;
 
-                if( TT_Char_Index( map, geosCharMap[charIndex] ) )
+                if( TT_Char_Index( map, unicode ) )
                 {
-                        if( firstFound == NUM_CHARMAPENTRIES )
-                                firstFound = charIndex;
-                        lastFound = charIndex;
+                        if( firstFound == 0x100 )
+                                firstFound = geosChar;
+                        lastFound = geosChar;
                 }
         }
 
-        *firstChar = (firstFound < NUM_CHARMAPENTRIES) ? (char)(firstFound + C_SPACE) : 255;
-        *lastChar  = (lastFound  > 0)                  ? (char)(lastFound  + C_SPACE) : 0;
+        *firstChar = (firstFound <= MAX_GEOS_CHAR) ? (char)firstFound : 255;
+        *lastChar  = (lastFound >= MIN_GEOS_CHAR)  ? (char)lastFound  : 0;
 
         return (*firstChar <= *lastChar) ? (1 + *lastChar - *firstChar) : 0;
 }
@@ -391,24 +303,27 @@ MemHandle CreateIndexLookupTable( const TT_CharMap  map )
 {
         MemHandle     memHandle;
         LookupEntry*  lookupTable;
+        word          geosChar;
+        word          unicode;
         int           i;
 
 
         memHandle = MemAllocSetOwner( GeodeGetCodeProcessHandle(), 
-                                NUM_CHARMAPENTRIES * sizeof( LookupEntry ),
+                                NUM_GEOS_CHARS * sizeof( LookupEntry ),
                               	HF_SHARABLE | HF_SWAPABLE, HAF_LOCK | HAF_NO_ERR);
 EC(     ECCheckMemHandle( memHandle ) );
 
         lookupTable = (LookupEntry*)MemDeref( memHandle );
 EC(     ECCheckBounds( lookupTable ) );
 
-        for( i = 0; i < NUM_CHARMAPENTRIES; ++i )
+        for( geosChar = MIN_GEOS_CHAR, i = 0; geosChar <= MAX_GEOS_CHAR; ++geosChar, ++i )
         {
-                lookupTable[i].ttindex = TT_Char_Index( map, geosCharMap[i] );
-                lookupTable[i].geoscode = (char)i + C_SPACE;
+                unicode = GeosCharToUnicode( geosChar );
+                lookupTable[i].ttindex = unicode ? TT_Char_Index( map, unicode ) : 0;
+                lookupTable[i].geoscode = (char)geosChar;
         }
 
-        SortLookupTable( lookupTable, NUM_CHARMAPENTRIES );
+        SortLookupTable( lookupTable, NUM_GEOS_CHARS );
 
         MemUnlock( memHandle );
         return memHandle;
@@ -463,12 +378,12 @@ static void SortLookupTable(LookupEntry* table, int count)
 word  GetGEOSCharForIndex( const LookupEntry* lookupTable, const word index )
 {
         int  left = 0;
-        int  right = NUM_CHARMAPENTRIES - 1;
+        int  right = NUM_GEOS_CHARS - 1;
 
 
         while( left <= right )
         {
-                int mid = left + ( (right - left) >> 1 );
+                int mid = (right + left) >> 1;
                 if( lookupTable[mid].ttindex == index )
                         return lookupTable[mid].geoscode; 
                 else if( lookupTable[mid].ttindex < index )

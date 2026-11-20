@@ -284,6 +284,7 @@ EC( ECCheckBounds( pairs ) );
     DEFINE_LOAD_LOCALS( face->stream );
 
     UShort             num_tables;
+    UShort             length;
     Short              table;
     TT_Kern_Subtable*  sub;
 
@@ -295,7 +296,9 @@ EC( ECCheckBounds( pairs ) );
     /* Now load the kerning directory. We're called from the face */
     /* constructor.  We thus need not use the stream.             */
 
+#ifdef TT_CONFIG_OPTION_SUPPORT_OPTIONAL_FIELDS
     kern->version = 0;
+#endif
     kern->nTables = 0;
     kern->tables  = NULL;
 
@@ -307,7 +310,11 @@ EC( ECCheckBounds( pairs ) );
          ACCESS_Frame( 4 ) )
       return error;
 
+#ifdef TT_CONFIG_OPTION_SUPPORT_OPTIONAL_FIELDS
     kern->version = GET_UShort();
+#else
+    SKIP( 2 );
+#endif
     num_tables    = GET_UShort();
 
     FORGET_Frame();
@@ -328,11 +335,18 @@ EC( ECCheckBounds( pairs ) );
       if ( ACCESS_Frame( 6 ) )
         return error;
 
-      sub->loaded   = FALSE;             /* redundant, but good to see */
+#ifdef TT_CONFIG_OPTION_SUPPORT_OPTIONAL_FIELDS
       sub->version  = GET_UShort();
-      sub->length   = GET_UShort() - 6;  /* substract header length */
-      sub->format   = GET_Byte();
-      sub->coverage = GET_Byte();
+#else
+      SKIP( 2 );
+#endif
+      length      = GET_UShort() - 6;    /* substract header length */
+      sub->format = GET_Byte();
+#ifdef TT_CONFIG_OPTION_SUPPORT_OPTIONAL_FIELDS
+    sub->coverage = GET_Byte();
+#else
+    SKIP( 1 );
+#endif
 
       FORGET_Frame();
 
@@ -340,7 +354,7 @@ EC( ECCheckBounds( pairs ) );
 
       /* now skip to the next table */
 
-      if ( FILE_Skip( sub->length ) )
+      if ( FILE_Skip( length ) )
         return error;
 
       ++sub;
@@ -384,42 +398,7 @@ EC( ECCheckBounds( pairs ) );
     for ( n = 0; n < directory->nTables; ++n )
     {
       if ( sub->loaded )
-      {
-        switch ( sub->format )
-        {
-        case 0:
-          GEO_FREE( sub->t.kern0.pairsBlock );
-          sub->t.kern0.nPairs        = 0;
-#ifdef TT_CONFIG_OPTION_SUPPORT_OPTIONAL_FIELDS
-          sub->t.kern0.searchRange   = 0;
-          sub->t.kern0.entrySelector = 0;
-          sub->t.kern0.rangeShift    = 0;
-#endif
-          break;
-
-#ifdef TT_CONFIG_OPTION_SUPPORT_KERN2
-        case 2:
-          FREE( sub->t.kern2.leftClass.classes );
-          sub->t.kern2.leftClass.firstGlyph = 0;
-          sub->t.kern2.leftClass.nGlyphs    = 0;
-
-          FREE( sub->t.kern2.rightClass.classes );
-          sub->t.kern2.rightClass.firstGlyph = 0;
-          sub->t.kern2.rightClass.nGlyphs    = 0;
-
-          FREE( sub->t.kern2.array );
-          sub->t.kern2.rowWidth = 0;
-          break;
-#endif
-        }
-
-        sub->loaded   = FALSE;
-        sub->version  = 0;
-        sub->offset   = 0;
-        sub->length   = 0;
-        sub->coverage = 0;
-        sub->format   = 0;
-      }
+        GEO_FREE( sub->t.kern0.pairsBlock );
       ++sub;
     }
 
@@ -513,8 +492,7 @@ EC( ECCheckBounds( directory ) );
     if( error )
       return error;
 
-    if ( sub->format == 0 )
-      error = Subtable_Load_0( &sub->t.kern0, faze );
+    error = Subtable_Load_0( &sub->t.kern0, faze );
 #ifdef TT_CONFIG_OPTION_SUPPORT_KERN2
     else if ( sub->format == 2 )
       error = Subtable_Load_2( &sub->t.kern2, faze );
@@ -523,7 +501,6 @@ EC( ECCheckBounds( directory ) );
     if ( !error )
       sub->loaded = TRUE;
 
-  Fail:
     return error;
   }
 

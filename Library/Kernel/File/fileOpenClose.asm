@@ -605,6 +605,7 @@ LocalDefNLString fctfTemplateTail <".TMP",0>
 FileCreateTempFile	proc	far
 		uses	es, di, si, bx
 curCount	local	dword
+nameOffset	local	word
 		.enter
 if	FULL_EXECUTE_IN_PLACE
 EC<	push	bx, si						>
@@ -643,8 +644,7 @@ makeName:
 	    ; Put in the timer count XOR'd with the process handle
 	    ; for a nice random value
 	    ; 
-		mov	bx, di		; ds:bx <- start of part that changes
-					;  with each iteration.
+		mov	ss:nameOffset, di	; preserve across calls that change bx
 		call	TimerGetCount
 		xor	bx, ss:TPD_processHandle
 		movdw	ss:curCount, bxax
@@ -692,7 +692,7 @@ createLoop:
 	; over 136 years...
 	;
 		incdw	ss:curCount
-		mov	di, bx				;es:di <- buf
+		mov	di, ss:nameOffset	; es:di <- filename digits
 		call	putHexDWord
 		jmp	createLoop
 	
