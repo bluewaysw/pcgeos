@@ -1523,21 +1523,7 @@ haveDimensions:
 	jnc	sizeOK
 
 bitmapTooLarge:
-	; bitmap is too large.  notify user.
-
-	clr	ax
-	pushdw	axax			; SDOP_helpContext
-	pushdw	axax			; SDOP_customTriggers
-	pushdw	axax			; SDOP_stringArg2
-	pushdw	axax			; SDOP_stringArg1
-	mov	ax, handle BitmapTooLargeString
-	push	ax
-	mov	ax, offset BitmapTooLargeString
-	push	ax			; SDOP_customString
-	mov	ax, CDT_NOTIFICATION shl offset CDBF_DIALOG_TYPE or \
-		    GIT_NOTIFICATION shl offset CDBF_INTERACTION_TYPE
-	push	ax			; SDOP_customFlags
-	call	UserStandardDialogOptr
+	call	VisBitmapReportTooLarge
 
 	; and redraw.
 
@@ -1735,25 +1721,22 @@ bitmapSizeKey	char	"bitmapSizeLimit",0
 
 VisBitmapCheckBitmapSize	proc	near
 	class	VisBitmapClass
-	uses	ax,bx,cx,dx,si,ds
+	uses	ax,bx,cx,dx,si,di,ds
 	.enter
 
-	mov	ax, cx
-	mul	dx			; dx:ax = number of pixels in bitmap
+		mov	bx, ds:[si]
+		add	bx, ds:[bx].VisBitmap_offset
+		cmp	ds:[bx].VBI_bmFormat, BMF_24BIT
+		jne	checkIndexed
+		mov	di, ds:[bx].VBI_xResolution
+		mov	bx, ds:[bx].VBI_yResolution
+		call	VisBitmapCheck24BitSize
+		jmp	done
 
-	mov	bx, ds:[si]
-	add	bx, ds:[bx].VisBitmap_offset
-	mov	cl, ds:[bx].VBI_bmFormat
-
-		cmp	cl, BMF_24BIT
-		jne	check8Bit
-		movdw	cxbx, dxax		; 24-bit pixels occupy three bytes
-		shldw	dxax
-		jc	tooLarge
-		adddw	dxax, cxbx
-		jc	tooLarge
-		jmp	gotSize
-check8Bit:
+checkIndexed:
+		mov	ax, cx
+		mul	dx			; DX:AX = number of pixels
+		mov	cl, ds:[bx].VBI_bmFormat
 	cmp	cl, BMF_8BIT		; 8bit = 1 byte/pixel
 	je	gotSize
 
@@ -1770,30 +1753,163 @@ check8Bit:
 	cmp	cl, BMF_MONO		; mono = 1/8 byte/pixel
 	jne	tooLarge		; other formats are considered too big
 gotSize:
-		cmp	dx, 0400h		; do not wrap the 16-bit KB count
-		jae	tooLarge
-	shldw	dxax
-	shldw	dxax
-	shldw	dxax
-	shldw	dxax
-	shldw	dxax
-	shldw	dxax			; dx = number of kbytes in bitmap
-	mov_tr	bx, dx			; bx = number of kbytes in bitmap
-
-	mov	ax, 65535		; default limit = 65535K
-	mov	cx, cs
-	mov	dx, offset bitmapSizeKey
-	mov	ds, cx
-	mov	si, offset bitmapCategory
-	call	InitFileReadInteger
-	cmp	ax, bx
-	jae	done
+		call	VisBitmapCheckBitmapByteLimit
+		jmp	done
 tooLarge:
-	stc
+		stc
 done:
 	.leave
 	ret
 VisBitmapCheckBitmapSize	endp
+
+;
+; Check a proposed 24-bit bitmap. CX and DX are its dimensions, DI and BX
+; its resolutions. Return carry set if the bitmap is too large.
+;
+VisBitmapCheck24BitSize proc near
+	class	VisBitmapClass
+	uses	ax, bx, cx, dx, si, di, bp, ds
+	.enter
+
+		tst	cx
+		jle	tooLarge
+		tst	dx
+		jle	tooLarge
+		mov	bp, ds:[si]
+		add	bp, ds:[bp].VisBitmap_offset
+		mov	si, dx			; SI = height
+		test	ds:[bp].VBI_undoFlags, mask VBUF_MOUSE_EVENTS_IN_BITMAP_COORDS
+		jnz	checkPixels
+	;
+	; Scale positive dimensions with the same rounding as CreateNewBitmap.
+	;
+		mov	ax, cx
+		call	ScaleBitmapDimension
+		jc	tooLarge
+		mov	cx, ax
+		mov	ax, si
+		mov	di, bx
+		call	ScaleBitmapDimension
+		jc	tooLarge
+		mov	si, ax
+
+checkPixels:
+		mov	ax, 3
+		mul	cx			; Three bytes per pixel.
+		tst	dx
+		jnz	tooLarge
+		test	ds:[bp].VBI_undoFlags, mask VBUF_TRANSPARENT
+		jz	haveRowSize
+		add	cx, 7			; Round up to one mask byte per 8 pixels.
+	rept 3
+		shr	cx, 1
+	endm
+		add	ax, cx
+		jc	tooLarge
+haveRowSize:
+		mov	bx, ax
+	;
+	; ATTENTION: Allow one 8-byte HugeArray directory entry per row.
+	; This bound can reject tall bitmaps with several rows per VM block.
+	; To raise it, calculate the actual number of HugeArray data blocks.
+	; The directory also needs a row buffer of at least two bytes per row.
+	; Use the sum of those buffer sizes and leave 256 bytes for headers.
+	;
+		mov	ax, 10
+		mul	si
+		add	ax, bx
+		adc	dx, 0
+		jnz	tooLarge
+		cmp	ax, 0xff00
+		jae	tooLarge
+
+		mov	ax, bx
+		mul	si			; DX:AX = bytes of pixel and mask data.
+		call	VisBitmapCheckBitmapByteLimit
+		jmp	done
+
+tooLarge:
+		stc
+done:
+	.leave
+	ret
+VisBitmapCheck24BitSize endp
+
+;
+; AX = positive point dimension, DI = resolution. Return rounded-up pixels
+; in AX. Carry set if the result cannot be used by the signed converter.
+;
+ScaleBitmapDimension proc near
+	uses	bx
+	.enter
+
+		tst	di
+		jle	invalid
+		mul	di
+		mov	bx, 72
+		cmp	dx, bx			; Check for divide overflow.
+		jae	invalid
+		div	bx
+		tst	dx
+		jz	checkRange
+		inc	ax
+checkRange:
+		tst	ax
+		jg	done			; Signed positive result. TST clears carry.
+invalid:
+		stc
+done:
+	.leave
+	ret
+ScaleBitmapDimension endp
+
+;
+; DX:AX = bitmap payload bytes. Return carry set if over bitmapSizeLimit.
+;
+VisBitmapCheckBitmapByteLimit proc near
+		cmp	dx, 0400h		; Do not wrap the 16-bit KB count.
+		jae	tooLarge
+	rept 6
+		shldw	dxax			; DX = payload in KB.
+	endm
+		mov_tr	bx, dx
+
+		mov	ax, 65535		; Default limit = 65535 KB.
+		mov	cx, cs
+		mov	dx, offset bitmapSizeKey
+		mov	ds, cx
+		mov	si, offset bitmapCategory
+		call	InitFileReadInteger
+		cmp	ax, bx
+		ret
+
+tooLarge:
+		stc
+		ret
+VisBitmapCheckBitmapByteLimit endp
+
+VisBitmapReportTooLarge proc near
+	uses	bx
+	.enter
+		push	ds:[LMBH_handle]	; The dialog can move the object block.
+		clr	ax
+		pushdw	axax			; SDOP_helpContext
+		pushdw	axax			; SDOP_customTriggers
+		pushdw	axax			; SDOP_stringArg2
+		pushdw	axax			; SDOP_stringArg1
+		mov	ax, handle BitmapTooLargeString
+		push	ax
+		mov	ax, offset BitmapTooLargeString
+		push	ax			; SDOP_customString
+		mov	ax, CDT_NOTIFICATION shl offset CDBF_DIALOG_TYPE or \
+			    GIT_NOTIFICATION shl offset CDBF_INTERACTION_TYPE
+		push	ax			; SDOP_customFlags
+		call	UserStandardDialogOptr
+		pop	bx
+		call	MemDerefDS
+	.leave
+	ret
+VisBitmapReportTooLarge endp
 
 
 
@@ -2016,10 +2132,28 @@ done:
 	.leave
 	ret
 
-doResize:	
+doResize:
+		mov	di, ds:[si]
+		add	di, ds:[di].VisBitmap_offset
+		cmp	ds:[di].VBI_bmFormat, BMF_24BIT
+		jne	resize
+		mov	cx, ss:[bp].RAG_rect.R_right
+		sub	cx, ss:[bp].RAG_rect.R_left
+		jle	tooLarge
+		mov	dx, ss:[bp].RAG_rect.R_bottom
+		sub	dx, ss:[bp].RAG_rect.R_top
+		jle	tooLarge
+		mov	bx, ds:[di].VBI_yResolution
+		mov	di, ds:[di].VBI_xResolution
+		call	VisBitmapCheck24BitSize
+		jc	tooLarge
+resize:
+		call	VisBitmapDoThatCrazyRemappingThing
+		jmp	done
 
-	call	VisBitmapDoThatCrazyRemappingThing
-	jmp	done
+tooLarge:
+		call	VisBitmapReportTooLarge
+		jmp	done
 VisBitmapResizeRealEstate	endm
 
 
@@ -2091,11 +2225,24 @@ makeTheChange:
 	call	ObjCallInstanceNoLock
 
 
-	mov	di, ds:[si]
-	add	di, ds:[di].VisBitmap_offset
-	mov	ds:[di].VBI_bmFormat, bl
-	pop	ds:[di].VBI_yResolution
-	pop	ds:[di].VBI_xResolution
+		mov	di, ds:[si]
+		add	di, ds:[di].VisBitmap_offset
+		pop	ax, bp			; AX = x resolution, BP = y resolution.
+		cmp	bl, BMF_24BIT
+		jne	storeFormat
+	;
+	; Check the proposed dimensions before changing the instance or bitmap.
+	;
+		push	bx, di
+		mov	di, ax
+		mov	bx, bp
+		call	VisBitmapCheck24BitSize
+		pop	bx, di
+		jc	tooLarge
+storeFormat:
+		mov	ds:[di].VBI_bmFormat, bl
+		mov	ds:[di].VBI_yResolution, bp
+		mov	ds:[di].VBI_xResolution, ax
 
 	sub	sp, size RectAndGState
 	mov	bp, sp
@@ -2115,9 +2262,15 @@ makeTheChange:
 	mov	ax, MSG_VIS_INVALIDATE
 	call	ObjCallInstanceNoLock
 
+finish:
 	call	VisBitmapMarkNotBusy
-
 	jmp	done
+
+tooLarge:
+		call	VisBitmapReportTooLarge
+		mov	ax, MSG_VIS_BITMAP_NOTIFY_CURRENT_FORMAT_CHANGE
+		call	ObjCallInstanceNoLock	; Restore the controller selection.
+		jmp	finish
 VisBitmapSetFormatAndResolution	endm
 
 

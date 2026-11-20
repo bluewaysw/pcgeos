@@ -655,6 +655,8 @@ dialogDone:
 		mov	ax, MSG_GB_CREATE_GSTRING_TRANSFER_FORMAT
 		call	ObjCallInstanceNoLock
 		pop	bp
+		tst	ax
+		LONG jz	notBusy			; capture failed; keep the selection
 		push	si
 		mov	si, ax
 		mov	cl, GST_VMEM
@@ -770,6 +772,7 @@ freeGString:
 		clr	di
 		mov	dl, GSKT_KILL_DATA
 		call	GrDestroyGString
+notBusy:
 		mov	si, ss:[bodyChunk]
 		call	GBMarkNotBusy
 done:
