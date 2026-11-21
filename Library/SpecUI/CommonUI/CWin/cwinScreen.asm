@@ -305,11 +305,6 @@ LONG	jne	callSuper
 	push	bx
 	call	GeodeInfoDriver		; ds:si = DriverInfoStruct
 
-	push    ax,bx,cx,dx,si,di,bp,es
-	mov	di, DR_VID_HIDEPTR
-	call	ds:[si].DIS_strategy
-	pop  	ax,bx,cx,dx,si,di,bp,es
-
 	; call update escape function
 	mov	di, VID_ESC_UPDATE_DEVICE
 	call	ds:[si].DIS_strategy
@@ -425,7 +420,6 @@ LONG	jne	callSuper
 	tst	ax
 	jz	done				; no mouse driver, no pointer
 
-
 	push 	si, ds, di
 	mov	di, ds:[si]
 	add	di, ds:[di].Gen_offset
@@ -437,8 +431,6 @@ LONG	jne	callSuper
 	push    ax,bx,cx,dx,si,di,bp
 	mov	di, DR_VID_SHOWPTR
 	call	ds:[si].DIS_strategy
-	mov	di, DR_VID_SHOWPTR
-	call	ds:[si].DIS_strategy
 	pop    ax,bx,cx,dx,si,di,bp
 	pop 	si, ds, di
 
@@ -446,6 +438,7 @@ done:
 
 
 callSuper:
+	segmov	es, <segment OLScreenClass>, bx
 	mov	di, offset OLScreenClass
 	GOTO	ObjCallSuperNoLock
 
