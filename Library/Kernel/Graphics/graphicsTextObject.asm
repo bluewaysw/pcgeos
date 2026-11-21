@@ -453,7 +453,7 @@ noMaximum:
 	pushf
 	andnf	externals.TOCE_otherFlags, not mask TOCOF_FOUND_WORD
 	popf
-	jnz	endLoop
+	LONG	jnz	endLoop
 					; else, set pending and continue
 	ornf	externals.TOCE_otherFlags, mask TOCOF_WAIT_FOR_WORD
 	jmp	afterOverflowCheck

@@ -24,6 +24,9 @@
 #	ParseTemplateFileAndSend(<template file>, <destination file>)
 #		Read in the template file, process it for this build, and 
 #		write it out to the destination directory.
+#	ResolveEnvar(<name>)
+#		Resolve ENVAR(...) in the order ENV -> build variable
+#		-> variable name.
 #	Hexify(<string>)
 #		Convert a character string to hex digits.  If demo is DBCS, 
 #               each character will map to two bytes.
@@ -62,6 +65,7 @@ sub ParseTemplateFileAndSend {
     $passedtemplate=$template;
     local($destname)="$template";
     $destname =~ s|.*/([\w]*)|$1|;
+	$destname =~ y/a-z/A-Z/;
     $template=&FindInstalledFile("$template");
     if ( !"$template" && ($passedtemplate =~ /ec\./) ) {
 
@@ -110,6 +114,7 @@ sub ParseTemplateFileAndSend {
 
 	# Replace variables.
 
+	s/ENVAR\(([^)]*)\)/&ResolveEnvar($1)/ge;
 	s/VAR\(([^)]*)\)/&EvaluateExpression($1)/ge;
 	
 	# Process special EC/NEC macros.
@@ -128,7 +133,7 @@ sub ParseTemplateFileAndSend {
 	    s/EC-only\(([^)]*)\)/$1/;
 	    s/EC-NEC\(([^),]*),([^)]*)\)/$1/;
 	    s/EC-dos\(([^).]*)\.([^)]*)\)/\@S\@$1ec.$2\@E\@/;
-	    s/\@S\@(.*)\@E\@/&Dosify("$1")/e;
+	    s/\@S\@(.*)\@E\@/lc(&Dosify("$1"))/e;
 
 	} else {
 
@@ -144,7 +149,7 @@ sub ParseTemplateFileAndSend {
 	    s/EC-only\([^)]*\)//;
 	    s/EC-NEC\(([^),]*),([^)]*)\)/$2/;
 	    s/EC-dos\(([^).]*)\.([^)]*)\)/\@S\@$1.$2\@E\@/;
-	    s/\@S\@(.*)\@E\@/&Dosify("$1")/e;
+	    s/\@S\@(.*)\@E\@/lc(&Dosify("$1"))/e;
 	}
 
 	# Handle mono vs. color macros.
@@ -358,16 +363,75 @@ sub EvaluateExpression {
 	print "* Evaluating expression $expr\n";
     }
 
-    $expr =~ s/!/! /g;
     $expr =~ s/[^"\w]([\w]+)[^"\w]/"\$var{$1}"/g;
     $expr =~ s/==/ eq /g;
-    $expr =~ s/!=/ neq /g;
+    $expr =~ s/!=/ ne /g;
+    $expr =~ s/!/! /g;
 
     if ( &Debug("parsefiletree")  || &Debug("parsetemplate") ) {
 	print "* Evaluating pexpression $expr\n";
     }
  
     return (eval ($expr));
+}
+
+
+##############################################################################
+#	ResolveEnvar
+##############################################################################
+#
+# SYNOPSIS:	Resolve a ENVAR(...) token.
+# PASS:		variable name
+# CALLED BY:	ParseTemplateFileAndSend, filetree parser
+# RETURN:	resolved value
+#
+# STRATEGY:	Try ENV first (exact, then uppercase), then build variable
+#		(exact, then lowercase). If unresolved, return the variable
+#		name itself.
+#
+##############################################################################
+sub ResolveEnvar {
+    local($name, $upperName, $lowerName) = @_;
+
+    $name =~ s/^[\s]+//;
+    $name =~ s/[\s]+$//;
+
+    if (exists($ENV{$name})) {
+	if ( &Debug("parsefiletree") || &Debug("parsetemplate") ) {
+	    print "* ENVAR($name) from ENV exact\n";
+	}
+	return $ENV{$name};
+    }
+
+    $upperName = $name;
+    $upperName =~ tr/a-z/A-Z/;
+    if (exists($ENV{$upperName})) {
+	if ( &Debug("parsefiletree") || &Debug("parsetemplate") ) {
+	    print "* ENVAR($name) from ENV uppercase\n";
+	}
+	return $ENV{$upperName};
+    }
+
+    if (exists($var{$name})) {
+	if ( &Debug("parsefiletree") || &Debug("parsetemplate") ) {
+	    print "* ENVAR($name) from build var exact\n";
+	}
+	return $var{$name};
+    }
+
+    $lowerName = $name;
+    $lowerName =~ tr/A-Z/a-z/;
+    if (exists($var{$lowerName})) {
+	if ( &Debug("parsefiletree") || &Debug("parsetemplate") ) {
+	    print "* ENVAR($name) from build var lowercase\n";
+	}
+	return $var{$lowerName};
+    }
+
+    if ( &Debug("parsefiletree") || &Debug("parsetemplate") ) {
+	print "* ENVAR($name) unresolved; using name fallback\n";
+    }
+    return $name;
 }
 
 

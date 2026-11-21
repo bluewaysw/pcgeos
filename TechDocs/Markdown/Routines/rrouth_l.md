@@ -738,9 +738,10 @@ TE_CUSTOM.
 ### InitFileCommit()
     void    InitFileCommit(void);
 
-This routine commits any changes to the GEOS.INI file, removing and 
-replacing its stored backup. It ensures that no other threads are working on 
-the file during the commit operation.
+This routine writes the primary INI buffer to its active file. It finishes any
+pending list rewrite before writing. The INI lock covers both operations, so
+the stored list and its key.disabled exclusions agree. Commit does not update
+ini.bak; use InitFileSave() to update that backup.
 
 **Include:** initfile.h
 
@@ -756,6 +757,11 @@ GEOS.INI file. Pass it the following:
 category to be deleted. This string ignores white space and is 
 case-insensitive.
 
+Before removing the category, this routine finishes any pending list rewrite.
+This prevents a later commit from recreating the category through key.disabled.
+It physically removes only the primary category. Lower keys can become visible
+again. It does not create category or key deletion markers.
+
 **Include:** initfile.h
 
 ----------
@@ -764,7 +770,68 @@ case-insensitive.
             const char      *category,
             const char      *key);
 
-This routine deletes an entry in the GEOS.INI file. Pass it the following:
+This routine deletes the specified key from the primary INI file. The primary
+file is the first file in the search order. Lower files are the other loaded
+INI files, in search order. The routine searches this active chain. It does not
+require a file named net.ini.
+
+The routine uses these rules:
+
+- If the primary entry is already a deletion marker, keep it.
+- If a lower value is available, write key = @deleted in the primary file.
+  The key does not need to have a primary entry before the call.
+- If no lower value is available, remove the primary entry without a marker.
+
+A lower value is available if the search finds a normal entry before it finds
+a marker. Zero, false, and an empty string all count as values. A lower marker
+blocks all files below it. If a future factory update adds a previously absent
+key, its value becomes available after a deletion without a marker. An existing
+marker remains if an update removes the lower key. Repeated deletion keeps it.
+
+The marker is the exact, case-sensitive, bare value @deleted. "Bare" means
+outside a blob. Spaces and tabs can surround the marker. A semicolon can start
+a comment after it. After the token, only spaces, tabs, and an optional comment
+are allowed. @Deleted and @deletedLater are not markers. Blob contents are
+ordinary data. The grammar is the same in the kernel and the loader.
+
+All logical reads treat a marker as a missing key. They do not parse it as a
+string, number, Boolean, or data block. They return the normal missing-key
+result, with the same output rules as for an absent key. The application
+can use its own default. The marker does not mean false, zero, or an empty
+string. IFRF_FIRST_ONLY also treats a primary marker as missing. Routines that
+read all files stop at a marker and keep results from higher files.
+
+A normal write replaces the primary marker. InitFileWriteString protects a
+literal "@deleted" automatically. It uses a blob in SBCS builds and the normal
+encoded data form in DBCS builds. Empty strings keep their normal representation.
+The internal raw lookup and deletion routines still find and remove physical
+entries. They do not change their rules for this marker.
+
+String-section lists keep their existing key.disabled entries and item rules.
+A marker for the whole key blocks the complete list. A later list write clears
+that marker before the kernel applies the item rules. It must clear the marker
+even if a match with a factory item avoids a local write. The kernel reads factory
+rewrite snapshots directly from lower files, below the primary marker.
+Whole-key marker support does not depend on INI_STRING_SECTION_TOMBSTONES.
+
+To restore a lower value for a scalar key by hand, remove its primary entry.
+For a full factory-list reset, also remove the local list and its key.disabled
+entry. InitFileDeleteEntry does not request a factory reset. Existing callers
+keep using this API. For example, video recovery deletes keys to request
+autodetection, and mouse preferences delete a port key that no longer applies.
+OpenWith and ConfigUI delete keys before list writes. PreflvlResetAppFeatures
+also uses this API and receives the same missing-key result. The API uses
+the same deletion rule for all callers.
+
+InitFileDeleteCategory removes only the primary category and can expose lower
+keys. It finishes pending list work before physical removal. With only one file loaded, InitFileDeleteEntry does not
+create new markers, but it retains any existing marker. Older kernels do not
+support the marker. Public entry points and parameters are unchanged.
+
+See [Deleted Keys in Layered INI Files](../Tools/tini.md#911-deleted-keys-in-layered-ini-files)
+for INI examples.
+
+Pass the following:
 
 *category* - A pointer to the null-terminated string representing the 
 category in which the entry resides. This string ignores white 
@@ -782,7 +849,7 @@ be deleted.
             const char *        key,
             word                stringNum);
 
-This routine deletes the specified string section from the given blob in the 
+This routine deletes the specified string section from the given blob in the
 GEOS.INI file. Pass it the following:
 
 category - A pointer to the null-terminated string representing the 
@@ -793,6 +860,18 @@ key - A pointer to the null-terminated string representing the key to
 be edited.
 
 stringNum - The zero-based string section number.
+
+When the kernel is built with `INI_STRING_SECTION_TOMBSTONES` and a lower INI
+file is present, string sections are read as a merged list from the layered INI
+files. If a section entry that originated in a lower-priority INI file is
+deleted, the kernel stores the exact original factory entry in a sidecar string
+section named `key.disabled` in the same category. Kernels built with
+`INI_STRING_SECTION_TOMBSTONES=FALSE`, and runtimes with only one INI file, use
+the legacy local-only string-section delete behavior.
+
+Item deletion finishes any pending list rewrite before resolving stringNum.
+The index therefore refers to the current visible list. A later commit cannot
+replace the new deletion with an older snapshot.
 
 **Include:** initfile.h
 
@@ -830,8 +909,16 @@ described below.
 *enumData* - This pointer is passed unchanged to the callback routine. 
 **InitFileEnumStringSection()** does not use it.
 
-This routine returns a Boolean value. It returns *true* if the callback routine 
+This routine returns a Boolean value. It returns *true* if the callback routine
 halted the enumeration by returning *true*; otherwise, it returns *false*.
+
+For string-section keys, enumeration uses the layered INI merge only when
+`INI_STRING_SECTION_TOMBSTONES` is enabled and a lower INI file is present.
+Entries from lower-priority INI files are combined with local entries, exact
+duplicates are removed, and entries listed in the primary file sidecar key
+`key.disabled` are suppressed. Passing `IFRF_FIRST_ONLY` preserves
+primary-file-only behavior. Disabled kernels and single-file runtimes use the
+legacy read behavior.
 
 **Callback Routine:**
 
@@ -1091,11 +1178,14 @@ not be found; it will be *false* otherwise.
             InitFileReadFlags   flags,
             word *              dataSize);
 
-This routine reads a string section from the specified entry in the GEOS.INI 
-file, allocates a new block on the global heap, and copies the read string 
-section into the new block. It returns the first instance of the category/key 
-combination it encounters, searching the local INI file first. Thus, local 
-settings will always override system or network settings.
+This routine reads a string section from the specified entry in the GEOS.INI
+file, allocates a new block on the global heap, and copies the read string
+section into the new block. If the kernel is built with
+`INI_STRING_SECTION_TOMBSTONES` and a lower INI file is present, layered INI
+entries are merged so that factory entries from lower-priority INI files remain
+visible after local customization. Local entries are included, exact duplicates
+are removed, and factory entries listed in the sidecar key `key.disabled` are
+suppressed.
 
 This routine is used for reading data written with **InitFileWriteString()** or 
 **InitFileWriteStringSection()**. Pass it the following parameters:
@@ -1135,11 +1225,13 @@ not be found; it will be *false* otherwise.
             InitFileReadFlags   flags,
             word *              dataSize);
 
-This routine reads a string section from the specified entry in the GEOS.INI 
-file, copying it into a passed, locked buffer. It returns the indicated section in 
-the first instance of the category/key combination it encounters, searching 
-the local INI file first. Thus, local settings will always override system or 
-network settings.
+This routine reads a string section from the specified entry in the GEOS.INI
+file, copying it into a passed, locked buffer. If the kernel is built with
+`INI_STRING_SECTION_TOMBSTONES` and a lower INI file is present, layered INI
+entries are merged so that factory entries from lower-priority INI files remain
+visible after local customization. Local entries are included, exact duplicates
+are removed, and factory entries listed in the sidecar key `key.disabled` are
+suppressed.
 
 This routine is used for reading data written with 
 **InitFileWriteStringSection()**. Pass it the following parameters:
@@ -1175,10 +1267,17 @@ not be found; it will be *false* otherwise.
 ### InitFileRevert()
     Boolean InitFileRevert(void);
 
-This routine restores the GEOS.INI file from its saved backup version. It 
-ensures that no other thread is operating on the file while it is being restored. 
-This function returns an error flag: *true* represents an error in restoring the 
-file; *false* indicates success.
+This routine restores the primary INI buffer from ini.bak. It reads and checks
+the backup in a separate memory block while holding the INI lock. If opening,
+allocation, reading, or validation fails, it returns true and keeps the active
+buffer, pending list rewrite, and cached positions unchanged. The backup must
+contain the final DOS EOF byte written by InitFileSave().
+
+On success, it returns false, replaces the primary buffer, and discards the
+pending rewrite from the old buffer. It clears cached positions and rebuilds
+the optional hash table for the active INI chain. The new buffer and hash table
+belong to the kernel. Lower INI buffers and the active primary file handle stay
+in place. InitFileCommit() writes the restored buffer to the primary file.
 
 **Include:** initfile.h
 
@@ -1186,11 +1285,14 @@ file; *false* indicates success.
 ### InitFileSave()
     Boolean InitFileSave(void);
 
-This routine saves the GEOS.INI file synchronously by updating the backup 
-file to be the current version. (**InitFileCommit()** actually overwrites the 
-GEOS.INI file itself.) It ensures that no other thread is operating on the file 
-while it is being written out. This function returns an error flag: *true* 
-represents an error in trying to save the file; *false* indicates success.
+This routine finishes any pending list rewrite and copies the primary buffer
+to ini.bak. The INI lock covers both operations. The backup includes the current
+key.disabled exclusions, so restoring it preserves the list that was saved.
+Save ends the pending rewrite, as commit does.
+
+Only the primary buffer is backed up. Lower INI files stay separate.
+InitFileCommit() writes the primary buffer to its active file. This function
+returns true on a reported save error and false on success.
 
 **Include:** initfile.h
 
@@ -1319,9 +1421,28 @@ written.
 
 *string* - A pointer to the string section to be written.
 
-Once written, the segment may be read with 
-**InitFileReadStringSectionBlock()** or 
+Once written, the segment may be read with
+**InitFileReadStringSectionBlock()** or
 **InitfileReadStringSectionBuffer()**.
+
+When `INI_STRING_SECTION_TOMBSTONES` is enabled and a lower INI file is present,
+a string section being rewritten after deleting the local key causes the kernel
+to temporarily list the current factory entries in `key.disabled` and remove
+each entry again when it is written back with only lexical formatting changes.
+The sidecar stores exact factory string-section entries. This preserves user
+deletions and modifications while still allowing new lower-priority INI entries
+to appear later. Disabled kernels and single-file runtimes append string
+sections with the legacy local-only behavior.
+
+After each list write, key.disabled contains the current exclusions. This also
+applies when a factory-item match skips the local write. Reads see the current
+list before commit. The kernel keeps the pending snapshot so more items can
+still match during the rewrite. The list change and its exclusions use one INI
+lock.
+
+Save, commit, entry deletion, item deletion, and category deletion finish a
+pending rewrite. A successful restore discards the old pending state. A failed
+restore keeps it. The list order and matching rules are unchanged.
 
 **Include:** initfile.h
 
