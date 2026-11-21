@@ -39,7 +39,7 @@ REVISION HISTORY:
 	Cheng	11/89		Initial revision
 
 DESCRIPTION:
-		
+
 	$Id: initfileConstruct.asm,v 1.1 97/04/05 01:18:06 newdeal Exp $
 
 -------------------------------------------------------------------------------@
@@ -306,8 +306,8 @@ DBCS <	mov	al, C_TAB						>
 SBCS <	mov	al, VC_ENTER						>
 DBCS <	mov	al, C_ENTER						>
 	repne	scasb			;scan for CR
-	jz	initEntry		;CR found, so use a blob	
-	
+	jz	initEntry		;CR found, so use a blob
+
 	mov	di, si
 	mov	cx, dx
 SBCS <	mov	al, VC_LF						>
@@ -321,6 +321,16 @@ DBCS <	mov	al, C_LINEFEED						>
 	mov	al, INIT_FILE_COMMENT
 	repne	scasb			;scan for semi
 	jz	initEntry		;semicolon found, so use a blob
+	;
+	; A string value equal to @deleted is data, not a deletion request.
+	; Force a blob so the reader does not treat it as a raw marker.
+	; Normal DBCS string writes use the existing encoded data path.
+	;
+	push	ds
+	segmov	ds, es
+	call	InitFileIsDeletedString
+	pop	ds
+	jc	initEntry
 	clr	bx			;no special chars, so no blob
 
 initEntry:
@@ -376,7 +386,7 @@ fetchChar:
 	cmp	al, ah			;escape backslashes in blobs
 	je	storeEscaped
 
-notBrace:                               ;escape CR ONLY if not paired with LF
+;notBrace:                               ;escape CR ONLY if not paired with LF
 SBCS<   cmp     al, VC_ENTER                                            >
 DBCS<   cmp     al, C_ENTER                                             >
         jne     notCR
@@ -447,6 +457,31 @@ nullString:
 	stosw
 	jmp	terminate
 BuildEntryFromString	endp
+
+	;
+	; Build key = @deleted for the private deletion write mode.
+	; Do not use the string builder: it must protect a literal marker in
+	; a blob. The raw marker is ASCII in both SBCS and DBCS INI files.
+	;
+BuildEntryFromDeleted proc near
+	uses	cx, di, si, ds
+	.enter
+		mov	cx, INITFILE_DELETED_VALUE_LENGTH + 2
+		call	InitEntry
+		LoadVarSeg	ds, ax
+		mov	si, offset initfileDeletedValue
+		mov	cx, INITFILE_DELETED_VALUE_LENGTH
+		rep	movsb
+		mov	ax, C_CR or (C_LF shl 8)
+		stosw
+		clr	al
+		stosb
+		dec	di			; entry size excludes the NUL
+		mov	es, bp
+		mov	es:[entrySize], di
+	.leave
+		ret
+BuildEntryFromDeleted endp
 
 
 COMMENT @-----------------------------------------------------------------------
@@ -640,8 +675,8 @@ ReconstructData	proc	near
 	;
 	mov	ax, es			;sav seg addr of buffer
 	mov	es, bp			;es <- dgroup
-	
-	mov	es:[bufAddr].offset, di	
+
+	mov	es:[bufAddr].offset, di
 	mov	es:[bufAddr].segment, ax
 
 	call	SkipWhiteSpace
@@ -776,8 +811,8 @@ ReconstructString	proc	near
 	;
 	mov	ax, es			;sav seg addr of buffer
 	mov	es, bp			;es <- dgroup
-	
-	mov	es:[bufAddr].offset, di	
+
+	mov	es:[bufAddr].offset, di
 	mov	es:[bufAddr].segment, ax
 
 	call	SkipWhiteSpace		;func(es)
@@ -800,7 +835,7 @@ blob::
 	call	GetChar
 	cmp	al, VC_LF
 	jne	charGotten
-	
+
 copyLoop:
 	mov	es, bp
 	call	GetChar			;fetch char
@@ -814,7 +849,7 @@ charGotten:
 	jne	processingBlob		;branch if so
 
 	cmp	al, VC_ENTER		;else CR?
-	je	copyDone		;done if so
+	LONG_EC	je	copyDone		;done if so
 	cmp	al, VC_LF		;LF?
 	je	copyDone		;done if so
 	cmp	al, MSDOS_TEXT_FILE_EOF	;EOF?

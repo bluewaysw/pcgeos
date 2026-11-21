@@ -128,7 +128,7 @@ REVISION HISTORY:
 	Cheng	11/89		Initial revision
 
 DESCRIPTION:
-		
+
 	$Id: initfileLow.asm,v 1.1 97/04/05 01:18:00 newdeal Exp $
 
 ----------------------------------------------------------------------------@
@@ -174,8 +174,8 @@ PASS:		nothing
 
 RETURN:		doesn't return
 
-DESTROYED:	
- 
+DESTROYED:
+
 PSEUDO CODE/STRATEGY:
 
 KNOWN BUGS/SIDE EFFECTS/IDEAS:
@@ -192,7 +192,7 @@ CorruptedIniFileError	proc	far
 	call	VInitFile
 
 if	ERROR_CHECK
-	ERROR	CORRUPTED_INI_FILE					
+	ERROR	CORRUPTED_INI_FILE
 else
 ifdef GPC
 	mov	al, KS_TE_SYSTEM_ERROR
@@ -292,10 +292,10 @@ RETURN:		all parameters stored away in variables
 DESTROYED:	ax, bx
 
 PSEUDO CODE/STRATEGY:
-		
+
 
 KNOWN BUGS/SIDE EFFECTS/IDEAS:
-		
+
 
 REVISION HISTORY:
 	Name	Date		Description
@@ -336,7 +336,7 @@ endif
 EC <		cmp	cx, MAX_INITFILE_CATEGORY_LENGTH		>
 EC <		ERROR_AE INIT_FILE_CATEGORY_STRING_TOO_LONG		>
 		mov	ds:[catStrLen], cx
-		
+
 		les	di, ds:[keyStrAddr]
 		call	GetStringLength
 		mov	ds:[keyStrLen], cx
@@ -393,10 +393,10 @@ RETURN:		buffer unlocked
 DESTROYED:	nothing
 
 PSEUDO CODE/STRATEGY:
-		
+
 
 KNOWN BUGS/SIDE EFFECTS/IDEAS:
-		
+
 
 REVISION HISTORY:
 	Name	Date		Description
@@ -440,10 +440,10 @@ RETURN:		buffer unlocked
 DESTROYED:	nothing
 
 PSEUDO CODE/STRATEGY:
-		
+
 
 KNOWN BUGS/SIDE EFFECTS/IDEAS:
-		
+
 
 REVISION HISTORY:
 	Name	Date		Description
@@ -499,7 +499,7 @@ PASS:
 	bp - InitFileReadFlags
 
 RETURN:
-	carry - set if error (category or key not found)
+	carry - set if the category or key is absent, or a marker is found
 	all parameters stored away in variables
 	initFileSem grabbed
 	es, bp - dgroup
@@ -534,7 +534,18 @@ searchLoop:
 	call	FindCategory
 	jc	notFound
 	call	FindKey
+	jc	notFound
+	;
+	; A raw marker makes the key missing. Do not search a lower file.
+	; Check before type conversion so missing-key outputs stay unchanged.
+	;
+	call	InitFileIsDeletedValue
 	jnc	doneGood
+	push	bx
+	mov	bx, es:[bx]
+	call	MemUnlock
+	pop	bx
+	jmp	error			; stop at the tombstone
 notFound:
 	;
 	; category or key not found in .ini file, progress down the
@@ -551,7 +562,7 @@ notFound:
 	; get handle of next .ini file in the path
 
 	add	bx, size word
-	
+
 	cmp	bx, (offset loaderVars.KLV_initFileBufHan)+ \
 						((size word)*MAX_INI_FILES)
 	je	error
@@ -559,7 +570,7 @@ notFound:
 	je	error
 
 if HASH_INIFILE
-	add	es:[currentIniOffset], size word	
+	add	es:[currentIniOffset], size word
 endif		; HASH_INIFILE
 
 	push	bx
@@ -601,11 +612,11 @@ PASS:		es - dgroup
 		ds:si - category string
 		cx:dx - key string
 
-RETURN:		nothing 
+RETURN:		nothing
 
-DESTROYED:	nothing 
+DESTROYED:	nothing
 
-PSEUDO CODE/STRATEGY:	
+PSEUDO CODE/STRATEGY:
 	Unlock the current initfile buffer, find the next one, and
 	lock it. Search for the passed category/key.  If it's not in
 	that file, then go to the next one
@@ -621,7 +632,7 @@ REVISION HISTORY:
 GetNextInitFileAndFindKey	proc near
 
 		uses	ax,bx,cx,dx,di,si,bp
-		
+
 		.enter
 
 nextInitFile:
@@ -634,27 +645,27 @@ nextInitFile:
 	;
 	; Find the currently locked init file
 	;
-		
+
 searchLoop:
 		cmp	es:[bx], ax
 		lea	bx, es:[bx][size word]
 		jne	searchLoop
-		
+
 	;
 	; Now, lock the next one if such there be
 	;
-		
+
 		cmp	bx, (offset loaderVars.KLV_initFileBufHan)+ \
 					((size word)*MAX_INI_FILES)
 		jae	notFound
-		
+
 		mov	bx, es:[bx]
 		tst	bx
 		jz	notFound
 if HASH_INIFILE
 		add	es:[currentIniOffset], size word
 endif ;
-		
+
 		call	MemLock
 
 		mov	es:[initFileBufSegAddr], ax
@@ -667,6 +678,15 @@ endif ;
 
 		call	FindKey
 		jc	nextInitFile
+	;
+	; Stop at a marker. The caller keeps values from higher files.
+	; Clear the handle because this buffer is no longer locked.
+	;
+		call	InitFileIsDeletedValue
+		jnc	done
+		call	MemUnlock
+		mov	es:[initFileHanLocked], 0
+		jmp	notFound		; retain earlier read-all contributions
 done:
 		.leave
 		ret
@@ -674,7 +694,7 @@ done:
 notFound:
 		stc
 		jmp	done
-	
+
 GetNextInitFileAndFindKey	endp
 
 
@@ -721,12 +741,12 @@ REVISION HISTORY:
 FindCategory	proc	far
 
 
-		
+
 EC <	call	IFCheckDgroupRegs					>
 	push	ax,bx,cx,si,di,ds
 if HASH_INIFILE
 	tst	es:[hashTableBlkHandle]
-	jz	slowWay	
+	jz	slowWay
 	call	HashFindCategory
 	jmp	exit
 slowWay:
@@ -859,6 +879,11 @@ REVISION HISTORY:
 
 ----------------------------------------------------------------------------@
 
+	;
+	; This is physical lookup. Return markers as entries so a normal write
+	; can replace them and internal cleanup can remove them. Logical read
+	; paths call InitFileIsDeletedValue after this routine succeeds.
+	;
 FindKey		proc	far
 EC<	call	IFCheckDgroupRegs					>
 
@@ -926,7 +951,7 @@ blobFound:
 EC<	ERROR_C	INIT_FILE_BAD_BLOB					>
 EC<	tst	bx			;assert no longer in blob	>
 EC<	ERROR_NZ INIT_FILE_BAD_BLOB					>
-	jnc	findLoop						
+	LONG_EC	jnc	findLoop
 error:
 	GOTO	CorruptedIniFileError
 
@@ -941,6 +966,191 @@ exit:
 	pop	ax,bx,cx,si,ds
 	ret
 FindKey		endp
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		InitFileIsDeletedString
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Check the raw value for the whole-key deletion marker.
+PASS:		ds:si - ASCII text, terminated by NUL, CR, LF or DOS EOF
+RETURN:		carry set if the value is a marker; all registers unchanged
+
+STRATEGY:	Compare the complete token without case conversion. Allow only
+		spaces or tabs before and after it. A semicolon starts a trailing
+		comment. A blob or a longer token is data, not a marker.
+		Do not move the caller's pointer or the INI parser position.
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+InitFileIsDeletedString proc far
+	uses	ax, si, di, es
+	.enter
+
+	;
+	; Match only @deleted outside a blob. Keep Loader/ini.asm in sync.
+	;
+		LoadVarSeg	es, ax
+		mov	di, offset initfileDeletedValue
+skipLeading:
+		mov	al, ds:[si]
+		cmp	al, ' '
+		je	nextLeading
+		cmp	al, C_TAB
+		jne	matchToken
+nextLeading:
+		inc	si
+		jmp	skipLeading
+
+matchToken:
+		mov	al, es:[di]
+		inc	di
+		tst	al
+		jz	checkEnd
+		cmp	al, ds:[si]
+		jne	notDeleted
+		inc	si
+		jmp	matchToken
+
+checkEnd:
+		mov	al, ds:[si]
+		cmp	al, ' '
+		je	nextTrailing
+		cmp	al, C_TAB
+		je	nextTrailing
+		tst	al
+		jz	deleted
+		cmp	al, C_CR
+		je	deleted
+		cmp	al, C_LF
+		je	deleted
+		cmp	al, MSDOS_TEXT_FILE_EOF
+		je	deleted
+		cmp	al, INIT_FILE_COMMENT
+		je	deleted
+notDeleted:
+		clc
+		jmp	done
+nextTrailing:
+		inc	si
+		jmp	checkEnd
+
+deleted:
+		stc
+done:
+	.leave
+		ret
+InitFileIsDeletedString endp
+
+	;
+	; Check the current raw body without changing the parser position.
+	;
+InitFileIsDeletedValue proc far
+	uses	ds, si
+	.enter
+		lds	si, es:[initFileBufPos]
+		call	InitFileIsDeletedString
+	.leave
+		ret
+InitFileIsDeletedValue endp
+
+if INI_STRING_SECTION_TOMBSTONES
+
+	;
+	; Check the primary key before a list merge. Carry set means a marker.
+	; A missing primary entry allows lower items; a marker blocks the list.
+	;
+InitFilePrimaryIsDeleted proc far
+	uses	ax, bx, cx, di, si, bp, ds, es
+	.enter
+		call	EnterInitfile
+		call	FindCategory
+		jc	notDeleted
+		call	FindKey
+		jc	notDeleted
+		call	InitFileIsDeletedValue
+		jmp	done
+notDeleted:
+		clc
+done:
+		call	ExitInitfile
+	.leave
+		ret
+InitFilePrimaryIsDeleted endp
+
+endif	; INI_STRING_SECTION_TOMBSTONES
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		InitFileFindLowerKey
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Check for a lower value while the primary file stays locked.
+PASS:		es,bp - dgroup; EnterInitfile has stored category and key
+RETURN:		carry clear if a lower value is available
+		carry set if no value is available, or a lower marker blocks it
+		Primary parser state and all registers unchanged.
+
+STRATEGY:	Search lower files in order. Zero, false and an empty string
+		count as values. Stop at the first value or deletion marker.
+		Release each lower buffer. Restore the primary parser offsets
+		and hash index before return. The caller keeps the INI lock
+		from this check through the primary write or physical deletion.
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+InitFileFindLowerKey proc far
+	uses	ax, bx
+	.enter
+
+		push	es:[initFileBufSegAddr], es:[initFileBufPos]
+		push	es:[curCatOffset], es:[curKeyOffset]
+if HASH_INIFILE
+		push	es:[currentIniOffset]
+endif
+		mov	bx, offset loaderVars.KLV_initFileBufHan + size hptr
+searchLoop:
+		cmp	bx, offset loaderVars.KLV_initFileBufHan + \
+				MAX_INI_FILES * size hptr
+		jae	notFound
+		tst	{hptr}es:[bx]
+		jz	notFound
+
+		push	bx
+		mov	bx, es:[bx]
+		call	MemLock
+		pop	bx
+		mov	es:[initFileBufSegAddr], ax
+		mov	es:[curCatOffset], CATEGORY_NOT_CACHED
+if HASH_INIFILE
+		mov	ax, bx
+		sub	ax, offset loaderVars.KLV_initFileBufHan
+		mov	es:[currentIniOffset], ax
+endif
+		call	FindCategory
+		jc	nextFile
+		call	FindKey
+		jc	nextFile
+		call	InitFileIsDeletedValue
+		pushf			; keep the result while unlocking the buffer
+		mov	bx, es:[bx]
+		call	MemUnlock
+		popf
+		jmp	done
+
+nextFile:
+		push	bx
+		mov	bx, es:[bx]
+		call	MemUnlock
+		pop	bx
+		add	bx, size hptr
+		jmp	searchLoop
+notFound:
+		stc
+done:
+if HASH_INIFILE
+		pop	es:[currentIniOffset]
+endif
+		pop	es:[curCatOffset], es:[curKeyOffset]
+		pop	es:[initFileBufSegAddr], es:[initFileBufPos]
+	.leave
+		ret
+InitFileFindLowerKey endp
+
 
 
 COMMENT @--------------------------------------------------------------------
@@ -1043,7 +1253,7 @@ done:
 	; initFileBufPos (which won't advance beyond the ^Z). In the normal
 	; case (a blob or a return-terminated string), we want to not include
 	; the final character.
-	; 
+	;
 	cmp	al, MSDOS_TEXT_FILE_EOF
 	je	figureSize		; (carry clear)
 ignoreChar::
@@ -1185,7 +1395,7 @@ DESTROYED:	nothing
 REGISTER/STACK USAGE:
 
 PSEUDO CODE/STRATEGY:
-	unfortunately, the speed of the 8086 scas instructions cannot 
+	unfortunately, the speed of the 8086 scas instructions cannot
 	be taken advantage of
 
 KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
@@ -1218,7 +1428,7 @@ findCharLoop:
 checkEscaped:
 	cmp	al, '\\'
 	je	escapedChar
-notEscaped:
+;notEscaped:
 	cmp	al, INIT_FILE_COMMENT
 	je	commentChar
 	cmp	al, '{'				;found start of blob?
@@ -1292,7 +1502,7 @@ RETURN:		carry clear if successful
 		    al - next character
 		    dgroup:[initFileBufPos] updated
 		carry set if end of file encountered
-		    al - EOF 
+		    al - EOF
 
 DESTROYED:	nothing
 
@@ -1326,7 +1536,7 @@ EC<	call	IFCheckDgroupRegs					>
 			;This can be done because the initFileBufSegAddr
 			; directly follows initFileBufPos. These should
 			; actually be one variable, but, hell, I didn't
-			; write this stuff.		
+			; write this stuff.
 
 	lodsb	es:				;fetch character
 	mov	es, bp				;es <- dgroup
@@ -1378,7 +1588,7 @@ FUNCTION:	CmpString
 DESCRIPTION:	Compares the given string with the string at the
 		current init file buffer location. The comparison is
 		case-insensitive and white space is ignored.
-		
+
 
 CALLED BY:	INTERNAL ()
 
@@ -1391,7 +1601,7 @@ RETURN:		carry clear if strings 'match'
 
 		set otherwise
 		initFileBufPos - unchanged
-DESTROYED:	
+DESTROYED:
 
 REGISTER/STACK USAGE:
 
@@ -1460,7 +1670,7 @@ RETURN:		carry clear if character is cmp-able
 			al - made uppercase if passed al was a lowercase letter
 		carry set if character is white space
 
-DESTROYED:	
+DESTROYED:
 
 REGISTER/STACK USAGE:
 
@@ -1486,7 +1696,7 @@ DBCS <	cmp	al, C_SPACE						>
 SBCS <	cmp	al, VC_TAB						>
 DBCS <	cmp	al, C_TAB						>
 	je	illegal
-	
+
 	cmp	al, 'a'
 	jb	legal
 
@@ -1640,7 +1850,7 @@ REVISION HISTORY:
 
 IsNumeric	proc	near
 	cmp	al, '0'				; carry is already set correctly
-	jb	done	
+	jb	done
 	cmp	al, '9'+ 1			; carry is clear fort above/eq
 	cmc					; invert it, please
 done:
@@ -1671,7 +1881,7 @@ RETURN:		clc	- section found
 DESTROYED:	nothing
 
 PSEUDO CODE/STRATEGY:
-		
+
 KNOWN BUGS/SIDE EFFECTS/IDEAS:
 
 REVISION HISTORY:
@@ -1721,15 +1931,15 @@ SYNOPSIS:	Return ptr to string section.
 
 CALLED BY:	GetStringSectionByIndex
 
-PASS:		
+PASS:
 		ds:si - ptr into string buffer
 		cx - remaining chars in string buffer including ds:si char
-RETURN:		
+RETURN:
 		ax - length
 		ds:si - ptr to first char of section
 		ds:di - ptr to byte after last char of section
 		cx - remaining chars in string buffer including ds:di char
-		
+
 DESTROYED:	bx
 
 PSEUDO CODE/STRATEGY:
@@ -1756,7 +1966,7 @@ GetStringSectionPtr		proc	near
 
 	; Scan for first unacceptable char after acceptable char
 	;
-	mov	si, di				
+	mov	si, di
 	mov	bx, offset IsUnprintableAsciiChar?
 	call	ScanStringForCharType
 
@@ -1842,7 +2052,7 @@ RETURN:		clc - yes
 DESTROYED:	nothing
 
 PSEUDO CODE/STRATEGY:
-	
+
 KNOWN BUGS/SIDE EFFECTS/IDEAS:
 
 REVISION HISTORY:
@@ -1968,10 +2178,10 @@ doDel:
 
 if HASH_INIFILE
 	mov	cx, ax
-	neg	cx	
+	neg	cx
 	call	HashUpdateHashTable
 endif		; HASH_INIFILE
-		
+
 	pop	cx,di,si,ds
 	ret
 DeleteEntry	endp
@@ -2017,14 +2227,13 @@ CreateCategory	proc	near
 	uses	cx, di, si, ds
 	.enter
 
-if HASH_INIFILE
 	;
-	; Jump to the end of the file
+	; Always append new categories at EOF.  FindCategory can return a
+	; cached CATEGORY_NOT_PRESENT without positioning initFileBufPos.
 	;
 	mov	ax, es:[loaderVars].KLV_initFileSize	; size including EOF
 	dec	ax					; offset of EOF
 	mov	es:[initFileBufPos], ax
-endif		;HASH_INIFILE
 
 	; First make space for the new category name
 	;
@@ -2048,7 +2257,7 @@ if HASH_INIFILE
 endif				; HASH_INIFILE
 
 	rep	movsb				; now write the category name
-	mov	al, ']'	
+	mov	al, ']'
 	stosb					; write the close bracket
 SBCS <	mov	ax, (VC_LF shl 8) or VC_ENTER				>
 DBCS <	mov	ax, (C_LINEFEED shl 8) or C_ENTER			>
@@ -2064,7 +2273,7 @@ if HASH_INIFILE
 	pop	cx				; pointer to category name
 	call	HashAddPrimaryEntry
 endif			;HASH_INIFILE
-		
+
 	.leave
 	ret
 CreateCategory	endp
@@ -2269,10 +2478,10 @@ PASS:		al	= number to convert
 		es:di	= place to store result (won't be null-terminated)
 RETURN:		es:di	= points after last char stored
 DESTROYED:	ax
-SIDE EFFECTS:	
+SIDE EFFECTS:
 
 PSEUDO CODE/STRATEGY:
-		
+
 
 REVISION HISTORY:
 	Name	Date		Description
@@ -2317,7 +2526,7 @@ PASS:		ds - segment of ini file
 		cx - # chars in .ini file
 RETURN:		carry set if file is trashed (has non-ascii chars)
 DESTROYED:	nothing but flags
- 
+
 PSEUDO CODE/STRATEGY:
 
 	1) If any non-ascii characters are found, return TRASHED

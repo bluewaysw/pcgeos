@@ -136,6 +136,18 @@ sub SetVars {
 	}
     }
 
+    # If not passed in, expose the primary build file name to template files.
+    if ( !defined($var{buildfile}) || $var{buildfile} eq "" ) {
+	if ( scalar(@varfiles) ) {
+	    $var{buildfile} = $varfiles[$#varfiles];
+	    $var{buildfile} =~ s|^.*/||;
+	}
+    }
+
+    # Use the distribution tag as the build number in VERSION.TXT.
+    $var{buildnumber} = &ResolveEnvar("versionTag");
+    $var{buildnumber} =~ s/^BLD//i;
+
     @sourcedirs=split(' ', "$var{sourcedirs}");
 
     # Determine where we're sending this thing, if that hasn't been 
@@ -274,7 +286,6 @@ sub SetVars {
 
     &VariableSanityCheck();
 }
-
 
 ##############################################################################
 #	ReadVars
