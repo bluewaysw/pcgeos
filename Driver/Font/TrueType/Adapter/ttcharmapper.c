@@ -323,19 +323,19 @@ EC(     ECCheckBounds( lookupTable ) );
                 lookupTable[i].geoscode = (char)geosChar;
         }
 
-        SortLookupTable( lookupTable, NUM_GEOS_CHARS );
+        SortLookupTable( lookupTable );
 
         MemUnlock( memHandle );
         return memHandle;
 }
 
 
-static void SortLookupTable(LookupEntry* table, int count)
+static void SortLookupTable(LookupEntry* table)
 {
     int         i, j;
     LookupEntry temp;
 
-    for (i = 1; i < count; ++i)
+    for (i = 1; i < NUM_GEOS_CHARS; ++i)
     {
         temp = table[i];
         for (j = i; j > 0 && table[j - 1].ttindex > temp.ttindex; --j)

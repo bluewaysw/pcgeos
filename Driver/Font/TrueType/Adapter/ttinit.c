@@ -1072,7 +1072,6 @@ GetKernCount( TRUETYPE_VARS )
 {
         TT_Kerning        kerningDir;
         word              table;
-        TT_Kern_0_Pair*   pairs;
         word              numGeosKernPairs = 0;
         LookupEntry*      indices;
         const word        minKernValue = UNITS_PER_EM / KERN_VALUE_DIVIDENT;
@@ -1086,43 +1085,83 @@ GetKernCount( TRUETYPE_VARS )
                 return 0;
         }
 
-        /* get pointer to lookup table */
         indices = GEO_LOCK( LOOKUP_TABLE );
 EC(     ECCheckBounds( indices ) );
 
-        /* search for format 0 subtables */
         for( table = 0; table < kerningDir.nTables; ++table )
         {
-                word i;
-                TT_Kern_Subtable* subtable = &kerningDir.tables[table];
+                TT_Kern_Subtable* sub = &kerningDir.tables[table];
+                TT_Error error;
+                TT_UShort total, done, chunk, count, i;
+                word valid = 0;
+                Boolean partial;
+                TT_Kern_0_Pair* pairs;
 
-                if( TT_Load_Kerning_Table( FACE, &kerningDir, table ) )
+                if( sub->format != 0 )
                         continue;
 
-                if( subtable->format != 0 )
+                error = TT_Load_Kerning_Table( FACE, &kerningDir, table );
+                if( error && error != TT_Err_Out_Of_Memory )
                         continue;
 
-                pairs = GEO_LOCK( subtable->t.kern0.pairsBlock );
-EC(             ECCheckBounds( pairs ) );
+                /* Subtable_Load_0 preserves nPairs on allocation failure. */
+                total   = sub->t.kern0.nPairs;
+                partial = (error != TT_Err_Ok);
+                chunk   = partial ? total / 2 : total;
+                if( chunk == 0 )
+                        chunk = 1;
 
-                for( i = 0; i < subtable->t.kern0.nPairs; ++i )
+                done = 0;
+                while( done < total )
                 {
-                        if( ABS( pairs[i].value ) <= minKernValue )
-                                continue;
+                        count = total - done;
+                        if( count > chunk )
+                                count = chunk;
 
-                        if( GetGEOSCharForIndex( indices, pairs[i].left ) &&
-                            GetGEOSCharForIndex( indices, pairs[i].right ) )
-                                ++numGeosKernPairs;
+                        if( partial )
+                        {
+                                error = TT_Load_Kerning_Table_Range(
+                                        FACE, sub, done, count );
+                                if( error )
+                                {
+                                        if( error != TT_Err_Out_Of_Memory || count == 1 )
+                                                break;
+                                        chunk = count / 2;
+                                        continue;
+                                }
+                        }
+
+                        pairs = GEO_LOCK( sub->t.kern0.pairsBlock );
+EC(                     ECCheckBounds( pairs ) );
+                        if( !pairs )
+                                break;
+
+                        for( i = 0; i < count; ++i )
+                        {
+                                if( ABS( pairs[i].value ) > minKernValue &&
+                                    GetGEOSCharForIndex( indices, pairs[i].left ) &&
+                                    GetGEOSCharForIndex( indices, pairs[i].right ) )
+                                        ++valid;
+                        }
+
+                        GEO_UNLOCK( sub->t.kern0.pairsBlock );
+                        done += count;
                 }
 
-                GEO_UNLOCK( subtable->t.kern0.pairsBlock );
+                /* Do not leave complete subtables allocated; the directory
+                   destructor must not free a block twice. */
+                GEO_FREE( sub->t.kern0.pairsBlock );
+                sub->loaded = FALSE;
+
+                if( done == total )
+                        numGeosKernPairs += valid;
         }
 
         GEO_UNLOCK( LOOKUP_TABLE );
         TT_Kerning_Directory_Done( &kerningDir );
-
         return numGeosKernPairs;
 }
+
 #pragma code_seg()
 
 /*******************************************************************/

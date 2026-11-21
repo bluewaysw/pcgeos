@@ -434,68 +434,103 @@ EC(     ECCheckMemHandle(LOOKUP_TABLE) );
         indices = GEO_LOCK(LOOKUP_TABLE);
 EC(     ECCheckBounds(indices) );
 
-        /* search for format 0 subtables */
+        /* Process format 0 subtables, using smaller chunks only if needed. */
         for( table = 0; table < kerningDir.nTables; ++table )
         {
-                word              i;
-                TT_Kern_Subtable* subtable = &kerningDir.tables[table];
+                TT_Kern_Subtable* sub = &kerningDir.tables[table];
+                TT_Error error;
+                TT_UShort total, done, chunk, count, i;
+                Boolean partial;
 
-                if( TT_Load_Kerning_Table( FACE, &kerningDir, table) )
+                if( sub->format != 0 )
                         continue;
 
-EC(             ECCheckMemHandle( subtable->t.kern0.pairsBlock) );
+                error = TT_Load_Kerning_Table( FACE, &kerningDir, table );
+                if( error && error != TT_Err_Out_Of_Memory )
+                        continue;
 
-                pairs = GEO_LOCK(subtable->t.kern0.pairsBlock);
+                total = sub->t.kern0.nPairs;
+                partial = (error != TT_Err_Ok);
+                chunk = partial ? total / 2 : total;
+                if( chunk == 0 )
+                        chunk = 1;
 
-EC(             ECCheckBounds(pairs) );
-
-                for( i = 0; i < subtable->t.kern0.nPairs; ++i )
+                done = 0;
+                while( done < total )
                 {
-                        WWFixedAsDWord scaledKernValue;
+                        count = total - done;
+                        if( count > chunk )
+                                count = chunk;
 
-                        /* discard pairs with small kerning values */
-                        if( ABS(pairs[i].value) <= minKernValue )
-                                continue;
-
-                        left  = GetGEOSCharForIndex( indices, pairs[i].left);
-                        right = GetGEOSCharForIndex( indices, pairs[i].right);
-
-                        if( !left || !right )
-                                continue;
-
-                        /* Never write beyond the kerning arrays */
-                        if( kernCount >= fontBuf->FB_kernCount )
+                        if( partial )
                         {
-                                GEO_UNLOCK(subtable->t.kern0.pairsBlock);
-                                goto cleanup;
+                                error = TT_Load_Kerning_Table_Range(
+                                        FACE, sub, done, count );
+                                if( error )
+                                {
+                                        if( error != TT_Err_Out_Of_Memory || count == 1 )
+                                                break;
+                                        chunk = count / 2;
+                                        continue;
+                                }
                         }
 
-                        kernPair->KP_charLeft  = left;
-                        kernPair->KP_charRight = right;
+                        pairs = GEO_LOCK( sub->t.kern0.pairsBlock );
+EC(                     ECCheckBounds( pairs ) );
+                        if( !pairs )
+                                break;
 
-EC(                     EC_ERROR_IF( (unsigned char)(left - fontBuf->FB_firstChar) >
+                        for( i = 0; i < count; ++i )
+                        {
+                                WWFixedAsDWord scaledKernValue;
+
+                                if( ABS( pairs[i].value ) <= minKernValue )
+                                        continue;
+
+                                left = GetGEOSCharForIndex( indices, pairs[i].left );
+                                right = GetGEOSCharForIndex( indices, pairs[i].right );
+                                if( !left || !right )
+                                        continue;
+
+                                if( kernCount >= fontBuf->FB_kernCount )
+                                {
+                                        GEO_UNLOCK( sub->t.kern0.pairsBlock );
+                                        goto free_subtable;
+                                }
+
+                                kernPair->KP_charLeft = left;
+                                kernPair->KP_charRight = right;
+
+EC(                             EC_ERROR_IF( (unsigned char)(left - fontBuf->FB_firstChar) >
                                         fontBuf->FB_lastChar - fontBuf->FB_firstChar, CHARINDEX_OUT_OF_BOUNDS ) );
-EC(                     EC_ERROR_IF( (unsigned char)(right - fontBuf->FB_firstChar) >
+EC(                             EC_ERROR_IF( (unsigned char)(right - fontBuf->FB_firstChar) >
                                         fontBuf->FB_lastChar - fontBuf->FB_firstChar, CHARINDEX_OUT_OF_BOUNDS ) );
 
-                        charTableEntries[(unsigned char)(left - fontBuf->FB_firstChar)].CTE_flags |= CTF_IS_FIRST_KERN;
-                        charTableEntries[(unsigned char)(right - fontBuf->FB_firstChar)].CTE_flags |= CTF_IS_SECOND_KERN;
+                                charTableEntries[(unsigned char)(left - fontBuf->FB_firstChar)].CTE_flags |= CTF_IS_FIRST_KERN;
+                                charTableEntries[(unsigned char)(right - fontBuf->FB_firstChar)].CTE_flags |= CTF_IS_SECOND_KERN;
 
-                        /* save scaled kerning value */
-                        scaledKernValue = SCALE_WORD( pairs[i].value, SCALE_WIDTH );
+                                scaledKernValue = SCALE_WORD( pairs[i].value, SCALE_WIDTH );
+                                kernValue->BBF_int = IntegerOf( scaledKernValue );
+                                kernValue->BBF_frac = FractionOf( scaledKernValue ) >> 8;
 
-                        kernValue->BBF_int  = IntegerOf(scaledKernValue);
-                        kernValue->BBF_frac = FractionOf(scaledKernValue) >> 8;
+                                ++kernPair;
+                                ++kernValue;
+                                ++kernCount;
+                        }
 
-                        ++kernPair;
-                        ++kernValue;
-                        ++kernCount;
+                        GEO_UNLOCK( sub->t.kern0.pairsBlock );
+                        done += count;
                 }
 
-                GEO_UNLOCK(subtable->t.kern0.pairsBlock);
+free_subtable:
+                GEO_FREE( sub->t.kern0.pairsBlock );
+                sub->loaded = FALSE;
+
+                /* Avoid proceeding with a partially converted subtable. */
+                if( done != total || kernCount >= fontBuf->FB_kernCount )
+                        break;
         }
 
-cleanup:
         GEO_UNLOCK(LOOKUP_TABLE);
         TT_Kerning_Directory_Done(&kerningDir);
 
