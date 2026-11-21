@@ -144,6 +144,8 @@ resource GrObjControlInfoXIP			read-only shared
 endif
 
 
+resource GrObjBitmapFormatDialogUI		ui-object read-only shared
+
 # Export Table
 
 export GrObjBodyClass
