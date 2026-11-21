@@ -11,7 +11,7 @@ name            icmtool.lib
 longname        "IconEd and more Tool Library"
 tokenchars      "IMTl"
 tokenid         16480
-usernotes	"International version 1.0\rMade by RABE-Soft 10/2026"
+usernotes	"International version 1.0.1\rMade by RABE-Soft 10/2026"
 
 type            library, single
 
