@@ -183,6 +183,13 @@ struct TT_Kern_Subtable_
                                    TT_Kerning*  directory,
                                    TT_UShort    kern_index );
 
+  /* Load a format-0 range into the subtable's reusable pair block. */
+  EXPORT_DEF
+  TT_Error  TT_Load_Kerning_Table_Range( TT_Face face,
+                                         TT_Kern_Subtable* sub,
+                                         TT_UShort first,
+                                         TT_UShort count );
+
 
 #ifdef __cplusplus
 }

@@ -126,9 +126,8 @@ EC(             		ECCheckMemHandle( *fontHandle ) );
 
 			    {
 				byte* srcPtr = VMLock(cacheFile, block, &blockMem);
-				byte* destPtr = MemLock(*fontHandle);
+				byte* destPtr = MemDeref(*fontHandle);
 				memcpy(destPtr, srcPtr, size);
-				MemUnlock(*fontHandle);
 				VMUnlock(blockMem);
 			    }
 

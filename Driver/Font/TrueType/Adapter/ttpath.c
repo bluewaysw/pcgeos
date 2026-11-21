@@ -283,7 +283,6 @@ void _pascal TrueType_Gen_In_Region(
         RenderFunctions        renderFunctions;
         TransformMatrix        transform;
         XYValueAsDWord         cursorPos;
-        XYValueAsDWord         result;
         TT_Matrix              flipMatrix = HORIZONTAL_FLIP_MATRIX;
 
 
@@ -324,13 +323,13 @@ EC(     ECCheckBounds( (void*)fontHeader ) );
 
         /* get current cursor position */
         cursorPos = GrGetCurPos( gstate );
-        result = GrTransform( gstate, DWORD_X(cursorPos), DWORD_Y(cursorPos) );
+        cursorPos = GrTransform( gstate, DWORD_X(cursorPos), DWORD_Y(cursorPos) );
 
         /* transform glyphs outline */
         TT_Transform_Outline( outline, &transform.TM_matrix );
         TT_Transform_Outline( outline, &flipMatrix );
-        TT_Translate_Outline( outline, DWORD_X(result) + transform.TM_heightX + transform.TM_scriptX, 
-                                        DWORD_Y(result) + transform.TM_heightY + transform.TM_scriptY );
+        TT_Translate_Outline( outline, DWORD_X(cursorPos) + transform.TM_heightX + transform.TM_scriptX, 
+                                        DWORD_Y(cursorPos) + transform.TM_heightY + transform.TM_scriptY );
 
         /* set render functions */
         renderFunctions.Proc_MoveTo  = RegionPathMoveTo;

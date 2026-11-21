@@ -161,15 +161,11 @@ EC(             ECCheckBounds( (void*)charData ) );
                 TT_Get_Outline_Region( outline, &rasterMap );
 
 EC_ERROR_IF(    size < rasterMap.size, ERROR_BITMAP_BUFFER_OVERFLOW );
-EC_ERROR_IF(    size < rasterMap.size, ERROR_BITMAP_BUFFER_OVERFLOW );
 
                 /* fill header of charData */
                 ((RegionCharData*)charData)->RCD_xoff = transformMatrix->TM_scriptX + 
                                                         transformMatrix->TM_heightX + ( glyphBBox.xMin >> 6 );
-                                                        transformMatrix->TM_heightX + ( glyphBBox.xMin >> 6 );
                 ((RegionCharData*)charData)->RCD_yoff = transformMatrix->TM_scriptY + 
-                                                        transformMatrix->TM_heightY - ( glyphBBox.yMax >> 6 ); 
-                ((RegionCharData*)charData)->RCD_size = rasterMap.size;
                                                         transformMatrix->TM_heightY - ( glyphBBox.yMax >> 6 ); 
                 ((RegionCharData*)charData)->RCD_size = rasterMap.size;
                 ((RegionCharData*)charData)->RCD_bounds.R_left   = 0;
@@ -177,7 +173,6 @@ EC_ERROR_IF(    size < rasterMap.size, ERROR_BITMAP_BUFFER_OVERFLOW );
                 ((RegionCharData*)charData)->RCD_bounds.R_top    = 0;
                 ((RegionCharData*)charData)->RCD_bounds.R_bottom = height;
 
-                size = rasterMap.size + SIZE_REGION_HEADER;
                 size = rasterMap.size + SIZE_REGION_HEADER;
         }
         else
@@ -556,14 +551,17 @@ static void* EnsureBitmapBlock( MemHandle bitmapHandle, word size )
     else
         allocSize = (size + 255) & 0xFF00;
 
-    bitmapData  = MemLock( bitmapHandle );
-    currentSize = (bitmapData == NULL) ? 0 : MemGetInfo( bitmapHandle, MGIT_SIZE );
-        
-    if ( currentSize != allocSize )
+    /* Avoid locking the block before a resize. */
+    currentSize = MemGetInfo( bitmapHandle, MGIT_SIZE );
+
+    if ( currentSize == allocSize )
     {
-        MemReAlloc( bitmapHandle, allocSize, HAF_NO_ERR | HAF_LOCK );
-        bitmapData = MemDeref( bitmapHandle );
+        bitmapData = MemLock( bitmapHandle );
+        if ( bitmapData != NULL )
+            return bitmapData;
     }
-        
-    return bitmapData;
+
+    /* Also restores a discarded bitmap block (MemLock returned NULL). */
+    MemReAlloc( bitmapHandle, allocSize, HAF_NO_ERR | HAF_LOCK );
+    return MemDeref( bitmapHandle );
 }

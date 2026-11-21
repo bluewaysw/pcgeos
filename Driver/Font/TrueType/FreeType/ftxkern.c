@@ -48,65 +48,81 @@
  *
  ******************************************************************/
 
-  static TT_Error  Subtable_Load_0( TT_Kern_0*  kern0,
-                                    PFace       input )
+  static TT_Error  Subtable_Load_0( TT_Kern_0* kern0, PFace input,
+                                    UShort first, UShort count )
   {
     DEFINE_LOAD_LOCALS( input->stream );
-
-    UShort            num_pairs, n;
-    TT_Kern_0_Pair*   pairs;
-
+    UShort          total, n;
+    TT_Kern_0_Pair* pairs;
 
     if ( ACCESS_Frame( 8 ) )
       return error;
 
-    num_pairs            = GET_UShort();
-    kern0->nPairs        = 0;
+    total = GET_UShort();
 #ifdef TT_CONFIG_OPTION_SUPPORT_OPTIONAL_FIELDS
     kern0->searchRange   = GET_UShort();
     kern0->entrySelector = GET_UShort();
     kern0->rangeShift    = GET_UShort();
 #endif
-
-    /* we only set kern0->nPairs if the subtable has been loaded */
-
     FORGET_Frame();
 
-    if ( GEO_ALLOC_ARRAY( kern0->pairsBlock, num_pairs, TT_Kern_0_Pair ) )
+    /* Keep the total even when the complete load runs out of memory.
+       GetKernCount needs it to retry with smaller ranges. */
+    kern0->nPairs = total;
+    if ( count == 0 )
+      count = total;
+
+    if ( first > total || count > total - first )
+      return TT_Err_Invalid_Kerning_Table;
+
+    if ( count == 0 )
+      return TT_Err_Ok;
+
+    /* The size of ONE chunk, not the total pair count, is limited. */
+    if ( count > MAX_BLOCK_SIZE / 6 ||
+         count > MAX_BLOCK_SIZE / sizeof( TT_Kern_0_Pair ) )
+      return TT_Err_Out_Of_Memory;
+
+    /* A successfully allocated chunk is reused by subsequent reads. */
+    if ( kern0->pairsBlock == NullHandle &&
+         GEO_ALLOC_ARRAY( kern0->pairsBlock, count, TT_Kern_0_Pair ) )
       return error;
 
-    if ( ACCESS_Frame( num_pairs * 6 ) )
+    if ( (first && FILE_Skip( (Long)first * 6L )) ||
+         ACCESS_Frame( count * 6 ) )
       goto Fail;
 
     pairs = GEO_LOCK( kern0->pairsBlock );
+    if ( !pairs )
+    {
+      error = TT_Err_Out_Of_Memory;
+      FORGET_Frame();
+      goto Fail;
+    }
 EC( ECCheckBounds( pairs ) );
 
-    for ( n = 0; n < num_pairs; ++n )
+    for ( n = 0; n < count; ++n )
     {
       pairs[n].left  = GET_UShort();
       pairs[n].right = GET_UShort();
       pairs[n].value = GET_UShort();
-
-      if ( pairs[n].left >= input->numGlyphs || pairs[n].right >= input->numGlyphs )
+      if ( pairs[n].left >= input->numGlyphs ||
+           pairs[n].right >= input->numGlyphs )
       {
-        FORGET_Frame();
         error = TT_Err_Invalid_Kerning_Table;
+        GEO_UNLOCK( kern0->pairsBlock );
+        FORGET_Frame();
         goto Fail;
       }
     }
 
     GEO_UNLOCK( kern0->pairsBlock );
-
     FORGET_Frame();
-
-    /* we're ok, set the pairs count */
-    kern0->nPairs = num_pairs;
-
     return TT_Err_Ok;
 
-    Fail:
-      GEO_FREE( kern0->pairsBlock );
-      return error;
+  Fail:
+    GEO_FREE( kern0->pairsBlock );
+    return error;
   }
 
 #ifdef TT_CONFIG_OPTION_SUPPORT_KERN2
@@ -492,7 +508,7 @@ EC( ECCheckBounds( directory ) );
     if( error )
       return error;
 
-    error = Subtable_Load_0( &sub->t.kern0, faze );
+    error = Subtable_Load_0( &sub->t.kern0, faze, 0, 0 );
 #ifdef TT_CONFIG_OPTION_SUPPORT_KERN2
     else if ( sub->format == 2 )
       error = Subtable_Load_2( &sub->t.kern2, faze );
@@ -504,5 +520,26 @@ EC( ECCheckBounds( directory ) );
     return error;
   }
 
+
+/* Load one format-0 range into the subtable's reusable pair block.
+   Unlike TT_Load_Kerning_Table, this never sets sub->loaded. */
+  EXPORT_FUNC
+  TT_Error  TT_Load_Kerning_Table_Range( TT_Face face,
+                                         TT_Kern_Subtable* sub,
+                                         TT_UShort first,
+                                         TT_UShort count )
+  {
+    PFace faze = HANDLE_Face( face );
+    TT_Error error;
+
+    if ( sub->format != 0 )
+      return TT_Err_Invalid_Kerning_Table_Format;
+
+    error = TT_Seek_File( faze->stream, sub->offset );
+    if ( error )
+      return error;
+
+    return Subtable_Load_0( &sub->t.kern0, faze, first, count );
+  }
 
 /* END */
