@@ -1500,6 +1500,8 @@ sub GenerateFreeGEOSSetupCopyScript {
     }
 
     foreach $path ( @files ) {
+        # The payload root label belongs to the staging directory.
+        next if ( uc( $path ) eq "\@DIRNAME.000" );
         # Ignore a GFS.INI left in a reused build tree. Setup generates it.
         next if ( $dosSourceRoot eq "SETUP\\ACTIVATE" &&
                   uc( $path ) eq "GFS.INI" );
