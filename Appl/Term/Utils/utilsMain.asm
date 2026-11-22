@@ -3046,6 +3046,7 @@ TermGetDatarecAccPnt	proc	far
 		clr	bx
 		mov	ax, APT_APP_LOCAL
 		call	AccessPointCreateEntry		; ax = accpnt ID
+		jc	done
 		mov	bp,ax
 		call	InitFileWriteInteger
 		call	InitFileCommit
