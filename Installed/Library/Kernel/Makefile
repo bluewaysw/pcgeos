@@ -4,8 +4,8 @@
 # If you edit it, you will lose your changes, should it be regenerated.
 #
 GEODE           = kernel
-BOOT            = bootBoot.asm bootInit.asm bootInitfile.asm bootLog.asm\
-                  bootManager.asm bootStrings.asm bootConstant.def\
+BOOT            = bootInit.asm bootInitfile.asm bootLog.asm bootManager.asm\
+                  bootStrings.asm bootBoot.asm bootConstant.def\
                   bootInitfileVariable.def bootMacro.def bootVariable.def
 DBASE           = dbaseC.asm dbaseCode.asm dbaseErrorCheck.asm\
                   dbaseGroup.asm dbaseItemBlock.asm dbaseManager.asm\
@@ -23,10 +23,11 @@ DRIVE           = driveC.asm driveEC.asm driveHigh.asm driveInit.asm\
 FSD             = fsdDisk.asm fsdDrive.asm fsdEC.asm fsdFile.asm\
                   fsdInit.asm fsdManager.asm fsdSkeleton.asm fsdUtils.asm\
                   fsdConstant.def fsdMacro.def fsdVariable.def
-FILE            = fileC.asm fileEC.asm fileEnum.asm fileFile.asm fileIO.asm\
-                  fileInit.asm fileLink.asm fileList.asm fileManager.asm\
-                  fileOpenClose.asm filePath.asm fileSync.asm fileUtils.asm\
-                  fileConstant.def fileMacro.def fileVariable.def
+FILE            = fileC.asm fileEC.asm fileEnum.asm fileIO.asm fileInit.asm\
+                  fileLink.asm fileList.asm fileManager.asm\
+                  fileOpenClose.asm fileSync.asm fileUtils.asm filePath.asm\
+                  fileFile.asm fileConstant.def fileMacro.def\
+                  fileVariable.def
 GEODES          = geodesAccess.asm geodesAnalysis.asm geodesC.asm\
                   geodesDriver.asm geodesErrorCheck.asm geodesEvent.asm\
                   geodesHandle.asm geodesInit.asm geodesLibrary.asm\
@@ -38,11 +39,11 @@ GEODES          = geodesAccess.asm geodesAnalysis.asm geodesC.asm\
                   geodesConstant.def geodesMacro.def geodesVariable.def
 GRAPHICS        = graphicsArc.asm graphicsArcLow.asm\
                   graphicsBitmapCreate.asm graphicsBitmapHuge.asm\
-                  graphicsBitmapString.asm graphicsC.asm\
-                  graphicsCalcConic.asm graphicsCalcEllipse.asm\
-                  graphicsChars.asm graphicsColor.asm graphicsEllipse.asm\
+                  graphicsBitmapString.asm graphicsCalcConic.asm\
+                  graphicsCalcEllipse.asm graphicsChars.asm\
+                  graphicsColor.asm graphicsEllipse.asm\
                   graphicsEllipseLow.asm graphicsFatLine.asm\
-                  graphicsFont.asm graphicsFontC.asm graphicsFontDriver.asm\
+                  graphicsFontC.asm graphicsFontDriver.asm\
                   graphicsGStringC.asm graphicsGetState.asm\
                   graphicsImage.asm graphicsInit.asm graphicsLine.asm\
                   graphicsLineStyles.asm graphicsManager.asm\
@@ -51,54 +52,54 @@ GRAPHICS        = graphicsArc.asm graphicsArcLow.asm\
                   graphicsPattern.asm graphicsPatternBitmap.asm\
                   graphicsPatternHatch.asm graphicsPolygon.asm\
                   graphicsPolyline.asm graphicsRaster.asm\
-                  graphicsRasterDraw.asm graphicsRasterRotate.asm\
-                  graphicsRasterScale.asm graphicsRasterUtils.asm\
-                  graphicsRegion.asm graphicsRegionAppl.asm\
-                  graphicsRegionPath.asm graphicsRegionRaster.asm\
-                  graphicsRoundedRect.asm graphicsSpline.asm\
-                  graphicsState.asm graphicsString.asm\
+                  graphicsRasterRotate.asm graphicsRasterScale.asm\
+                  graphicsRasterUtils.asm graphicsRegion.asm\
+                  graphicsRegionAppl.asm graphicsRegionPath.asm\
+                  graphicsRegionRaster.asm graphicsRoundedRect.asm\
+                  graphicsSpline.asm graphicsState.asm\
                   graphicsStringMisc.asm graphicsStringStore.asm\
                   graphicsStringUtils.asm graphicsSubString.asm\
                   graphicsTables.asm graphicsText.asm\
-                  graphicsTextMetrics.asm graphicsTextObject.asm\
-                  graphicsTextObscure.asm graphicsTransform.asm\
-                  graphicsTransformSimple.asm graphicsTransformUtils.asm\
-                  graphicsUtils.asm graphicsWin.asm graphicsConstant.def\
+                  graphicsTextMetrics.asm graphicsTextObscure.asm\
+                  graphicsTransform.asm graphicsTransformSimple.asm\
+                  graphicsTransformUtils.asm graphicsUtils.asm\
+                  graphicsWin.asm graphicsFont.asm graphicsC.asm\
+                  graphicsTextObject.asm graphicsString.asm\
+                  graphicsRasterDraw.asm graphicsConstant.def\
                   graphicsMacro.def graphicsVariable.def
-HEAP            = heapC.asm heapCompress.asm heapCore.asm\
-                  heapErrorCheck.asm heapHandle.asm heapHigh.asm\
-                  heapInit.asm heapLow.asm heapManager.asm heapScrub.asm\
-                  heapSwap.asm heapConstant.def heapMacro.def\
-                  heapVariable.def
-IM              = imInit.asm imManager.asm imMisc.asm imPen.asm imPtr.asm\
-                  imScreenSaver.asm imMonitors.asm imConstant.def\
+HEAP            = heapC.asm heapCompress.asm heapErrorCheck.asm\
+                  heapHandle.asm heapHigh.asm heapInit.asm heapLow.asm\
+                  heapManager.asm heapScrub.asm heapSwap.asm heapCore.asm\
+                  heapConstant.def heapMacro.def heapVariable.def
+IM              = imInit.asm imManager.asm imMisc.asm imMonitors.asm\
+                  imPen.asm imPtr.asm imScreenSaver.asm imConstant.def\
                   imMacro.def imVariable.def
-INITFILE        = initfileBBRTable.asm initfileC.asm initfileConstruct.asm\
-                  initfileEC.asm initfileHash.asm initfileHigh.asm\
-                  initfileLow.asm initfileManager.asm initfileNike.asm\
+INITFILE        = initfileBBRTable.asm initfileEC.asm initfileHash.asm\
+                  initfileManager.asm initfileNike.asm initfileC.asm\
+                  initfileHigh.asm initfileConstruct.asm initfileLow.asm\
                   initfileConstant.def initfileVariable.def
-LMEM            = lmemC.asm lmemChunkArray.asm lmemCode.asm\
-                  lmemElementArray.asm lmemErrorCheck.asm lmemGCNList.asm\
-                  lmemManager.asm lmemNameArray.asm lmemTemp.asm\
+LMEM            = lmemC.asm lmemChunkArray.asm lmemElementArray.asm\
+                  lmemErrorCheck.asm lmemGCNList.asm lmemManager.asm\
+                  lmemNameArray.asm lmemTemp.asm lmemCode.asm\
                   lmemConstants.def lmemMacros.def lmemVariable.def
 LOCAL           = cmapFrench.asm cmapLatin1.asm cmapMulti.asm\
                   cmapNordic.asm cmapPort.asm cmapUS.asm dateTimeFields.asm\
                   dateTimeFormat.asm dateTimeParse.asm dosConvert.asm\
                   dosConvertDBCS.asm dosVariable.asm gengoDate.asm\
                   kinsokuChars.asm localC.asm localDBCS.asm localInit.asm\
-                  localManager.asm localStrings.asm numericFormats.asm\
-                  numericMeasure.asm stringCase.asm stringCaseTables.asm\
+                  localManager.asm localStrings.asm numericMeasure.asm\
+                  stringCase.asm stringCaseTables.asm\
                   stringCaseTablesDBCS.asm stringChar.asm\
                   stringCharTables.asm stringCharTablesDBCS.asm\
                   stringQuotes.asm stringSize.asm stringSort.asm\
                   stringSortTables.asm stringSortTablesDBCS.asm\
-                  localConstant.def stringConstant.def
+                  numericFormats.asm localConstant.def stringConstant.def
 OBJECT          = objectC.asm objectClass.asm objectComposite.asm\
-                  objectDup.asm objectErrorCheck.asm objectFile.asm\
-                  objectInit.asm objectLinkable.asm objectManager.asm\
-                  objectMeta.asm objectProcess.asm objectReloc.asm\
-                  objectShutdown.asm objectState.asm objectUtils.asm\
-                  objectVarData.asm objectConstant.def objectMacro.def\
+                  objectDup.asm objectErrorCheck.asm objectInit.asm\
+                  objectLinkable.asm objectManager.asm objectMeta.asm\
+                  objectProcess.asm objectReloc.asm objectShutdown.asm\
+                  objectState.asm objectUtils.asm objectVarData.asm\
+                  objectFile.asm objectConstant.def objectMacro.def\
                   objectVariable.def
 SYS             = sysC.asm sysError.asm sysErrorNotKCode.asm sysInit.asm\
                   sysInterrupt.asm sysManager.asm sysMisc.asm\
@@ -112,11 +113,10 @@ THREAD          = threadC.asm threadErrorCheck.asm threadException.asm\
 TIMER           = timerC.asm timerInit.asm timerInt.asm timerList.asm\
                   timerManager.asm timerMisc.asm timerConstant.def\
                   timerMacro.def timerVariable.def
-VMEM            = vmemBlkManip.asm vmemC.asm vmemChain.asm vmemEC.asm\
-                  vmemHeader.asm vmemHigh.asm vmemHugeArray.asm\
-                  vmemKernelHigh.asm vmemLow.asm vmemManager.asm\
-                  vmemObject.asm vmemConstant.def vmemMacro.def\
-                  vmemVariable.def
+VMEM            = vmemBlkManip.asm vmemC.asm vmemEC.asm vmemHeader.asm\
+                  vmemHigh.asm vmemHugeArray.asm vmemKernelHigh.asm\
+                  vmemLow.asm vmemManager.asm vmemObject.asm vmemChain.asm\
+                  vmemConstant.def vmemMacro.def vmemVariable.def
 WIN             = winC.asm winCreDest.asm winGeode.asm winIndividual.asm\
                   winInit.asm winManager.asm winNotification.asm\
                   winState.asm winTrans.asm winUtils.asm winWindows.asm\
@@ -124,8 +124,8 @@ WIN             = winC.asm winCreDest.asm winGeode.asm winIndividual.asm\
 UI_TO_RDFS      =
 OBJS            =
 COMMON          = kernelConstant.def kernelErrors.def kernelFS.def\
-                  kernelGeode.def kernelGlobal.def kernelMacro.def\
-                  kernelResource.def
+                  kernelGeode.def kernelGlobal.def kernelResource.def\
+                  kernelMacro.def
 MODULES         = Boot DBase Disk Dosappl Drive FSD File Geodes Graphics\
                   Heap IM Initfile LMem Local Object Sys Thread Timer VMem\
                   Win

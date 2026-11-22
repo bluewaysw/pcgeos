@@ -66,7 +66,7 @@
       M = MemAllocSetOwner( GeodeGetCodeProcessHandle(), 
                             Size,
                             HF_SHARABLE | HF_SWAPABLE, 
-                            HAF_ZERO_INIT | HAF_LOCK );
+                            HAF_ZERO_INIT | HAF_LOCK | HAF_NO_ERR );
 
       if ( !M )
         return TT_Err_Out_Of_Memory;
@@ -162,18 +162,19 @@
  ******************************************************************/
 
   EXPORT_FUNC
-  TT_Error GEO_Alloc(  UShort  Size, MemHandle* M )
+  TT_Error GEO_Alloc( UShort Size, MemHandle* M )
   {
+    *M = NullHandle;
     if ( Size > MAX_BLOCK_SIZE )
       return TT_Err_Out_Of_Memory;
-  
-    if ( Size > 0 )
-      *M =  MemAllocSetOwner( GeodeGetCodeProcessHandle(), 
-                               Size, HF_SHARABLE | HF_SWAPABLE, HAF_ZERO_INIT );
-    else
-      *M = NullHandle;
 
-    return TT_Err_Ok;
+    if ( Size )
+      *M = MemAllocSetOwner( GeodeGetCodeProcessHandle(), Size,
+                             HF_SHARABLE | HF_SWAPABLE,
+                             HAF_ZERO_INIT | HAF_NO_ERR );
+
+    return ( Size && *M == NullHandle ) ?
+           TT_Err_Out_Of_Memory : TT_Err_Ok;
   }
 
 

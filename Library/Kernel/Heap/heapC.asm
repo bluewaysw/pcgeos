@@ -537,10 +537,10 @@ REVISION HISTORY:
 
 ------------------------------------------------------------------------------@
 ECCHECKGSTATEHANDLE	proc	far
-EC <	mov_tr	ax, di			;save passed di			>
-EC <	C_GetOneWordArg	di,   bx,cx	;di = handle			>
+EC <	C_GetOneWordArg	bx,   ax,cx	;bx = handle			>
+EC <	xchg	bx, di			;di = handle, save passed di	>
 EC <	call	ECCheckGStateHandle					>
-EC <	mov_tr	di, ax			;restore passed di		>
+EC <	xchg	bx, di			;restore passed di		>
 EC <	ret								>
 NEC <	ret	2							>
 

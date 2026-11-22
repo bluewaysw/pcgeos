@@ -1,4 +1,10 @@
-uiManager.rdef:
+uiManager.rdef: generic.uih product.uih bitmap.uih uiToolControl.ui \
+                Art/mkrSelectionTool.ui Art/mkrLineTool.ui \
+                Art/mkrPencilTool.ui Art/mkrEraserTool.ui \
+                Art/mkrRectTool.ui Art/mkrDrawRectTool.ui \
+                Art/mkrEllipseTool.ui Art/mkrDrawEllipseTool.ui \
+                Art/mkrFloodFillTool.ui Art/mkrFatbitsTool.ui \
+                uiFormatControl.ui fatbits.ui uiUndoStrings.ui
 bitmapMain.obj \
 bitmapMain.eobj: geos.def geode.def ec.def geoworks.def library.def \
                 resource.def object.def lmem.def graphics.def fontID.def \
@@ -42,3 +48,5 @@ bitmapMain.eobj: geos.def geode.def ec.def geoworks.def library.def \
                 floodFillTool.asm textTool.asm selectionTool.asm \
                 fatbitsTool.asm uiToolControl.asm uiFormatControl.asm \
                 bitmapC.asm
+
+bitmapEC.geo bitmap.geo : geos.ldf ui.ldf 
