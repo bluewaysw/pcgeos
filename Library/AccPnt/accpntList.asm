@@ -770,11 +770,12 @@ AccessPointSelectorCreate	method dynamic AccessPointSelectorClass,
 		call	ObjMessage			; ax = selection
 	;
 	; create an entry in the database before the current selection
-	; if no current selection (cx=0), it goes at the end
+	; if no current selection, append the entry
 	;
 		mov	bx, ax				; bx = selection
 		pop	ax				; ax = type
 		call	AccessPointCreateEntry		; ax = entry ID
+		jc	resume
 	;
 	; select it
 	;

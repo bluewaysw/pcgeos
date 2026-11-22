@@ -90,7 +90,7 @@ PASS:		bx	- ID of entry before which to insert new entry
 			 (0 to place at end)
 		ax	- AccessPointType
 RETURN:		ax	- new ID
-		carry set if old entry not found
+		carry set and ax = 0 if the entry could not be created
 DESTROYED:	nothing
 SIDE EFFECTS:	
 
@@ -201,9 +201,8 @@ AccessPointDestroyEntryDirect	proc	far
 	;
 	; remove access point from table of contents
 	;
-		call	FreeEntryFile		; remove from init file
+		call	FreeEntry		; dx = entry type
 		jc	done
-		call	FreeEntryMem		; dx = entry type
 		call	BuildEntryCategory	; get category name
 	;
 	; remove it's category, and hence all of its properties
@@ -256,9 +255,8 @@ AccessPointDestroyEntryNoNotify	proc	far
 	;
 	; remove access point from table of contents
 	;
-		call	FreeEntryFile		; remove from init file
+		call	FreeEntry		; dx = entry type
 		jc	done
-		call	FreeEntryMem		; dx = entry type
 		call	BuildEntryCategory	; get category name
 	;
 	; remove it's category, and hence all of its properties

@@ -17,7 +17,7 @@ ROUTINES:
 
     GLB AccessPointEntry        Entry point for library
 
-    INT AccessPointEnumCallback Add an access point to the chunk array
+    INT LoadContents            Load the effective access point index
 
     INT BuildEntryCategory      Build the category for an type's active entry
 
@@ -32,20 +32,10 @@ ROUTINES:
     INT AsciiToWord             Convert 4 hex ASCII digits into a binary
 				word
 
-    INT UpdateContents          Update the table of contents
-
-    INT UpdateContentsCallback  Write one entry to the contents string
-				section
-
-    INT AllocateEntry           Add ax to the list of entry points
-
-    INT FreeEntryMem            Remove ax from the list of access points
-
-    INT FreeEntryFile           Remove an entry from the list in the init
-				file
-
-    INT MatchEntryID            Compare string section to desired ID
-
+    INT AllocContentsBuffer     Allocate space for an index write
+    INT WriteContents           Write the complete access point index
+    INT AllocateEntry           Add an access point to the index
+    INT FreeEntry               Remove an access point from the index
     INT GetTypeLow
     INT	ValidateEntry
 
@@ -301,19 +291,9 @@ DESTROYED:	nothing
 SIDE EFFECTS:	
 
 PSEUDO CODE/STRATEGY:
-	It is necessary that the table of contents be kept entirely
-	in the primary init file.  Some of the problems which would
-	have to be addressed if this restriction were removed include:
-		* how to selectively write only the RAM based entries
-		  in UpdateContents
-		* how to maintain the ordering of ROM and RAM entries
-
-	Keeping the access point's data in the secondary init file
-	is possible.  The only annoying side effect is that if the 
-	user deletes a property, the original value will pop up again.
-	If they delete the whole entry, it will disappear, but if
-	the ID numbers wrap and that ID is reused, the old data
-	will reappear in the new access point.
+	Read the first [accpnt] contents key in the active INI chain.
+	A local key overrides the complete list, including its order.
+	The properties of each access point can come from lower files.
 
 REVISION HISTORY:
 	Name	Date		Description
@@ -327,89 +307,81 @@ AccessPointEntry	proc	far
 		.enter
 		cmp	di, LCT_ATTACH
 		jne	done
-	;
-	; read in all the access point ids
-	;
-		mov	bx, handle AccessPointArray
-		call	MemLock
-		mov	bx, ax
-		
 		mov	cx, cs
 		mov	ds, cx
-		mov	si, offset initCategory		; ds:si = category
-		mov	dx, offset initContents		; cx:dx = key
-		mov	di, cs
-		mov	ax, offset AccessPointEnumCallback  ; di:ax = callback
-		mov	bp, mask IFRF_FIRST_ONLY
-		call	InitFileEnumStringSection
-		
+		mov	si, offset initCategory
+		mov	dx, offset initContents
+		clr	bp				; use normal INI lookup
+		call	InitFileReadString
+		jc	done
+
+		push	bx
+		call	MemLock
+		mov	ds, ax
+		mov	bx, handle AccessPointArray
+		call	MemLock
+		mov	es, ax
+		call	LoadContents
 		mov	bx, handle AccessPointArray
 		call	MemUnlock
+		pop	bx
+		call	MemFree
 done:
 		clc
-		.leave
+	.leave
 		ret
 AccessPointEntry	endp
 
-
-COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-		AccessPointEnumCallback
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+LoadContents	proc	near
+		clr	si
+nextRecord:
+		jcxz	done
+		mov	di, si				; start of the record
+		clr	dx
+scanRecord:
+		LocalGetChar ax, dssi
+		dec	cx
+		LocalCmpChar ax, C_SPACE		; control characters separate records
+		jb	endRecord
+		inc	dx
+		jcxz	endRecord
+		jmp	scanRecord
+endRecord:
+		cmp	dx, 8				; four hex digits per word
+		jne	nextRecord
 
-SYNOPSIS:	Add an access point to the chunk array
+		push	ds, si, cx
+		mov	si, di
+		call	AsciiToWord
+		jc	skipRecord
+		tst	ax				; ID 0 is invalid
+		jz	skipRecord
+		mov	dx, ax
+		call	AsciiToWord
+		jc	skipRecord
+		cmp	ax, APT_INTERNET
+		jb	skipRecord
+		cmp	ax, APT_CALLING_CARD
+		ja	skipRecord
+		mov	bx, ax				; save the type
+		mov	ax, dx				; find this ID in the cache
+		call	FindEntry
+		jnc	skipRecord			; keep the first record for an ID
 
-CALLED BY:	AccessPointEntry via InitFileEnumStringSection
-PASS:		ds:si	- access point id string
-		cx	- length of section
-		bx	- segment of AccessPointArray
-RETURN:		carry clear
-		bx	- segment of AccessPointArray
-DESTROYED:	ax, cx, dx, di, si, bp
-SIDE EFFECTS:	
-
-PSEUDO CODE/STRATEGY:
-		
-
-REVISION HISTORY:
-	Name	Date		Description
-	----	----		-----------
-	EW	4/25/95    	Initial version
-	PT	7/24/96		DBCS'ized
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
-AccessPointEnumCallback	proc	far
-		uses	ds
-		.enter
-	;
-	; verify that we have exactly eight "characters"
-	;
-		cmp	cx, 8
-		ERROR_NE INVALID_ACCESS_POINT_IN_INIT_FILE		
-	;
-	; convert the hex digits into two words
-	;
-		call	AsciiToWord		
-		ERROR_C INVALID_ACCESS_POINT_IN_INIT_FILE		
-		mov	cx, ax				; cx = access id
-		call	AsciiToWord			; ax = access type
-		ERROR_C INVALID_ACCESS_POINT_IN_INIT_FILE		
-	;
-	; store the information
-	;
-		mov	ds, bx
+		segmov	ds, es
 		mov	si, offset AccessPointArray
-		call	ChunkArrayAppend		; ds:di = new slot
-		mov	ds:[di], cx
-
-		mov	si, offset AccessTypeArray
-		call	ChunkArrayAppend		; ds:di = new slot
+		call	ChunkArrayAppend
 		mov	ds:[di], ax
-		mov	bx, ds
-		
-		clc
-		.leave
+		mov	si, offset AccessTypeArray
+		call	ChunkArrayAppend
+		mov	ds:[di], bx
+		segmov	es, ds				; growing the arrays can move the block
+skipRecord:
+		pop	ds, si, cx
+		jmp	nextRecord
+done:
 		ret
-AccessPointEnumCallback	endp
+LoadContents	endp
 
 
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -477,31 +449,42 @@ REVISION HISTORY:
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 CheckIfEntryExists	proc	near
-		uses	bx,cx,di,es
-		.enter
-	;
-	; lock the array
-	;
+	uses	bx, di, es
+	.enter
+
 		push	ax
 		mov	bx, handle AccessPointArray
 		call	MemLock
 		mov	es, ax
 		pop	ax
-	;
-	; search for the requested key
-	;
+		call	FindEntry
+		call	MemUnlock
+
+	.leave
+		ret
+CheckIfEntryExists	endp
+
+; Find AX in the locked AccessPointBlock in ES. Return ES:DI or set carry.
+FindEntry	proc	near
+	uses	cx
+	.enter
+
 		mov	di, offset AccessPointArray
 		mov	di, es:[di]
 		mov	cx, es:[di].CAH_count
+		jcxz	missing
 		add	di, es:[di].CAH_offset
 		repne	scasw
-		jz	done				; z => !c
+		jne	missing
+		sub	di, size word			; SCASW advanced past the match
+		clc
+		jmp	done
+missing:
 		stc
 done:
-		call	MemUnlock
-		.leave
+	.leave
 		ret
-CheckIfEntryExists	endp
+FindEntry	endp
 
 
 
@@ -593,7 +576,7 @@ COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 SYNOPSIS:	Converts a word to a DBCS hex string, not including null.
 
-CALLED BY:	UpdateContentsCallback, FreeEntryFile
+CALLED BY:	WriteContents
 PASS:		ax	- input buffer
 		es:di	- output buffer
 RETURN:		es:di	- points past converted data (DBCS)
@@ -657,7 +640,7 @@ COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 SYNOPSIS:	Convert 4 hex ASCII digits into a binary word
 
-CALLED BY:	AccessPointEnumCallback
+CALLED BY:	LoadContents
 PASS:		ds:si	- 4 hex digits
 RETURN:		ax	- binary value
 		ds:si	- points past converted data
@@ -691,7 +674,9 @@ top:
 	; read the next "byte" and try to convert it as a numeric
 	;
 SBCS <		lodsb			; get next byte from ds:si >
-DBCS <		lodsw			; ignore ah		>
+DBCS <		lodsw						>
+DBCS <		tst	ah			; require an ASCII digit >
+DBCS <		jnz	invalid					>
 		sub	al, '0'
 		js	invalid
 		cmp	al, 9
@@ -702,7 +687,7 @@ notDigit::
 	;
 		sub	al, 'A' - '0'
 		js	invalid
-		cmp	al, 6
+		cmp	al, 5
 		jbe	doAdd
 notUpper::
 	;
@@ -710,7 +695,7 @@ notUpper::
 	; maybe its lowercase alpha
 	;
 		sub	al, 'a' - 'A'
-		cmp	al,6
+		cmp	al, 5
 		ja	invalid
 doAdd:
 		add	al,10
@@ -732,399 +717,205 @@ invalid:
 
 AsciiToWord	endp
 
+; Allocate a locked buffer in BX and ES for CX records, or set carry.
+AllocContentsBuffer	proc	near
+	uses	ax, cx, dx
+	.enter
+
+	;
+	; Allow space for eight digits and CR/LF per record. The DBCS INI
+	; writer uses two hex digits per byte and adds line breaks.
+	;
+SBCS <		cmp	cx, (0fff0h - 32) / 10			>
+DBCS <		cmp	cx, (0fff0h - 32) / 42			>
+		ja	tooLarge
+		mov	ax, 10 * size TCHAR
+		mul	cx
+		add	ax, size TCHAR			; terminating null
+		mov	cx, ALLOC_DYNAMIC_LOCK or (mask HAF_ZERO_INIT shl 8)
+		call	MemAlloc
+		jc	done
+		mov	es, ax
+		jmp	done
+tooLarge:
+		stc
+done:
+	.leave
+		ret
+AllocContentsBuffer	endp
+
 
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-		UpdateContents
+		WriteContents
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-SYNOPSIS:	Update the table of contents
-
-CALLED BY:	AllocateEntry
-PASS:		ds	- segment of AccessPointBlock
+SYNOPSIS:	Save the complete ordered index to the primary INI.
+CALLED BY:	AllocateEntry, FreeEntry
+PASS:		ds - locked AccessPointBlock
+		bx - buffer handle, es - locked buffer segment
 RETURN:		nothing
-DESTROYED:	nothing
-SIDE EFFECTS:	
-
-PSEUDO CODE/STRATEGY:
-		
-
-REVISION HISTORY:
-	Name	Date		Description
-	----	----		-----------
-	EW	4/30/95    	Initial version
+SIDE EFFECTS:	Frees the buffer. An empty index still overrides lower INIs.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
-UpdateContents	proc	near
-		uses	ax,bx,cx,dx,di,bp,es
-		.enter
-	;
-	; remove old contents
-	;
-		push	ds
+WriteContents	proc	near
+	uses	ax, bx, cx, dx, si, di, ds
+	.enter
+
+		push	bx				; save the handle for MemFree
+		mov	si, ds:[AccessPointArray]
+		mov	bx, ds:[AccessTypeArray]
+		mov	cx, ds:[si].CAH_count
+EC <		cmp	cx, ds:[bx].CAH_count			>
+EC <		ERROR_NE CORRUPT_ACCESS_POINT_INDEX		>
+		add	si, ds:[si].CAH_offset
+		add	bx, ds:[bx].CAH_offset
+		clr	di
+		jcxz	writeString
+nextRecord:
+		lodsw					; ID from the first array
+SBCS <		call	WordToAscii					>
+DBCS <		call	WordToAsciiDBCS				>
+		mov	ax, ds:[bx]			; type from the second array
+		add	bx, size word
+SBCS <		call	WordToAscii					>
+DBCS <		call	WordToAsciiDBCS				>
+		dec	cx
+		jz	writeString
+		mov	ax, C_ENTER
+		LocalPutChar esdi, ax
+		mov	ax, C_LINEFEED
+		LocalPutChar esdi, ax
+		jmp	nextRecord
+
+writeString:
+		clr	ax
+		LocalPutChar esdi, ax
+		clr	di
 		mov	cx, cs
 		mov	ds, cx
-		mov	si, offset initCategory		; ds:si = category
-		mov	dx, offset initContents		; cx:dx = key
-		call	InitFileDeleteEntry
-		pop	ds
-	;
-	; make sure both arrays are the same size
-	; initialize si in both EC and non-EC
-	;
-EC <		mov	si, offset AccessTypeArray			>
-EC <		call	ChunkArrayGetCount		; cx = count	>
-EC <		mov	ax, cx						>
-		mov	si, offset AccessPointArray
-EC <		call	ChunkArrayGetCount				>
-EC <		cmp	ax, cx						>
-EC <		ERROR_NE CORRUPT_ACCESS_POINT_INDEX			>
-	;
-	; write out array
-	;
-		mov	bx, cs
-		mov	di, offset UpdateContentsCallback
-		
-		call	ChunkArrayEnum
-		AccpntCommit
-done::
-		.leave
+		mov	si, offset initCategory
+		mov	dx, offset initContents
+		call	InitFileWriteString
+		pop	bx
+		call	MemFree
+
+	.leave
 		ret
-UpdateContents	endp
-
-
-COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-		UpdateContentsCallback
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-SYNOPSIS:	Write one entry to the contents string section
-
-CALLED BY:	UpdateContents (via ChunkArrayEnum)
-PASS:		ds:di	- access point ID
-		*ds:si	- AccessPointArray
-RETURN:		carry clear
-DESTROYED:	ax,cx,dx,si,di,es
-SIDE EFFECTS:	
-
-PSEUDO CODE/STRATEGY:
-		
-
-REVISION HISTORY:
-	Name	Date		Description
-	----	----		-----------
-	EW	4/30/95    	Initial version
-	PT	7/24/96		DBCS'ized
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
-UpdateContentsCallback	proc	far
-		uses	ds
-		.enter
-        ;
-        ; fetch both array values
-        ;
-		mov	ax, ds:[di]			; ax = ID
-		sub	di, ds:[si]
-		mov	si, offset AccessTypeArray
-		add	di, ds:[si]
-		mov	dx, ds:[di]			; dx = type
-	;
-	; convert them into a single ASCII string
-	;
-SBCS <		sub     sp, 10			>	; 2*size word + null
-DBCS <		sub	sp, 18			>	; 4*size word + null
-                segmov  es, ss
-                mov     di, sp
-SBCS <		call    WordToAscii		>	; convert ID / move di
-DBCS <		call	WordToAsciiDBCS		>
-		mov	ax, dx
-SBCS <		call	WordToAscii		>	; convert type
-DBCS <		call	WordToAsciiDBCS		>
-		clr	ax
-		stosw					; add a NULL
-		mov	di, sp
-        ;
-        ; add the entry point to the init file
-        ;
-                mov     cx, cs
-                mov     ds, cx
-                mov     si, offset initCategory         ; ds:si = category
-                mov     dx, offset initContents         ; cx:dx = key
-                call    InitFileWriteStringSection
-SBCS <		add     sp, 10			>	; free stack buffer
-DBCS <		add	sp, 18			>
-	;
-	; continue the enumeration
-	;
-		clc
-		.leave
-		ret
-UpdateContentsCallback	endp
+WriteContents	endp
 
 
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 		AllocateEntry
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-SYNOPSIS:	Add ax to the list of entry points
-
+SYNOPSIS:	Insert an entry and save the index.
 CALLED BY:	AccessPointCreateEntry
-PASS:		ax	- entry id
-		bx	- id to place before
-		dx	- type of entry
-RETURN:		carry	- set if bx not in array
-DESTROYED:	nothing
-SIDE EFFECTS:	
-
-PSEUDO CODE/STRATEGY:
-		
-
-REVISION HISTORY:
-	Name	Date		Description
-	----	----		-----------
-	EW	4/25/95    	Initial version
+PASS:		ax - new ID, bx - ID to insert before (0 to append), dx - type
+RETURN:		ax - new ID, or 0 with carry set on error
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 AllocateEntry	proc	near
-		uses	bx,cx,dx,si,di,ds,es
-		.enter
-	;
-	; lock down the contents array
-	;
+	uses	bx, cx, dx, si, di, bp, ds, es
+	.enter
+
 		push	ax, bx
 		mov	bx, handle AccessPointArray
 		call	MemLock
 		mov	ds, ax
 		mov	es, ax
+		pop	bx, ax				; BX = new ID, AX = anchor
 		mov	si, offset AccessPointArray
-		pop	bx, ax				; swap ax and bx
-	;
-	; make room in the ID array for a new entry
-	;
 		tst	ax
-		jnz	search
-		call	ChunkArrayAppend		; ds:di = new slot
-		jmp	foundIt
-search:
-		mov	di, ds:[si]
-		mov	cx, ds:[di].CAH_count
-		add	di, ds:[di].CAH_offset
-		repne	scasw
-		jne	notFound
-		dec	di
-		dec	di
-		call	ChunkArrayInsertAt		; ds:di = new slot
-foundIt:
+		jz	prepareWrite
+		call	FindEntry
+		jc	failed
+
+prepareWrite:
+		push	bx
+		call	ChunkArrayGetCount
+		inc	cx				; size of the new index
+		call	AllocContentsBuffer
+		mov	bp, bx
+		pop	bx
+		jc	failed
+
+		tst	ax
+		jnz	insertEntry
+		call	ChunkArrayAppend
+		jmp	storeEntry
+insertEntry:
+		call	ChunkArrayInsertAt
+storeEntry:
 		mov	ds:[di], bx
-	;
-	; now insert at exactly the same spot in the type array
-	;
-		sub	di, ds:[si]		; offset from top of CAH
+		sub	di, ds:[si]			; same element offset in both arrays
 		mov	si, offset AccessTypeArray
-		add	di, ds:[si]		; position in other array
-		call	ChunkArrayInsertAt	; ds:di = new slot
-		mov	ds:[di], dx		; store type
-	;
-	; write out both arrays to the init file
-	;
-		call	UpdateContents
+		add	di, ds:[si]
+		call	ChunkArrayInsertAt
+		mov	ds:[di], dx
+
 		mov	ax, bx
+		mov	bx, bp
+		call	WriteContents
 		clc
-notFound:
+		jmp	done
+failed:
+		clr	ax
+		stc
+done:
 		mov	bx, handle AccessPointArray
 		call	MemUnlock
-		.leave
+	.leave
 		ret
 AllocateEntry	endp
 
-
 
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-		FreeEntryMem
+		FreeEntry
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-SYNOPSIS:	Remove ax from the list of access points
-
-CALLED BY:	AccessPointDestroyEntry
-PASS:		ax	- access point id
-RETURN:		dx	- access point type
-DESTROYED:	nothing
-SIDE EFFECTS:	
-
-PSEUDO CODE/STRATEGY:
-		
-
-REVISION HISTORY:
-	Name	Date		Description
-	----	----		-----------
-	EW	4/25/95    	Initial version
+SYNOPSIS:	Remove an entry and save the index.
+CALLED BY:	AccessPointDestroyEntryDirect, AccessPointDestroyEntryNoNotify
+PASS:		ax - ID to remove
+RETURN:		dx - entry type, or carry set on error
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
-FreeEntryMem	proc	near
-		uses	bx,cx,si,di,ds,es
-		.enter
-	;
-	; lock the array
-	;
+FreeEntry	proc	near
+	uses	bx, cx, si, di, ds, es
+	.enter
+
 		push	ax
 		mov	bx, handle AccessPointArray
 		call	MemLock
-		mov	es, ax
 		mov	ds, ax
+		mov	es, ax
 		pop	ax
-	;
-	; search for the requested key in cache
-	;
+		call	FindEntry
+		jc	done
+
 		mov	si, offset AccessPointArray
-		mov	di, es:[si]
-		mov	cx, es:[di].CAH_count
-		mov	dx, cx
-		add	di, es:[di].CAH_offset
-		repne	scasw
-		jne	done
-	;
-	; remove it from the chunk array
-	;
-		dec	di
-		dec	di
+		call	ChunkArrayGetCount
+		dec	cx				; size of the new index
+		call	AllocContentsBuffer
+		jc	done
+
 		push	di
-		call	ChunkArrayDelete
-		pop	di
-	;
-	; remove it from the other chunk array
-	;
 		sub	di, ds:[si]
-		mov	si, offset AccessTypeArray
-		add	di, ds:[si]
-		mov	dx, ds:[di]			; remember type
+		mov	cx, di				; save the element offset
+		pop	di
 		call	ChunkArrayDelete
+		mov	si, offset AccessTypeArray
+		mov	di, ds:[si]
+		add	di, cx
+		mov	dx, ds:[di]			; return the removed type
+		call	ChunkArrayDelete
+		call	WriteContents
+		clc
 done:
 		mov	bx, handle AccessPointArray
 		call	MemUnlock
-		.leave
+	.leave
 		ret
-FreeEntryMem	endp
-
-
-COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-		FreeEntryFile
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-SYNOPSIS:	Remove an entry from the list in the init file
-
-CALLED BY:	AccessPointDestroyEntry
-PASS:		ax	- entry to be freed
-RETURN:		carry set if entry not found
-DESTROYED:	nothing
-SIDE EFFECTS:	
-
-PSEUDO CODE/STRATEGY:
-
-REVISION HISTORY:
-	Name	Date		Description
-	----	----		-----------
-	EW	4/25/95    	Initial version
-	PT	7/24/96		DBCS'ized
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
-FreeEntryFile	proc	near
-		uses	ax,bx,cx,dx,si,di,bp,ds,es
-		.enter
-	;
-	; build string form of id number
-	;
-SBCS <		sub	sp, 4				; size word	>
-DBCS <		sub	sp, 8						>
-		segmov	es, ss
-		mov	di, sp
-SBCS <		call	WordToAscii					>
-DBCS <		call	WordToAsciiDBCS					>
-		mov	bx, sp				; es:bx = string
-	;	
-	; enumerate the entries to locate the one of interest
-	;
-		mov	cx, cs
-		mov	ds, cx
-		mov	si, offset initCategory 	; ds:si = category
-		mov	dx, offset initContents 	; cx:dx = key
-		mov	di, cs
-		mov	ax, offset MatchEntryID
-		mov	bp, mask IFRF_FIRST_ONLY
-		call	InitFileEnumStringSection
-		cmc
-		jc	done
-	;
-	; delete the entry we found
-	;
-		mov	ax, bx
-		call	InitFileDeleteStringSection
-done:
-		lahf
-SBCS <		add	sp, 4						>
-DBCS <		add	sp, 8						>
-		sahf
-		.leave
-		ret
-FreeEntryFile	endp
-
-
-COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-		MatchEntryID
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-SYNOPSIS:	Compare string section to desired ID
-
-CALLED BY:	FreeEntryFile via InitFileEnumStringSection
-PASS:		es:bx	- string to match
-		ds:si	- string section from init file
-		cx	- size of string section
-		dx	- current index
-RETURN:		if no match
-			carry clear
-			bx unchanged
-		if string matches
-			carry set
-			bx = index
-DESTROYED:	ax,cx,dx,di,si,bp
-SIDE EFFECTS:	
-
-PSEUDO CODE/STRATEGY:
-		
-
-REVISION HISTORY:
-	Name	Date		Description
-	----	----		-----------
-	EW	4/25/95    	Initial version
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
-MatchEntryID	proc	far
-		.enter
-	;
-	; verify that we have exactly eight characters
-	;
-EC <		cmp	cx, 8						>
-EC <		ERROR_NE INVALID_ACCESS_POINT_IN_INIT_FILE		>
-	;
-	; compare the first four bytes
-	;
-		mov	di, bx
-		cmpsw
-		jne	noMatch
-		cmpsw
-		je	match
-noMatch:
-		clc
-done:
-		.leave
-		ret
-	;
-	; it matches, return this index
-	;
-match:
-		mov	bx, dx
-		stc
-		jmp	done
-MatchEntryID	endp
-
-
+FreeEntry	endp
 
 
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
