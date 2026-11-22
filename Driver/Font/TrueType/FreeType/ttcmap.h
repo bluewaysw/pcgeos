@@ -162,11 +162,6 @@
   /* Use character mapping table to perform mapping */
 
   LOCAL_DEF
-  UShort  CharMap_Index( PCMapTable  cmap,
-                         UShort      charCode );
-
-
-  LOCAL_DEF
   TT_Error getCharMap( TT_Face              face, 
                        TT_Face_Properties*  faceProperties, 
                        TT_CharMap*          charMap );

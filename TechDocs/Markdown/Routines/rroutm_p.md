@@ -261,9 +261,10 @@ than the size originally requested, as blocks are allocated along
 paragraph boundaries.
 
 MGIT_FLAGS_AND_LOCK_COUNT  
-The upper byte of the return value is the current **HeapFlags** 
-record for the block. The lower byte is the number of locks 
-currently on the block.
+The lower byte of the return value is the current **HeapFlags** 
+record for the block. The upper byte is the number of locks 
+currently on the block. Use the macros MGI_TYPE_FLAGS() and 
+MGI_LOCK_COUNT() to get the values.
 
 MGIT_OWNER_OR_VM_FILE_HANDLE  
 If the block is part of a VM file, return value is the VM file 

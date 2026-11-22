@@ -184,8 +184,8 @@
 
 #define READ_CVT( index )          (CUR.cvt[(index)])
 
-#define CURRENT_Ratio()  Current_Ratio( EXEC_ARG )
-#define CURRENT_Ppem()   Current_Ppem( EXEC_ARG )
+/*#define CURRENT_Ratio()  Current_Ratio( EXEC_ARG )
+#define CURRENT_Ppem()   Current_Ppem( EXEC_ARG )*/
 
 #define CALC_Length()  Calc_Length( EXEC_ARG )
 
@@ -203,64 +203,6 @@
 
 #define BOUNDS( x, n )    ( (unsigned short)(x) >= (unsigned short)(n) )
 
-#ifdef TT_CONFIG_GEOS_REAL_MODE_SEGMENTING
-#pragma code_seg(InterpEntry)
-#endif
-
-  /* Implementation copy to enable fast _near call */
-
-  static TT_Long  _near TT_MulFixLocal( TT_Long  a, TT_Long  b )
-  {
-  #ifdef TT_CONFIG_OPTION_USE_ASSEMBLER_IMPLEMENTATION
-    __asm {
-        ; signed multiplication
-        mov     eax, a
-        imul    b
-
-        ; round to nearest
-        bt      edx, 31
-        cmc
-        adc     eax, 0x7fff
-        adc     edx, 0
-
-        ; fixed point scaling
-        shrd    eax, edx, 16
-
-        ; return value alignment
-        mov     edx, eax 
-        shr     edx, 16
-    }
-  #else
-    long   s;
-
-    if ( a == 0 || b == 0x10000 )
-      return a;
-
-    s  = a; a = ABS( a );
-    s ^= b; b = ABS( b );
-
-    if ( a <= 1024 && b <= 2097151 )
-    {
-      a = ( a*b + 0x8000 ) >> 16;
-    }
-    else
-    {
-      TT_Int64  temp, temp2;
-
-      MulTo64( a, b, &temp );
-      temp2.hi = 0;
-      temp2.lo = 0x8000;
-      Add64( &temp, &temp2, &temp );
-      a = Div64by32( &temp, 0x10000 );
-    }
-
-    return ( s < 0 ) ? -a : a;
-  #endif
-  }
-
-#ifdef TT_CONFIG_GEOS_REAL_MODE_SEGMENTING
-#pragma code_seg()
-#endif
 
 /*********************************************************************/
 /*                                                                   */
@@ -623,37 +565,6 @@
 #pragma code_seg(InterpEntry)
 #endif
 
-/*******************************************************************
- *
- *  Function    :  Current_Ratio
- *
- *  Description :  Return the current aspect ratio scaling factor
- *                 depending on the projection vector's state and
- *                 device resolutions.
- *
- *  Input  :  None
- *
- *  Output :  Aspect ratio in 16.16 format, always <= 1.0 .
- *
- *****************************************************************/
-
-  static Long _near Current_Ratio( EXEC_OP )
-  {
-    if ( CUR.metrics.ratio )
-      return CUR.metrics.ratio;
-
-    if ( CUR.GS.projVector.x == 0 || CUR.GS.projVector.y == 0 )
-      CUR.metrics.ratio = 1L << 16;
-    else
-      CUR.metrics.ratio = Norm( CUR.GS.projVector.x, CUR.GS.projVector.y );
-  }
-
-
-  static Long  Current_Ppem( EXEC_OP )
-  {
-    return TT_MulFixLocal( CUR.metrics.ppem, CURRENT_Ratio() );
-  }
-
 
 /******************************************************************
  *
@@ -791,11 +702,15 @@
  *****************************************************************/
 
   static void _near Direct_Move( EXEC_OPS PGlyph_Zone zone,
-                                     UShort      point,
-                                     TT_F26Dot6  distance )
+                                          UShort      point,
+                                          TT_F26Dot6  distance )
   {
     TT_F26Dot6 v;
 
+
+    /* No valid movement for nearly orthogonal vectors. */
+    if ( CUR.F_dot_P == 0 )
+      return;
 
     v = CUR.GS.freeVector.x;
 
@@ -1423,8 +1338,8 @@
       }
       else
       {
-        CUR.F_dot_P = (Long)CUR.GS.projVector.x * CUR.GS.freeVector.x << 2 +
-                      (Long)CUR.GS.projVector.y * CUR.GS.freeVector.y << 2;
+        CUR.F_dot_P = (Long)CUR.GS.projVector.x * CUR.GS.freeVector.x * 4 +
+                      (Long)CUR.GS.projVector.y * CUR.GS.freeVector.y * 4;
       }
     }
 
@@ -1468,7 +1383,7 @@
       CUR.F_dot_P = 0x40000000L;
 
     /* Disable cached aspect ratio */
-    CUR.metrics.ratio = 0;
+    //CUR.metrics.ratio = 0;
   }
 
 /*******************************************************************
@@ -1492,35 +1407,31 @@ static void Normalize( TT_F26Dot6 Vx, TT_F26Dot6 Vy, TT_UnitVector* R )
     if ( Vx < 0 ) { Vx = -Vx; s1 = TRUE; }
     if ( Vy < 0 ) { Vy = -Vy; s2 = TRUE; }
 
-    /* Opt 2: Nullvektor-Check vorgezogen, verhindert Division durch 0 */
     if ( (Vx | Vy) == 0 ) return;
 
-    /* Opt 2: Beide Zweige vereint */
     if ( Vx < 0x10000L && Vy < 0x10000L )
     {
         Vx <<= 8;
         Vy <<= 8;
     }
 
-    /* Opt 1: Kein Doppel-Shift mehr */
     W  = Norm( Vx, Vy );
     Vx = (TT_F26Dot6)TT_MulDiv( Vx, 0x4000L, W );
     Vy = (TT_F26Dot6)TT_MulDiv( Vy, 0x4000L, W );
 
     W = Vx * Vx + Vy * Vy;
 
-    while ( W < 0x1000000L )
+    while ( W < 0x10000000L )
     {
         if ( Vx < Vy ) { W += (Vx << 1) + 1; ++Vx; }
         else           { W += (Vy << 1) + 1; ++Vy; }
     }
-    while ( W >= 0x1004000L )
+    while ( W >= 0x10004000L )
     {
         if ( Vx < Vy ) { W -= (Vx << 1) - 1; --Vx; }
         else           { W -= (Vy << 1) - 1; --Vy; }
     }
 
-    /* Opt 4: Vorzeichen ohne verschachtelte ternäre Ausdrücke */
     if ( s1 ) Vx = -Vx;
     if ( s2 ) Vy = -Vy;
     R->x = (TT_F2Dot14)Vx;
@@ -1560,6 +1471,13 @@ static void Normalize( TT_F26Dot6 Vx, TT_F26Dot6 Vy, TT_UnitVector* R )
 
     A = p1->x - p2->x;
     B = p1->y - p2->y;
+
+    /* A zero-length line defaults to the x-axis. */
+    if ( A == 0 && B == 0 )
+    {
+      A    = 0x4000;
+      aOpc = 0;
+    }
 
     if ( (aOpc & 1) != 0 )
     {
@@ -1808,7 +1726,7 @@ static void Normalize( TT_F26Dot6 Vx, TT_F26Dot6 Vy, TT_UnitVector* R )
 
 
 #define DO_MPPEM  \
-    args[0] = CURRENT_Ppem();
+      args[0] = CUR.metrics.ppem;
 
 
 #define DO_MPS  \
@@ -3809,6 +3727,11 @@ static void Normalize( TT_F26Dot6 Vx, TT_F26Dot6 Vy, TT_UnitVector* R )
       A = -C;
     }
 
+    if ( A == 0 && B == 0 )
+    {
+      A = 0x4000;
+      B = 0;
+    }
     NORMalize( A, B, &CUR.GS.dualVector );
 
     {
@@ -3827,6 +3750,11 @@ static void Normalize( TT_F26Dot6 Vx, TT_F26Dot6 Vy, TT_UnitVector* R )
       A = -C;
     }
 
+    if ( A == 0 && B == 0 )
+    {
+      A = 0x4000;
+      B = 0;
+    }
     NORMalize( A, B, &CUR.GS.projVector );
 
     COMPUTE_Funcs();
@@ -3991,8 +3919,29 @@ static void Normalize( TT_F26Dot6 Vx, TT_F26Dot6 Vy, TT_UnitVector* R )
 
   static void  Ins_SCANCTRL( INS_ARG )
   {
-    (void)args;
-    (void)exc;
+    Int  A = (Int)( args[0] & 0xFF );
+
+
+    /* PC/GEOS applies rotation and stretching after hinting. */
+    /* Only the ppem-related SCANCTRL conditions apply here.  */
+
+    if ( A == 0xFF )
+    {
+      CUR.GS.scan_control = TRUE;
+      return;
+    }
+
+    if ( A == 0 )
+    {
+      CUR.GS.scan_control = FALSE;
+      return;
+    }
+
+    if ( ( args[0] & 0x100 ) != 0 && CUR.metrics.ppem <= A )
+      CUR.GS.scan_control = TRUE;
+
+    if ( ( args[0] & 0x800 ) != 0 && CUR.metrics.ppem > A )
+      CUR.GS.scan_control = FALSE;
 }
 
 
@@ -4003,15 +3952,18 @@ static void Normalize( TT_F26Dot6 Vx, TT_F26Dot6 Vy, TT_UnitVector* R )
 
   static void  Ins_SCANTYPE( INS_ARG )
   {
-    /* For compatibility with future enhancements, */
-    /* we must ignore new modes                    */
+    /* Map the TrueType modes to the rasterizer's internal modes. */
+    /* Raster mode 0 disables dropout control, while TrueType     */
+    /* mode 0 selects simple dropout control including stubs.     */
 
-    if ( args[0] >= 0 && args[0] <= 5 )
+    if ( args[0] >= 0 && args[0] <= 7 )
     {
-      if ( args[0] == 3 )
-        args[0] = 2;
+      if ( args[0] & 2 )
+        args[0] = 0;
+      else if ( args[0] < 2 )
+        args[0]++;
 
-      CUR.GS.scan_type = (Int)args[0];
+    CUR.GS.scan_type = (Int)args[0];
     }
   }
 
@@ -4171,6 +4123,13 @@ static TT_F26Dot6 _far FarCUR_Func_project( EXEC_OPS TT_Vector*  v1, TT_Vector* 
 
     *zone = zp;
     *refp = p;
+
+    if ( CUR.F_dot_P == 0 )
+    {
+      *x = 0;
+      *y = 0;
+      return SUCCESS;
+    }
 
     d = FarCUR_Func_project( EXEC_ARGS zp.cur + p, zp.org + p );
 
@@ -4594,7 +4553,7 @@ static TT_F26Dot6 _far FarCUR_Func_project( EXEC_OPS TT_Vector*  v1, TT_Vector* 
 
     /* single width cutin test */
 
-    if ( ABS( org_dist ) < CUR.GS.single_width_cutin )
+    if ( ABS( org_dist - CUR.GS.single_width_value ) < CUR.GS.single_width_cutin )
     {
       if ( org_dist >= 0 )
         org_dist = CUR.GS.single_width_value;
@@ -4679,7 +4638,7 @@ static TT_F26Dot6 _far FarCUR_Func_project( EXEC_OPS TT_Vector*  v1, TT_Vector* 
 
     /* single width test */
 
-    if ( ABS( cvt_dist ) < CUR.GS.single_width_cutin )
+    if ( ABS( cvt_dist - CUR.GS.single_width_value ) < CUR.GS.single_width_cutin )
     {
       if ( cvt_dist >= 0 )
         cvt_dist =  CUR.GS.single_width_value;
@@ -5248,7 +5207,7 @@ static void _near Interp( UShort               p1,
 
 
     nump = (UShort)args[0];
-    ppem = CURRENT_Ppem();
+    ppem = CUR.metrics.ppem;
 
     C = (ULong)CUR.GS.delta_base;
 
@@ -5314,7 +5273,7 @@ static void _near Interp( UShort               p1,
     Long   ppem;
 
 
-    ppem = CURRENT_Ppem();
+    ppem = CUR.metrics.ppem;
 
     C = (ULong)CUR.GS.delta_base;
 

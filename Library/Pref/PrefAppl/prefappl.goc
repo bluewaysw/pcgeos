@@ -1,0 +1,844 @@
+/***********************************************************************
+ *
+ * Created in Feb/Mar 2026. OpenAI Codex prompted by MeyerK.
+ *
+ * PROJECT:      Preferences
+ * MODULE:       PrefAppl
+ * FILE:         prefappl.goc
+ *
+ * DESCRIPTION:
+ *     Preferences module for managing application visibility links.
+ *
+ ***********************************************************************/
+
+@include <stdapp.goh>
+@include <config.goh>
+@include <token.h>
+
+#include "prefapplLow.h"
+#include <lmem.h>
+
+@class PrefApplDialogClass, PrefDialogClass;
+    @message (GEN_ITEM_GROUP_APPLY_MSG) MSG_PREF_APPL_TAB_SELECTION_CHANGED;
+    @message (GEN_DYNAMIC_LIST_QUERY_MSG) MSG_PREF_APPL_LEFT_LIST_MONIKER_QUERY;
+    @message (GEN_DYNAMIC_LIST_QUERY_MSG) MSG_PREF_APPL_RIGHT_LIST_MONIKER_QUERY;
+    @message (GEN_ITEM_GROUP_APPLY_MSG) MSG_PREF_APPL_LEFT_LIST_DOUBLE_PRESS;
+    @message (GEN_ITEM_GROUP_APPLY_MSG) MSG_PREF_APPL_RIGHT_LIST_DOUBLE_PRESS;
+    @message (GEN_TRIGGER_ACTION) MSG_PREF_APPL_ADD_APPLICATION;
+    @message (GEN_TRIGGER_ACTION) MSG_PREF_APPL_REMOVE_APPLICATION;
+    @message (GEN_TRIGGER_ACTION) MSG_PREF_APPL_LAUNCH_DOCUMENTS;
+    @message void MSG_PREF_APPL_SET_STATUS_TEXT(const char *statusMessage);
+    @message void MSG_PREF_APPL_SHOW_ERROR(PrefApplError paError);
+    @message void MSG_PREF_APPL_QUEUE_REFRESH();
+    @message PrefApplError MSG_PREF_APPL_REFRESH_LIST_FROM_DISK();
+    @message void MSG_PREF_APPL_SET_CONTROL_STATE(Boolean enabled);
+    @instance Boolean PADI_appCatalogLoaded = FALSE;
+    @instance Boolean PADI_appCatalogScanAttempted = FALSE;
+    @instance Boolean PADI_ignoreFileChanges = FALSE;
+    @instance Boolean PADI_refreshQueued = FALSE;
+    @instance Boolean PADI_refreshInProgress = FALSE;
+
+@endc
+
+@classdecl PrefApplDialogClass;
+
+optr _pascal PrefGetOptrBox(void);
+void _pascal PrefGetModuleInfo(PrefModuleInfo *info);
+
+word OldSelection = GIGS_NONE;
+static const char prefApplDistApplMissingText[] =
+    "Required folder DISTAPPL was not found. PrefAppl cannot build the application list.";
+static const char prefApplOutOfMemoryText[] =
+    "PrefAppl ran out of memory while scanning applications.";
+static const char prefApplStatusTextOk[] =
+    "Ready.";
+static const char prefApplEnabledText[] =
+    "Application enabled.";
+static const char prefApplEnableFailedText[] =
+    "Application enable failed.";
+static const char prefApplDisabledText[] =
+    "Application disabled.";
+static const char prefApplDisableFailedText[] =
+    "Application disable failed.";
+static const char prefApplDocumentsUrl[] =
+    "FILE:///GFS:/FG/USERDATA/DISTDOC/DOCINDEX.HTM";
+
+#define PREF_APPL_ICON_TEXT_SPACING 4
+#define PREF_APPL_MAX_ICON_WIDTH 20
+#define PREF_APPL_MAX_ICON_HEIGHT 20
+
+@start MONIKERRESOURCE, data;
+
+@include "Art/PrefApplIcon.goh"
+@include "Art/PrefApplDocMoniker.goh"
+
+@visMoniker PrefApplTextMoniker = "Packages";
+
+@visMoniker PrefApplMonikerList = list {
+    @PrefApplIconMoniker,
+    @PrefApplTextMoniker
+};
+
+@include    <Art/mkrRightArrowSC.goh>
+@include    <Art/mkrRightArrowSM.goh>
+@include    <Art/mkrRightArrowSCGA.goh>
+@include    <Art/mkrLeftArrowSC.goh>
+@include    <Art/mkrLeftArrowSM.goh>
+@include    <Art/mkrLeftArrowSCGA.goh>
+
+@end MONIKERRESOURCE;
+
+@start BASEINTERFACE, notDetachable;
+
+@object PrefApplDialogClass BaseBox = {
+    GI_visMoniker = "Packages";
+    GI_states = @default & ~GS_USABLE;
+    GI_comp = @TabHolder, @DoneTrigger;
+    GII_type = GIT_COMMAND;
+    GII_visibility = GIV_DIALOG;
+
+    HINT_ORIENT_CHILDREN_VERTICALLY;
+    HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+    HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
+    ATTR_GEN_HELP_CONTEXT = "dbApps";
+    ATTR_GEN_INIT_FILE_CATEGORY = "prefappl";
+}
+
+@object GenTriggerClass DoneTrigger = {
+    GI_visMoniker = "Done";
+    ATTR_GEN_TRIGGER_INTERACTION_COMMAND = IC_DISMISS;
+    HINT_SEEK_REPLY_BAR;
+}
+
+@object GenInteractionClass TabHolder = {
+    GI_comp = @TabSelector, @TabGroup;
+
+    HINT_MINIMIZE_CHILD_SPACING;
+    HINT_ORIENT_CHILDREN_VERTICALLY;
+    HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+    HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
+}
+
+@object GenItemGroupClass TabSelector = {
+    GI_comp = @EnsembleAppsTab, @DocumentsTab;
+    GIGI_selection = 0;
+    GIGI_destination = @BaseBox;
+    GIGI_applyMsg = MSG_PREF_APPL_TAB_SELECTION_CHANGED;
+
+    HINT_ITEM_GROUP_TAB_STYLE;
+    HINT_ITEM_GROUP_DONT_CENTER_TABBED_CHILDREN;
+    HINT_ORIENT_CHILDREN_HORIZONTALLY;
+    HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+}
+
+@object GenItemClass EnsembleAppsTab = {
+    GI_visMoniker = "Ensemble Applications";
+    GII_identifier = 0;
+}
+
+@object GenItemClass DocumentsTab = {
+    GI_visMoniker = "Ensemble Documents";
+    GII_identifier = 1;
+}
+
+@object GenInteractionClass TabGroup = {
+    GI_comp = @EnsembleAppsPage, @DocumentsPage;
+
+    HINT_CENTER_CHILDREN_HORIZONTALLY;
+    HINT_CENTER_CHILDREN_VERTICALLY;
+    HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+    HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
+    HINT_RAISED_FRAME = { GRFI_LEFT | GRFI_RIGHT | GRFI_BOTTOM };
+    HINT_DRAW_IN_BOX;
+}
+
+@object GenInteractionClass EnsembleAppsPage = {
+    GI_comp = @TopRow, @MainRow, @StatusText;
+
+    HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+    HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
+    HINT_ORIENT_CHILDREN_VERTICALLY;
+}
+
+@object GenInteractionClass TopRow = {
+    GI_comp = @EnsembleAppsGlyph, @EnsembleAppsInfoGlyph;
+
+    HINT_ORIENT_CHILDREN_HORIZONTALLY;
+    HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+    HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
+}
+
+@object GenGlyphClass EnsembleAppsGlyph = {
+    GI_visMoniker = list { @PrefApplIconMoniker };
+}
+
+@object GenGlyphClass EnsembleAppsInfoGlyph = {
+    GI_visMoniker = "Manage app visibility.";
+}
+
+@object GenInteractionClass MainRow = {
+    GI_comp = @AllAppsGroup, @ActionColumn, @LinkedAppsGroup;
+
+    HINT_ORIENT_CHILDREN_HORIZONTALLY;
+    HINT_MINIMIZE_CHILD_SPACING;
+    HINT_CENTER_CHILDREN_VERTICALLY;
+    HINT_FULL_JUSTIFY_CHILDREN_HORIZONTALLY;
+    HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+    HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
+}
+
+@object GenInteractionClass AllAppsGroup = {
+    GI_comp = @AllAppsList;
+
+    HINT_ORIENT_CHILDREN_VERTICALLY;
+    HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
+}
+
+@object GenDynamicListClass AllAppsList = {
+    GI_visMoniker = "Disabled";
+
+    GIGI_behaviorType = GIGBT_EXCLUSIVE;
+
+    GIGI_destination = @BaseBox;
+    GDLI_queryMsg = MSG_PREF_APPL_LEFT_LIST_MONIKER_QUERY;
+    GDLI_numItems = 0;
+    ATTR_GEN_ITEM_GROUP_CUSTOM_DOUBLE_PRESS =
+        MSG_PREF_APPL_LEFT_LIST_DOUBLE_PRESS;
+
+    HINT_PLACE_MONIKER_ABOVE;
+    HINT_ITEM_GROUP_SCROLLABLE;
+    HINT_INITIAL_SIZE = {
+        SST_AVG_CHAR_WIDTHS | 28,
+        SST_LINES_OF_TEXT | 12,
+        12
+    };
+    HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
+}
+
+@object GenInteractionClass ActionColumn = {
+    GI_comp = @EnableTriggerPadding, @DisableTriggerPadding;
+
+    HINT_ORIENT_CHILDREN_VERTICALLY;
+    HINT_MINIMIZE_CHILD_SPACING;
+    HINT_CENTER_CHILDREN_HORIZONTALLY;
+    HINT_CENTER_CHILDREN_VERTICALLY;
+    HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
+}
+
+@object GenInteractionClass EnableTriggerPadding = {
+    GI_comp = @AddTrigger;
+
+    HINT_CUSTOM_EXTRA_MARGINS = { 4, 1, 4, 1 };
+    HINT_ORIENT_CHILDREN_VERTICALLY;
+    HINT_CENTER_CHILDREN_HORIZONTALLY;
+    HINT_CENTER_CHILDREN_VERTICALLY;
+}
+
+@object GenTriggerClass AddTrigger = {
+    GI_visMoniker = list {
+	    @RightArrowSCMoniker, @RightArrowSMMoniker, @RightArrowSCGAMoniker
+    }
+    GI_states = @default & ~GS_ENABLED;
+    GTI_actionMsg = MSG_PREF_APPL_ADD_APPLICATION;
+    GTI_destination = @BaseBox;
+}
+
+@object GenInteractionClass DisableTriggerPadding = {
+    GI_comp = @RemoveTrigger;
+
+    HINT_CUSTOM_EXTRA_MARGINS = { 4, 1, 4, 1 };
+    HINT_ORIENT_CHILDREN_VERTICALLY;
+    HINT_CENTER_CHILDREN_HORIZONTALLY;
+    HINT_CENTER_CHILDREN_VERTICALLY;
+}
+
+@object GenTriggerClass RemoveTrigger = {
+    GI_states = @default & ~GS_ENABLED;
+    GI_visMoniker = list {
+	    @LeftArrowSCMoniker, @LeftArrowSMMoniker, @LeftArrowSCGAMoniker
+    }
+    GTI_actionMsg = MSG_PREF_APPL_REMOVE_APPLICATION;
+    GTI_destination = @BaseBox;
+}
+
+@object GenInteractionClass LinkedAppsGroup = {
+    GI_comp = @LinkedAppsList;
+
+    HINT_ORIENT_CHILDREN_VERTICALLY;
+    HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
+}
+
+@object GenDynamicListClass LinkedAppsList = {
+    GI_visMoniker = "Enabled";
+
+    GIGI_behaviorType = GIGBT_EXCLUSIVE;
+
+    GIGI_destination = @BaseBox;
+    GDLI_queryMsg = MSG_PREF_APPL_RIGHT_LIST_MONIKER_QUERY;
+    GDLI_numItems = 0;
+    ATTR_GEN_ITEM_GROUP_CUSTOM_DOUBLE_PRESS =
+        MSG_PREF_APPL_RIGHT_LIST_DOUBLE_PRESS;
+
+    HINT_PLACE_MONIKER_ABOVE;
+    HINT_ITEM_GROUP_SCROLLABLE;
+    HINT_INITIAL_SIZE = {
+        SST_AVG_CHAR_WIDTHS | 28,
+        SST_LINES_OF_TEXT | 12,
+        12
+    };
+    HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
+}
+
+@object GenInteractionClass DocumentsPage = {
+    GI_states = @default & ~GS_USABLE;
+    GI_comp = @DocumentsInfoGlyphs, @DocumentsContentRow;
+
+    HINT_ORIENT_CHILDREN_VERTICALLY;
+    HINT_CENTER_CHILDREN_VERTICALLY;
+    HINT_CENTER_CHILDREN_HORIZONTALLY;
+    HINT_MINIMIZE_CHILD_SPACING;
+    HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+    HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
+    HINT_DRAW_IN_BOX;
+}
+
+@object GenInteractionClass DocumentsInfoGlyphs = {
+    GI_comp = @DocumentsIconGlyph, @DocumentsInfoGlyph;
+    HINT_ORIENT_CHILDREN_HORIZONTALLY;
+    HINT_CENTER_CHILDREN_VERTICALLY;
+    HINT_CENTER_CHILDREN_HORIZONTALLY;
+}
+
+@object GenGlyphClass DocumentsIconGlyph = {
+    GI_visMoniker = list { @PrefApplDocMoniker};
+}
+
+@object GenTextClass DocumentsInfoGlyph = {
+    GTXI_text = "Use the button below to open the browser and find sample documents.";
+    GI_attrs = @default | GA_READ_ONLY;
+    HINT_FIXED_SIZE = {
+        SST_AVG_CHAR_WIDTHS | 45,
+        0,
+        0
+    };
+}
+
+@object GenInteractionClass DocumentsContentRow = {
+    GI_comp = @DocumentsLaunchTrigger;
+
+    HINT_ORIENT_CHILDREN_VERTICALLY;
+    HINT_CENTER_CHILDREN_HORIZONTALLY;
+    HINT_CENTER_CHILDREN_VERTICALLY;
+    HINT_CUSTOM_EXTRA_MARGINS = { 0, 8, 0, 8 };
+}
+
+@object GenTriggerClass DocumentsLaunchTrigger = {
+    GI_visMoniker = "Open Sample Documents";
+    GTI_actionMsg = MSG_PREF_APPL_LAUNCH_DOCUMENTS;
+    GTI_destination = @BaseBox;
+}
+
+@object GenGlyphClass StatusText = {
+    GI_visMoniker = "Status:";
+}
+
+@end BASEINTERFACE;
+
+@define Dup(obj) ConstructOptr(OptrToHandle(oself), OptrToChunk(obj))
+
+static void
+PrefApplSyncListsFromCurrentModel(optr dialog, optr allAppsList,
+                                  optr linkedAppsList, Boolean enabled)
+{
+    word disabledCount;
+    word linkedCount;
+
+    if (enabled) {
+        disabledCount = PrefApplGetDisabledApplicationCount();
+        linkedCount = PrefApplGetLinkedApplicationCount();
+    } else {
+        disabledCount = 0;
+        linkedCount = 0;
+    }
+
+    @call allAppsList::MSG_GEN_DYNAMIC_LIST_INITIALIZE(disabledCount);
+    @call linkedAppsList::MSG_GEN_DYNAMIC_LIST_INITIALIZE(linkedCount);
+    if (disabledCount != 0) {
+        @call allAppsList::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(0, FALSE);
+    } else {
+        @call allAppsList::MSG_GEN_ITEM_GROUP_SET_NONE_SELECTED(FALSE);
+    }
+    if (linkedCount != 0) {
+        @call linkedAppsList::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(0, FALSE);
+    } else {
+        @call linkedAppsList::MSG_GEN_ITEM_GROUP_SET_NONE_SELECTED(FALSE);
+    }
+
+    @call dialog::MSG_PREF_APPL_SET_CONTROL_STATE(enabled);
+}
+
+optr _export _pascal PrefGetOptrBox(void)
+{
+    return (@BaseBox);
+}
+
+void _export _pascal PrefGetModuleInfo(PrefModuleInfo *modInfo)
+{
+    modInfo->PMI_requiredFeatures = PMF_USER;
+    modInfo->PMI_prohibitedFeatures = 0;
+    modInfo->PMI_minLevel = UIIL_INTRODUCTORY;
+    modInfo->PMI_maxLevel = UIIL_MAX_LEVEL;
+
+    modInfo->PMI_monikerList = @PrefApplMonikerList;
+    modInfo->PMI_monikerToken.GT_chars[0] = 'P';
+    modInfo->PMI_monikerToken.GT_chars[1] = 'A';
+    modInfo->PMI_monikerToken.GT_chars[2] = 'P';
+    modInfo->PMI_monikerToken.GT_chars[3] = 'L';
+    modInfo->PMI_monikerToken.GT_manufID = MANUFACTURER_ID_GEOWORKS;
+}
+
+@method PrefApplDialogClass, MSG_PREF_APPL_SET_STATUS_TEXT
+{
+    if (statusMessage == NULL) {
+        statusMessage = prefApplStatusTextOk;
+    }
+
+    @call @Dup(@StatusText)::MSG_GEN_REPLACE_VIS_MONIKER_TEXT(statusMessage, VUM_NOW);
+}
+
+@method PrefApplDialogClass, MSG_PREF_APPL_SHOW_ERROR
+{
+    const char *statusMessage = NULL;
+
+    switch (paError) {
+        case PREF_APPL_SCAN_ERROR_DISTAPPL_MISSING:
+            statusMessage = prefApplDistApplMissingText;
+            break;
+        case PREF_APPL_SCAN_ERROR_OUT_OF_MEMORY:
+            statusMessage = prefApplOutOfMemoryText;
+            break;
+        default:
+            statusMessage = NULL;
+            break;
+    }
+
+    @call oself::MSG_PREF_APPL_SET_STATUS_TEXT(statusMessage);
+}
+
+@method PrefApplDialogClass, MSG_PREF_APPL_QUEUE_REFRESH
+{
+    if (pself->PADI_refreshInProgress) {
+        pself->PADI_refreshQueued = TRUE;
+        return;
+    }
+
+    if (pself->PADI_refreshQueued) {
+        return;
+    }
+
+    pself->PADI_refreshQueued = TRUE;
+    @send, forceQueue, checkDuplicate oself::MSG_PREF_APPL_REFRESH_LIST_FROM_DISK();
+}
+
+@method PrefApplDialogClass, MSG_PREF_APPL_REFRESH_LIST_FROM_DISK
+{
+    PrefApplError paError;
+    Boolean queueFollowupRefresh;
+
+    pself->PADI_refreshQueued = FALSE;
+    pself->PADI_refreshInProgress = TRUE;
+    paError = PREF_APPL_ERROR_NONE;
+    if (!pself->PADI_appCatalogScanAttempted) {
+        pself->PADI_appCatalogScanAttempted = TRUE;
+        if (!PrefApplLoadApplicationCatalog()) {
+            paError = PrefApplGetLastScanError();
+        } else {
+            pself->PADI_appCatalogLoaded = TRUE;
+            (void) PrefApplRefreshLinkSelections();
+        }
+    } else if (pself->PADI_appCatalogLoaded) {
+        (void) PrefApplRefreshLinkSelections();
+    } else {
+        paError = PrefApplGetLastScanError();
+    }
+
+    PrefApplSyncListsFromCurrentModel(oself,
+        ConstructOptr(OptrToHandle(oself), OptrToChunk(@AllAppsList)),
+        ConstructOptr(OptrToHandle(oself), OptrToChunk(@LinkedAppsList)),
+        (paError == PREF_APPL_ERROR_NONE));
+
+    pself->PADI_refreshInProgress = FALSE;
+    queueFollowupRefresh = pself->PADI_refreshQueued;
+    if (queueFollowupRefresh) {
+        @send, forceQueue, checkDuplicate oself::MSG_PREF_APPL_REFRESH_LIST_FROM_DISK();
+    }
+
+    return paError;
+}
+
+@method PrefApplDialogClass, MSG_PREF_APPL_SET_CONTROL_STATE
+{
+    word disabledCount;
+    word linkedCount;
+
+    if (enabled) {
+        @call @Dup(@AllAppsList)::MSG_GEN_SET_ENABLED(VUM_NOW);
+        @call @Dup(@LinkedAppsList)::MSG_GEN_SET_ENABLED(VUM_NOW);
+        disabledCount = PrefApplGetDisabledApplicationCount();
+        linkedCount = PrefApplGetLinkedApplicationCount();
+        if (disabledCount != 0) {
+            @call @Dup(@AddTrigger)::MSG_GEN_SET_ENABLED(VUM_NOW);
+        } else {
+            @call @Dup(@AddTrigger)::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+        }
+        if (linkedCount != 0) {
+            @call @Dup(@RemoveTrigger)::MSG_GEN_SET_ENABLED(VUM_NOW);
+        } else {
+            @call @Dup(@RemoveTrigger)::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+        }
+    } else {
+        @call @Dup(@AllAppsList)::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+        @call @Dup(@LinkedAppsList)::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+        @call @Dup(@AddTrigger)::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+        @call @Dup(@RemoveTrigger)::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+    }
+}
+
+@method PrefApplDialogClass, MSG_GEN_INTERACTION_INITIATE
+{
+    PrefApplError paError;
+
+    @callsuper();
+    @call @Dup(@TabSelector)::MSG_GEN_ITEM_GROUP_SEND_STATUS_MSG(FALSE);
+    paError = @call oself::MSG_PREF_APPL_REFRESH_LIST_FROM_DISK();
+    @call oself::MSG_PREF_APPL_SHOW_ERROR(paError);
+}
+
+@method PrefApplDialogClass, MSG_GEN_GUP_INTERACTION_COMMAND
+{
+    if (command == IC_DISMISS) {
+        pself->PADI_appCatalogLoaded = FALSE;
+        pself->PADI_appCatalogScanAttempted = FALSE;
+        pself->PADI_ignoreFileChanges = FALSE;
+        pself->PADI_refreshQueued = FALSE;
+        pself->PADI_refreshInProgress = FALSE;
+        PrefApplResetCachedApplicationData();
+    }
+
+    return @callsuper();
+}
+
+@method PrefApplDialogClass, MSG_NOTIFY_FILE_CHANGE
+{
+    Boolean shouldQueueRefresh;
+
+    if (pself->PADI_ignoreFileChanges) {
+        return;
+    }
+
+    shouldQueueRefresh = ((notifyType == FCNT_CREATE) ||
+                          (notifyType == FCNT_DELETE) ||
+                          (notifyType == FCNT_RENAME) ||
+                          (notifyType == FCNT_BATCH));
+    /*
+     * Notifications are forwarded by PrefMgr while it still owns the
+     * notification data block (BP). Do not call MetaClass here, or it would
+     * attempt to dec-ref a handle owned by the forwarder.
+     */
+    if (shouldQueueRefresh) {
+        @call oself::MSG_PREF_APPL_QUEUE_REFRESH();
+    }
+}
+
+@method PrefApplDialogClass, MSG_PREF_APPL_TAB_SELECTION_CHANGED
+{
+    if (selection > 1) {
+        return;
+    }
+
+    if ((OldSelection != GIGS_NONE) && (selection == OldSelection)) {
+        return;
+    }
+
+    if (OldSelection == GIGS_NONE) {
+        if (selection == 0) {
+            @call @Dup(@DocumentsPage)::MSG_GEN_SET_NOT_USABLE(
+                VUM_DELAYED_VIA_APP_QUEUE
+            );
+        } else {
+            @call @Dup(@EnsembleAppsPage)::MSG_GEN_SET_NOT_USABLE(
+                VUM_DELAYED_VIA_APP_QUEUE
+            );
+        }
+    } else if (OldSelection == 0) {
+        @call @Dup(@EnsembleAppsPage)::MSG_GEN_SET_NOT_USABLE(
+            VUM_DELAYED_VIA_APP_QUEUE
+        );
+    } else if (OldSelection == 1) {
+        @call @Dup(@DocumentsPage)::MSG_GEN_SET_NOT_USABLE(
+            VUM_DELAYED_VIA_APP_QUEUE
+        );
+    }
+
+    OldSelection = selection;
+    if (selection == 0) {
+        @call @Dup(@EnsembleAppsPage)::MSG_GEN_SET_USABLE(VUM_NOW);
+    } else {
+        @call @Dup(@DocumentsPage)::MSG_GEN_SET_USABLE(VUM_NOW);
+    }
+}
+
+@method PrefApplDialogClass, MSG_PREF_APPL_LAUNCH_DOCUMENTS
+{
+    (void) PrefApplLaunchBrowserURL(prefApplDocumentsUrl);
+}
+
+static void
+PrefApplReplaceListItemMoniker(optr list, word item,
+                               const PrefApplApplicationRecord *record)
+{
+    DisplayScheme displayScheme;
+    DisplayType displayType;
+    Handle destinationBlock;
+    ChunkHandle iconMonikerChunk;
+    VisMonikerWithGString *iconMoniker;
+    optr combinedMoniker;
+    word iconMonikerSize;
+    Boolean foundToken;
+
+    if (record == NULL) {
+        return;
+    }
+
+    @call GeodeGetAppObject(0)::MSG_GEN_APPLICATION_GET_DISPLAY_SCHEME(&displayScheme);
+    displayType = displayScheme.DS_displayType;
+    destinationBlock = OptrToHandle(list);
+
+    foundToken = TokenLoadMonikerChunk(
+        TOKEN_CHARS(record->PAAR_token.GT_chars[0],
+                    record->PAAR_token.GT_chars[1],
+                    record->PAAR_token.GT_chars[2],
+                    record->PAAR_token.GT_chars[3]),
+        record->PAAR_token.GT_manufID,
+        displayType,
+        VMSF_GSTRING | (VMS_TOOL << VMSF_STYLE_OFFSET),
+        destinationBlock,
+        &iconMonikerSize,
+        &iconMonikerChunk
+    );
+    if (!foundToken) {
+        @call list::MSG_GEN_DYNAMIC_LIST_REPLACE_ITEM_TEXT(item, (char *)record->PAAR_name);
+        return;
+    }
+
+    iconMoniker = (VisMonikerWithGString *)
+        LMemDerefHandles(destinationBlock, iconMonikerChunk);
+    if ((iconMoniker == NULL) ||
+        !(iconMoniker->VMWGS_common.VM_type & VMT_GSTRING) ||
+        (iconMonikerSize == 0) ||
+        (iconMoniker->VMWGS_common.VM_width == 0) ||
+        (iconMoniker->VMWGS_height == 0) ||
+        (iconMoniker->VMWGS_common.VM_width > PREF_APPL_MAX_ICON_WIDTH) ||
+        (iconMoniker->VMWGS_height > PREF_APPL_MAX_ICON_HEIGHT) ||
+        (iconMoniker->VMWGS_common.VM_width > (iconMoniker->VMWGS_height * 2))) {
+        LMemFree(ConstructOptr(destinationBlock, iconMonikerChunk));
+        @call list::MSG_GEN_DYNAMIC_LIST_REPLACE_ITEM_TEXT(item, (char *)record->PAAR_name);
+        return;
+    }
+
+    combinedMoniker = UserCreateIconTextMoniker(
+        (optr)record->PAAR_name,
+        ConstructOptr(destinationBlock, iconMonikerChunk),
+        destinationBlock,
+        PREF_APPL_ICON_TEXT_SPACING,
+        CITMF_TEXT_IS_FPTR
+    );
+
+    if (combinedMoniker == 0) {
+        LMemFree(ConstructOptr(destinationBlock, iconMonikerChunk));
+        @call list::MSG_GEN_DYNAMIC_LIST_REPLACE_ITEM_TEXT(item, (char *)record->PAAR_name);
+        return;
+    }
+
+    @call list::MSG_GEN_DYNAMIC_LIST_REPLACE_ITEM_MONIKER(
+        item,
+        0,
+        0,
+        0,
+        0,
+        VMDT_VIS_MONIKER,
+        VMST_OPTR,
+        (dword)combinedMoniker
+    );
+    LMemFree(combinedMoniker);
+}
+
+@method PrefApplDialogClass, MSG_PREF_APPL_LEFT_LIST_MONIKER_QUERY
+{
+    PrefApplApplicationRecord record;
+    word appIndex;
+
+    if (!PrefApplMapDisabledIndexToApplicationIndex(item, &appIndex)) {
+        return;
+    }
+
+    if (!PrefApplGetApplicationRecord(appIndex, &record)) {
+        return;
+    }
+
+    PrefApplReplaceListItemMoniker(list, item, &record);
+}
+
+@method PrefApplDialogClass, MSG_PREF_APPL_RIGHT_LIST_MONIKER_QUERY
+{
+    PrefApplApplicationRecord record;
+    word appIndex;
+
+    if (!PrefApplMapLinkedIndexToApplicationIndex(item, &appIndex)) {
+        return;
+    }
+
+    if (!PrefApplGetApplicationRecord(appIndex, &record)) {
+        return;
+    }
+
+    PrefApplReplaceListItemMoniker(list, item, &record);
+}
+
+@method PrefApplDialogClass, MSG_PREF_APPL_LEFT_LIST_DOUBLE_PRESS
+{
+    word appIndex;
+
+    if ((selection == GIGS_NONE) ||
+        !PrefApplMapDisabledIndexToApplicationIndex(selection, &appIndex)) {
+        return;
+    }
+
+    @call @Dup(@AllAppsList)::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(
+        selection,
+        FALSE
+    );
+    @call oself::MSG_PREF_APPL_ADD_APPLICATION(oself);
+}
+
+@method PrefApplDialogClass, MSG_PREF_APPL_RIGHT_LIST_DOUBLE_PRESS
+{
+    word appIndex;
+
+    if ((selection == GIGS_NONE) ||
+        !PrefApplMapLinkedIndexToApplicationIndex(selection, &appIndex)) {
+        return;
+    }
+
+    @call @Dup(@LinkedAppsList)::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(
+        selection,
+        FALSE
+    );
+    @call oself::MSG_PREF_APPL_REMOVE_APPLICATION(oself);
+}
+
+@method PrefApplDialogClass, MSG_PREF_APPL_ADD_APPLICATION
+{
+    PrefApplApplicationRecord record;
+    PrefApplError paError;
+    const char *statusMessage;
+    word disabledSelection;
+    word appIndex;
+    Boolean actionSucceeded;
+    Boolean modelUpdated;
+
+    disabledSelection = @call @Dup(@AllAppsList)::MSG_GEN_ITEM_GROUP_GET_SELECTION();
+
+    if ((disabledSelection == GIGS_NONE) ||
+        !PrefApplMapDisabledIndexToApplicationIndex(disabledSelection, &appIndex) ||
+        !PrefApplGetApplicationRecord(appIndex, &record)) {
+        return;
+    }
+
+    @call oself::MSG_PREF_APPL_SET_CONTROL_STATE(FALSE);
+    pself->PADI_ignoreFileChanges = TRUE;
+    actionSucceeded = PrefApplCreateApplicationLink(&record);
+    statusMessage = prefApplEnableFailedText;
+    if (actionSucceeded) {
+        modelUpdated = PrefApplSetApplicationSelectedByToken(&record.PAAR_token,
+                                                             TRUE);
+        if (modelUpdated) {
+            modelUpdated = PrefApplAddScannedLinkRecord(&record.PAAR_token,
+                                                        SP_APPLICATION,
+                                                        "",
+                                                        record.PAAR_linkName);
+        }
+
+        if (modelUpdated) {
+            statusMessage = prefApplEnabledText;
+        } else {
+            actionSucceeded = FALSE;
+        }
+    }
+    pself->PADI_ignoreFileChanges = FALSE;
+
+    if (actionSucceeded) {
+        PrefApplSyncListsFromCurrentModel(oself,
+            ConstructOptr(OptrToHandle(oself), OptrToChunk(@AllAppsList)),
+            ConstructOptr(OptrToHandle(oself), OptrToChunk(@LinkedAppsList)),
+            TRUE);
+        @call oself::MSG_PREF_APPL_SET_STATUS_TEXT(statusMessage);
+    } else {
+        paError = @call oself::MSG_PREF_APPL_REFRESH_LIST_FROM_DISK();
+        if (paError == PREF_APPL_ERROR_NONE) {
+            @call oself::MSG_PREF_APPL_SET_STATUS_TEXT(statusMessage);
+        } else {
+            @call oself::MSG_PREF_APPL_SHOW_ERROR(paError);
+        }
+    }
+}
+
+@method PrefApplDialogClass, MSG_PREF_APPL_REMOVE_APPLICATION
+{
+    PrefApplApplicationRecord record;
+    PrefApplError paError;
+    const char *statusMessage;
+    word linkedSelection;
+    word appIndex;
+    Boolean actionSucceeded;
+    Boolean modelUpdated;
+
+    linkedSelection = @call @Dup(@LinkedAppsList)::MSG_GEN_ITEM_GROUP_GET_SELECTION();
+
+    if ((linkedSelection == GIGS_NONE) ||
+        !PrefApplMapLinkedIndexToApplicationIndex(linkedSelection, &appIndex) ||
+        !PrefApplGetApplicationRecord(appIndex, &record)) {
+        return;
+    }
+
+    @call oself::MSG_PREF_APPL_SET_CONTROL_STATE(FALSE);
+    pself->PADI_ignoreFileChanges = TRUE;
+    statusMessage = prefApplDisableFailedText;
+    actionSucceeded = PrefApplDeleteScannedLinksForToken(&record.PAAR_token);
+    if (actionSucceeded) {
+        PrefApplRemoveScannedLinkRecordsForToken(&record.PAAR_token);
+        modelUpdated = PrefApplSetApplicationSelectedByToken(&record.PAAR_token,
+                                                             FALSE);
+        if (modelUpdated) {
+            statusMessage = prefApplDisabledText;
+        } else {
+            actionSucceeded = FALSE;
+        }
+    }
+    pself->PADI_ignoreFileChanges = FALSE;
+
+    if (actionSucceeded) {
+        PrefApplSyncListsFromCurrentModel(oself,
+            ConstructOptr(OptrToHandle(oself), OptrToChunk(@AllAppsList)),
+            ConstructOptr(OptrToHandle(oself), OptrToChunk(@LinkedAppsList)),
+            TRUE);
+        @call oself::MSG_PREF_APPL_SET_STATUS_TEXT(statusMessage);
+    } else {
+        paError = @call oself::MSG_PREF_APPL_REFRESH_LIST_FROM_DISK();
+        if (paError == PREF_APPL_ERROR_NONE) {
+            @call oself::MSG_PREF_APPL_SET_STATUS_TEXT(statusMessage);
+        } else {
+            @call oself::MSG_PREF_APPL_SHOW_ERROR(paError);
+        }
+    }
+}

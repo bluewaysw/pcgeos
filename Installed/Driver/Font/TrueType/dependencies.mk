@@ -101,7 +101,7 @@ ttadapter.eobj: Adapter/ttadapter.h geos.h ec.h fontID.h file.h graphics.h \
                 Adapter/ttcharmapper.h FreeType/freetype.h \
                 FreeType/ttcmap.h FreeType/tttags.h FreeType/ttconfig.h \
                 FreeType/ttmemory.h FreeType/tttypes.h Ansi/string.h \
-                geode.h
+                FreeType/ttload.h FreeType/ttobjs.h geode.h
 ttwidths.obj \
 ttwidths.eobj: geos.h ec.h unicode.h graphics.h fontID.h font.h color.h \
                 heap.h Adapter/ttwidths.h Adapter/../FreeType/freetype.h \

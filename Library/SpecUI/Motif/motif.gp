@@ -245,6 +245,7 @@ skip 1
 export WindowListListClass
 export TaskBarListClass
 export SysTrayInteractionClass
+export TaskBarMenuClass
 
 #
 # READ ME:

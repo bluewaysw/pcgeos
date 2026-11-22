@@ -2490,6 +2490,8 @@ DesktopItems	DesktopDefaultItems \
 
 
 NDInitDesktop	proc	near
+drivesDirSeg	local	word
+	.enter
 	call	FilePushDir
 
 	;
@@ -2504,12 +2506,25 @@ NDInitDesktop	proc	near
 
 	mov	bx, handle DrivesDirectory
 	call	MemLock
-	mov	ds, ax
-	mov	es, ax
+	mov	ss:[drivesDirSeg], ax
 	mov	si, offset DesktopItems
 
 linkLoop:
+	mov	ds, ss:[drivesDirSeg]
+	mov	es, ss:[drivesDirSeg]
 	call	FilePushDir
+	;
+	; FileSetCurrentPath may destroy segment registers, so preserve
+	; our string-resource segments and precomputed offsets.
+	;
+	mov	di, cs:[si].DDI_name
+	mov	dx, ds:[di]
+	push	dx
+	mov	di, cs:[si].DDI_targetPath
+	mov	di, es:[di]
+	push	di
+	push	ds
+	push	es
 	clr	bx
 	tst	cs:[si].DDI_destDir
 	jz	noDirChange
@@ -2517,16 +2532,16 @@ linkLoop:
 	mov	dx, ds:[di]
 	call	FileSetCurrentPath
 noDirChange:		
-	mov	di, cs:[si].DDI_name
-	mov	dx, ds:[di]
+	pop	es
+	pop	ds
+	pop	di
+	pop	dx
 	tst	cs:[si].DDI_isDir
 	jz	notDir
 	call	FileCreateDir
 	jmp	setAttrs
 notDir:
 	mov	bx, cs:[si].DDI_targetSP
-	mov	di, cs:[si].DDI_targetPath
-	mov	di, es:[di]
 	clr	cx
 	call	FileCreateLink
 	tst	cs:[si].DDI_toDir
@@ -2542,9 +2557,9 @@ setAttrs:
 	lea	di, es:[si].DDI_token
 	mov	cx, size GeodeToken
 	call	FileSetPathExtAttributes
+	pop	es
 notToDir:
 	call	FilePopDir
-	pop	es
 	add	si, size DesktopDefaultItems
 	cmp	si, offset DesktopItems + size DesktopItems
 	jb	linkLoop
@@ -2555,6 +2570,7 @@ notToDir:
 	call	MemUnlock
 done:
 	call	FilePopDir
+	.leave
 	ret
 NDInitDesktop	endp
 

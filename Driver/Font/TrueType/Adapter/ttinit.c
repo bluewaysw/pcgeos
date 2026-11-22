@@ -60,11 +60,9 @@ static word getNameFromNameTable(
 
 void InitConvertHeader(         TRUETYPE_VARS, FontHeader* fontHeader );
 
-word GetKernCount(       TRUETYPE_VARS );
+word GetKernCount( TRUETYPE_VARS );
 
 static word toHash( const char* str );
-
-static word strlen( const char* str );
 
 static void strcpoy( char* dest, const char* source );
 
@@ -338,6 +336,7 @@ static void ProcessFont( TRUETYPE_VARS, const char* fileName, MemHandle fontInfo
         sword                   availIndex;
         char                    styleName[STYLE_NAME_LENGTH];
         char                    familyName[FID_NAME_LEN];
+        TextStyle               style;
 
 
 EC(     ECCheckBounds( (void*)fileName ) );
@@ -364,6 +363,7 @@ EC(     ECCheckFileHandle( truetypeFile ) );
         if ( getNameFromNameTable( trueTypeVars, &styleName, STYLE_NAME_ID ) == 0 )
                 goto Fail;
 
+        style      = mapTextStyle( &styleName );  
         mappedFont = getFontID( trueTypeVars, familyName, &fontID );
 	availIndex = getFontIDAvailIndex( fontID, fontInfoBlock );
 
@@ -434,7 +434,7 @@ EC(     ECCheckFileHandle( truetypeFile ) );
     
                 /* fill OutlineDataEntry */
                 outlineDataEntry = (OutlineDataEntry*) (fontInfo + 1);
-                outlineDataEntry->ODE_style  = mapTextStyle( &styleName );
+                outlineDataEntry->ODE_style  = style;
                 outlineDataEntry->ODE_weight = mapFontWeight( FACE_PROPERTIES.os2->usWeightClass );
                 outlineDataEntry->ODE_header.OE_handle = trueTypeOutlineChunk;
                 outlineDataEntry->ODE_first.OE_handle = fontHeaderChunk;
@@ -452,18 +452,20 @@ EC(     ECCheckFileHandle( truetypeFile ) );
 	}
         else
         {
-                FontsAvailEntry*      availEntries = LMemDeref( ConstructOptr(fontInfoBlock, sizeof(LMemBlockHeader)) );
-                OutlineDataEntry*     outlineData;
-                OutlineDataEntry*     outlineDataEnd;
+                FontsAvailEntry*  availEntries;
+                OutlineDataEntry* outlineData;
+                OutlineDataEntry* outlineDataEnd;
+
+                availEntries = LMemDeref(ConstructOptr(fontInfoBlock, sizeof(LMemBlockHeader)));
 
                 fontInfoChunk = availEntries[availIndex].FAE_infoHandle;
-                fontInfo = LMemDerefHandles( fontInfoBlock, fontInfoChunk );
-	            outlineData = (OutlineDataEntry*) (((byte*)fontInfo) + fontInfo->FI_outlineTab);
-                outlineDataEnd = (OutlineDataEntry*) (((byte*)fontInfo) + fontInfo->FI_outlineEnd);
+                fontInfo = LMemDerefHandles(fontInfoBlock, fontInfoChunk);
 
-        while( outlineData < outlineDataEnd)
+                outlineData = (OutlineDataEntry*)(((byte*)fontInfo) + fontInfo->FI_outlineTab);
+                outlineDataEnd = (OutlineDataEntry*)(((byte*)fontInfo) + fontInfo->FI_outlineEnd);
+		while( outlineData < outlineDataEnd)
 		{
-                        if( ( mapTextStyle( &styleName ) == outlineData->ODE_style ) &&
+                        if( ( style == outlineData->ODE_style ) &&
 	                    ( mapFontWeight( FACE_PROPERTIES.os2->usWeightClass ) == outlineData->ODE_weight ) )
 			{
 				goto Fail;
@@ -502,7 +504,7 @@ EC(     ECCheckFileHandle( truetypeFile ) );
                 /* fill OutlineDataEntry */
                 fontInfo = LMemDeref( ConstructOptr(fontInfoBlock, fontInfoChunk) );
                 outlineData = (OutlineDataEntry*) (fontInfo + 1);
-                outlineData->ODE_style  = mapTextStyle( &styleName );
+                outlineData->ODE_style  = style;
                 outlineData->ODE_weight = mapFontWeight( FACE_PROPERTIES.os2->usWeightClass );
                 outlineData->ODE_header.OE_handle = trueTypeOutlineChunk;
                 outlineData->ODE_first.OE_handle = fontHeaderChunk;
@@ -595,11 +597,14 @@ static Boolean isFontUnacceptable( TRUETYPE_VARS )
 
 static word toHash( const char* str )
 {
-        word   i;
-        word   hash = strlen( str );
+        const char* p = str;
+        word        hash = 0;
 
-        for ( i = 0; i < strlen( str ); ++i )
-		hash = hash * 7 + str[i];
+        while( *p++ )
+                ++hash;
+
+        while( *str )
+                hash = hash * 7 + *str++;
 
         /* The generated FontID has the following structure:      */
         /* 0bMMMMGGGHHHHHHHHH        MMMM      Fontmaker (4 bit)  */
@@ -1067,7 +1072,6 @@ GetKernCount( TRUETYPE_VARS )
 {
         TT_Kerning        kerningDir;
         word              table;
-        TT_Kern_0_Pair*   pairs;
         word              numGeosKernPairs = 0;
         LookupEntry*      indices;
         const word        minKernValue = UNITS_PER_EM / KERN_VALUE_DIVIDENT;
@@ -1081,58 +1085,89 @@ GetKernCount( TRUETYPE_VARS )
                 return 0;
         }
 
-        /* get pointer to lookup table */
         indices = GEO_LOCK( LOOKUP_TABLE );
 EC(     ECCheckBounds( indices ) );
 
-        /* search for format 0 subtables */
         for( table = 0; table < kerningDir.nTables; ++table )
         {
-                word i;
-                TT_Kern_Subtable* subtable = &kerningDir.tables[table];
+                TT_Kern_Subtable* sub = &kerningDir.tables[table];
+                TT_Error error;
+                TT_UShort total, done, chunk, count, i;
+                word valid = 0;
+                Boolean partial;
+                TT_Kern_0_Pair* pairs;
 
-                if( TT_Load_Kerning_Table( FACE, &kerningDir, table ) )
+                if( sub->format != 0 )
                         continue;
 
-                if( subtable->format != 0 )
+                error = TT_Load_Kerning_Table( FACE, &kerningDir, table );
+                if( error && error != TT_Err_Out_Of_Memory )
                         continue;
 
-                pairs = GEO_LOCK( subtable->t.kern0.pairsBlock );
-EC(             ECCheckBounds( pairs ) );
+                /* Subtable_Load_0 preserves nPairs on allocation failure. */
+                total   = sub->t.kern0.nPairs;
+                partial = (error != TT_Err_Ok);
+                chunk   = partial ? total / 2 : total;
+                if( chunk == 0 )
+                        chunk = 1;
 
-                for( i = 0; i < subtable->t.kern0.nPairs; ++i )
+                done = 0;
+                while( done < total )
                 {
-                        if( ABS( pairs[i].value ) <= minKernValue )
-                                continue;
+                        count = total - done;
+                        if( count > chunk )
+                                count = chunk;
 
-                        if( GetGEOSCharForIndex( indices, pairs[i].left ) &&
-                            GetGEOSCharForIndex( indices, pairs[i].right ) )
-                                ++numGeosKernPairs;
+                        if( partial )
+                        {
+                                error = TT_Load_Kerning_Table_Range(
+                                        FACE, sub, done, count );
+                                if( error )
+                                {
+                                        if( error != TT_Err_Out_Of_Memory || count == 1 )
+                                                break;
+                                        chunk = count / 2;
+                                        continue;
+                                }
+                        }
+
+                        pairs = GEO_LOCK( sub->t.kern0.pairsBlock );
+EC(                     ECCheckBounds( pairs ) );
+                        if( !pairs )
+                                break;
+
+                        for( i = 0; i < count; ++i )
+                        {
+                                if( ABS( pairs[i].value ) > minKernValue &&
+                                    GetGEOSCharForIndex( indices, pairs[i].left ) &&
+                                    GetGEOSCharForIndex( indices, pairs[i].right ) )
+                                        ++valid;
+                        }
+
+                        GEO_UNLOCK( sub->t.kern0.pairsBlock );
+                        done += count;
                 }
 
-                GEO_UNLOCK( subtable->t.kern0.pairsBlock );
+                /* Do not leave complete subtables allocated; the directory
+                   destructor must not free a block twice. */
+                GEO_FREE( sub->t.kern0.pairsBlock );
+                sub->loaded = FALSE;
+
+                if( done == total )
+                        numGeosKernPairs += valid;
         }
 
         GEO_UNLOCK( LOOKUP_TABLE );
         TT_Kerning_Directory_Done( &kerningDir );
-
         return numGeosKernPairs;
 }
+
 #pragma code_seg()
 
 /*******************************************************************/
 /* We cannot use functions from the Ansic library, which causes a  */
 /* cycle. Therefore, the required functions are reimplemented here.*/
 /*******************************************************************/
-
-static word strlen( const char* str )
-{
-        const char  *s;
-
-        for ( s = str; *s; ++s )
-                ;
-        return( s - str );  
-}
 
 
 static void strcopy( char* dest, const char* source )
