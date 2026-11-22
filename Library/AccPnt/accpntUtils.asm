@@ -723,11 +723,12 @@ AllocContentsBuffer	proc	near
 	.enter
 
 	;
-	; Allow space for eight digits and CR/LF per record. The DBCS INI
-	; writer uses two hex digits per byte and adds line breaks.
+	; ATTENTION: The SBCS builder needs 20 bytes per record plus 16.
+	; The DBCS builder compares 40 bytes per record plus 7 as a signed
+	; word. Raise these limits only when the INI builders support it.
 	;
-SBCS <		cmp	cx, (0fff0h - 32) / 10			>
-DBCS <		cmp	cx, (0fff0h - 32) / 42			>
+SBCS <		cmp	cx, (0fff0h - 16) / 20			>
+DBCS <		cmp	cx, (7fffh - 7) / 40			>
 		ja	tooLarge
 		mov	ax, 10 * size TCHAR
 		mul	cx
