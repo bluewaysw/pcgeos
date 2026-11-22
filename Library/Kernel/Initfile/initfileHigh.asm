@@ -3013,11 +3013,16 @@ PASS:		ds:si - target category
 DESTROYED:	ax,bx,cx,dx,di,si,bp,ds,es
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 InitFileAppendStringSectionEntryRaw	proc	near
+	;
+	; ESP uses the BP word saved by the prologue for entryLen.
+	; Keep entryLen first. A later declaration shifts the offsets
+	; of earlier locals, so they refer to the wrong stack words.
+	;
+	entryLen	local	word	push	bp
 	catString	local	fptr.char	push	ds, si
 	keyString	local	fptr.char	push	cx, dx
 	entrySeg	local	sptr	push	es
 	entryPtr	local	word	push	di
-	entryLen	local	word	push	bp
 	tempHan	local	hptr
 	tempSeg	local	sptr
 
@@ -3094,11 +3099,12 @@ RETURN:		carry set if an entry was removed
 DESTROYED:	ax,bx,cx,dx,di,si,bp,ds,es
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 InitFileRemoveStringSectionEntryRaw	proc	near
+	; Keep entryLen first. ESP uses the saved BP word for it.
+entryLen	local	word	push	bp
 catString	local	fptr.char	push	ds, si
 keyString	local	fptr.char	push	cx, dx
 entrySeg	local	sptr	push	es
 entryPtr	local	word	push	di
-entryLen	local	word	push	bp
 blobHan	local	hptr
 blobSeg	local	sptr
 blobSize	local	word
@@ -3225,9 +3231,10 @@ RETURN:		carry set if the entry is active factory data
 DESTROYED:	ax,bx,cx,dx,di,si,bp,ds,es
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 InitFileEntryIsActiveFactory	proc	near
+	; Keep entryLen first. ESP uses the saved BP word for it.
+entryLen	local	word	push	bp
 entrySeg	local	sptr	push	es
 entryPtr	local	word	push	di
-entryLen	local	word	push	bp
 factoryHan	local	hptr
 factorySize	local	word
 factorySeg	local	sptr
@@ -3950,20 +3957,23 @@ legacyDelete:
 endif
 
 	;
-	; First get the blob
+	; InitFileReadString takes read flags in BP. Zero requests an
+	; allocated buffer. Restore BP on both success and error so
+	; .leave can use it to restore SP. Save the character count
+	; in DI until CX is available for the section lookup.
 	;
-		push	cx
+		push	bp, cx				; save the stack frame and key segment
 		clr	bp				; allocate memory for us
 		call	InitFileReadString		; memory handle => BX
-		mov	bp, cx				; size of original string => BP
-		pop	cx
+		mov	di, cx				; size of original string => DI
+		pop	bp, cx
 		jc	exit				; if error, we abort
 
 	; Now we find the string section we want
 	;
 		push	ds, si, cx, dx
 		mov_tr	dx, ax				; string number => DX
-		mov	cx, bp				; string size => CX
+		mov	cx, di				; string size => CX
 		call	MemLock
 		mov	ds, ax				; start of string => DS:SI
 		mov	es, ax
