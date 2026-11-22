@@ -762,18 +762,9 @@ AccessPointSelectorCreate	method dynamic AccessPointSelectorClass,
 		mov	di, mask MF_CALL or mask MF_FIXUP_DS
 		call	ObjMessage			; ax = type
 	;
-	; get current selection
+	; Append a new entry of this type.
 	;
-		push	ax
-		mov	ax, MSG_ACCESS_POINT_CONTROL_GET_SELECTION
-		mov	di, mask MF_CALL or mask MF_FIXUP_DS
-		call	ObjMessage			; ax = selection
-	;
-	; create an entry in the database before the current selection
-	; if no current selection, append the entry
-	;
-		mov	bx, ax				; bx = selection
-		pop	ax				; ax = type
+		clr	bx
 		call	AccessPointCreateEntry		; ax = entry ID
 		jc	resume
 	;

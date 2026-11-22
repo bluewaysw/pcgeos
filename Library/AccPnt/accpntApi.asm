@@ -86,8 +86,8 @@ COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 SYNOPSIS:	Create an access point
 
 CALLED BY:	GLOBAL
-PASS:		bx	- ID of entry before which to insert new entry
-			 (0 to place at end)
+PASS:		bx	- existing entry ID, or 0
+			  The new entry always goes at the end.
 		ax	- AccessPointType
 RETURN:		ax	- new ID
 		carry set and ax = 0 if the entry could not be created
@@ -129,6 +129,13 @@ nextValue:
 		inc	ax		; don't use zero
 noZ:
 		call	CheckIfEntryExists	; carry if does not exist
+		jnc	nextValue
+	;
+	; A list write with a deleted ID and type can restore the factory entry.
+	;
+		mov	dx, offset initDisabled
+		mov	bp, mask IFRF_FIRST_ONLY
+		call	FindContentsEntry
 		jnc	nextValue
 	;
 	; this is the value we want to use
