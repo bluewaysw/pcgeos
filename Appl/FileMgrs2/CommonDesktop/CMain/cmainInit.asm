@@ -2536,6 +2536,7 @@ noDirChange:
 	pop	ds
 	pop	di
 	pop	dx
+	jc	notToDir		; Skip an item if its folder is unavailable.
 	tst	cs:[si].DDI_isDir
 	jz	notDir
 	call	FileCreateDir
@@ -2562,7 +2563,7 @@ notToDir:
 	call	FilePopDir
 	add	si, size DesktopDefaultItems
 	cmp	si, offset DesktopItems + size DesktopItems
-	jb	linkLoop
+	LONG jb	linkLoop
 
 	call	UpdateWastebasket
 
@@ -2847,6 +2848,7 @@ NDInitDriveLinks	proc	near
 	jnc	nukeInvalidDrives
 	call	FileCreateDir
 	call	FileSetCurrentPath
+	jc	done			; Leave the previous folder alone.
 nukeInvalidDrives:
 	call	NDNukeInvalidDriveLinks		; clean up Desktop
 
