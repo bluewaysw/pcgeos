@@ -18,6 +18,7 @@
 name os2.ifsd
 type driver, single system
 library geos
+library hostif
 
 #
 # Desktop-related things

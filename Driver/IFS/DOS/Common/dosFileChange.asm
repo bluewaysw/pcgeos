@@ -320,7 +320,7 @@ if SEND_DOCUMENT_FCN_ONLY
 		call	DOSFileChangeCheckIfCurPathLikelyHasDoc
 		jc	done		; => no
 endif	; SEND_DOCUMENT_FCN_ONLY
-if _MSLF
+if _LFN
 		GetIDFromFindData	ds:[dos7FindData], cx, dx
 else
 		GetIDFromDTA	ds:[dosNativeFFD], cx, dx

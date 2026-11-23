@@ -92,6 +92,19 @@ endif
 		clr	di			; no private data set for disks
 		call	FSDRegister
 		mov	ds:[fsdOffset], dx
+if HOST_FS_FASTPATH
+	;
+	; Enable the BASEBOX host FS fast path if we're running under it.
+	; Must come before OS2LocateDrives, which uses host drive info.
+	;
+		call	OS2HostFsInit
+endif
+if _LFN
+	;
+	; Without long file names from the host, maybe DOS has them.
+	;
+		call	OS2LfnInit
+endif
 
 		call	DOSHookCriticalError
 	;
@@ -302,6 +315,14 @@ REVISION HISTORY:
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 OS2CreateDrive proc	near
 		.enter
+if HOST_FS_FASTPATH
+	;
+	; Under BASEBOX, host directory mounts and FAT images are classified
+	; from the host's drive table; the IOCTLs below can't identify them.
+	;
+		call	OS2HostFsGetDriveParams
+		jnc	createDrive
+endif
 	;
 	; Fetch device parameters using generic IOCTL call, if driver supports
 	; it.
@@ -916,6 +937,9 @@ REVISION HISTORY:
 OS2Exit		proc	far
 		uses	ds, es, si
 		.enter
+if HOST_FS_FASTPATH
+		call	OS2HostFsShutdown	; host change notifications
+endif
 		call	LoadVarSegDS
 	;
 	; Unhook idle

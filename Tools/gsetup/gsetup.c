@@ -17,9 +17,11 @@ static char comspecPath[MAX_PATH_CHARS + 1];
 static char cmdTail[CMD_TAIL_MAX + 2];
 static char cwdPath[MAX_PATH_CHARS + 1];
 static char bootPath[MAX_PATH_CHARS + 1];
-static char gfsText[512];
+static char gfsText[600];
 
 static const char batchName[] = "gsetup.bat";
+/* BASEBOX host file system driver (EC, then non-EC name), see WriteGfsIni */
+static const char *const hostfsNames[] = { "HOSTFSEC.GEO", "HOSTFS.GEO", 0 };
 static const char slashC[] = "/C ";
 static const char msgError[] = "GSETUP launcher failed.\r\n";
 
@@ -217,6 +219,8 @@ static int _pascal WriteGfsIni(const char *iniNameP)
     unsigned closeError;
     int fileH;
     int haveOld;
+    int i;
+    const char *hostfsP;
 
     if (_fullpath(bootPath, launcherDir, sizeof(bootPath)) == (void*)0 ||
         _fullpath(cwdPath, ".", sizeof(cwdPath)) == (void*)0 ||
@@ -261,9 +265,33 @@ static int _pascal WriteGfsIni(const char *iniNameP)
         }
     }
 
-    /* A BOOT path of at most 58 characters keeps this below 512 bytes. */
-    sprintf(gfsText,
-        "[system]\r\nfs = MEGAFILE.GEO\r\n\r\n"
+    /*
+     * The BASEBOX host file system driver is loaded after MegaFile when
+     * the build has it next to MegaFile. It stays loaded only under
+     * pcgeos-basebox with [hostfs] drives configured, else it unloads
+     * itself again.
+     */
+    hostfsP = 0;
+    for (i = 0; hostfsNames[i] != 0 && hostfsP == 0; i++) {
+        ownPath[0] = '\0';
+        if (appendText(ownPath, sizeof(ownPath), bootPath) &&
+            appendText(ownPath, sizeof(ownPath), "\\SYSTEM\\FS\\") &&
+            appendText(ownPath, sizeof(ownPath), hostfsNames[i]) &&
+            _dos_getfileattr(ownPath, &attributes) == 0 &&
+            !(attributes & _A_SUBDIR)) {
+            hostfsP = hostfsNames[i];
+        }
+    }
+
+    /* A BOOT path of at most 58 characters keeps this below 600 bytes. */
+    if (hostfsP != 0) {
+        sprintf(gfsText, "[system]\r\nfs = {\r\nMEGAFILE.GEO\r\n%s\r\n}\r\n\r\n",
+            hostfsP);
+    } else {
+        strcpy(gfsText, "[system]\r\nfs = MEGAFILE.GEO\r\n\r\n");
+    }
+    length = strlen(gfsText);
+    sprintf(gfsText + length,
         "[paths]\r\ntop = %s GFS:\\FG\r\nini = %s\\%s\r\n\r\n"
         "[gfs]\r\nfile = %s\\GFS.IMG\r\ndrive = GFS\r\n"
         "bootstrapPath = %s\r\ncacheFile = none\r\n",

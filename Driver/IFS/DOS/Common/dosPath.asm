@@ -588,7 +588,7 @@ SYNOPSIS:	Create a file in the current directory with the native
 CALLED BY:	DOSAllocOpCreate, DOSPathCreateDirectoryFileCommon
 PASS:		dosNativeFFD.FFD_name set
 
-		For _MSLF:
+		For _LFN:
 		dos7FindData.W32FD_fileName set instead
 
 		es:si	= DiskDesc on which the operation is being performed
@@ -626,7 +626,7 @@ DOSCreateNativeFile proc far
 	; Create the file whose name is in dosNativeFFD.FFD_name.
 	; 
 		call	PathOps_LoadVarSegDS
-if _MSLF
+if _LFN
 		tst	ds:[dos7FindData].W32FD_fileName[0]
 else
 		tst	ds:[dosNativeFFD].FFD_name[0]
@@ -636,7 +636,7 @@ endif
 		mov	bx, NIL			; allocate a DOS handle
 		call	DOSAllocDosHandleFar	;  for our use
 
-if _MSLF
+if _LFN
 		mov	dx, offset dos7FindData.W32FD_fileName
 else
 		mov	dx, offset dosNativeFFD.FFD_name
@@ -653,7 +653,7 @@ if	_MS and not _MS2 and (not _MS3)
 		mov	bl, al			; bx <- ExtendedFileAccessFlags
 		clr	bh
 		andnf	bl, not FAF_GEOS_BITS
-if _MSLF
+if _LFN
 		mov	ax, MSDOS7F_CREATE_OR_OPEN
 else
 		mov	ah, MSDOS_EXTENDED_OPEN_FILE
@@ -1016,7 +1016,7 @@ generateNotify:
 	; want to waste the time).
 	; 
 		mov	bx, dx
-if _MSLF
+if _LFN
 		GetIDFromFindData	ds:[dos7FindData], cx, dx
 else
 		GetIDFromDTA	ds:[dosNativeFFD], cx, dx
@@ -1066,7 +1066,7 @@ handleGeosCreate:
 	; Now create and initialize the file.
 	; 
 createGeosUsingNativeName:
-if _MSLF
+if _LFN
 	;
 	; Copy generated DOS name to dos7FindData, so that it can be passed
 	; to DOSCreateNativeFile.
@@ -1456,7 +1456,7 @@ endif	; SEND_DOCUMENT_FCN_ONLY
 
 		mov	ds:[bx].DFE_index, -1	; flag index unknown
 
-if _MSLF
+if _LFN
 		GetIDFromFindData ds:[dos7FindData], cx, dx
 else
 		GetIDFromDTA ds:[dosNativeFFD], cx, dx
@@ -1751,7 +1751,7 @@ DOSCheckFileInUse	proc near
 		call	PathOps_LoadVarSegDS
 		clr	bx
 		push	ax		; save in case everything's cool
-if _MSLF
+if _LFN
 		GetIDFromFindData	ds:[dos7FindData], ax, dx
 else
 		GetIDFromDTA	ds:[dosNativeFFD], ax, dx
@@ -1851,7 +1851,7 @@ PASS:		ds:dx	= name of directory to create.
 		es:si	= DiskDesc for disk on which to perform it
 		CWD lock grabbed, with all that implies.
 
-		For _MSLF:
+		For _LFN:
 			di = {word} FSPathOpFunction * 2
 RETURN:		carry set on error:
 			ax	= error code
@@ -1930,7 +1930,7 @@ notLink:
 	; already exist.
 	; 
 		call	PathOps_LoadVarSegDS
-if _MSLF
+if _LFN
 		mov	dx, offset dos7FindData.W32FD_fileName	; assume so
 		tst	ds:[dos7FindData].W32FD_fileName[0]
 		jz	generateDosName		; => wasn't valid DOS name.
@@ -1975,7 +1975,7 @@ else
 endif
 		call	DOSVirtGenerateDosName
 		jc	done
-if _MSLF
+if _LFN
 	;
 	; Copy the generated filename from dosNativeFFD.FFD_name to
 	; dos7FindData.W32FD_fileName, since DOSPathCheckExactMatch
@@ -2005,7 +2005,7 @@ haveDosName:
  	; file, as it'll get created when (if) it's needed.
 	;
 
-if _MSLF
+if _LFN
 		mov	ax, MSDOS7F_CREATE_DIR
 else
 		mov	ah, MSDOS_CREATE_DIR
@@ -2190,7 +2190,7 @@ pathBuf		local	DOS_STD_PATH_LENGTH dup(char)
 	; 
 		jcxz	tooLong
 		segmov	es, dgroup, si
-if _MSLF
+if _LFN
 		mov	di, offset dos7FindData.W32FD_fileName
 else
 		mov	di, offset dosNativeFFD.FFD_name
@@ -2248,7 +2248,7 @@ DOSPathCreateDirectoryFileCommon	proc far
 	; 
 		push	es, si
 		segmov	es, ds
-if _MSLF
+if _LFN
 		mov	di, offset dos7FindData.W32FD_fileName
 else
 		mov	di, offset dosNativeFFD.FFD_name
@@ -2704,7 +2704,7 @@ DOSPathCheckExactMatch	proc far
 		.enter
 
 		les	di, ds:[dosFinalComponent]
-if _MSLF
+if _LFN
 		mov	si, offset dos7FindData.W32FD_fileName
 else
 		mov	si, offset dosNativeFFD.FFD_name
@@ -2868,7 +2868,7 @@ PASS:		ds	= dgroup
 		source name mapped and not-in-use; dos name in dosNativeFFD
 		CWD lock grabbed
 
-		For _MSLF:
+		For _LFN:
 		source name mapped in dos7FindData also.
 
 RETURN:		carry set on error:
@@ -2918,7 +2918,7 @@ if SEND_DOCUMENT_FCN_ONLY
 destDiskHandle	local	word	push cx
 endif
 
-if _MSLF
+if _LFN
 srcPath		local	MSDOS7PathName
 else
 srcPath		local	DOS_STD_PATH_LENGTH+DOS_DOT_FILE_NAME_LENGTH+2 dup(char)
@@ -2943,7 +2943,7 @@ srcFileType	local	GeosFileType
 	; bail if file is read-only
 	; 
 		mov	ax, ERROR_ACCESS_DENIED
-if _MSLF
+if _LFN
 		test	ds:[dos7FindData].W32FD_fileAttrs.low.low, \
 				mask FA_RDONLY
 else
@@ -2956,7 +2956,7 @@ endif
 	; move it about the filesystem. WHY IS THIS? Grrrr...
 	; 
 		mov	ax, ERROR_CANNOT_MOVE_DIRECTORY
-if _MSLF
+if _LFN
 		test	ds:[dos7FindData].W32FD_fileAttrs.low.low, \
 				mask FA_SUBDIR
 else
@@ -2991,7 +2991,7 @@ endif
 		je	srcSeparatorAdded
 		stosb
 srcSeparatorAdded:
-if _MSLF
+if _LFN
 		mov	si, offset dos7FindData.W32FD_fileName
 else
 		mov	si, offset dosNativeFFD.FFD_name
@@ -3002,7 +3002,7 @@ copyNativeFFD:
 endif
 		mov	ss:[srcFinalComponent], di
 		rep	movsb
-if _MSLF
+if _LFN
 		mov	al, ds:[dos7FindData].W32FD_fileAttrs.low.low
 else
 		mov	al, ds:[dosNativeFFD].FFD_attributes
@@ -3115,7 +3115,7 @@ tryUseSrcName:
 		mov	di, offset dosNativeFFD.FFD_name
 		mov	cx, size FFD_name
 		rep	movsb
-if _MSLF
+if _LFN
 		jmp	copyToFindData
 else
 		jmp	doRename
@@ -3123,7 +3123,7 @@ endif
 
 generateDosName:
 		call	DOSVirtGenerateDosName
-if _MSLF
+if _LFN
 copyToFindData:
 	;
 	; Copy the filename from dosNativeFFD.FFD_name to
@@ -3140,7 +3140,7 @@ srcNotGeosFile:
 	; 
 		call	PathOpsRare_LoadVarSegDS
 		mov	ax, ERROR_INVALID_NAME
-if _MSLF
+if _LFN
 		tst	ds:[dos7FindData].W32FD_fileName[0]
 else
 		tst	ds:[dosNativeFFD].FFD_name[0]
@@ -3154,14 +3154,14 @@ doRename:
 	; to move the beast.
 	; 
 		segmov	es, dgroup, di
-if _MSLF
+if _LFN
 		mov	di, offset dos7FindData.W32FD_fileName
 else
 		mov	di, offset dosNativeFFD.FFD_name
 endif
 		segmov	ds, ss
 		lea	dx, ss:[srcPath]
-if _MSLF
+if _LFN
 		mov	ax, MSDOS7F_RENAME_FILE
 else
 		mov	ah, MSDOS_RENAME_FILE
@@ -3184,7 +3184,7 @@ endif
 	; Writing of new long name failed, so move the darn thing back again.
 	; 
 		push	ax
-if _MSLF
+if _LFN
 		mov	dx, offset dos7FindData.W32FD_fileName
 else
 		mov	dx, offset dosNativeFFD.FFD_name
@@ -3249,7 +3249,7 @@ PASS: 		source name mapped and not-in-use; dos name in dosNativeFFD
 		si	= disk handle
 		CWD lock grabbed
 
-		For _MSLF:
+		For _LFN:
 		source name mapped in dos7FindData also.
 
 RETURN:		carry set on error:
@@ -3286,7 +3286,7 @@ REVISION HISTORY:
 DOSPathOpRenameFile proc far
 
 diskHandle	local	word	push	si
-if _MSLF
+if _LFN
 srcName		local	MSDOS7PathName
 else
 srcName		local	DOS_DOT_FILE_NAME_LENGTH_ZT dup(char)
@@ -3299,7 +3299,7 @@ srcFileType	local	GeosFileType
 	; bail if file is read-only
 	; 
 		mov	ax, ERROR_ACCESS_DENIED
-if _MSLF
+if _LFN
 		test	ds:[dos7FindData].W32FD_fileAttrs.low.low, \
 				mask FA_RDONLY
 else
@@ -3315,7 +3315,7 @@ endif
 	; buffer.
 	; 
 		push	es, di
-if _MSLF
+if _LFN
 		mov	si, offset dos7FindData.W32FD_fileName
 else
 		mov	si, offset dosNativeFFD.FFD_name
@@ -3324,7 +3324,7 @@ endif
 		segmov	es, ss
 		mov	cx, length srcName
 		rep	movsb
-if _MSLF
+if _LFN
 		mov	al, ds:[dos7FindData].W32FD_fileAttrs.low.low
 else
 		mov	al, ds:[dosNativeFFD].FFD_attributes
@@ -3423,7 +3423,7 @@ checkDestMapError:
 		test	ss:[srcAttrs], mask FA_SUBDIR
 		jz	generateNewGeosName
 		
-if _MSLF
+if _LFN
 		tst	ds:[dos7FindData].W32FD_fileName[0]
 else
 		tst	ds:[dosNativeFFD].FFD_name[0]
@@ -3432,7 +3432,7 @@ endif
 
 generateNewGeosName:
 		call	DOSVirtGenerateDosName
-if _MSLF
+if _LFN
 	;
 	; Copy the filename from dosNativeFFD.FFD_name to
 	; dos7FindData.W32FD_fileName, to be passed to MSDOS7F_RENAME_FILE.
@@ -3447,7 +3447,7 @@ srcNotGeosFile:
 	; (first char of dosNativeFFD.FFD_name is 0 if not).
 	; 
 		mov	ax, ERROR_INVALID_NAME
-if _MSLF
+if _LFN
 		tst	ds:[dos7FindData].W32FD_fileName[0]
 else
 		tst	ds:[dosNativeFFD].FFD_name[0]
@@ -3461,14 +3461,14 @@ doRename:
 	; to rename the beast.
 	; 
 		segmov	es, ds
-if _MSLF
+if _LFN
 		mov	di, offset dos7FindData.W32FD_fileName
 else
 		mov	di, offset dosNativeFFD.FFD_name
 endif
 		segmov	ds, ss
 		lea	dx, ss:[srcName]
-if _MSLF
+if _LFN
 		mov	ax, MSDOS7F_RENAME_FILE
 else
 		mov	ah, MSDOS_RENAME_FILE
@@ -3493,7 +3493,7 @@ renameGeosPart:
 		test	al, FA_GEOS_FILE		; (clears carry)
 		jz	generateNotify
 
-if _MSLF
+if _LFN
 		test	al, mask FA_SUBDIR
 		jz	afterGetAlias
 
@@ -3524,7 +3524,7 @@ if _MSLF
 		Assert	carryClear		; error shouldn't happen.
 
 afterGetAlias:
-endif	; _MSLF
+endif	; _LFN
 
 		mov	ah, ss:[srcFileType].low
 		mov	si, ss:[diskHandle]
