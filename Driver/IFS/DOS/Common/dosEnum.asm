@@ -80,7 +80,7 @@ REVISION HISTORY:
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 DOSFileEnum	proc	far
-if _MSLF
+if _LFN
 		uses	di, si, es, ds
 else
 		uses	si, es
@@ -161,7 +161,7 @@ countAttrsLoop:
 		mov	ds:[FGEAD_flags], mask FGEAF_CLEAR_VALUE_SEG_IF_ABSENT
 					; remaining flags filled in by
 					;  DOSVirtGetExtAttrsLow
-if _MSLF
+if _LFN
 		mov	ds:[FGEAD_fd].segment, ds
 		mov	ds:[FGEAD_fd].offset,
 				offset FGEAD_spec.FGEASD_enum.FED_fd
@@ -170,12 +170,12 @@ else
 		mov	ds:[FGEAD_dta].segment, ds
 		mov	ds:[FGEAD_dta].offset, 
 				offset FGEAD_spec.FGEASD_enum.FED_dta
-endif	; _MSLF
+endif	; _LFN
 	;
 	; Set DOS function to invoke to get the next file/dir/whatever to
 	; actually get the first one.
 	; 
-if _MSLF
+if _LFN
 	;
 	; It's easier to do the FindFirst outside of the loop as we
 	; need to be sure to store the search handle here, but not
@@ -193,7 +193,7 @@ if _MSLF
 		jmp	afterInt21
 else
 		mov	ah, MSDOS_FIND_FIRST
-endif	; _MSLF
+endif	; _LFN
 findLoop:
 	;
 	; ds	= FileGetExtAttrData
@@ -210,7 +210,7 @@ if GSDOS
 		pop	bx
 endif	;GSDOS
 
-if not _MSLF
+if not _LFN
 	;
 	; Snag BIOS lock so we can set the DTA w/o worry, then do that.
 	; 
@@ -220,22 +220,22 @@ if not _MSLF
 		mov	ah, MSDOS_SET_DTA
 		call	DOSUtilInt21
 		pop	ax
-endif	; not _MSLF
+endif	; not _LFN
 	;
 	; Enumerate *all* files, including hidden and system ones; the kernel
 	; will filter as appropriate.
 	; 
-if _MSLF
+if _LFN
 		mov	bx, ds:[FGEAD_fdSearchHandle]
 		les	di, ds:[FGEAD_fd]	; es:di <- FindData
 		mov	ds:[FGEAD_spec].FGEASD_enum.FED_fd.W32FD_fileName[0], 0
 		mov	si, DOS7_DATE_TIME_MS_DOS_FORMAT
-endif	; _MSLF
+endif	; _LFN
 		mov	dx, offset FGEAD_spec.FGEASD_enum.FED_pattern
 		mov	cx, mask FA_HIDDEN or mask FA_SYSTEM or mask FA_SUBDIR
 		call	DOSUtilInt21
 
-if not _MSLF
+if not _LFN
 		call	SysUnlockBIOS
 endif
 if GSDOS
@@ -248,7 +248,7 @@ if GSDOS
 endif	;GSDOS
 		jc	checkComplete	; error => complete for one reason or
 					;  another
-if _MSLF
+if _LFN
 afterInt21:
 	;
 	; We're not supposed to pass . or .. to the callback.  We can't
@@ -277,7 +277,7 @@ endif
 	; Deal with some unknown public-domain utility program Brian Chin
 	; just told me about that likes to create entries with no name.
 	; 
-if _MSLF
+if _LFN
 		cmp	ds:[FGEAD_spec].FGEASD_enum.FED_fd.W32FD_fileName[0], 0
 else
 		cmp	ds:[FGEAD_spec].FGEASD_enum.FED_dta.FFD_name, 0
@@ -292,7 +292,7 @@ endif
 	; See if this might be a special directory file that we should
 	; manifestly not be passing to the callback.
 	; 
-if _MSLF
+if _LFN
 		test	ds:[FGEAD_spec].FGEASD_enum.FED_fd.\
 				W32FD_fileAttrs.low.low, mask FA_SUBDIR
 else
@@ -301,7 +301,7 @@ else
 endif
 		jnz	fillFECD	; actually a dir, so we don't care
 					;  about name or file type
-if _MSLF
+if _LFN
 		cmp	ds:[FGEAD_spec].FGEASD_enum.FED_fd.W32FD_fileName[0], '@'
 else
 		cmp	ds:[FGEAD_spec].FGEASD_enum.FED_dta.FFD_name[0], '@'
@@ -345,7 +345,7 @@ endFindLoop:
 	;
 	; Switch to the "find next" call and go for the next file.
 	; 
-if _MSLF
+if _LFN
 		mov	ax, MSDOS7F_FIND_NEXT
 else
 		mov	ah, MSDOS_FIND_NEXT
@@ -375,7 +375,7 @@ endif	; GSDOS
 	;
 		pushf
 
-if _MSLF
+if _LFN
 		push	bx
 		mov	bx, ds:[FGEAD_fdSearchHandle]
 		tst	bx

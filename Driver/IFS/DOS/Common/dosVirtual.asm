@@ -143,7 +143,7 @@ fail:
 		jmp	done
 DOSVirtMapToDOS	endp
 
-if _MSLF
+if _LFN
 ; ms7 allows a few extra characters.
 LocalDefNLString badDosFilenameChars <'"*./:<>?\\\\|'>
 else
@@ -185,7 +185,7 @@ DOSVirtCheckLegalDosFileChar proc	far
 		uses	es, di, cx
 		.enter
 		LocalCmpChar	ax, ' '	; space or ctrl code?
-if _MSLF
+if _LFN
 		jb	fail
 else
 		jbe	fail
@@ -210,7 +210,7 @@ Resident	ends
 
 PathOps		segment	resource
 
-if _MSLF
+if _LFN
 
 
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -261,7 +261,7 @@ done:
 		ret
 DOSVirtCheckLegalDosShortFileChar	endp
 
-endif	; _MSLF
+endif	; _LFN
 
 
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -963,7 +963,7 @@ else
 		clr	dx
 mapLoop:
 		lodsb			; al <- next char
-if _MSLF
+if _LFN
 		call	DOSVirtCheckLegalDosShortFileChar ; al <- _ if illegal
 else
 		call	DOSVirtCheckLegalDosFileChar	; al <- _ if illegal
@@ -1133,7 +1133,7 @@ SYNOPSIS:	See if the given component is a valid DOS name, mapping it
 		to the DOS character set, upcasing it, and copying it to
 		the passed buffer.
 
-		For _MSLF:
+		For _LFN:
 			Checks for DOS short name, not long name.
 
 CALLED BY:	DOSVirtMapCheckDosName, DOSVirtMapPathWithDosAFAP
@@ -1222,7 +1222,7 @@ SBCS <		je	mapUnmappable					>
 	; See if the thing is allowed to appear in a DOS filename. If not, this
 	; can't be a DOS name mapped to GEOS.
 	; 
-if _MSLF
+if _LFN
 SBCS <		call	DOSVirtCheckLegalDosShortFileChar		>
 else
 SBCS <		call	DOSVirtCheckLegalDosFileChar			>
@@ -1326,7 +1326,7 @@ asciiToBin:
 endif
 DOSVirtMapCheckComponentIsValidDosName endp
 
-if _MSLF
+if _LFN
 
 
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -1485,7 +1485,7 @@ asciiToBin:
 endif
 DOSVirtMapCheckComponentIsValidDosLongName	endp
 
-endif	; _MSLF
+endif	; _LFN
 
 
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -1508,7 +1508,7 @@ RETURN:		carry clear if file/dir of given name found:
 			    legal
 			    DOS filename.
 
-		For _MSLF:
+		For _LFN:
 		Set dos7FindData.W32FD_fileName instead.
 		dos7FindData.W32FD_alternateFileName is set to 8.3 short alias
 		if returned long name does not conform to 8.3.  Otherwise
@@ -1543,7 +1543,7 @@ compType	local	DOSVirtComponentType push cx
 		xchg	si, dx		; ds:si <- compoment
 		LocalPrevChar dsdx	; dx <- end of component (null or b/s)
 
-if _MSLF
+if _LFN
 		push	si		; save start of component
 
 		segmov	es, <segment dos7FindData>, di
@@ -1584,7 +1584,7 @@ else
 			.assert segment dosNativeFFD eq udata
 
 		call	DOSVirtMapCheckComponentIsValidDosName
-endif	; _MSLF
+endif	; _LFN
 	LONG	jc	done
 		
 		segmov	ds, es
@@ -1599,7 +1599,7 @@ endif	; _MSLF
 	; If the name is ".", then assume it exists
 	;
 
-if _MSLF
+if _LFN
 		cmp	{word} ds:[dos7FindData].W32FD_fileName[0], '.'
 else
 		cmp	{word} ds:[dosNativeFFD.FFD_name], '.'
@@ -1618,7 +1618,7 @@ endif
 		jne	notParent
 
 		call	DOSGetTimeStamp
-if _MSLF
+if _LFN
 		mov	ds:[dos7FindData].W32FD_modified.MSD7DT_time, cx
 		mov	ds:[dos7FindData].W32FD_modified.MSD7DT_date, dx
 		mov	ds:[dos7FindData].W32FD_fileAttrs.low.low, \
@@ -1650,7 +1650,7 @@ if	GSDOS
 		pop	bx
 endif	;GSDOS
 
-if _MSLF
+if _LFN
 		mov	di, offset dos7FindData
 		mov	si, DOS7_DATE_TIME_MS_DOS_FORMAT
 		mov	dx, offset dos7FindData.W32FD_fileName
@@ -1676,7 +1676,7 @@ else
 		mov	ah, MSDOS_FIND_FIRST
 		call	DOSUtilInt21
 		call	SysUnlockBIOS
-endif	; _MSLF
+endif	; _LFN
 if GSDOS
 		pushf
 		push	bx
@@ -1700,7 +1700,7 @@ foundIt:
 	;
 	; Found it, so copy the DTA into dosNativeFFD.
 	; 
-if not _MSLF
+if not _LFN
 		lea	si, ds:[mapDTA]
 		mov	di, offset dosNativeFFD
 		mov	cx, size dosNativeFFD
@@ -1711,7 +1711,7 @@ endif
 	; (aka FA_GEOS_FILE) set for some files (something to do with file
 	; being sharable or somesuch nonsense) -- ardeb
 	;
-if _MSLF
+if _LFN
 		andnf	ds:[dos7FindData].W32FD_fileAttrs.low.low, not FA_GEOS_FILE
 else
 		andnf	ds:[dosNativeFFD].FFD_attributes, not FA_GEOS_FILE
@@ -1742,7 +1742,7 @@ tryChangeDir:
 	; fails, we can just jump up to done w/o copying anything into
 	; dosNativeFFD since no one will use it...
 	; 
-if _MSLF
+if _LFN
 		mov	dx, offset dos7FindData.W32FD_fileName
 else
 		mov	dx, offset dosNativeFFD.FFD_name
@@ -1762,7 +1762,7 @@ COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 SYNOPSIS:	See if dosNativeFFD.FFD_name is the name of the parent
 		directory (..)
 
-		For _MSLF:
+		For _LFN:
 		Check dos7FindData.W32FD_fileName instead.
 
 CALLED BY:	DOSVirtMapCheckDosName, DOSPathOp
@@ -1786,7 +1786,7 @@ REVISION HISTORY:
 DOSVirtCheckParentDir	proc near
 		.enter
 
-if _MSLF
+if _LFN
 		cmp	{word} es:[dos7FindData].W32FD_fileName[0], '..'
 		jne	done
 		cmp	es:[dos7FindData].W32FD_fileName[2], 0
@@ -1820,7 +1820,7 @@ RETURN:		If found:
 			carry clear
 			mapDTA setup
 
-			For _MSLF:
+			For _LFN:
 			dos7FindData setup instead of mapDTA.
 		Else:
 			carry set
@@ -1927,7 +1927,7 @@ found:				; MUCH less common case.
 	; 
 		call	PathOps_LoadVarSegDS
 		clr	ax
-if _MSLF
+if _LFN
 		mov	ds:[dos7FindData].W32FD_fileAttrs.low.low, al
 		mov	ds:[dos7FindData].W32FD_modified.MSD7DT_time, ax
 		mov	ds:[dos7FindData].W32FD_modified.MSD7DT_date, ax
@@ -1942,7 +1942,7 @@ else
 		mov	ds:[mapDTA].FFD_fileSize.high, ax
 		dec	ax
 		mov	ds:[mapDTA].FFD_dirIndex, ax
-endif	; _MSLF
+endif	; _LFN
 	;
 	; Copy the device name into mapDTA, without the space-padding.
 	; 
@@ -1950,7 +1950,7 @@ endif	; _MSLF
 		mov	si, sp
 		mov	ds, ss:[si+DEVICE_NAME_SIZE]
 		mov	si, dx
-if _MSLF
+if _LFN
 		mov	di, offset dos7FindData.W32FD_fileName
 else
 		mov	di, offset mapDTA.FFD_name
@@ -1986,7 +1986,7 @@ RETURN:		carry set if component not found, or if link
 			dosNativeFFD.FFD_name	= file name
 			(DOS character set, of course)
 
-			For _MSLF:
+			For _LFN:
 			dos7FindData.W32FD_fileName and
 			dos7FindData.W32FD_fileAttrs.low.low also set.
 DESTROYED:	
@@ -2264,7 +2264,7 @@ success::
 		lea	si, ds:[mapDTA]	; ds:si <- source
 		rep	movsb
 
-if _MSLF
+if _LFN
 	;
 	; Need to also copy various fields to dos7FindData, such that both
 	; the short-name code and the long-name code can see the data after
@@ -2284,7 +2284,7 @@ if _MSLF
 		movdw	ds:[dos7FindData].W32FD_fileSizeHigh, axax
 
 		call	DOSUtilCopyFilenameFFDToFindData
-endif	; _MSLF
+endif	; _LFN
 
 		mov	ax, ds:[mapHeaderBuf].DVMCGNH_type
 		mov	ds:[dosFileType], ax
@@ -2340,7 +2340,7 @@ RETURN:		carry set on error:
 			dosNativeFFD.FFD_name set
 			ax	= preserved
 
-			For _MSLF:
+			For _LFN:
 			dos7FindData.W32FD_fileName set instead.
 DESTROYED:	nothing
 
@@ -2511,7 +2511,7 @@ DBCS <		mov	ax, DOS_DOT_FILE_NAME_LENGTH			>
 		jae	checkLeadingComponents
 		
 		xchg	dx, si		; ds:si <- start, ds:dx <- end
-if _MSLF
+if _LFN
 		call	DOSVirtMapCheckComponentIsValidDosLongName
 else
 		call	DOSVirtMapCheckComponentIsValidDosName
@@ -2620,7 +2620,7 @@ RETURN:		carry set if error:
 			dosNativeFFD.FFD_name contains final component in the
 			    native namespace
 
-			For _MSLF:
+			For _LFN:
 			dos7FindData.W32FD_fileName also set.
 DESTROYED:	nothing
 
@@ -2775,7 +2775,7 @@ mapComponent:
 		LocalIsNull	ax	; final component?
 		jnz	nextComponent	; no -- go map the next one
 
-if _MSLF
+if _LFN
 		push	di, ds, es
 
 	;
@@ -2817,7 +2817,7 @@ endif ; ERROR_CHECK
 
 		pop	di, ds, es
 		clc			; return no error
-endif	; _MSLF
+endif	; _LFN
 
 mapError:
 		pop	cx		; recover passed flag. CF and AX
@@ -2853,7 +2853,7 @@ RETURN:		carry set if couldn't map:
 			dosNativeFFD.FFD_name contains native name of final component.
 			DOS CWD set to directory containing it.
 
-			For _MSLF:
+			For _LFN:
 			dos7FindData.W32FD_fileName also set.
 DESTROYED:	nothing
 
@@ -2899,7 +2899,7 @@ RETURN:		carry set if couldn't map it:
 			version  of final component
 			DOS CWD set to directory holding dosNativeFFD.FFD_name
 
-			For _MSLF:
+			For _LFN:
 			dos7FindData.W32FD_fileName also set.
 DESTROYED:	nothing
 
@@ -3172,7 +3172,7 @@ haveAttrArray:
 
 		mov	ds:[FGEAD_attrs].offset, di
 		mov	ds:[FGEAD_attrs].segment, es
-if not _MSLF
+if not _LFN
 	    ;
 	    ; Always set the fptr to the DTA, even if have a handle (why not?)
 	    ; 
@@ -3185,7 +3185,7 @@ else
 	;
 		mov	ds:[FGEAD_fd].segment, dgroup
 		mov	ds:[FGEAD_fd].offset, offset dos7FindData
-endif	; not _MSLF
+endif	; not _LFN
 	;
 	; Set FGEAD_flags. Assume file not open (as there's nothing else to
 	; set up...)
@@ -3367,7 +3367,7 @@ endif
 	CheckHack <GFH_execHeader.EFH_attributes eq 0>
 
 		push	ds
-if _MSLF
+if _LFN
 	;
 	; DOSVirtOpenGeosFileForHeader can only take FileFindDTA, so we copy
 	; the FileAttrs and the filename (which are the only two fields
@@ -3425,7 +3425,7 @@ else
 		segmov	es, ds
 		mov	si, offset FGEAD_header	; es:si <- buffer for read
 		lds	dx, ds:[FGEAD_dta]	; ds:dx <- dta
-endif	; _MSLF
+endif	; _LFN
 		mov	cx, size FGEAD_header + size FGEAD_geodeAttr
 		call	DOSVirtOpenGeosFileForHeader
 		pop	ds
@@ -3802,7 +3802,7 @@ DOSVirtGetAttrModified	proc near
 		test	al, mask FGEAF_HAVE_HANDLE
 		jnz	eaMUseHandle
 		push	es
-if _MSLF
+if _LFN
 		les	bx, ds:[FGEAD_fd]
 		mov	dx, es:[bx].W32FD_modified.MSD7DT_date
 		mov	cx, es:[bx].W32FD_modified.MSD7DT_time
@@ -3864,7 +3864,7 @@ DOSVirtGetAttrFileAttr	proc near
 	; consult our own table for the info, based on the file's SFN.
 	; 
 		push	es
-if _MSLF
+if _LFN
 		les	bx, ds:[FGEAD_fd]
 		test	al, mask FGEAF_HAVE_HANDLE
 		mov	al, es:[bx].W32FD_fileAttrs.low.low
@@ -3929,7 +3929,7 @@ DOSVirtGetAttrSize	proc 	near
 		jnz	useHandle
 		call	DOSVirtGetExtAttrsEnsureHeader
 
-if _MSLF
+if _LFN
 		les	di, ds:[FGEAD_fd]
 EC <		movdw	cxdx, es:[di].W32FD_fileSizeHigh		>
 EC <		Assert	e cx, 0						>
@@ -3943,7 +3943,7 @@ else
 		mov	dx, es:[di].FFD_fileSize.low
 
 		test	es:[di].FFD_attributes, mask FA_SUBDIR
-endif	; _MSLF
+endif	; _LFN
 		jnz	eaSHaveSize
 
 		test	ds:[FGEAD_flags], mask FGEAF_NOT_GEOS
@@ -4129,7 +4129,7 @@ DOSVirtGetAttrUnsupported	proc near
 		mov	ax, 0		; don't biff flags, please
 		mov	dx, ds:[FGEAD_fileHandle]
 		jnz	eaUnsupCallSecondary
-if _MSLF
+if _LFN
 		mov	ax, ds:[FGEAD_fd].segment
 		mov	dx, ds:[FGEAD_fd].offset
 		add	dx, offset W32FD_fileName
@@ -4223,6 +4223,24 @@ endString:
 		stosw			; null-terminate
 
 else
+if HOST_FS_FASTPATH
+	;
+	; Names from the BASEBOX host's long file name calls are in the GEOS
+	; character set already: copy them as they are.
+	;
+		push	ds
+		segmov	ds, dgroup, ax
+		tst	ds:[lfnAvail]
+		pop	ds
+		jz	convertLoop
+copyLoop:
+		lodsb
+		tst	al
+		jz	done
+		stosb
+		loop	copyLoop
+		jmp	done
+endif
 convertLoop:
 		lodsb			;al <- DOS character
 		tst	al		;reached NULL terminator?
@@ -4308,7 +4326,7 @@ eaNDone:
 		.leave
 		ret
 useNative:
-if _MSLF
+if _LFN
 		call	ChooseDosLongOrShortName
 else
 		lds	si, ds:[FGEAD_dta]
@@ -4358,7 +4376,7 @@ DOSVirtGetAttrDosName	proc near
 						;  who's running the thing.
 
 		push	ds, si
-if _MSLF
+if _LFN
 		call	ChooseDosLongOrShortName
 else
 		lds	si, ds:[FGEAD_dta]
@@ -4370,7 +4388,7 @@ endif
 		ret
 DOSVirtGetAttrDosName	endp
 
-if _MSLF
+if _LFN
 
 
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -4425,7 +4443,7 @@ hasName:
 	ret
 ChooseDosLongOrShortName	endp
 
-endif	; _MSLF
+endif	; _LFN
 
 
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -4492,7 +4510,7 @@ addDTAID:
 	; on what was in the FFD from before (well, now based on adding a . to
 	; the current path ID) -- ardeb
 	; 
-if _MSLF
+if _LFN
 		lds	si, ds:[FGEAD_fd]
 		add	si, offset W32FD_fileName
 else

@@ -170,7 +170,7 @@ otherEnsemble	: conview reader term tedit geofile dirls  \
 #		  nimbus vidmem logibus logiser msbus msser \
 #		  disk xms emm nonts epson9 epson24 sound_std
 
-minimalDriver	: nimbus ms4 ntfat os2 cdrom megafile \
+minimalDriver	: nimbus ms4 ntfat os2 cdrom megafile hostfs \
 		  stream dri gdi keyboard modem gdipointer \
 		  standard winnt parallel serial disk vidmem svga \
 		  vga vga8 vga15 vga16 vga24 ega cga mcga hgc att6300 dscga \
@@ -609,7 +609,7 @@ ms4	: Installed/Driver/IFS/DOS/MS4
 Installed/Driver/IFS/DOS/MS4:		kernel MAKEDRV
 
 os2	: Installed/Driver/IFS/DOS/OS2
-Installed/Driver/IFS/DOS/OS2:		kernel MAKEDRV
+Installed/Driver/IFS/DOS/OS2:		kernel hostif MAKEDRV
 
 ntfat	: Installed/Driver/IFS/DOS/NTFat
 Installed/Driver/IFS/DOS/NTFat:		kernel MAKEDRV
@@ -625,6 +625,9 @@ Installed/Driver/IFS/DOS/CDROM:		kernel MAKEDRV
 
 megafile : Installed/Driver/IFS/GEOS/MegaFile
 Installed/Driver/IFS/GEOS/MegaFile:	kernel MAKEDRV
+
+hostfs	: Installed/Driver/IFS/HostFS
+Installed/Driver/IFS/HostFS:		kernel hostif MAKEDRV
 
 gdi	: Installed/Driver/Keyboard/GDI
 Installed/Driver/Keyboard/GDI:		kernel genpc MAKEDRV

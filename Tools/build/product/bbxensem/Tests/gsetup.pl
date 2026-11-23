@@ -444,10 +444,17 @@ my @paths = (
      'c:\\limit\\aaaaaaaa\\bbbbbbbb\\cccccccc\\dddddddd\\eeeeeeee',
      'NET.INI', 'AAAAAAAA\\BBBBBBBB\\CCCCCCCC\\DDDDDDDD\\EEEEEEEE\\BOOT'],
 );
+# Installations with the BASEBOX host file system driver next to MegaFile:
+# GFS.INI then lists it after MegaFile (EC and non-EC name).
+my %hostfs = (DOTS => 'HOSTFSEC.GEO', LIMIT => 'HOSTFS.GEO');
 for my $case (@paths) {
     my ($local, $source, $dos, $ini) = @$case;
     make_path("$tmp/$local");
     distribution($source, 1);
+    if ($hostfs{$local}) {
+        make_path("$tmp/$source/BOOT/SYSTEM/FS");
+        write_file("$source/BOOT/SYSTEM/FS/$hostfs{$local}", "test\r\n");
+    }
     $runner .= "cd \\$local\n";
     $runner .= "z:\\subst E: C:\\\n" if $local eq 'OTHER';
     $runner .= "$dos\\gsetup.exe /WRITEGFS $ini >RESULT.LOG\n";
@@ -515,7 +522,10 @@ for my $case (@paths, ['ROOT', 'DIST', 'c:\\dist', 'NET.INI', 'DIST\\BOOT']) {
     my ($local, $source, $dos, $ini, $boot) = @$case;
     my $folder = $local eq 'ROOT' ? '' : ($local eq 'SAME' ? 'MOVED/' : "$local/");
     my $gfs = read_file("${folder}GFS.INI");
-    for my $entry ("fs = MEGAFILE.GEO", "top = $boot GFS:\\FG",
+    my $fs = $hostfs{$local}
+        ? "fs = {\r\nMEGAFILE.GEO\r\n$hostfs{$local}\r\n}"
+        : "fs = MEGAFILE.GEO";
+    for my $entry ($fs, "top = $boot GFS:\\FG",
                    "ini = $boot\\$ini", "file = $boot\\GFS.IMG",
                    "bootstrapPath = $boot") {
         index($gfs, "$entry\r\n") >= 0 or die "$local: wrong GFS.INI: $gfs\n";
@@ -523,7 +533,8 @@ for my $case (@paths, ['ROOT', 'DIST', 'c:\\dist', 'NET.INI', 'DIST\\BOOT']) {
     for my $line ($gfs =~ /^(?:fs|top|ini|file|bootstrapPath) = (.*)/mg) {
         $line eq uc($line) or die "$local: lowercase path: $line\n";
     }
-    print "PASS: $local uppercase paths ($ini)\n";
+    print "PASS: $local uppercase paths ($ini" .
+        ($hostfs{$local} ? ", with $hostfs{$local}" : '') . ")\n";
 }
 read_file('MOVED/MOVE.LOG') =~ /Startup check complete/
     or die "Moved installation did not keep its normal startup path\n";

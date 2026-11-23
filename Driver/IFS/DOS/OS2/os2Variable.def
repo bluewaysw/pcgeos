@@ -35,8 +35,41 @@ DRIVE_KEY_LETTER_OFFSET equ (($-2)-driveKeyStr)
 
 idata	ends
 
+if _LFN
+;
+; Find emulation without host long file names (os2Lfn.asm): one DTA per
+; search handle.
+;
+LFN_MAX_FINDS	equ	8
+
+LfnFind	struct
+    LF_inUse	BooleanByte		; slot in use
+    LF_required	FileAttrs		; attributes an entry must have (CH)
+    LF_used	word			; last use, for reusing abandoned slots
+    LF_dta	FileFindDTA		; DTA of the classic find
+LfnFind	ends
+endif
+
 udata	segment
 
 maxSector	word	0	; largest sector size for any managed drive
+
+if HOST_FS_FASTPATH
+hostFsAvail	BooleanByte	BB_FALSE ; TRUE if the BASEBOX FS fast path
+					;  is enabled
+hostFsGeneration word	0		; host drive table generation at init
+hostFsVersion	word	0		; HIF_API_FS version of the host
+hostFsFuncMap	byte	HOSTFS_FUNC_MAP_SIZE dup(0)
+					; bit set for each DOS function (AH)
+					;  the host executes; filled in by
+					;  HIF_FS_ENABLE
+endif
+
+if _LFN
+lfnAvail	BooleanByte	BB_FALSE ; TRUE if the host executes the long file
+					;  name calls (else os2Lfn.asm emulates them)
+lfnFindClock	word	0
+lfnFinds	LfnFind	LFN_MAX_FINDS dup(<>)
+endif
 
 udata	ends
