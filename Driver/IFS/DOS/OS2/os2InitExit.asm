@@ -99,6 +99,12 @@ if HOST_FS_FASTPATH
 	;
 		call	OS2HostFsInit
 endif
+if _LFN
+	;
+	; Without long file names from the host, maybe DOS has them.
+	;
+		call	OS2LfnInit
+endif
 
 		call	DOSHookCriticalError
 	;

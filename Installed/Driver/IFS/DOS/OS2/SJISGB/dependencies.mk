@@ -1,29 +1,26 @@
-SJISGB/OS2MANAGER.obj \
-SJISGB/OS2MANAGER.eobj: DOSGEODE.DEF GEOS.DEF HEAP.DEF GEODE.DEF RESOURCE.DEF \
-                EC.DEF LMEM.DEF SYSTEM.DEF LOCALIZE.DEF SLLANG.DEF \
-                DRIVE.DEF DISK.DEF FILE.DEF DRIVER.DEF TIMEDATE.DEF \
-                SEM.DEF TIMER.DEF INITFILE.DEF GCNLIST.DEF \
-                OBJECTS/METAC.DEF OBJECT.DEF CHUNKARR.DEF GEOWORKS.DEF \
-                GRAPHICS.DEF FONTID.DEF FONT.DEF COLOR.DEF \
-                INTERNAL/SEMINT.DEF INTERNAL/INTERRUP.DEF \
-                INTERNAL/DOS.DEF FILEENUM.DEF INTERNAL/FILEINT.DEF \
-                INTERNAL/DRIVEINT.DEF INTERNAL/DISKINT.DEF \
-                INTERNAL/FSD.DEF INTERNAL/LOG.DEF INTERNAL/HEAPINT.DEF \
-                SYSSTATS.DEF INTERNAL/GEODESTR.DEF INTERNAL/FILESTR.DEF \
-                INTERNAL/LOCALINT.DEF CHAR.DEF UNICODE.DEF \
-                INTERNAL/FSDRIVER.DEF INTERNAL/DOSFSDR.DEF \
-                INTERNAL/PRODFEATURES.DEF ASSERT.DEF OS2INTERFACE.DEF \
-                DOSCONSTANT.DEF DOSMACRO.DEF DOSSTRINGS.ASM \
-                DOSVARIABLE.DEF OS2STRINGS.ASM OS2VARIABLE.DEF \
-                DOSENTRY.ASM DOSDISK.ASM DOSDRIVE.ASM OS2DRIVE.ASM \
-                DOSPATH.ASM DOSENUM.ASM DOSFORMAT.ASM DOSFORMATINIT.ASM \
-                DOSDISKCOPY.ASM DOSIO.ASM DOSPRIMARY.ASM DOSINITEXIT.ASM \
-                OS2INITEXIT.ASM DOSCRITICAL.ASM DOSUTILS.ASM OS2UTILS.ASM \
-                DOSVIRTUAL.ASM DOSSUSPEND.ASM DOSLINK.ASM DOSIDLE.ASM \
-                DOSFILECHANGE.ASM DOSCONVERT.ASM DOSCMAPUS.ASM \
-                DOSCMAPMULTI.ASM dosConstantSJIS.def dosConvertSJIS.asm \
-		dosCMapSJIS.asm dosConvertJIS.def dosConvertJIS.asm \
-		dosConvertEUC.asm dosConstantGB.def dosConvertGB.asm \
-		dosCMapGB.asm
+SJISGB/os2Manager.obj \
+SJISGB/os2Manager.eobj: dosGeode.def geos.def heap.def geode.def resource.def \
+                ec.def lmem.def system.def localize.def sllang.def \
+                drive.def disk.def file.def driver.def timedate.def \
+                sem.def timer.def initfile.def gcnlist.def \
+                Objects/metaC.def object.def chunkarr.def geoworks.def \
+                graphics.def fontID.def font.def color.def \
+                Internal/semInt.def Internal/interrup.def \
+                Internal/dos.def fileEnum.def Internal/fileInt.def \
+                Internal/driveInt.def Internal/diskInt.def \
+                Internal/fsd.def Internal/log.def Internal/heapInt.def \
+                sysstats.def Internal/geodeStr.def Internal/fileStr.def \
+                Internal/localInt.def char.def Internal/fsDriver.def \
+                Internal/dosFSDr.def Internal/prodFeatures.def assert.def \
+                os2Interface.def dosLfn.def hostif.def \
+                Internal/hostDosFs.def dosConstant.def dosMacro.def \
+                dosStrings.asm dosVariable.def os2Strings.asm \
+                os2Variable.def dosEntry.asm dosDisk.asm dosDrive.asm \
+                os2Drive.asm dosPath.asm dosEnum.asm dosFormat.asm \
+                dosFormatInit.asm dosDiskCopy.asm dosIO.asm \
+                dosPrimary.asm dosInitExit.asm os2InitExit.asm \
+                dosCritical.asm dosUtils.asm os2Utils.asm os2HostFs.asm \
+                os2Lfn.asm dosVirtual.asm dosSuspend.asm dosLink.asm \
+                dosIdle.asm dosFileChange.asm
 
-SJISGB/OS2EC.geo SJISGB/OS2.geo : GEOS.LDF 
+SJISGB/os2EC.geo SJISGB/os2.geo : geos.ldf hostif.ldf 

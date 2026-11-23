@@ -8,22 +8,31 @@ FILE:		os2Lfn.asm
 ROUTINES:
 	Name			Description
 	----			-----------
-    INT DOSLfnEmulate		Run an INT 21h AX=71xxh call with 8.3 names
+    INT DOSLfnEmulate		Run an INT 21h AX=71xxh call through DOS, or
+				with 8.3 names
     INT LfnFindFirst		714Eh through 4Eh
     INT LfnFindNext		714Fh through 4Fh
     INT LfnFindClose		71A1h
     INT LfnDtaToFindData	Convert a find DTA to WIN32_FIND_DATA
     INT OS2LfnOptions		HIF_FS_ENABLE options for long file names
+    INT OS2LfnInit		See whether DOS offers the LFN API
+    INT OS2LfnWanted		[os2] lfn
 
 DESCRIPTION:
 	The OS2 driver is built with the long file name code (_LFN), which
-	uses the MS-DOS 7 API (INT 21h AX=71xxh) throughout. Under
-	pcgeos-basebox the host executes those calls with long names
-	(HIF_API_FS version 2, see os2HostFs.asm). Everywhere else - real
-	DOS, DOSBox without the fast path, or with [os2] lfn = false - they
-	reach DOSUtilInt21 unexecuted and are emulated here with the
-	classic calls, i.e. with 8.3 names, the way the driver has always
-	worked.
+	uses the MS-DOS 7 API (INT 21h AX=71xxh) throughout. The calls are
+	served, in this order, by:
+
+	1. the pcgeos-basebox host (HIF_API_FS version 2, see
+	   os2HostFs.asm), with names in the GEOS character set;
+	2. DOS itself, when it offers the LFN API (dosemu2, DOSBox-X with
+	   lfn=true, DOSLFN, the Windows 9x DOS box): passed through, names
+	   in the DOS code page as usual;
+	3. emulation here with the classic calls, i.e. with 8.3 names, the
+	   way the driver has always worked - on DOS without LFN, and on
+	   drives where DOS answers a call with AX = 7100h.
+
+	[os2] lfn = false in GEOS.INI turns 1 and 2 off.
 
 	Most calls map one to one onto a classic call with the same
 	registers; those only get AX rewritten and then go through
@@ -33,6 +42,13 @@ DESCRIPTION:
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 
 if _LFN
+
+;
+; Search handles of emulated finds: kept apart from DOS's own LFN search
+; handles, so 714Fh and 71A1h find the right owner when DOS serves some
+; drives and the emulation others.
+;
+LFN_HANDLE_BASE		equ	0ef00h
 
 Resident	segment	resource
 
@@ -66,6 +82,57 @@ REVISION HISTORY:
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 DOSLfnEmulate	proc	near
+	;
+	; If DOS offers the LFN API, let it do the call. AX = 7100h back
+	; means DOS doesn't do it (for this drive): emulate. Searches the
+	; emulation started stay with it.
+	;
+		push	ds
+		segmov	ds, dgroup
+		tst	ds:[lfnDos]
+		pop	ds
+		jz	emulate
+		cmp	al, MSDOS_FIND_NEXT
+		je	checkHandle
+		cmp	al, 0a1h		; find close
+		jne	tryDos
+checkHandle:
+		call	LfnIsOwnHandle
+		jc	emulate
+tryDos:
+	;
+	; Some LFN implementations (DOSBox-X) also write classic search data
+	; into the current DTA, which may point anywhere by now: give them
+	; the driver's own scratch DTA for find first/next.
+	;
+		cmp	al, MSDOS_FIND_FIRST
+		je	privateDTA
+		cmp	al, MSDOS_FIND_NEXT
+		jne	callDos
+privateDTA:
+		call	LfnScratchDTA
+callDos:
+		push	ax
+		stc
+		call	FileInt21
+		jc	dosFailed
+		cmp	ax, 7100h		; older DOS: no carry for unknown
+		je	notByDos		;  functions
+		inc	sp			; drop the saved ax (keeps CF)
+		inc	sp
+		clc
+		jmp	handled
+dosFailed:
+		cmp	ax, 7100h
+		je	notByDos
+		inc	sp
+		inc	sp
+		stc				; ax = DOS's error code
+		jmp	handled
+notByDos:
+		pop	ax			; registers are as passed again
+
+emulate:
 		cmp	al, MSDOS_CREATE_DIR
 		je	sameRegs
 		cmp	al, MSDOS_DELETE_DIR
@@ -209,14 +276,14 @@ haveSlot:
 		pop	es, di
 		call	LfnDtaToFindData
 	;
-	; Search handle = slot number + 1.
+	; Search handle = LFN_HANDLE_BASE + slot number + 1.
 	;
 		mov	ax, si
 		sub	ax, offset lfnFinds
 		mov	cl, size LfnFind
 		div	cl
 		clr	ah
-		inc	ax
+		add	ax, LFN_HANDLE_BASE + 1
 		clr	cx
 		clc
 		jmp	done
@@ -323,9 +390,9 @@ LfnSlotForHandle proc	near
 		uses	ax, dx
 		.enter
 		mov	ax, bx
-		dec	ax
+		sub	ax, LFN_HANDLE_BASE + 1
 		cmp	ax, LFN_MAX_FINDS
-		jae	bad			; also catches handle 0
+		jae	bad			; also catches DOS's handles
 		mov	dx, size LfnFind
 		mul	dx
 		add	ax, offset lfnFinds
@@ -340,6 +407,63 @@ done:
 		.leave
 		ret
 LfnSlotForHandle endp
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		LfnIsOwnHandle
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Is a search handle one of the emulation's?
+
+PASS:		bx	= search handle
+RETURN:		carry set if it is
+DESTROYED:	nothing
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+LfnIsOwnHandle	proc	near
+		uses	si, ds
+		.enter
+		segmov	ds, dgroup, si
+		call	LfnSlotForHandle	; carry clear if it is ours
+		cmc
+		.leave
+		ret
+LfnIsOwnHandle	endp
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		LfnScratchDTA
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Point DOS's DTA at the driver's scratch DTA before a find
+		passed through to DOS.
+
+PASS:		nothing
+RETURN:		nothing
+DESTROYED:	nothing
+
+PSEUDO CODE/STRATEGY:
+	DOSBox-X's LFN finds write classic search data into the current
+	DTA too; without this they overwrote whatever buffer the driver
+	last used as DTA (KS_ILLEGAL_HANDLE at boot). The driver sets its
+	DTA itself before every classic find, so nothing needs restoring.
+
+	(DOSBox-X also takes an entry of the program's JFT for every open
+	LFN search, behind the driver's JFT accounting. The driver only
+	holds JFT entries during single operations, so this only matters
+	if a search is open while all other entries are in use.)
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+LfnScratchDTA	proc	near
+		uses	ax, dx, ds
+		.enter
+		segmov	ds, dgroup, ax
+		mov	dx, offset lfnScratchDTA
+		mov	ah, MSDOS_SET_DTA
+		call	FileInt21
+		.leave
+		ret
+LfnScratchDTA	endp
 
 
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -470,23 +594,104 @@ os2CatStr	char	'os2', 0
 lfnKeyStr	char	'lfn', 0
 
 OS2LfnOptions	proc	near
-		uses	ax, cx, dx, si, ds
 		.enter
 		cmp	ax, HOSTFS_API_VERSION_LFN
 		jb	done
-		segmov	ds, cs, cx		; ds:si <- category
-		mov	si, offset os2CatStr	; cx:dx <- key
-		mov	dx, offset lfnKeyStr
-		call	InitFileReadBoolean	; carry set if not there
-		jc	wantLfn			; default: on
-		tst	ax
-		jz	done			; lfn = false
-wantLfn:
+		call	OS2LfnWanted
+		jc	done
 		ornf	di, HOSTFS_OPT_LFN
 done:
 		.leave
 		ret
 OS2LfnOptions	endp
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		OS2LfnWanted
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Are long file names wanted? GEOS.INI [os2] lfn, default on.
+
+PASS:		nothing
+RETURN:		carry set if [os2] lfn = false
+DESTROYED:	nothing
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+OS2LfnWanted	proc	near
+		uses	ax, cx, dx, si, ds
+		.enter
+		segmov	ds, cs, cx		; ds:si <- category
+		mov	si, offset os2CatStr	; cx:dx <- key
+		mov	dx, offset lfnKeyStr
+		call	InitFileReadBoolean	; carry set if not there
+		jc	wanted			; default: on
+		tst	ax
+		jnz	wanted
+		stc				; lfn = false
+		jmp	done
+wanted:
+		clc
+done:
+		.leave
+		ret
+OS2LfnWanted	endp
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		OS2LfnInit
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	See whether DOS itself offers the long file name API, for
+		when the BASEBOX host doesn't provide long file names.
+
+CALLED BY:	OS2Init, after OS2HostFsInit
+PASS:		nothing
+RETURN:		nothing (lfnDos set)
+DESTROYED:	nothing
+
+PSEUDO CODE/STRATEGY:
+	Ask for the volume information (71A0h) of the default drive's
+	root. A DOS without the API answers AX = 7100h (older ones without
+	setting the carry); any other answer, even an error for that drive,
+	means the API is there.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+OS2LfnInit	proc	near
+rootName	local	4 dup(char)
+fsName		local	16 dup(char)
+		uses	ax, bx, cx, dx, di, ds, es
+		.enter
+		segmov	ds, dgroup, ax
+		tst	ds:[lfnAvail]
+		jnz	done			; the host serves them
+		call	OS2LfnWanted
+		jc	done
+
+		mov	ah, MSDOS_GET_DEFAULT_DRIVE
+		call	FileInt21		; al <- drive (0 = A)
+		add	al, 'A'
+		mov	ss:[rootName][0], al
+		mov	ss:[rootName][1], ':'
+		mov	ss:[rootName][2], '\\'
+		mov	ss:[rootName][3], 0
+
+		segmov	ds, ss, ax
+		lea	dx, ss:[rootName]
+		segmov	es, ss, ax
+		lea	di, ss:[fsName]
+		mov	cx, size fsName
+		mov	ax, 71a0h		; get volume information
+		stc
+		call	FileInt21
+		cmp	ax, 7100h
+		je	done			; DOS doesn't know the API
+	;
+		segmov	ds, dgroup, ax
+		mov	ds:[lfnDos], BB_TRUE
+done:
+		.leave
+		ret
+OS2LfnInit	endp
 
 Init		ends
 
