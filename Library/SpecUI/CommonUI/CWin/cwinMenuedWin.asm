@@ -1107,6 +1107,46 @@ bail:	;forget it!
 
 10$:	;minimize window: enable icon, make this object unusable
 
+if _MOTIF and not _NO_WIN_ICONS
+	;
+	; Copy the document title before hiding the primary releases its target
+	; and frees the title. Keep only the temporary chunk handle on the stack.
+	;
+if TOOL_AREA_IS_TASK_BAR
+		push	ds
+		segmov	ds, dgroup
+		test	ds:[taskBarPrefs], mask TBF_ENABLED
+		pop	ds
+		jnz	noDocumentCaption
+endif
+		cmp	ds:[di].OLWI_type, MOWT_PRIMARY_WINDOW
+		jne	noDocumentCaption
+		mov	ax, HINT_DISPLAY_USE_APPLICATION_MONIKER_WHEN_MINIMIZED
+		call	ObjVarFindData
+		jc	noDocumentCaption
+		mov	ax, MSG_GEN_PRIMARY_GET_LONG_TERM_MONIKER
+		call	ObjCallInstanceNoLock
+		tst	ax
+		jz	saveDocumentCaption
+		mov	di, ax
+		mov	di, ds:[di]
+		test	ds:[di].VM_type, mask VMT_GSTRING or mask VMT_MONIKER_LIST
+		jnz	noDocumentCaption
+		LocalIsNull	ds:[di].VM_data.VMT_text
+		jz	noDocumentCaption
+
+		mov	bp, ax			;source moniker chunk
+		mov	cx, ds:[LMBH_handle]	;copy into this object block
+		clr	ax, bx, dx, di		;copy the complete chunk
+		call	UserCopyChunkOut
+		jmp	saveDocumentCaption
+noDocumentCaption:
+		clr	ax
+saveDocumentCaption:
+		push	ax
+		call	WinClasses_DerefVisSpec_DI
+endif
+
 	ORNF	ds:[di].OLWI_specState, mask OLWSS_MINIMIZED
 					;set flag: this window is minimized
 					;(not really important, since window
@@ -1235,7 +1275,9 @@ endif
 
 	; Tell the icon which monikers to use for icon and icon caption
 
+if not _MOTIF
 	call	OLMenuedWinSendIconMonikers
+endif
 
 	;When this object is generic->specific built, the BUILD_INFO query
 	;will be sent up the generic tree to find a generic parent for the icon.
@@ -1243,6 +1285,26 @@ endif
 OMWGSM_50: ;make the Icon SA_REALIZABLE so will appear on-screen.
 	  ;(We can touch specific-visible state data since we have created
 	  ;this generic object.)
+
+if _MOTIF
+	;
+	; Refresh both new and reused icons. The icon copies the caption, so
+	; its text survives the temporary chunk. Keep the normal source optr.
+	;
+		pop	ax			;temporary document caption, or zero
+		push	ax
+		call	WinClasses_DerefVisSpec_DI
+		pushdw	ds:[di].OLMDWI_iconCaptionMoniker
+		tst	ax
+		jz	sendIconCaption
+		mov	ds:[di].OLMDWI_iconCaptionMoniker.chunk, ax
+		mov	ax, ds:[LMBH_handle]
+		mov	ds:[di].OLMDWI_iconCaptionMoniker.handle, ax
+sendIconCaption:
+		call	OLMenuedWinSendIconMonikers
+		call	WinClasses_DerefVisSpec_DI
+		popdw	ds:[di].OLMDWI_iconCaptionMoniker
+endif
 
 	mov	ax, MSG_OL_WIN_ICON_SET_USABLE
 	call	OLMenuedWinCallIconObject
@@ -1265,6 +1327,16 @@ OMWGSM_50: ;make the Icon SA_REALIZABLE so will appear on-screen.
 	call	OLMenuedWinCallIconObject
 
 afterNoIconsBecauseOfTaskbar: ;if TOOL_AREA_IS_TASK_BAR
+if _MOTIF
+	;
+	; The icon owns its copy. No temporary caption is needed after this call.
+	;
+		pop	ax
+		tst	ax
+		jz	captionFreed
+		call	ObjFreeChunk
+captionFreed:
+endif
 endif	; if not _NO_WIN_ICONS ------------------------------------------------
 
 
