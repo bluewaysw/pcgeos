@@ -1210,6 +1210,14 @@ done:
 		ret
 
 readOne:
+	;
+	; Some paths get here after InitFileReadLowerString or
+	; InitFileBuildMergedStringBlock, which destroy ds:si and cx:dx:
+	; reload the category and key, or a key that is only in the primary
+	; .ini file would be looked up with garbage and not be found.
+	;
+		lds	si, ss:[catString]
+		movdw	cxdx, ss:[keyString]
 		push	bp
 		mov	bp, ss:[readFlags]
 		call	InitFileReadString

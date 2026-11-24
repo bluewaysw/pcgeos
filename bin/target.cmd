@@ -36,7 +36,7 @@ IF DEFINED GEOS_CDROM_DRIVE (
       echo imgmount r "%GEOS_CDROM_DRIVE%" -t iso >> ensemble\init.bat
    )
 )
-IF EXIST ensemble\geos\init.bat (
+IF EXIST ensemble\init.bat (
    echo swatgo >> ensemble\init.bat
 )
 start /B %BASEBOX% -conf %ROOT_DIR%\bin\basebox.conf -conf %LOCAL_ROOT%\basebox_user.conf -noconsole >nul 2>&1 
