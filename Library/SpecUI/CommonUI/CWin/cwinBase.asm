@@ -1584,7 +1584,11 @@ OLS  <	cmp	ds:[di].OLWI_type, OLWT_BASE_WINDOW		>
 	mov	dx, ds:[di].GPI_longTermMoniker
 	.warn	@private
 	tst	dx
+if TOOL_AREA_IS_TASK_BAR
+	jz	keepMinimizedMoniker
+else
 	jz	getTextMoniker
+endif
 	mov	di, dx
 	mov	di, ds:[di]
 	test	ds:[di].VM_type, mask VMT_GSTRING or mask VMT_MONIKER_LIST
@@ -1593,6 +1597,29 @@ OLS  <	cmp	ds:[di].OLWI_type, OLWT_BASE_WINDOW		>
 	jz	getTextMoniker
 	mov	cx, ds:[LMBH_handle]
 	jmp	getIconMoniker
+
+if TOOL_AREA_IS_TASK_BAR
+keepMinimizedMoniker:
+	;
+	; Closing the minimized branch releases the document's target reference
+	; and clears the primary's document title. Keep the entry's own copy.
+	;
+		call	AA_DerefVisSpec_DI
+		test	ds:[di].OLWI_specState, mask OLWSS_MINIMIZED
+		jz	getTextMoniker
+
+	;
+	; A primary that starts minimized still needs its first moniker.
+	;
+		push	si
+		movdw	bxsi, ds:[di].OLBWI_windowListEntry
+		mov	ax, MSG_GEN_GET_VIS_MONIKER
+		mov	di, mask MF_CALL or mask MF_FIXUP_DS
+		call	ObjMessage
+		pop	si
+		tst	ax
+		LONG	jnz done
+endif
 
 getTextMoniker:
 	mov	bp, (VMS_TEXT shl offset VMSF_STYLE)
@@ -3608,6 +3635,12 @@ OLBaseWinDisplaySetNotMinimized	method dynamic OLBaseWinClass,
 	call	ObjCallSuperNoLock
 
 if TOOL_AREA_IS_TASK_BAR
+	;
+	; Refresh the saved title on restore, including when no document remains.
+	;
+		mov	ax, MSG_OL_BASE_WIN_SET_WINDOW_ENTRY_MONIKER
+		call	ObjCallInstanceNoLock
+
 	;
 	; if TaskBar == off
 	; RUNTIME
