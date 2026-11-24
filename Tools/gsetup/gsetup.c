@@ -212,6 +212,7 @@ static int _pascal WriteGfsIni(const char *iniNameP)
     char *pathP;
     unsigned rootLength;
     unsigned attributes;
+    unsigned oldAttributes;
     unsigned error;
     unsigned length;
     unsigned written;
@@ -251,6 +252,12 @@ static int _pascal WriteGfsIni(const char *iniNameP)
         goto badPath;
     }
 
+    /* These lower INI files are read-only as a hint to the user. */
+    if (!(attributes & _A_RDONLY) &&
+        _dos_setfileattr(ownPath, attributes | _A_RDONLY) != 0) {
+        fprintf(stderr, "WARNING: Cannot set %s read-only.\r\n", ownPath);
+    }
+
     rootLength = strlen(cwdPath);
     pathP = bootPath;
     if (strncmp(bootPath, cwdPath, rootLength) == 0 &&
@@ -284,11 +291,15 @@ static int _pascal WriteGfsIni(const char *iniNameP)
     }
 
     /* A BOOT path of at most 58 characters keeps this below 600 bytes. */
+    strcpy(gfsText,
+        "; Do not change this file by hand.\r\n"
+        "; An update will overwrite changes.\r\n\r\n");
+    length = strlen(gfsText);
     if (hostfsP != 0) {
-        sprintf(gfsText, "[system]\r\nfs = {\r\nMEGAFILE.GEO\r\n%s\r\n}\r\n\r\n",
+        sprintf(gfsText + length, "[system]\r\nfs = {\r\nMEGAFILE.GEO\r\n%s\r\n}\r\n\r\n",
             hostfsP);
     } else {
-        strcpy(gfsText, "[system]\r\nfs = MEGAFILE.GEO\r\n\r\n");
+        strcpy(gfsText + length, "[system]\r\nfs = MEGAFILE.GEO\r\n\r\n");
     }
     length = strlen(gfsText);
     sprintf(gfsText + length,
@@ -298,10 +309,10 @@ static int _pascal WriteGfsIni(const char *iniNameP)
         pathP, pathP, iniNameP, pathP, pathP);
     length = strlen(gfsText);
 
-    error = _dos_getfileattr("GFS.INI", &attributes);
+    error = _dos_getfileattr("GFS.INI", &oldAttributes);
     haveOld = error == 0;
     if ((error != 0 && error != 2) ||
-        (haveOld && (attributes & (_A_RDONLY | _A_SUBDIR)))) {
+        (haveOld && (oldAttributes & _A_SUBDIR))) {
         goto fileError;
     }
 
@@ -323,8 +334,15 @@ static int _pascal WriteGfsIni(const char *iniNameP)
         if (remove(comspecPath) != 0 || closeError != 0) {
             goto removeTemp;
         }
+
+        /* Allow activation to replace a previously protected GFS.INI. */
+        if ((oldAttributes & _A_RDONLY) &&
+            _dos_setfileattr("GFS.INI", oldAttributes & ~_A_RDONLY) != 0) {
+            fputs("WARNING: Cannot clear read-only on GFS.INI.\r\n", stderr);
+        }
+        pathP = "GFS.INI";
         if (rename("GFS.INI", comspecPath) != 0) {
-            goto removeTemp;
+            goto restoreAttributes;
         }
     }
 
@@ -332,13 +350,23 @@ static int _pascal WriteGfsIni(const char *iniNameP)
         if (haveOld && rename(comspecPath, "GFS.INI") != 0) {
             fprintf(stderr, "ERROR: Previous GFS.INI is saved as %s.\r\n",
                     comspecPath);
+            pathP = comspecPath;
+        }
+        if (haveOld) {
+            goto restoreAttributes;
         }
         goto removeTemp;
+    }
+    if (_dos_getfileattr("GFS.INI", &attributes) != 0 ||
+        (!(attributes & _A_RDONLY) &&
+         _dos_setfileattr("GFS.INI", attributes | _A_RDONLY) != 0)) {
+        fputs("WARNING: Cannot set GFS.INI read-only.\r\n", stderr);
     }
     if (haveOld && remove(comspecPath) != 0) {
         fprintf(stderr, "ERROR: Cannot remove GFS.INI backup %s.\r\n",
                 comspecPath);
-        return 1;
+        pathP = comspecPath;
+        goto restoreAttributes;
     }
     return 0;
 
@@ -347,6 +375,11 @@ badPath:
           stderr);
     return 1;
 
+restoreAttributes:
+    if ((oldAttributes & _A_RDONLY) &&
+        _dos_setfileattr(pathP, oldAttributes) != 0) {
+        fprintf(stderr, "WARNING: Cannot restore attributes on %s.\r\n", pathP);
+    }
 removeTemp:
     (void)remove(cwdPath);
 fileError:
