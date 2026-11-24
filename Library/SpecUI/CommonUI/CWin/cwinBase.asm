@@ -1572,6 +1572,55 @@ OLBaseWinSetWindowEntryMoniker	method OLBaseWinClass,
 	tst	ds:[di].OLBWI_windowListEntry.handle
 	LONG 	jz done
 
+	;
+	; Prefer a primary's document title, keeping the usual name as fallback.
+	;
+CUAS <	cmp	ds:[di].OLWI_type, MOWT_PRIMARY_WINDOW		>
+OLS  <	cmp	ds:[di].OLWI_type, OLWT_BASE_WINDOW		>
+	jne	getTextMoniker
+	mov	di, ds:[si]
+	add	di, ds:[di].Gen_offset
+	.warn	-private
+	mov	dx, ds:[di].GPI_longTermMoniker
+	.warn	@private
+	tst	dx
+if TOOL_AREA_IS_TASK_BAR
+	jz	keepMinimizedMoniker
+else
+	jz	getTextMoniker
+endif
+	mov	di, dx
+	mov	di, ds:[di]
+	test	ds:[di].VM_type, mask VMT_GSTRING or mask VMT_MONIKER_LIST
+	jnz	getTextMoniker
+	LocalIsNull	ds:[di].VM_data.VMT_text
+	jz	getTextMoniker
+	mov	cx, ds:[LMBH_handle]
+	jmp	getIconMoniker
+
+if TOOL_AREA_IS_TASK_BAR
+keepMinimizedMoniker:
+	;
+	; Closing the minimized branch releases the document's target reference
+	; and clears the primary's document title. Keep the entry's own copy.
+	;
+		call	AA_DerefVisSpec_DI
+		test	ds:[di].OLWI_specState, mask OLWSS_MINIMIZED
+		jz	getTextMoniker
+
+	;
+	; A primary that starts minimized still needs its first moniker.
+	;
+		push	si
+		movdw	bxsi, ds:[di].OLBWI_windowListEntry
+		mov	ax, MSG_GEN_GET_VIS_MONIKER
+		mov	di, mask MF_CALL or mask MF_FIXUP_DS
+		call	ObjMessage
+		pop	si
+		tst	ax
+		LONG	jnz done
+endif
+
 getTextMoniker:
 	mov	bp, (VMS_TEXT shl offset VMSF_STYLE)
 	clc				;check window's moniker list
@@ -1721,8 +1770,6 @@ OLBaseWinCreateCombinationMoniker	proc	far
 combMkr		local	optr		push	bp, 0
 iconMkr		local	optr		push	bx, di
 textMkr		local	optr		push	cx, dx
-iconWidth	local	word
-iconHeight	local	word
 	uses	ax, bx, si, di, es
 	.enter
 
@@ -3589,6 +3636,12 @@ OLBaseWinDisplaySetNotMinimized	method dynamic OLBaseWinClass,
 
 if TOOL_AREA_IS_TASK_BAR
 	;
+	; Refresh the saved title on restore, including when no document remains.
+	;
+		mov	ax, MSG_OL_BASE_WIN_SET_WINDOW_ENTRY_MONIKER
+		call	ObjCallInstanceNoLock
+
+	;
 	; if TaskBar == off
 	; RUNTIME
 	;
@@ -4854,6 +4907,13 @@ OLBaseWinUseLongTermMoniker	method	dynamic OLBaseWinClass, \
 					;should we set title area also invalid
 					;in case moniker is getting smaller?
 	call	OpenWinHeaderMarkInvalid
+if TOOL_AREA_IS_TASK_BAR or WINDOW_LIST_ACTIVE
+	;
+	; Refresh the entry even when the document title has been removed.
+	;
+	mov	ax, MSG_OL_BASE_WIN_SET_WINDOW_ENTRY_MONIKER
+	call	ObjCallInstanceNoLock
+endif
 done:
 	ret
 OLBaseWinUseLongTermMoniker	endm
