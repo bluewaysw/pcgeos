@@ -821,7 +821,15 @@ Boolean _pascal fjpeg_finish_decompress (j_decompress_ptr cinfo)
 // free all allocated buffers
 void _pascal fjpeg_destroy_decompress (j_decompress_ptr cinfo)
 {
-   freeall(cinfo);
+    int ci;
+
+    for (ci = 0; ci < MAX_COMPONENTS; ci++) {
+        if (cinfo->main.bufferH[ci] != NullHandle) {
+            MemFree(cinfo->main.bufferH[ci]);
+            cinfo->main.bufferH[ci] = NullHandle;
+        }
+    }
+    freeall(cinfo);
 }
 
 
@@ -830,16 +838,61 @@ JDIMENSION _pascal fjpeg_read_scanlines (j_decompress_ptr cinfo,
                                         JSAMPARRAY scanlines,
 					JDIMENSION max_lines)
 {
-  volatile JDIMENSION retval;
-  PUSHDS;
-  GeodeLoadDGroup(GeodeGetCodeProcessHandle());
+    volatile JDIMENSION retval = 0;
+    JSAMPARRAY rowsP;
+    word rowSize;
+    int ci, i, rowCount;
 
-  /* need switch as soon as progressive supported !!! */
+    if (cinfo->main.bufferH[0] == NullHandle) {
+        set_error(cinfo, cinfo->global_state == DSTATE_SCANNING ?
+                  JERR_MEMFULL : JERR_BAD_STATE);
+        return 0;
+    }
+    for (ci = 0; ci < cinfo->num_components; ci++) {
+        if (cinfo->main.bufferH[ci] == NullHandle) {
+            set_error(cinfo, JERR_MEMFULL);
+            goto cleanup;
+        }
+        rowsP = MemLock(cinfo->main.bufferH[ci]);
+        if (rowsP == (void *)0) {
+            set_error(cinfo, JERR_MEMFULL);
+            goto cleanup;
+        }
+        rowSize = cinfo->comp_info[ci].width_in_blocks *
+                  cinfo->comp_info[ci].DCT_scaled_size;
+        rowCount = cinfo->comp_info[ci].v_samp_factor *
+                   cinfo->comp_info[ci].DCT_scaled_size;
+        for (i = 0; i < rowCount; i++) {
+            rowsP[i] = (JSAMPROW)(rowsP + rowCount) + i * rowSize;
+        }
+        cinfo->main.buffer[ci] = rowsP;
+        /* Full-size components retain this alias across partial row groups. */
+        if (cinfo->upsample.methods[ci] == NU_FULL_US) {
+            cinfo->upsample.color_buf[ci] = rowsP +
+                cinfo->main.rowgroup_ctr * cinfo->upsample.rowgroup_height[ci];
+        }
+    }
+    PUSHDS;
+    GeodeLoadDGroup(GeodeGetCodeProcessHandle());
 
-  retval = jpeg_read_scanlines_a (cinfo, scanlines, max_lines);
+    /* need switch as soon as progressive supported !!! */
 
-  POPDS;
-  return retval;
+    retval = jpeg_read_scanlines_a (cinfo, scanlines, max_lines);
+
+    POPDS;
+cleanup:
+    /* ATTENTION: still locked during streamed reads inside the decoder.
+     * Releasing them there requires locks around the IDCT/upsampling phases.
+     */
+    while (ci > 0) {
+        ci--;
+        cinfo->main.buffer[ci] = (void *)0;
+        if (cinfo->upsample.methods[ci] == NU_FULL_US) {
+            cinfo->upsample.color_buf[ci] = (void *)0;
+        }
+        MemUnlock(cinfo->main.bufferH[ci]);
+    }
+    return retval;
 }
 
 

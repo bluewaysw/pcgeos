@@ -64,9 +64,7 @@ HyphenOpen	proc	far
 	uses	bx,cx,dx,si,di,bp,ds,es
  	.enter
 
-	call 	FILEPUSHDIR			; push the directory
-	jmp	markStatusError
-	
+	; HyphenSetPath pushes the directory once; exit pops it once.
 	call	HyphenSetPath			; set the directory
 
 	;
@@ -81,7 +79,7 @@ HyphenOpen	proc	far
 			or mask HF_SWAPABLE or mask HF_SHARABLE
 	mov	bx, handle 0		
 	call	MemAllocSetOwner	; bx=block,ax=seg,cx destroyed	
-	jc	markStatusError		; exit on error
+LONG	jc	markStatusError		; exit on error
 
 	mov	es:[anIHBuffHandle], bx	; save the block handle
 	mov	es, ax			; es:0 -> IHBuff
@@ -165,7 +163,7 @@ NOFXIP<	pushdw	csdi			;push ptr -> null string	>
 	
 	clr	di
 	pushdw	esdi				; push ptr -> anIHBuff on stack
-	;call	IHhyp				; ax = non-zero if error
+	call	IHhyp				; ax = non-zero if error
 FXIP <	pop	di				; restore the stack	>
 
 	;
@@ -175,7 +173,16 @@ FXIP <	pop	di				; restore the stack	>
 	mov	es, cx
 	mov	bx, es:[anIHBuffHandle]
 	call	MemUnlock
+	tst	ax
+	jz	openSucceeded
+	; The adapter releases its own state on failure; free the ABI block.
+	push	ax
+	call	MemFree
+	pop	ax
+	clr	es:[anIHBuffHandle]
+	jmp	exit
 
+openSucceeded:
 	;
 	; Mark that hyphen has been opened
 	;
@@ -202,7 +209,7 @@ SBCS <nullString	char	0		; null for hyphenPathName>
 DBCS <nullString	wchar	0		; null for hyphenPathName>
 endif
 
-fileName	char	"hecdp301.dat",0	; only used as SBCS string
+fileName	char	"EN_US.HYP",0	; only used as SBCS string
 
 
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -280,7 +287,7 @@ lengthOK:
 
 	mov	cx, ax			; cx = mem block
 	mov	dx, bx			; ^hdx = mem block
-	pop	es,ds,si,bx,di,ax	; all other params unchanged
+	pop	es,ds,si,di,bx,ax	; restore matching push order
 
 	;
 	; Borrow space on the stack
@@ -377,7 +384,7 @@ REVISION HISTORY:
 HyphenateDoWork		proc	near
 	uses	bx, cx, dx, bp, di, si, es, ds
 
-	convertedWord		local	MAX_WORD_LENGTH dup(char)
+	convertedWord		local	(MAX_WORD_LENGTH+1) dup(char)
 	minWordLength		local	word
 	wordLength		local	word
 
@@ -436,7 +443,7 @@ endif
 LONG	jl	dontHyphenate
 
 	;
-	; Call SLcnv to convert word to DEC character set
+	; SLcnv preserves GEOS SBCS bytes for the new open dictionary format.
 	;
 	push 	cx				; push ptr-> word
 	push	dx
@@ -451,7 +458,7 @@ LONG	jl	dontHyphenate
 	mov	ax, PC_TO_DEC			; direction to convert
 	push	ax
 
-	;call	SLcnv
+	call	SLcnv
 
 	;
 	; Set up the parameters to call IHhyp() - lock the IHBuff
@@ -465,6 +472,7 @@ LONG	jl	dontHyphenate
 	;
 	; Push parameters to IHhyp (in reverse order)
 	;
+	push	es				; C may destroy ES; keep the locked IHBuff segment
 	push	ss				; push ptr-> converted word
 	lea	ax, convertedWord
 	push	ax
@@ -474,19 +482,20 @@ LONG	jl	dontHyphenate
 	clr	ax
 	push	ax
 
-	;call	IHhyp				; ax = success/fail
+	call	IHhyp				; ax = success/fail
+	pop	es
 	tst	ax				;
 	jnz	errorExit
 
 	;
 	; Allocate the hyphenation point array
 	;
-	mov	ax, MAX_HYPHENATION_POINTS + size HyphenationPoints
-	mov	cx, ((mask HAF_ZERO_INIT or mask HAF_LOCK or mask HAF_NO_ERR) \
+	mov	ax, MAX_HYPHENATION_POINTS + 1 + size HyphenationPoints
+	mov	cx, ((mask HAF_ZERO_INIT or mask HAF_LOCK) \
 			shl 8) or mask HF_SWAPABLE
 	mov	bx, handle 0
 	call	MemAllocSetOwner	; bx=block,ax=seg,cx destroyed
-	jc	dontHyphenate
+	jc	errorExit		; release the locked IHBuff on allocation failure
 	push	bx
 
 	push	ds
@@ -586,7 +595,7 @@ HyphenClose	proc	far
 	mov	ax, segment udata
 	mov	es, ax
 	tst	es:[hyphenStatus]
-	jz	noClose
+	jnz	noClose			; zero means the database opened successfully
 	;
 	; If the database was never opened, don't close it
 	;
@@ -616,7 +625,7 @@ NOFXIP<	push	di						>
 	clr	ax
 	push	ax
 
-	;call	IHhyp				; ax = success/fail indicator
+	call	IHhyp				; ax = success/fail indicator
 FXIP <	pop	di						>
 	;
 	; Free the IHBuff block
@@ -633,6 +642,8 @@ noClose:
 	mov	cx, segment udata
 	mov	es, cx
 	clr	es:[hyphenOpened]
+	clr	es:[anIHBuffHandle]
+	clr	ax				; close and no-op close both succeed
 	call 	FILEPOPDIR			; restore the directory path
 
 	.leave
@@ -677,26 +688,21 @@ BitsToBytes	proc	near
 	mov	di, dx
 	mov	cx, 4			; cx = number of words to check
 	clr	dx			; dx = position of current bit
-	mov	bp, 1			; bp = bitmask
 wordLoop:
-	mov	bx, es:[di]		; bx = next word
+	mov	bx, es:[di]		; bx = next word, most significant bit first
+	mov	bp, 16			; visit every bit, including each sixteenth bit
 bitLoop:
-	ror	bp, 1			; rotate the set bit one to the right
-	cmp	bp, 1			; when it's back to 1, done with word
-	je	endBitLoop
-	inc	dx
-	push	bx
-	and	bx, bp			; bx=0 unless same bit as in bp is set
-	tst	bx			; test the next bit (moving right)
-	pop	bx
-	jz	bitLoop			; if nonzero, go to next
-	mov	ds:[si], dl		; else put the position in next cell
+	inc	dx			; positions are one-based
+	shl	bx, 1			; carry is the next hyphenation bit
+	jnc	nextBit
+	mov	ds:[si], dl
 	inc	si
-	jmp 	bitLoop
-endBitLoop:	
-	add	di, 2			; to get next word at es:di
-	dec	cx
-	jnz	wordLoop
+nextBit:
+	dec	bp
+	jnz	bitLoop
+	add	di, 2
+	loop	wordLoop
+	mov	{byte}ds:[si], 0	; terminate explicitly, even for an empty map
 	.leave
 	ret
 BitsToBytes	endp

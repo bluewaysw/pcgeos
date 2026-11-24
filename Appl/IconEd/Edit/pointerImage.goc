@@ -1,0 +1,805 @@
+/**************************************************************************
+ *
+ * PROJECT:	Icon Editor	(GOC Version)
+ * FILE:	pointerImage.goc
+ *
+ *		This project is inspired by the Icon Editor by Steve Yegge, 1992 - 1994
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	RainerB 6/22/2025	Initial revision
+ *
+ *
+ * DESCRIPTION:	This file deals with creating and handling pointer images
+ *
+ **************************************************************************/
+
+
+/*  Standard include files */
+@include <stdapp.goh>
+@include <Ansi/stdlib.h>
+@include <Ansi/stdio.h>
+@include <Ansi/string.h>
+
+@include "iconed.goh"
+@include "UI/appui.goh"
+
+@include "bmptools.goh"
+
+
+extern GlobalStruct global;
+
+
+/*++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+ *
+ * Create a new pointer image iSet
+ *	In most cases we cannot use the icon-related routines, because there
+ *	are a lot of special things to do.
+ *
+ *++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++*/
+
+/*--------------------- InitializePtrImage ---------------------
+ *  Purpose:	Setup an pointer image to default values
+ *  Context:	Create new pointer image set
+ *  Strategy:
+ 	- We are prepared to ahndle bigger (32x32 and 64x64) pointer images
+ 	- Set up an 16 color image because every pixel can be
+		* transparent
+		* black
+		* white
+		* inverse the background
+	- Set hotspot to 0, 0
+	- Assigs default name
+	- Create an extra block for further use
+ *  Parameters:	vmFile,
+ *		iSet	which icon set
+ *		icon	which icon for that icon set
+ *		size	image size: 16 (normal) or 32 (big)
+ *  Return:	-
+ ---------------------------------------------------------------------------*/
+void InitializePtrImage(VMFileHandle vmFile, int iSet, int icon, int size) {
+VMBlockHandle 	bmp;
+
+
+    /*
+     * Set up bitmap and hotspot (hotspot is stored in IE_type field!)
+     * IdGetIconExtraBlock ensures that an initialized extra block (IE_extraBlock) exists
+     */
+    bmp = IconToolCreateBitmap(vmFile, BMF_4BIT | BMT_MASK, size, size, NULL, TRUE);
+    IdSetEntryBitmapNoCopy(vmFile, iSet, icon, bmp);
+    IdSetHotspot(vmFile, iSet, icon, 0, 0);
+
+    /*
+     * Set up initial name
+     */
+    MemLock(OptrToHandle(@DefaultNameMousePointer));
+    switch ( size ) {
+    case 16:
+    	IdSetEntryName(vmFile, iSet, icon, LMemDeref(@DefaultNameMousePointer));
+    	break;
+@if @ALLOW_POINTER_DEF_32_AND_64
+    case 32:
+    	IdSetEntryName(vmFile, iSet, icon, LMemDeref(@DefaultNameBigMousePointer));
+    	break;
+    case 64:
+    	IdSetEntryName(vmFile, iSet, icon, LMemDeref(@DefaultNameHugeMousePointer));
+    	break;
+@endif
+    EC( default: ProgError("Wrong size in InitializePtrImage");  )
+    }
+    MemUnlock(OptrToHandle(@DefaultNameMousePointer));
+
+    /*
+     * IdGetIconExtraBlock ensures that an initialized extra block (IE_extraBlock) exists
+     */
+    IdGetIconExtraBlock(vmFile, iSet, icon);
+}
+
+/*--------------------- CreateNewMousePointer ---------------------
+ *  Purpose:	Create a new mouse pointer iSet
+ *  Context:
+ *  Strategy:
+	- Mouse pointers have a fixed size of 16x16 pixel
+	- create new set (one imgae)
+	- Mark the icon set as PTR_IMAGE
+	- Initialize the new image
+ *  Parameters:	vmFile:	Database file
+ *  Return:	number(Index) of the new icon set
+ ---------------------------------------------------------------------------*/
+int CreateNewMousePointer(VMFileHandle vmFile) {
+int 	iSet, ptrImageSize;
+
+
+    /*
+     * Create the new icon set with one or two pointer images
+     * Create and initialize pointer image
+     * Mark the icon set as pointer-image-set
+     */
+    iSet = IdAddISet(vmFile, 1);
+    IdSetEntryCount(vmFile, iSet , 1);
+
+    IdSetFlags(vmFile, iSet, IF_PTR_IMAGE);
+
+    ptrImageSize = @call MousePointerSizeChooser::MSG_GEN_ITEM_GROUP_GET_SELECTION();
+    InitializePtrImage(vmFile, iSet, 0, ptrImageSize);
+    	/* Comment: Why we call an object to get a fixed (known) size? The reason is, that
+    	 * There are more poiner image sizes defined in the graphics.h header file, but they
+    	 * are currently (07/2026) not supported by the system. The icon editor has code and
+    	 * UI to support them, but the UI is disabled.
+    	 * See definition of ALLOW_POINTER_DEF_32_AND_64 for more details.
+    	 */
+
+
+
+    return iSet;
+}
+
+/*--------------------- MSG_DB_VIEWER_POINTER_IMAGE_ENTER_PTR_MODE ---------------------
+ *  Purpose:	Switch from "edit-normal-icon" mode to "edit-pointer-image" mode
+ *  Context:
+ *  Strategy:
+ *  Parameters:
+ *  Return:	-
+ ---------------------------------------------------------------------------*/
+@extern method IconDBViewerClass, MSG_DB_VIEWER_POINTER_IMAGE_ENTER_PTR_MODE {
+int width, height;
+
+    /*
+     * Set unneeded UI elements to �not enabled�
+     * Some object has been covered for this purpose, because they are controlled by
+     * EnableEditing, which enables the objects automatically.
+     */
+    @send ExportToTokenDBTriggerCover::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+    @send TextMonikerDialogTrigger::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+    @send CropIconTrigger::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+    @send ModifyIconAttributesTrigger::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+    @send ResizeLaunchTrigger::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+
+    @send IconLineAttrDialog::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+    @send IconAreaAttrDialog::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+
+    /*
+     * Close unusable non-modal dialogs
+     */
+    @send ChangeIconAttributesDialog::MSG_GEN_GUP_INTERACTION_COMMAND(IC_DISMISS);
+    @send TextMonikerDialog::MSG_GEN_GUP_INTERACTION_COMMAND(IC_DISMISS);
+
+    @send IconLineAttrDialog::MSG_GEN_GUP_INTERACTION_COMMAND(IC_DISMISS);
+    @send IconAreaAttrDialog::MSG_GEN_GUP_INTERACTION_COMMAND(IC_DISMISS);
+    @send IconCustomColorDialog::MSG_GEN_GUP_INTERACTION_COMMAND(IC_DISMISS);
+
+    /*
+     * Update GenValue objects in PointerImageControlDialog
+     * - get bitmap size
+     * - update GenValue objects (GVLI_maximum)
+     * - get current hotspot (reuse width and hight variable)
+     * - update GenValue objects (GVLI_value)
+
+     */
+    IdGetEntryDimensions(pself->DBVI_vmFile, pself->DBVI_currentISet, pself->DBVI_currentIcon, &width, &height);
+    @send PIMHotspotX::MSG_GEN_VALUE_SET_MAXIMUM(MakeWWFixed(width-1));
+    @send PIMHotspotY::MSG_GEN_VALUE_SET_MAXIMUM(MakeWWFixed(height-1));
+
+    IdGetHotspot(pself->DBVI_vmFile, pself->DBVI_currentISet, pself->DBVI_currentIcon, &width, &height);
+    @send PIMHotspotX::MSG_GEN_VALUE_SET_INTEGER_VALUE(width, FALSE);
+    @send PIMHotspotY::MSG_GEN_VALUE_SET_INTEGER_VALUE(height, FALSE);
+
+
+    /*
+     * Update dialog UI
+     */
+    @send PointerImageModeChooser::MSG_GEN_ITEM_GROUP_SET_MODIFIED_STATE(TRUE);
+    @send PointerImageModeChooser::MSG_GEN_APPLY();
+
+    /*
+     * Open control box
+     */
+    @send PointerImageControlDialog::MSG_GEN_INTERACTION_INITIATE();
+}
+
+
+/*--------------------- MSG_DB_VIEWER_POINTER_IMAGE_LEAVE_PTR_MODE ---------------------
+ *  Purpose:	Switch from "edit-pointer-image" mode to "edit-normal-icon" mode
+ *  Context:
+ *  Strategy:
+ *  Parameters:
+ *  Return:
+ ---------------------------------------------------------------------------*/
+@extern method IconDBViewerClass, MSG_DB_VIEWER_POINTER_IMAGE_LEAVE_PTR_MODE {
+
+    /*
+     * enable all UI elements that have been disabled in POINTER_IMAGE_ENTER_PTR_MODE
+     */
+    @send ExportToTokenDBTriggerCover ::MSG_GEN_SET_ENABLED(VUM_NOW);
+    @send TextMonikerDialogTrigger::MSG_GEN_SET_ENABLED(VUM_NOW);
+    @send CropIconTrigger::MSG_GEN_SET_ENABLED(VUM_NOW);
+    @send ModifyIconAttributesTrigger::MSG_GEN_SET_ENABLED(VUM_NOW);
+    @send ResizeLaunchTrigger::MSG_GEN_SET_ENABLED(VUM_NOW);
+
+    @send IconLineAttrDialog::MSG_GEN_SET_ENABLED(VUM_NOW);
+    @send IconAreaAttrDialog::MSG_GEN_SET_ENABLED(VUM_NOW);
+
+    @send PointerImageControlDialog::MSG_GEN_GUP_INTERACTION_COMMAND(IC_DISMISS);
+}
+
+/*--------------------- MSG_DB_VIEWER_POINTER_IMAGE_OPTIONS_CHANGED ---------------------
+ *  Purpose:	Switch between "show hotspot" and "don't show hotspot".
+ *  Context:
+ *  Strategy:	Force the fatbits object to redraw
+ *		The VIS_DRAW handler does the right thing
+ *  Parameters: GEN_BOOLEAN_GROUP_APPLY_MSG (word selectedBooleans = cx,
+ *	          word indeterminateBooleans = dx, word modifiedBooleans = bp);
+ *  Return:
+ ---------------------------------------------------------------------------*/
+@extern method IconDBViewerClass, MSG_DB_VIEWER_POINTER_IMAGE_OPTIONS_CHANGED {
+    @send CombineOselfWith(@FatbitsView)::MSG_GEN_VIEW_REDRAW_CONTENT();
+}
+
+/*--------------------- MSG_DB_VIEWER_POINTER_IMAGE_HOTSPOT_CHANGED ---------------------
+ *  Purpose:
+ *  Context:
+ *  Strategy:	We ignore passed paramters and read values from both
+ *		GenValues.
+ *		Then we simulate a mouse click.
+ *  Parameters:	GEN_VALUE_APPLY_MSG
+ *		void (WWFixedAsDWord value, GenValueStateFlagsAsWord stateFlags);
+ *  Return:
+ ---------------------------------------------------------------------------*/
+@extern method IconDBViewerClass, MSG_DB_VIEWER_POINTER_IMAGE_HOTSPOT_CHANGED {
+int xHot, yHot;
+
+    xHot = @call PIMHotspotX::MSG_GEN_VALUE_GET_INTEGER_VALUE();
+    yHot = @call PIMHotspotY::MSG_GEN_VALUE_GET_INTEGER_VALUE();
+    @call CombineOselfWith(@MyFatbits)::MSG_FATBITS_TEST_AND_HANDLE_PTR_IMAGE_START_SELECT(xHot, yHot, FALSE);
+
+}
+
+/*--------------------- UpdatePointerImageModeText ---------------------
+ *  Purpose:	As the name says ...
+ *  Context:
+ *  Strategy:	Make the meaning of the selected item understandable for the user.
+ *  Parameters:
+ *  Return:
+ ---------------------------------------------------------------------------*/
+void UpdatePointerImageModeText(int mode) {
+optr modeText;
+
+    switch (mode) {
+    case PIM_BLACK:
+	modeText = @PtrImgModeBlack;
+    	break;
+
+    case PIM_WHITE:
+	modeText = @PtrImgModeWhite;
+    	break;
+
+    case PIM_INVERT:
+	modeText = @PtrImgModeInvert;
+    	break;
+
+    case PIM_TRANSPARENT:
+	modeText = @PtrImgModeTransparent;
+    	break;
+
+    case PIM_HOTSPOT:
+	modeText = @PtrImgModeHotspot;
+    	break;
+
+    }
+
+    @send PointerImageModeText::MSG_VIS_TEXT_REPLACE_ALL_OPTR(modeText, 0);
+
+    /* That looks too hectic to me.
+    @send PointerImageControlDialog:: MSG_GEN_RESET_TO_INITIAL_SIZE(VUM_NOW);
+    */
+}
+
+
+/*--------------------- MSG_DB_VIEWER_POINTER_IMAGE_NEW_EDIT_MODE ---------------------
+ *  Purpose:	Update dialog UI according to new selection
+ *  Context:
+ *  Strategy:	- Update info text
+ *		- Return if hotspot mode (don't not chnage aynthings)
+ *		- fetch current tool
+ *		- calculate correct tool and color value
+ *		- set area color, line color and bitmap tool accordingly
+ *  Parameters: GEN_ITEM_GROUP_APPLY_MSG ( word selection = cx,
+ *			word numSelections = bp, GenItemGroupStateFlags stateFlags = dl);
+ *		selection: pointer image edit mode value (PIM_xxx)
+ *  Return:
+ ---------------------------------------------------------------------------*/
+@extern method IconDBViewerClass, MSG_DB_VIEWER_POINTER_IMAGE_NEW_EDIT_MODE {
+optr fatbits;
+int r, g, b, tool;
+Boolean isMaskTool;
+
+    UpdatePointerImageModeText(selection);
+
+    if (selection == PIM_HOTSPOT) return;
+    			/* Do not change colors or other settings.
+    			 * Hotspot mode is handles separately */
+
+    fatbits = CombineOselfWith(@MyFatbits);
+    tool = @call fatbits::MSG_FATBITS_GET_BITMAP_TOOL();
+    isMaskTool = TestIfToolWorksWithTheMask(tool);
+    r = 0;		/* default: black */
+    g = 0;
+    b = 0;
+
+
+    switch (selection) {
+    case PIM_WHITE:	g = 0xAA;
+    case PIM_INVERT:	r = 0xFF;	/* C_LIGHT_CYAN */
+    			g += 0x55;	/* --> white will be 0xFF :-) */
+    			b = 0xFF;
+    case PIM_BLACK:
+    	/* only switch to pencil if we currently have an "edit-mask" tool */
+    	if (isMaskTool) tool = BTF_PENCIL;
+    	break;
+    case PIM_TRANSPARENT:
+    	/* only switch to eraser if we currently have an "edit-color-plane" tool */
+    	if (!isMaskTool) tool = BTF_ERASER;
+    	break;
+    }
+
+    @send fatbits::MSG_FATBITS_SET_BITMAP_TOOL(tool, 0, 0);
+    @send fatbits::MSG_GO_SET_AREA_COLOR(r, g, b);
+    @send fatbits::MSG_GO_SET_LINE_COLOR(r, g, b);
+
+}
+
+/*--------------------- MSG_FATBITS_TEST_IF_PTR_IMAGE ---------------------
+ *  Purpose:	Check if the currently editied icon is a pointer image
+ *  Context:
+ *  Strategy:	Ask DBViewer for information
+ *  Parameters:
+ *  Return:	TRUE:	it is a pointer image
+ *		FALSE:	it's normal icon
+ ---------------------------------------------------------------------------*/
+@extern method FatbitsClass, MSG_FATBITS_TEST_IF_PTR_IMAGE {
+optr dbViewer;
+
+    dbViewer = CombineOselfWith(@DBViewerContent);
+    return (@call dbViewer::MSG_DB_VIEWER_TEST_IF_PTR_IMAGE() );
+}
+
+/*--------------------- MSG_FATBITS_TEST_AND_HANDLE_PTR_IMAGE_START_SELECT ---------------------
+ *  Purpose:	Set a new hotspot for the pointer image.
+ *  Context:
+ *  Strategy:
+ *  Parameters: xPos, yPos: new hotspot coordinates
+ *		testHotspot: test if PIM_HOTSPOT item is active
+ *			Skipping this test allows us to use this method as
+ *			handler for MSG_DB_VIEWER_POINTER_IMAGE_HOTSPOT_CHANGED.
+ *  Return:	FALSE:	not in set-hotspot mode (caller can continue normally)
+ *		TRUE:	set-hotspot mode, we have done necessary actions
+ *			caller may return immediately
+ ---------------------------------------------------------------------------*/
+@extern method FatbitsClass, MSG_FATBITS_TEST_AND_HANDLE_PTR_IMAGE_START_SELECT {
+VMFileHandle	vmFile;
+optr dbViewer;
+Boolean	isPtrImageMode;
+int sel, iSet, icon;
+
+    isPtrImageMode = @call oself::MSG_FATBITS_TEST_IF_PTR_IMAGE();
+    if (!isPtrImageMode) return FALSE;
+
+    if (testHotspot) {
+	sel = @call PointerImageModeChooser::MSG_GEN_ITEM_GROUP_GET_SELECTION();
+	if ( sel != PIM_HOTSPOT) return FALSE;
+    }
+
+    /*
+     * Update GenValue objects
+     */
+    @send PIMHotspotX::MSG_GEN_VALUE_SET_INTEGER_VALUE(xPos, FALSE);
+    @send PIMHotspotY::MSG_GEN_VALUE_SET_INTEGER_VALUE(yPos, FALSE);
+
+    /*
+     * Store undo information
+     */
+    @call oself::MSG_FATBITS_UNDO_SAVE_ICON_STATE(UNDO_CHANGE_HOTSPOT);
+
+    /*
+     * Set hotspot in icon
+     */
+    dbViewer = CombineOselfWith(@DBViewerContent);
+    vmFile = @call dbViewer::MSG_DB_VIEWER_GET_DATABASE();
+    iSet = @call dbViewer::MSG_DB_VIEWER_GET_CURRENT_ISET();
+    icon = @call dbViewer::MSG_DB_VIEWER_GET_CURRENT_ICON();
+    EC( if (!vmFile) return FALSE; )
+    EC( if (iSet == NO_CURRENT_ISET) return FALSE; )
+    EC( if (icon == NO_CURRENT_ICON) return FALSE; )
+
+    IdSetHotspot(vmFile, iSet, icon, xPos, yPos);
+
+    /*
+     * Redraw Image
+     */
+    @send CombineOselfWith(@FatbitsView)::MSG_GEN_VIEW_REDRAW_CONTENT();
+
+    /*
+     * Mark file dirty
+     */
+    @send IconDocumentGroup::MSG_GEN_DOCUMENT_GROUP_MARK_DIRTY_BY_FILE(vmFile);
+
+    return TRUE;
+}
+
+/*--------------------- PointerImageToolCorrectColor ---------------------
+ *  Purpose:	Ensure that the pixel value is one of the values
+ *		C_WHITE, C_BLACK and C_LIGHT_VIOLET
+ *  Context:
+ *  Strategy:	We have only 16 color values.
+ *		The replacement strategy doesn't really matter, because
+ *		this is an emergency procedure.
+ *  Parameters:	pix:	color index to check:
+ *  Return:	probabely corrected color;
+ ---------------------------------------------------------------------------*/
+int PointerImageToolCorrectColor(int pix) {
+int color;
+
+    switch (pix) {
+    case C_BLACK:	/* dark colors becomes black */
+    case C_BLUE:
+    case C_GREEN:
+    case C_CYAN:
+    case C_RED:
+    case C_VIOLET:
+    case C_DARK_GRAY:
+    	color = C_BLACK;
+    	break;
+    case C_BROWN:	/* medium colors becomes light violet (invert pixel indicator) */
+    case C_LIGHT_GRAY:
+    case C_LIGHT_BLUE:
+    case C_LIGHT_RED:
+    case C_LIGHT_VIOLET:
+    	color = C_LIGHT_VIOLET;
+    	break;
+    case C_LIGHT_GREEN:	/* bright colors becomes withe */
+    case C_LIGHT_CYAN:
+    case C_YELLOW:
+    case C_WHITE:
+    default:
+    	color = C_WHITE;
+    	break;
+    }
+
+    return color;
+}
+
+/*--------------------- PointerImageToolEnsureOnlyAllowedColors ---------------------
+ *  Purpose:	"Pointer Image" bitmaps are 16 color bitmaps, but only the colors
+ *		C_WHITE, C_BLACK and C_LIGHT_VIOLET are allowed.
+ *		We replace wrong color indices.
+ *  Context:
+ *  Strategy:	We also know that the line width can be only 16 oder 32 pixels.
+ *		There are no dangeling pixels at the end of the line.
+ *  Parameters:	vmFile, bmp:	handles to the bitmap
+ *  Return:	probabely bitmap has been cahnged.
+ ---------------------------------------------------------------------------*/
+void PointerImageToolEnsureOnlyAllowedColors(VMFileHandle vmFile, VMBlockHandle bmp) {
+byte *bmpData, *maskData, pix, newVal;
+BitmapAccessRecord bar;
+int width, height, maskLen, y, numBytes, n;
+EC( int format);
+
+    EC(format = ) BTGetMoreBitmapInfos(vmFile, bmp, &width, &height, 0);
+    EC( if ( (format & BMT_FORMAT) != BMF_4BIT ) ProgError("EnsureOnlyAllowedColors: wrong color deepth"); )
+    EC( if ( width != height ) ProgError("EnsureOnlyAllowedColors: not-squared bitmap"); )
+
+    switch (height) {
+    	case 16:
+@if @ALLOW_POINTER_DEF_32_AND_64
+	case 32:
+	case 64:
+@endif
+		break;
+    	default: EC( ProgError("EnsureOnlyAllowedColors: wrong bmp size"); )
+    		return;
+    }
+
+
+    /*
+     * Lock lines from top to bottom.
+     */
+    maskLen = (width + 7)/8;
+    numBytes = (width+1)/2;
+    maskData = BTBitmapLock(vmFile, bmp, &bar, 0);
+    bmpData = maskData + maskLen;
+
+    for ( y = 0; y < height; y++ ) {
+    	/*
+    	 * Process any data pixel
+    	 */
+    	for ( n = 0; n < numBytes; n++ ) {
+    	    pix = (bmpData[n]>>4) & 0xF;
+	    newVal = PointerImageToolCorrectColor(pix);
+
+    	    pix = bmpData[n] & 0xF;
+	    pix = PointerImageToolCorrectColor(pix);
+	    newVal = (newVal <<4) + pix;
+
+	    bmpData[n] = newVal;
+	}
+
+	maskData = BTBitmapNext(&bar, TRUE);
+	bmpData = maskData + maskLen;
+    }
+
+    BTBitmapUnlock(&bar, TRUE);
+
+
+}
+
+/*--------------------- MSG_DB_VIEWER_POINTER_IMAGE_ADD_IMAGE ---------------------
+ *  Purpose:	Add an new pointer to the current ("poiner-image") icon set
+ *  Context:	This is a specialized "ADD_ICON" message
+ *  Strategy:
+ 	- execute AddPointerImageDialog
+	- set up the database entry for the new icon
+	- switch editing to the first new icon
+ *  Parameters:
+ *  Return:
+ ---------------------------------------------------------------------------*/
+@extern method IconDBViewerClass, MSG_DB_VIEWER_POINTER_IMAGE_ADD_IMAGE {
+char	iconName[ICON_NAME_BUFFER_SIZE + 20];	// enough space for MonoMonikerPrefix, USually Mono or Monochrome SchwarzWeiss
+int 	iSet, count, cmd, ptrImageSize;
+VMFileHandle vmFile;
+
+    /*
+     *  Execute AddIconDialog
+     */
+    @call AddPointerImageNameTextField::MSG_VIS_TEXT_REPLACE_ALL_OPTR(@DefaultCustomMonikerPrefix, 0);
+    @call AddPointerImageNameTextField::MSG_VIS_TEXT_APPEND_OPTR(@DefaultNameMousePointer, 0);
+
+    cmd = UserDoDialog(@AddPointerImageDialog);
+    if ( cmd != IC_OK ) return;
+
+    AppMarkBusy();
+
+    /*
+     * Ask UI for information about the icon
+     */
+    @call AddPointerImageNameTextField::MSG_VIS_TEXT_GET_ALL_PTR(iconName);
+
+    /*
+     * Create the new pointer images
+     */
+    vmFile = pself->DBVI_vmFile;
+    iSet = pself->DBVI_currentISet;
+    count = IdGetEntryCount(vmFile, iSet);
+
+    ptrImageSize = @call AddPointerImageSizeChooser::MSG_GEN_ITEM_GROUP_GET_SELECTION();
+    	/* Comment: Why we call an object to get a fixed (known) size? The reason is, that
+    	 * there are more poiner image sizes defined in the graphics.h header file, but they
+    	 * are currently (07/2026) not supported by the system. The icon editor has code and
+    	 * UI to support them, but the UI is disabled.
+    	 * See definition of ALLOW_POINTER_DEF_32_AND_64 for more details.
+    	 */
+    IdCreateEntries(vmFile, iSet, 1);
+    IdSetEntryCount(vmFile, iSet , count + 1);
+
+
+    /*
+     * Initialize pointer images.
+     * Old count is equal to the icon number (zero-based)
+     */
+     InitializePtrImage(vmFile, iSet, count, ptrImageSize);
+
+    /*
+     * Assign name
+     * Edit the new pointer image.
+     */
+    IdSetEntryName(vmFile, iSet, count, iconName);
+    @call oself::MSG_DB_VIEWER_SWITCH_ICON(count);
+    @call CombineOselfWith(@IconListContent)::MSG_ICON_VIEWER_RESCAN_LIST();
+
+    /*
+     * Mark database dirty.
+     */
+    @send IconDocumentGroup::MSG_GEN_DOCUMENT_GROUP_MARK_DIRTY_BY_FILE (vmFile);
+
+    AppMarkNotBusy();
+
+}
+
+
+/*--------------------- MakePointerFromImage ---------------------
+ *  Purpose:	Create PoinerDef structure in a LMem chunk from a bitmap
+ *  Context:	The routine has been tested for PoinerDef16 structure but
+ *		should also work for PoinerDef32 and PoinerDef64.
+ *  Strategy:
+ *  Parameters:	vmFile, bmp:	Bitmap to convert
+ *		size:		Return: size of the pointerDef structure
+ 		hotX, hotY:	Hotspot coordinates
+ *  Return:	Optr of the PointerDef structure
+ *		Zero in case of error.
+ ---------------------------------------------------------------------------*/
+optr MakePointerFromImage(VMFileHandle vmFile, VMBlockHandle bmp, int *size, int hotX, int hotY) {
+byte *bmpData, *maskData, pix;
+BitmapAccessRecord bar;
+int width, height, maskLen, x, y, chunkSize;
+MemHandle	mh;
+optr	pointerOp;
+byte 	*hdrPtr, *maskPtr, *imagePtr;
+byte curBit, maskByte, imgByte;
+EC( int format);
+
+    /* A pointer image is defined using two monochrome bitmaps: the mask and the image
+     *	typedef struct {
+     *	    byte        PD_width;
+     *	    byte    	PD_height;
+     *	    sbyte	PD_hotX;
+     *	    sbyte	PD_hotY;
+     *	    byte	PD_mask[STANDARD_CURSOR_IMAGE_SIZE];
+     *	    byte	PD_image[STANDARD_CURSOR_IMAGE_SIZE];
+     *	} PointerDef16;
+     *
+     *  Image	Mask	Drawing			IconEditor	IconEditor
+     *	Pixel	Pixel	Result			Mask Pixel	Color Pixel
+     *	  0	  0	Don't change pixel	0		doesn't matter
+     *    1	  0	Invert background	1		C_LIGHT_VIOLET
+     *	  0	  1	Draw pixel black	1		C_BLACK
+     *	  1	  1	Draw pixel white	1		C_WHITE
+     */
+
+    /*
+     * Do error checking, calculate chunk size
+     */
+    EC(format = ) BTGetMoreBitmapInfos(vmFile, bmp, &width, &height, 0);
+    EC( if ( (format & BMT_FORMAT) != BMF_4BIT ) ProgError("MakePointerFromImage: wrong color deepth"); )
+    EC( if ( width != height ) ProgError("MakePointerFromImage: not-squared bitmap"); )
+
+    switch (height) {
+    	case 16:
+    		chunkSize = sizeof(PointerDef16);
+    		break;
+@if @ALLOW_POINTER_DEF_32_AND_64
+	case 32:
+    		chunkSize = sizeof(PointerDef32);
+    		break;
+	case 64:
+    		chunkSize = sizeof(PointerDef64);
+    		break;
+@endif
+		break;
+    	default: EC( ProgError("MakePointerFromImage: wrong bmp size"); )
+    		return 0;
+    }
+    if ( size ) *size = chunkSize;
+
+    /*
+     * Allocate chunk and set up pointers
+     * We don't use a PointerDef16 structure to make the code runnable with
+     * PointerDef32 and PointerDef64 structures too.
+     */
+    mh = MemAllocLMem(LMEM_TYPE_GENERAL, 0);
+    MemLock(mh);
+    pointerOp = ConstructOptr(mh, LMemAlloc(mh, chunkSize) );
+    hdrPtr = LMemDeref(pointerOp);
+    maskPtr = hdrPtr + 4;
+    imagePtr = maskPtr + height*width/8;
+
+    /*
+     * Set up PointerDef header
+     */
+    hdrPtr[0] = width;
+    hdrPtr[1] = height;
+    hdrPtr[2] = hotX;
+    hdrPtr[3] = hotY;
+
+    /*
+     * Lock lines from top to bottom.
+     */
+    maskLen = (width + 7)/8;
+    maskData = BTBitmapLock(vmFile, bmp, &bar, 0);
+    bmpData = maskData + maskLen;
+
+    for ( y = 0; y < height; y++ ) {
+    	/*
+    	 * Process any bitmap pixel.
+    	 */
+    	maskByte = 0;
+    	imgByte = 0;	/* Values to write to the PointerDef structure */
+    	curBit = 0x80;	/* mask to filter out the actual PointerDef.PD_mask
+    			 * and PointerDef.PD_image bit. */
+
+    	for ( x = 0; x < width; x++ ) {
+
+	   pix = *bmpData;
+	   if (x & 1) {
+	   	pix &= 0x0F;		/* 2nd pixel color */
+	   	bmpData++;		/* there are two color pixel in one byte */
+	   } else {
+	   	pix >>= 4;		/* 1st pixel color */
+	   }
+
+	   if ( *maskData & curBit ) {		/* color does matter */
+	   	switch ( pix ) {
+	   	case C_LIGHT_VIOLET:	/* invert background */
+	   	    imgByte |= curBit;
+	   	    break;
+	   	case C_WHITE:		/* draw pixel white */
+	   	    maskByte |= curBit;
+	   	    imgByte |= curBit;
+	   	    break;
+	   	case C_BLACK:		/* draw pixel black */
+	   	default:		/* <-- useful to catch errors */
+	   	    maskByte |= curBit;
+	   	    break;
+		}
+	   } /* else ... color doesn't matter: transparent pixel, leave both bits zero */
+
+	   /*
+	    * Select next pixel.
+	    * If we cross byte boundaries, write current PD_mask and PD_image
+	    * byte and update pointers.
+	    * Because width is 16 (or 32 or 64) we don't need to check for dangeling bits.
+	    */
+	   curBit >>= 1;
+	   if (!curBit) {
+	   	*maskPtr = maskByte;
+	   	maskPtr++;
+	   	maskByte = 0;
+
+	   	*imagePtr = imgByte;
+	   	imagePtr++;
+	   	imgByte = 0;
+
+	   	curBit = 0x80;
+	   	maskData++;
+	   }
+	}
+
+	maskData = BTBitmapNext(&bar, TRUE);
+	bmpData = maskData + maskLen;
+    }
+
+    BTBitmapUnlock(&bar, TRUE);
+
+    /*
+     * Unlock memory block and return optr to PointerDef structure
+     */
+    MemUnlock(mh);
+    return pointerOp;
+}
+
+/*--------------------- MSG_DB_VIEWER_POINTER_IMAGE_MAKE_PTR_FROM_CURRENT_ICON ---------------------
+ *  Purpose:	Create PoinerDef16 structure in a LMem chunk from current icon
+ *  Context:
+ *  Strategy:
+ *  Parameters:
+ *  Return:	Optr of a LMemChunk holding the pointer image
+ *		Zero in case of error
+ ---------------------------------------------------------------------------*/
+@extern method IconDBViewerClass, MSG_DB_VIEWER_POINTER_IMAGE_MAKE_PTR_FROM_CURRENT_ICON {
+optr ptrImageOp;
+VMBlockHandle bmp;
+VMFileHandle  vmFile;
+int iSet, icon, hotX, hotY;
+
+
+    vmFile = pself->DBVI_vmFile;
+    iSet = pself->DBVI_currentISet;
+    icon = pself->DBVI_currentIcon;
+
+    bmp = IdGetEntryBitmap(vmFile, iSet, icon);
+    IdGetHotspot(vmFile, iSet, icon, &hotX, &hotY);
+
+    ptrImageOp = MakePointerFromImage(vmFile, bmp, NULL, hotX, hotY);
+    return ptrImageOp;
+}
+
+/*---------------------  ---------------------
+ *  Purpose:
+ *  Context:
+ *  Strategy:
+ *  Parameters:
+ *  Return:
+ ---------------------------------------------------------------------------*/
+
+/* *********** End of file pointerImages.goc ********************/
+
+

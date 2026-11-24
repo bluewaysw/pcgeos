@@ -6,10 +6,10 @@
 GEODE           = configui
 ASM_TO_OBJS     = configui.asm
 UI_TO_RDFS      = configui.ui
-SRCS            = configuiFileAssoc.asm configui.asm prefMinuteValue.asm\
-                  configuiProgList.asm configui.def configuiAdvanced.ui\
-                  configuiApp.ui configuiAppearance.ui configuiFileMgr.ui\
-                  configui.ui configuiInterface.ui configuiExpress.ui
+SRCS            = configuiProgList.asm prefMinuteValue.asm configui.asm\
+                  configuiFileAssoc.asm configui.def configuiAdvanced.ui\
+                  configuiApp.ui configuiExpress.ui configuiFileMgr.ui\
+                  configuiInterface.ui configui.ui configuiAppearance.ui
 OBJS            = configui.obj
 LOBJS           =
 LIBOBJ          = $(DEVEL_DIR)/Include/$(GEODE).ldf

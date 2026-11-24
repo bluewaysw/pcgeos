@@ -2083,7 +2083,7 @@ REVISION HISTORY:
 DOSLinkCreateDirectoryFile	proc far
 		uses	cx,dx,di,si,ds
 
-if _MSLF
+if _LFN
 pathBuf		local	MSDOS7_MAX_PATH_SIZE dup(char)
 else
 pathBuf		local	DOS_STD_PATH_LENGTH+2 dup(char)
@@ -2099,7 +2099,7 @@ longName	local	FileLongName
 		jc	done
 
 		push	ax		; SFN
-if _MSLF
+if _LFN
 	;
 	; Fetch the long-name current path on the default (current) drive.
 	; No need to prepend a leading backslash as one will be returned
@@ -2138,17 +2138,17 @@ else
 	; 
 		segmov	es, ds
 		mov	di, si
-endif	; _MSLF
+endif	; _LFN
 		clr	al
 		mov	cx, length pathBuf
 		repne	scasb
-MSLF <		mov	dx, di			; dx = char after null	>
+LFN <		mov	dx, di			; dx = char after null	>
 		std
 		mov	al, '\\'
 		repne	scasb
 		cld
 
-if _MSLF
+if _LFN
 	;
 	; In GEOS, we only support DOS long name that are as long as
 	; FILE_LONGNAME_LENGTH chars.  If the DOS long name is longer than
@@ -2161,7 +2161,7 @@ if _MSLF
 		ja	getPathName
 
 		pop	ax			; clean up "." 
-endif	; _MSLF
+endif	; _LFN
 
 	;
 	; Now map the DOS name to a GEOS name in our character set.

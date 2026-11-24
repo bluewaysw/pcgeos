@@ -21,6 +21,7 @@ class & message definitions
     @message word MSG_READ_APPS_IN_FOLDER();    // reads into TAPC_filesMemHan
     @message word MSG_COUNT_APPS_IN_FOLDER();
     @message void MSG_UPDATE_EVERY_TRAY_APPS_INTERACTION();
+    @message void MSG_TRAY_APPS_ATTACH_TIMEOUT(word timerID = bp);
 @endc   /* end of class definition */
 
 @class  TrayAppsInteractionClass, GenInteractionClass;
@@ -84,6 +85,11 @@ constants & structures
 #define MAX_TRAY_TRIGGERS_COUNT 25
 #define TRAYAPPS_STD_PATH       SP_USER_DATA
 
+/* TimerStart uses GEOS timer ticks, 60 ticks per second. Give the
+ * express menu three seconds to create the tray interaction before exiting.
+ */
+#define TRAYAPPS_ATTACH_TIMEOUT (3 * 60)
+
 #define TOOL_ICON_WIDTH         15
 #define TOOL_ICON_HEIGHT        15
 #define TOOL_ICON_FLAGS         ((VMSF_GSTRING) | (VMS_TOOL << VMSF_STYLE_OFFSET))
@@ -102,6 +108,8 @@ optr        TAPC_itemList       = NullOptr; // this gonna be a ChunkArray soon
 dword       TAPC_folderID       = 0;
 word        TAPC_filesCount     = 0;
 MemHandle   TAPC_filesMemHan    = NullHandle;
+TimerHandle TAPC_attachTimerHan = NullHandle;
+word        TAPC_attachTimerID  = 0;
 
 
 /*-------------------------------------------------------------------
@@ -147,6 +155,15 @@ add our special GenInteraction to SysTray
 
         event = @record ExpressMenuControlClass::MSG_EXPRESS_MENU_CONTROL_CREATE_ITEM(cemcip);
         GCNListSend(MANUFACTURER_ID_GEOWORKS, GCNSLT_EXPRESS_MENU_OBJECTS, event, 0, 0);
+
+        TAPC_attachTimerHan = TimerStart(
+            TIMER_EVENT_ONE_SHOT,
+            oself,
+            TRAYAPPS_ATTACH_TIMEOUT,
+            MSG_TRAY_APPS_ATTACH_TIMEOUT,
+            0,
+            &TAPC_attachTimerID
+        );
 
         // add ourselves to GCNSLT_EXPRESS_MENU_CHANGE list
         (void) GCNListAdd(ConstructOptr(GeodeGetProcessHandle(), 0), MANUFACTURER_ID_GEOWORKS, GCNSLT_EXPRESS_MENU_CHANGE);
@@ -276,6 +293,13 @@ store the E-Menu/TrayAppsInteractionClass combo
 {
     TaiEmcComboStruct   *elem = (void*) 0;
 
+    if (TAPC_attachTimerHan != NullHandle)
+    {
+        TimerStop(TAPC_attachTimerHan, TAPC_attachTimerID);
+        TAPC_attachTimerHan = NullHandle;
+        TAPC_attachTimerID = 0;
+    }
+
     if (TAPC_itemList != NullOptr)
     {
         MemLock(HandleOf(TAPC_itemList));
@@ -289,6 +313,34 @@ store the E-Menu/TrayAppsInteractionClass combo
         @call elem->interaction::MSG_INIT_APP_TRIGGERS(TAPC_filesMemHan, TAPC_filesCount);
 
         MemUnlock(HandleOf(TAPC_itemList));
+    }
+}
+
+/*-------------------------------------------------------------------
+quit if no Express menu created our tray interaction
+-------------------------------------------------------------------*/
+@method TrayAppsProcessClass, MSG_TRAY_APPS_ATTACH_TIMEOUT
+{
+    word                numElem = 0;
+
+    if (timerID != TAPC_attachTimerID)
+    {
+        return;
+    }
+
+    TAPC_attachTimerHan = NullHandle;
+    TAPC_attachTimerID = 0;
+
+    if (TAPC_itemList != NullOptr)
+    {
+        MemLock(HandleOf(TAPC_itemList));
+        numElem = ChunkArrayGetCount(TAPC_itemList);
+        MemUnlock(HandleOf(TAPC_itemList));
+    }
+
+    if (numElem == 0)
+    {
+        @send, forceQueue application::MSG_META_QUIT();
     }
 }
 
@@ -493,6 +545,13 @@ SysTrays
     TaiEmcComboStruct   *elem = (void*) 0;
     word                numElem = 0;
     word                i = 0;
+
+    if (TAPC_attachTimerHan != NullHandle)
+    {
+        TimerStop(TAPC_attachTimerHan, TAPC_attachTimerID);
+        TAPC_attachTimerHan = NullHandle;
+        TAPC_attachTimerID = 0;
+    }
 
     // take us off of lists
     (void) GCNListRemove(ConstructOptr(GeodeGetProcessHandle(), 0), MANUFACTURER_ID_GEOWORKS, GCNSLT_FILE_SYSTEM);

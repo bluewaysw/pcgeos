@@ -5096,17 +5096,33 @@ if TOOL_AREA_IS_TASK_BAR
 	jnz	done					; skip if taskbar
 endif
 	call	WinClasses_DerefVisSpec_DI
+if _MOTIF
+	;
+	; Size the express tool area from the same canonical height as the
+	; adjacent title-bar controls.
+	;
+	mov	ax, MSG_OL_WIN_GET_TITLE_BAR_HEIGHT
+	call	WinClasses_ObjCallInstanceNoLock
+	mov	cx, dx				; cx = canonical title height
+	call	OpenCheckIfBW
+	jc	5$
+	add	cx, MO_TITLE_BUTTON_COLOR_INSET
+						; canceled by color inset below
+else
 	mov	cx, ds:[di].OLWI_titleBarBounds.R_bottom
 	sub	cx, ds:[di].OLWI_titleBarBounds.R_top
 
-	;Fairly bad hacks to match menu bar height.  -cbh 6/29/92
-	;Must match similar code in EnableDisableAndPosSysIcon.
+	; ISUI calculates the menu bar independently from the title bounds.
+	; In a combined header its outer height is three pixels greater, so
+	; include that difference when sizing the express tool area.
 
 	call	OpenWinCheckIfSquished		; running CGA?
 	jc	5$				; yes, skip this
 	call	OpenWinCheckMenusInHeader	; are we in the header?
 	jnc	5$				; nope, done
-	add	cx, 3				; else expand to match menu bar
+	add	cx, ISUI_COMBINED_MENU_BAR_HEIGHT_EXTRA
+						; match combined menu-bar height
+endif
 5$:
 MO <	push	ds							>
 MO <	mov	ax, segment dgroup					>
@@ -5114,7 +5130,7 @@ MO <	mov	ds, ax							>
 MO <	test	ds:[moCS_flags], mask CSF_BW	; Is this a B&W display?>
 MO <	pop	ds							>
 MO <	jnz	20$				;   skip if so...	>
-MO <	sub	cx, 2				; Nest icon inside resize  >
+MO <	sub	cx, MO_TITLE_BUTTON_COLOR_INSET	; Nest icon inside resize  >
 MO <20$:					;   display		   >
 
 ISU <	push	ds							>
@@ -5459,6 +5475,15 @@ endif	; if _GCM -------------------------------------------------------------
 	call	WinClasses_DerefVisSpec_DI		; ds:di = instance data
 	test	ds:[di].OLBWI_flags, mask OLBWF_HAS_EXPRESS_TOOL_AREA
 	jz	done				; nope
+if TOOL_AREA_IS_TASK_BAR
+	; if the taskbar is enabled, the width of the express menu
+	; must not be reserved inside the window header.
+	push	ds
+	segmov	ds, dgroup
+	test	ds:[taskBarPrefs], mask TBF_ENABLED
+	pop	ds
+	jnz	done				; taskbar is not in the header
+endif
 	push	bp				;save right side width
 	call	OLBaseWinGetExpressMenuButtonWidth	; bp = width
 	dec	bp				;overlap express menu button
@@ -5856,3 +5881,204 @@ OLBaseWinMetaNotify	endm
 endif
 
 ActionObscure ends
+
+if TOOL_AREA_IS_TASK_BAR
+HighUncommon segment resource
+
+;
+; Menu order, command messages and permission bits stay together. The taskbar
+; uses this table to enable items; the primary rechecks it on every command.
+;
+taskMenuCommands label word
+		word MSG_OL_RESTORE_WIN, mask OLWSI_RESTORE
+		word MSG_MO_SYSMENU_MOVE, mask OLWSI_MOVE
+		word MSG_MO_SYSMENU_SIZE, mask OLWSI_SIZE
+		word MSG_OL_WIN_MINIMIZE, mask OLWSI_MINI
+		word MSG_OL_WIN_MAXIMIZE, mask OLWSI_MAXI
+		word MSG_OL_WIN_CLOSE, mask OLWSI_CLOSABLE
+TASK_MENU_COMMAND_COUNT equ ($-taskMenuCommands)/4
+
+;
+; Reply to the field-owned popup without selecting or restoring the primary.
+; Modal/disabled/unusable windows allow no commands.
+;
+OLBaseWinGetTaskMenuState method dynamic OLBaseWinClass, \
+				MSG_OL_BASE_WIN_GET_TASK_MENU_STATE
+		call	GetTaskMenuState
+		mov	di, ds:[si]
+		add	di, ds:[di].Vis_offset
+	; Ignore a request from a field the primary has since left.
+		cmp	cx, ds:[di].OLBWI_windowListEntry.handle
+		jne	done
+		jcxz	done
+		mov	bx, cx
+		mov	si, dx
+		mov	dx, ds:[di].OLBWI_windowListEntry.chunk
+		mov	cx, ax
+		mov	ax, MSG_TASK_BAR_MENU_STATE
+		mov	di, mask MF_FORCE_QUEUE
+		GOTO	ObjMessage
+done:
+		ret
+OLBaseWinGetTaskMenuState endm
+
+GetTaskMenuState proc near
+	uses	bx, cx, dx, bp, si, di, es
+	.enter
+		clr	cx
+		call	GenCheckIfFullyUsable
+		LONG jnc unavailable
+		clr	cx
+		call	GenCheckIfFullyEnabled
+		LONG jnc unavailable
+
+	; Do not bypass an application's modal dialog or input hold-up.
+		mov	ax, MSG_GEN_APPLICATION_GET_MODAL_WIN
+		call	GenCallApplication
+		jcxz	checkInput
+		jmp	unavailable
+checkInput:
+		mov	cx, ds:[LMBH_handle]
+		mov	dx, si
+		call	VisQueryWindow
+		mov	bp, di
+		mov	ax, MSG_META_TEST_WIN_INTERACTIBILITY
+		call	GenCallApplication
+		LONG jnc unavailable
+
+		mov	di, ds:[si]
+		add	di, ds:[di].Vis_offset
+		clr	ax
+		test	ds:[di].OLWI_attrs, mask OWA_CLOSABLE
+		jz	checkMinimized
+		ornf	al, mask OLWSI_CLOSABLE
+checkMinimized:
+		test	ds:[di].OLWI_specState, mask OLWSS_MINIMIZED
+		jz	notMinimized
+		test	ds:[di].OLWI_fixedAttr, mask OWFA_RESTORABLE
+		jz	done
+		ornf	al, mask OLWSI_RESTORE
+		test	ds:[di].OLWI_attrs, mask OWA_MAXIMIZABLE
+		jz	done
+		ornf	al, mask OLWSI_MAXI
+		jmp	done
+notMinimized:
+		test	ds:[di].OLWI_attrs, mask OWA_MINIMIZABLE
+		jz	checkMaximized
+		ornf	al, mask OLWSI_MINI
+checkMaximized:
+		test	ds:[di].OLWI_specState, mask OLWSS_MAXIMIZED
+		jz	canMaximize
+		test	ds:[di].OLWI_fixedAttr, mask OWFA_RESTORABLE
+		jz	checkMoveSize
+		ornf	al, mask OLWSI_RESTORE
+		jmp	checkMoveSize
+canMaximize:
+		test	ds:[di].OLWI_attrs, mask OWA_MAXIMIZABLE
+		jz	checkMoveSize
+		ornf	al, mask OLWSI_MAXI
+checkMoveSize:
+	; Interactive Move/Size require a realized window and native permission.
+		tst	ds:[di].VCI_window
+		jz	done
+		segmov	es, dgroup, bx
+		test	ds:[di].OLWI_attrs, mask OWA_MOVABLE
+		jz	checkSize
+		test	es:[olExtWinAttrs], mask EWA_MOVABLE
+		jz	checkSize
+		ornf	al, mask OLWSI_MOVE
+checkSize:
+		test	ds:[di].OLWI_attrs, mask OWA_RESIZABLE
+		jz	done
+		test	es:[olExtWinAttrs], mask EWA_RESIZABLE
+		jz	done
+		ornf	al, mask OLWSI_SIZE
+		jmp	done
+unavailable:
+		clr	ax
+done:
+	; Primaries retain OWA_MAXIMIZABLE for startup even without user controls.
+		call	OpenWinCheckIfMinMaxRestoreControls
+		jc	stateReady
+		andnf	al, not (mask OLWSI_MINI or mask OLWSI_MAXI or mask OLWSI_RESTORE)
+stateReady:
+	.leave
+		ret
+GetTaskMenuState endp
+
+;
+; Dispatch only a currently permitted menu command. Raising the layer does not
+; restore the primary. Maximize explicitly unminimizes, like the desktop icon.
+;
+OLBaseWinTaskMenuCommand method dynamic OLBaseWinClass, \
+				MSG_OL_BASE_WIN_TASK_MENU_COMMAND
+		push	cx
+		call	GetTaskMenuState
+		pop	cx
+		clr	bx
+findCommand:
+		cmp	cx, cs:[taskMenuCommands][bx]
+		je	foundCommand
+		add	bx, 4
+		cmp	bx, TASK_MENU_COMMAND_COUNT*4
+		jb	findCommand
+		ret
+foundCommand:
+		test	al, {byte}cs:[taskMenuCommands+2][bx]
+		jz	done
+		cmp	cx, MSG_OL_WIN_CLOSE
+		je	dispatch
+		cmp	cx, MSG_OL_WIN_MINIMIZE
+		je	dispatch
+
+	; Activate the owning layer before restoring or starting interactive UI.
+		push	cx
+		mov	cx, GUQT_FIELD
+		mov	ax, MSG_SPEC_GUP_QUERY
+		call	ObjCallInstanceNoLock
+		mov	bx, ds:[LMBH_handle]
+		call	MemOwner
+		mov	cx, bx
+		mov	dx, bx
+		mov	ax, MSG_GEN_SYSTEM_BRING_GEODE_TO_TOP
+		call	UserCallSystem
+		mov	ax, MSG_GEN_BRING_TO_TOP
+		call	ObjCallInstanceNoLock
+		pop	cx
+		cmp	cx, MSG_OL_WIN_MAXIMIZE
+		jne	dispatch
+		mov	ax, cx
+		call	ObjCallInstanceNoLock
+		mov	ax, MSG_GEN_DISPLAY_SET_NOT_MINIMIZED
+		GOTO	ObjCallInstanceNoLock
+dispatch:
+		mov	ax, cx
+		GOTO	ObjCallInstanceNoLock
+done:
+		ret
+OLBaseWinTaskMenuCommand endm
+
+;
+; The taskbar retains a backing list entry, never a positional button ID.
+; Queue both requests and commands onto the primary's own thread.
+;
+OLWindowListItemTaskMenuState method dynamic OLWindowListItemClass, \
+				MSG_OL_WINDOW_LIST_ITEM_GET_TASK_MENU_STATE
+		mov	dx, cx
+		mov	cx, ds:[LMBH_handle]
+		movdw	bxsi, ds:[di].OLWLI_windowObj
+		mov	ax, MSG_OL_BASE_WIN_GET_TASK_MENU_STATE
+		mov	di, mask MF_FORCE_QUEUE
+		GOTO	ObjMessage
+OLWindowListItemTaskMenuState endm
+
+OLWindowListItemTaskMenuCommand method dynamic OLWindowListItemClass, \
+				MSG_OL_WINDOW_LIST_ITEM_TASK_MENU_COMMAND
+		movdw	bxsi, ds:[di].OLWLI_windowObj
+		mov	ax, MSG_OL_BASE_WIN_TASK_MENU_COMMAND
+		mov	di, mask MF_FORCE_QUEUE
+		GOTO	ObjMessage
+OLWindowListItemTaskMenuCommand endm
+
+HighUncommon ends
+endif

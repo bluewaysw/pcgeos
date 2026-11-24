@@ -1,0 +1,1406 @@
+/**************************************************************************
+ *
+ * PROJECT:	Icon Editor	(GOC Version)
+ * FILE:	process.goc
+ *
+ *		This project is inspired by the Icon Editor by Steve Yegge, 1992 - 1994
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	RainerB 7/18/2025	Initial revision
+ *
+ *
+ * DESCRIPTION:	This file implements the classes IconProcessClass and IconApplicationClass,
+ *		as well as some common tool methods and routines.
+ *
+ **************************************************************************/
+
+/*  Standard include files */
+@include <stdapp.goh>
+@include <Ansi/stdlib.h>
+@include <Ansi/stdio.h>
+@include <Ansi/string.h>
+
+@include "iconed.goh"
+
+@include "UI/appui.goh"
+@include "token.h"
+@include "initfile.h"
+
+@include "rsftool.goh"
+
+/*---------------------------------------------------------------------------
+	Global Variables and local headers
+ ---------------------------------------------------------------------------*/
+GlobalStruct global;
+
+
+@classdecl IconProcessClass, neverSaved;
+
+	@extern method IconProcessClass, MSG_ICON_IMPORT_GRAPHIC_WITH_DIALOGS;
+	@extern method IconProcessClass, MSG_META_CLIPBOARD_NOTIFY_NORMAL_TRANSFER_ITEM_CHANGED;
+
+	@extern method IconProcessClass, MSG_ICON_CUSTOM_COLOR_MODE_CHOOSER_CHANGED;
+	@extern method IconProcessClass, MSG_ICON_OPEN_CUSTOM_COLORS_DIALOG;
+	@extern method IconProcessClass, MSG_ICON_CLOSE_CUSTOM_COLORS_DIALOG;
+	@extern method IconProcessClass, MSG_ICON_SET_CUSTOM_COLOR;
+
+	@extern method IconProcessClass, MSG_ICON_SHIFT_IMAGE_TO;
+	@extern method IconProcessClass, MSG_ICON_DO_EXPORT_TOKEN_DB_DIALOG;
+	@extern method IconProcessClass, MSG_ICON_DO_WRITE_SOURCE_DIALOG;
+	@extern method IconProcessClass, MSG_ICON_DO_WRITE_TO_VM_FILE_DIALOG;
+	@extern method IconProcessClass, MSG_ICON_CROP_CURRENT_ICON;
+	@extern method IconProcessClass, MSG_ICON_DO_CROP_IMAGE_DIALOG;
+	@extern method IconProcessClass, MSG_ICON_RESIZE_IMAGE_CREATE_PREVIEWS;
+	@extern method IconProcessClass, MSG_ICON_EXECUTE_ADD_ICON_DIALOG;
+	@extern method IconProcessClass, MSG_ICON_EXECUTE_ADD_ISET_DIALOG;
+
+@classdecl IconApplicationClass;
+
+	@extern method IconApplicationClass, MSG_ICON_APP_IMPORT_DESTINATION_CHANGED;
+
+	@extern method IconApplicationClass, MSG_ICON_APP_HSV_H_SLIDER_APPLY;
+	@extern method IconApplicationClass, MSG_ICON_APP_HSV_S_SLIDER_APPLY;
+	@extern method IconApplicationClass, MSG_ICON_APP_HSV_V_SLIDER_APPLY;
+
+	@extern method IconApplicationClass, MSG_ICON_APP_EXPORT_TOKEN_QUERY_ICON;
+	@extern method IconApplicationClass, MSG_ICON_APP_EXPORT_TOKEN_SOURCE_CHANGED;
+	@extern method IconApplicationClass, MSG_ICON_APP_EXP_TOKEN_CHARS_CHANGED;
+	@extern method IconApplicationClass, MSG_ICON_APP_EXP_TOKEN_ID_CHANGED;
+
+	@extern method IconApplicationClass, MSG_ICON_APP_WRITE_SOURCE_QUERY_ICON;
+	@extern method IconApplicationClass, MSG_ICON_APP_WRITE_SOURCE_ICON_CHANGED;
+	@extern method IconApplicationClass, MSG_ICON_APP_WRITE_SOURCE_HEADER_CHANGED;
+	@extern method IconApplicationClass, MSG_ICON_APP_WRITE_SOURCE_LANGUAGE_CHANGED;
+
+
+/*********************************************************************************
+ *
+ *      Create or open a temporary file.
+ *	This file holds the images edited by FatbitsClass.
+ *
+ *********************************************************************************/
+
+
+/*--------------------- ToolCreateTempFile ---------------------
+ * Task:	Create or open a temporary file.
+ * Startegy:
+ *	- Enter correct path
+ 	- If we are restoring from state, open the temporary file,
+ 	  otherwise truncate the file
+ * Paramters:	attachFlags: AppAttachFlags from MSG_GEN_PROCESS_OPEN_APPLICATION
+ * Return:	Handle of the file
+ *		Nullhandle if error
+ ---------------------------------------------------------------------------*/
+VMFileHandle ToolCreateTempFile(AppAttachFlags attachFlags) {
+VMFileHandle fh;
+FileLongName fileName;
+
+    /*
+     * Do initializing stuff
+     *	- enter path for temp. file
+     *	- initialize file name
+     */
+    FilePushDir();
+    MemLock( OptrToHandle(@IconEdTempFileName) );
+
+    FileSetStandardPath(SP_PRIVATE_DATA);
+    FileCreateDir(LMemDeref(@IconEdTempFolder));		// no problem, if already exist
+    FileSetCurrentPath(0,LMemDeref(@IconEdTempFolder));
+    strcpy(fileName, LMemDeref(@IconEdTempFileName));
+
+    MemUnlock( OptrToHandle(@IconEdTempFileName) );
+
+    /*
+     * Open the or create file. If we are restoring from state, the file holds
+     * the bitmaps which are edited by the fatbits objects. In this case we have
+     * to open the file.
+     * If we do not restoring from the state, we truncate the file to destroy
+     * any remnants of old bitmaps.
+     */
+    if ( attachFlags & AAF_RESTORING_FROM_STATE ) {
+    	fh = VMOpen(fileName, VMAF_FORCE_READ_WRITE | VMAF_FORCE_DENY_WRITE , VMO_CREATE, 0);
+    } else {
+        fh = VMOpen(fileName, VMAF_FORCE_READ_WRITE | VMAF_FORCE_DENY_WRITE , VMO_CREATE_TRUNCATE,0);
+    }
+
+    /*
+     * If opening fails, try to delete and recreate the file.
+     * Of course, this will also crash the app if we are restoring from state.
+     */
+    if ( !fh ) {
+        FileSetAttributes(fileName, 0);
+    	FileDelete(fileName);
+	fh = VMOpen(fileName, VMAF_FORCE_READ_WRITE | VMAF_FORCE_DENY_WRITE , VMO_CREATE_TRUNCATE,0);
+    }
+
+    EC ( if (!fh) { ProgError("Unable to create the temp. file"); } )
+
+    /*
+     * Do the same job for the undo file.
+     */
+    UndoOpenUndoFile(attachFlags);
+
+    FilePopDir();
+    return fh;
+}
+
+/*--------------------- ToolCloseTempFile ---------------------
+ * Task:	Close temporary file
+ * Paramters:   *fh: 	pointer to file handle
+ * Strategy:	Do no delete the file!
+ * Return:	-
+ ---------------------------------------------------------------------------*/
+void ToolCloseTempFile(VMFileHandle *fh) {
+
+    if (*fh) {
+	VMClose(*fh,FALSE);
+	*fh = 0;
+	}
+
+}
+
+
+
+/*+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+ *
+ *      IconProcessClass code
+ *
+ *+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++*/
+
+
+
+/*--------------------- MSG_PROCESS_CREATE_UI_THREAD ---------------------
+ * Task: The standard stack is too small and leads to stack overflow
+ *	 when working intensively with the UI.
+ ---------------------------------------------------------------------------*/
+@extern method IconProcessClass, MSG_PROCESS_CREATE_UI_THREAD {
+Boolean retVal;
+
+	stackSize = INTERFACE_THREAD_DEF_STACK_SIZE + 1000; // min. 400 bytes more;
+		//  INTERFACE_THREAD_DEF_STACK_SIZE is 2000
+	retVal = @callsuper();
+	return retVal;
+}
+
+/*--------------------- IconToolFindMonikerInfo ---------------------
+ * Task: Get TokenDBItem that is used by the system for passed screen
+ * Strategy: call TokenLookupMoniker() for IconEditor App icon
+ * return  : TokenDBItem if icon was found
+ *	     Zero if icon was not found
+ ---------------------------------------------------------------------------*/
+TokenDBItem IconToolFindMonikerInfo(DisplaySize displaySize, DisplayClass displayClass, TokenMonikerInfo *infoPtr) {
+TokenMonikerInfo tokenMonikerInfo;
+GeodeToken 	tok = { "ICON", 0 };
+Boolean		ok;
+dword 		tokenChars;
+int		aspect;
+DisplayType 	displayType;
+VisMonikerSearchFlags searchFlags;
+
+
+/* typedef struct { TokenDBItem         TMI_moniker;
+    		    word                TMI_fileFlag;
+    		    			/ * 0 if token is in shared token DB file
+						   Non-0 if it's in local file * /
+} TokenMonikerInfo; */
+
+	if ( displaySize== DS_TINY ) { aspect = DAR_VERY_SQUISHED; }
+				else { aspect = DAR_NORMAL; }
+
+	memcpy(&tokenChars, &tok.GT_chars[0], 4);
+    	displayType = displaySize << DT_DISP_SIZE_OFFSET |
+    		aspect	<< DT_DISP_ASPECT_RATIO_OFFSET |
+    		displayClass	<< DT_DISP_CLASS_OFFSET;
+   	searchFlags = VMS_ICON	<< VMSF_STYLE_OFFSET |
+    		VMSF_GSTRING;
+
+    	ok = TokenLookupMoniker(tokenChars, tok.GT_manufID,
+		       displayType, searchFlags,
+		       &tokenMonikerInfo);
+	if ( !ok ) return 0;
+
+	if (infoPtr) *infoPtr = tokenMonikerInfo;
+	return tokenMonikerInfo.TMI_moniker;
+}
+
+
+/*--------------------- IconCheckAndHandleOlderMoniker ---------------------
+ * Task: Check if the icon, stored in the tokenDB, is up to date
+ *	 If not, call MSG_GEN_PROCESS_INSTALL_TOKEN
+ * Strategy: see code
+ *	As long as there is no special API for getting the icons for a
+ *	given token, we have to use a work around
+ ---------------------------------------------------------------------------*/
+void IconCheckAndHandleOlderMoniker(void) {
+TokenDBItem 	stdMoniker, largeMoniker, monoMoniker, cgaMoniker;
+TokenMonikerInfo tokenMonikerInfo;
+
+    /*
+     * The old Icon editor has an imcomplete set of icons for the application
+     * token and/or the document token. Depending of the history and the
+     * version of the old icon editor, there may differnet token variants in
+     * the token database file
+     *	(1) - only a text token
+     *	(2) - only a standard VGA icon
+     *	(3) - a standard VGA icon and a monochrome icon (but no CGA icon)
+     *  (4) - two (empty) large icons (16 colors and monochrome) and a
+     *        more or less complete set of the other icons.
+     *
+     * We should replace the tokens only if this is required because we
+     * have one of the listed cased - oh what a painful job!
+     */
+
+    do {
+	/*
+	 * Find out the TokenDBItem for every moniker of interest.
+	 * IconToolFindMonikerInfo() retuns an "best fit" moniker if the
+	 * requested moniker was not found.
+	 * e.g. the VGA monon moniker is used, if there is no CGA moniker
+	 */
+
+    	stdMoniker = IconToolFindMonikerInfo(DS_STANDARD, DC_COLOR_4, &tokenMonikerInfo);
+    	if ( stdMoniker == 0) break;	/* token not found */
+
+    	largeMoniker = IconToolFindMonikerInfo(DS_LARGE, DC_COLOR_4, NULL);
+    	monoMoniker = IconToolFindMonikerInfo(DS_STANDARD, DC_GRAY_1, NULL);
+    	cgaMoniker = IconToolFindMonikerInfo(DS_TINY, DC_GRAY_1, NULL);
+
+	/*
+	 * For the cases (1), (2) and (3) we receive the same moniker for
+	 * vga mono screens and cga screens -> Update required
+	 */
+    	if ( monoMoniker == cgaMoniker) break;
+
+	/*
+	 * Because we have no special icons for large screens, the received
+	 * monikers should be equal for 16 color large screens and 16 color
+	 * standard screens. For the case (4) we receive the different monikers
+	 * -> Update required
+	 *
+	 */
+    	if ( stdMoniker != largeMoniker) break;
+
+    	/*
+    	 * Tokens are up-to-date
+    	 */
+    	return;
+
+    } while (FALSE);
+
+    /*
+     * --> update monikers
+     */
+    @call process::MSG_GEN_PROCESS_INSTALL_TOKEN();
+}
+
+
+
+/*--------------------- MSG_GEN_PROCESS_OPEN_APPLICATION ---------------------
+ * Task:	Do initializing stuff at app startup
+ * Paramters:	void (	AppAttachFlags		attachFlags,
+ * 			MemHandle		launchBlock,
+ * 			MemHandle 		extraState);
+ * 	attachFlags:	bitflags. possible flags are
+ *	 	  	  AAF_RESTORING_FROM_STATE | AAF_STATE_FILE_PASSED
+ *	 		| AAF_DATA_FILE_PASSED	| AAF_RESTORING_FROM_QUIT
+ * launchBlock:	AppLaunchBlock
+ * extraState:	Handle of the extra state block, if one is returned by
+ * 		MSG_GEN_PROCESS_CLOSE_APPLICATION
+ * Strategy:
+ ---------------------------------------------------------------------------*/
+@method IconProcessClass, MSG_GEN_PROCESS_OPEN_APPLICATION {
+word attrs, err, value;
+
+    /*
+     * - Initialize global Variables
+     * - Create temporary files to hold some bitmaps
+     * - Register process object for clipboard
+     */
+    memset(&global, 0, sizeof(GlobalStruct));
+
+    global.tempFile = ToolCreateTempFile(attachFlags);
+    ClipboardAddToNotificationList(HandleToOptr(GeodeGetProcessHandle()));
+
+    /*
+     * There is a hidden feature to allow icons that are (slightly) larger than 8 kB.
+     * The safe size for icons is 8 kB, but GEOS usually can also handle 10 kB or more.
+     * However, this should be done with great caution. The maximum moniker size
+     * therefore can be set in GEOS.INI. This was actually intended as a test feature,
+     * but it might be helpful in certain situations.
+     */
+    err = InitFileReadInteger (IE_INI_CATEGORY, "maxMonikerSize", &value);
+    if ( err ) { global.maxSaveMonikerSize = MAX_SAFE_MONIKER_SIZE_DEFAULT; }	/* 8kB + sizeof(CBitmap) */
+         else  { global.maxSaveMonikerSize = value; }
+
+    /*
+     * The 2nd hidden feature is to override the maximum allowed icons width and height
+     */
+    err = InitFileReadInteger (IE_INI_CATEGORY, "maxImageDimension", &value);
+    if ( err ) { global.maxMonikerImageSize = MAX_DEFAULT_ICON_WIDTH; }	   /* 1024 pixels */
+    else  {
+	global.maxMonikerImageSize = value;
+
+	/* update affected GenValue objects */
+	@send CustomIconHeightValue::MSG_GEN_VALUE_SET_MAXIMUM(MakeWWFixed(value));
+	@send CustomIconWidthValue::MSG_GEN_VALUE_SET_MAXIMUM(MakeWWFixed(value));
+
+	@send CustomHeightValue::MSG_GEN_VALUE_SET_MAXIMUM(MakeWWFixed(value));
+	@send CustomWidthValue::MSG_GEN_VALUE_SET_MAXIMUM(MakeWWFixed(value));
+
+	@send CustomToolHeightValue::MSG_GEN_VALUE_SET_MAXIMUM(MakeWWFixed(value));
+	@send CustomToolWidthValue::MSG_GEN_VALUE_SET_MAXIMUM(MakeWWFixed(value));
+
+	@send ResizeNewYSize::MSG_GEN_VALUE_SET_MAXIMUM(MakeWWFixed(value));
+	@send ResizeNewXSize::MSG_GEN_VALUE_SET_MAXIMUM(MakeWWFixed(value));
+
+    }
+
+    /*
+     * handle updates for older versions of the Icon Editor
+     */
+    IconCheckAndHandleOlderMoniker();
+    InitFileDeleteEntry("IconEd",  "BitmapTools");	/* Ensure that PickColor is visible */
+
+    @callsuper();
+
+
+    /*
+     * Some dialog boxes would require complex re-initialization when GEOS
+     * is restored from state. This affects all dialogs that have
+     * VisListContentClass objects as well as ResizeDialog.
+     * To keep things easy we close these dialogs here. Even if it's not
+     * GEOS-like, it's not worth the effort to re-initialze the dialog.
+     * There is no problem if the dialog box is not open here.
+     */
+    if ( attachFlags & AAF_RESTORING_FROM_STATE ) {
+	@send SortISetsDialog::MSG_GEN_GUP_INTERACTION_COMMAND(IC_DISMISS);
+	//send SortIconsDialog::MSG_GEN_GUP_INTERACTION_COMMAND(IC_DISMISS);
+        // SortIconsDialog can be restored easily
+	@send TokenDeleterDialog::MSG_GEN_GUP_INTERACTION_COMMAND(IC_DISMISS);
+	@send ImportTokenDialog::MSG_GEN_GUP_INTERACTION_COMMAND(IC_DISMISS);
+
+
+	/*
+	 * Closing ResizeDialog is more complex
+	 */
+	attrs = @call ResizeDialog::MSG_VIS_GET_ATTRS();
+	if (attrs & VA_VISIBLE) {
+	    @send ResizeDialog::MSG_GEN_GUP_INTERACTION_COMMAND(IC_DISMISS);
+	    @call ResizeTargetContent::MSG_OC_DESTROY_LIST();
+	    @call ResizeResizeTrigger::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+	    @call ResizeSourceContent::MSG_OC_REPLACE_BITMAP(0);
+	}
+
+    }
+
+    /*
+     * Create initial color bars for HSV sliders in CustomColorDialog
+     */
+    @send HsvHContent::MSG_OC_CREATE_COLOR_BAR(0, 0, 0, CREATE_H_BAR, FALSE);
+    @send HsvSContent::MSG_OC_CREATE_COLOR_BAR(0, 0, 0, CREATE_H_BAR, FALSE);
+    @send HsvVContent::MSG_OC_CREATE_COLOR_BAR(0, 0, 0, CREATE_H_BAR, FALSE);
+
+@if @DEBUG_FLAG
+    BTSetDebugText(@IconDebugText);
+@endif
+
+EC ( { int size; size = sizeof(ISetExtraData); \
+	if ( size != 152 ) { ProgError("Unexpected change of ISetExtraData size to .."); \
+		MessageNumberBox(sizeof(ISetExtraData)); } } )
+
+}
+
+/*--------------------- MSG_GEN_PROCESS_CLOSE_APPLICATION ---------------------
+ * Task:	App is beeing cosed. Do required stuff
+ * Paramters:	MemHandle ( void );
+ *
+ * Strategy: 	- close temp file
+ *		- free memory
+ *		- unregister process from clipbpoard
+ * Return:	Handle of extra state block (zero for none)
+ ---------------------------------------------------------------------------*/
+@method IconProcessClass, MSG_GEN_PROCESS_CLOSE_APPLICATION {
+MemHandle mh;
+
+    mh = @callsuper();	/* do this first to keep tempfile open until all timers are stoped */
+
+    ToolCloseTempFile(&global.tempFile);
+    UndoCloseUndoFile();
+    ClipboardRemoveFromNotificationList(HandleToOptr(GeodeGetProcessHandle()));
+
+    if (global.iconListPtr) free(global.iconListPtr);
+    global.iconListPtr = 0;
+    if (global.tokenListMH) MemFree(global.tokenListMH);
+
+    /*
+     * Free memory of color bars for HSV sliders in CustomColorDialog
+     */
+    @send HsvHContent::MSG_OC_DESTROY_COLOR_BAR();
+    @send HsvSContent::MSG_OC_DESTROY_COLOR_BAR();
+    @send HsvVContent::MSG_OC_DESTROY_COLOR_BAR();
+
+
+    InitFileCommit();
+
+
+    return mh;
+}
+
+/*--------------------- MSG_GEN_PROCESS_INSTALL_TOKEN ---------------------
+ *	Purpose:	Install the document token
+ *	Context:	Called if the App token does not exists in the token DB
+ *			- or explicitely if the token is outdated.
+ *	Strategy:	Usually, the App token is instaled by the SuperClass
+ 			But in our case, we have to update an older apptoken too
+ *	Parameters:	void ( void )
+ ---------------------------------------------------------------------------*/
+@method IconProcessClass, MSG_GEN_PROCESS_INSTALL_TOKEN {
+GeodeToken docToken = { "IDOC", 0 };
+GeodeToken appToken = { "ICON", 0 };
+dword	tokenDW;
+
+    @callsuper();
+
+    /*
+     * Install / update document token
+     * The list is in the same resource as the monikes - no relocation required
+     */
+    memcpy(&tokenDW, &docToken.GT_chars[0], 4);
+    TokenDefineToken( tokenDW, docToken.GT_manufID,  @IconDocMonikerList,0);
+
+    /*
+     * Install / update Application token
+     */
+    memcpy(&tokenDW, &appToken.GT_chars[0], 4);
+    TokenDefineToken( tokenDW, appToken.GT_manufID,  @IconAppMonikerList,0);
+}
+
+
+
+
+@if @ENABLE_MORE_SPEED_HSV_OPTION
+/*--------------------- MSG_ICON_CUSTOM_COLOR_MORE_SPEED_CHANGED ---------------------
+ *	Purpose:	Redraw color bars to make the changes visible
+ *	Parameters:	(GEN_BOOLEAN_GROUP_APPLY_MSG) (not used)
+ ---------------------------------------------------------------------------*/
+@method IconProcessClass, MSG_ICON_CUSTOM_COLOR_MORE_SPEED_CHANGED {
+     @send HsvHContent::MSG_OTHER_CONTENT_REDRAW_IMAGE();
+     @send HsvSContent::MSG_OTHER_CONTENT_REDRAW_IMAGE();
+     @send HsvVContent::MSG_OTHER_CONTENT_REDRAW_IMAGE();
+}
+@endif
+
+/*--------------------- ToolChangeTextSize ---------------------
+ *	Purpose:	Set a new value for ATTR_GEN_TEXT_DEFAULT_CHAR_ATTR
+ *	Strategy:
+ *	- set up VisTextDefaultCharAttr
+ *	- setobjext not usable and send attr
+ *	- set the object usable only if it was usable bevore.
+ *	Parameters:	optr textObj
+ 			int size	- pass a VTDS_-value
+ ---------------------------------------------------------------------------*/
+void ToolChangeTextSize(optr textObj, int size) {
+VisTextDefaultCharAttr  attr;
+Boolean isUsable;
+
+     attr = ((size << VTDCA_SIZE_OFFSET) | VTDF_UNIVERSITY);
+     isUsable = @call textObj::MSG_GEN_GET_USABLE();
+
+     @send textObj::MSG_GEN_SET_NOT_USABLE(VUM_DELAYED_VIA_UI_QUEUE);
+     @send textObj::MSG_META_ADD_VAR_DATA(ATTR_GEN_TEXT_DEFAULT_CHAR_ATTR, 2, &attr);
+     if (isUsable )
+     	@send textObj::MSG_GEN_SET_USABLE(VUM_NOW);
+
+}
+
+/*--------------------- MSG_ICON_QUICK_HELP_SIZE_CHANGED ---------------------
+ *	Purpose:	Select a new help theme
+ *	Parameters:	(GEN_ITEM_GROUP_APPLY_MSG)
+ ---------------------------------------------------------------------------*/
+@method IconProcessClass, MSG_ICON_QUICK_HELP_SIZE_CHANGED {
+
+     ToolChangeTextSize(@TermsTextField, selection);
+     ToolChangeTextSize(@StandardIconTextField, selection);
+     ToolChangeTextSize(@ColorInfoTextField, selection);
+}
+
+/*--------------------- MSG_ICON_QUICK_HELP_THEME_CHANGED ---------------------
+ *	Purpose:	Select a new help theme
+ *	Parameters:	(GEN_ITEM_GROUP_APPLY_MSG)
+ ---------------------------------------------------------------------------*/
+@method IconProcessClass, MSG_ICON_QUICK_HELP_THEME_CHANGED {
+optr obj = 0;
+
+     @send TermsTextField::MSG_GEN_SET_NOT_USABLE(VUM_NOW);
+     @send StandardIconTextField::MSG_GEN_SET_NOT_USABLE(VUM_NOW);
+     @send ColorInfoTextField::MSG_GEN_SET_NOT_USABLE(VUM_NOW);
+
+     switch (selection) {
+     case HELP_THEME_TERMS: obj = @TermsTextField; break;
+     case HELP_THEME_ICONS: obj = @StandardIconTextField; break;
+     case HELP_THEME_COLOR: obj = @ColorInfoTextField; break;
+     }
+
+     if (obj) {
+         @send obj::MSG_GEN_SET_USABLE(VUM_NOW);
+     }
+
+}
+
+/*--------------------- MSG_ICON_REDRAW_FATBITS ---------------------
+ *	Purpose:	Redraw Fatbits View
+ *	Parameters:	-
+ ---------------------------------------------------------------------------*/
+@method IconProcessClass, MSG_ICON_REDRAW_FATBITS {
+optr fatbitsObj;
+
+    fatbitsObj = CombineGCurDisplayWith(@MyFatbits);
+    if ( !fatbitsObj) return;
+
+    @send ConstructOptr(OptrToHandle(fatbitsObj), OptrToChunk(@FatbitsView))::MSG_GEN_VIEW_REDRAW_CONTENT();
+
+}
+
+/*--------------------- MSG_ICON_OPEN_PICK_COLOR_DIALOG ---------------------
+ *	Purpose:
+ *	Parameters:	-
+ ---------------------------------------------------------------------------*/
+@method IconProcessClass, MSG_ICON_OPEN_PICK_COLOR_DIALOG {
+optr fatbitsObj, viewObj;
+PaletteEntry color;
+
+    fatbitsObj = CombineGCurDisplayWith(@MyFatbits);
+    if ( !fatbitsObj) return;
+
+    /*
+     * Enter Fatbits Pick Color mode
+     */
+    @send fatbitsObj::MSG_FATBITS_SET_FLAGS(FB_PICK_COLOR_IS_ACTIVE, 0);
+
+    /*
+     * Hide the UI of interfering tool control boxes
+     */
+    @send PointerImageOptionsGroup::MSG_GEN_SET_NOT_USABLE(VUM_NOW);
+    @send PointerImagePickColorText::MSG_GEN_SET_USABLE(VUM_NOW);
+
+    /*
+     * Initialize Pick Color dialog box UI
+     */
+    @call oself::MSG_ICON_PICK_COLOR_DIALOG_UPDATE_COLOR(0, 0, fatbitsObj);
+    color = @call fatbitsObj::MSG_FATBITS_GET_PIXEL_COLOR(0, 0, NULL);
+    @call PickColorSelectedColorContent::MSG_OTHER_CONTENT_SET_COLOR(color.rt, color.gn, color.bl);
+
+    /*
+     * Set pipette pointer image
+     */
+    viewObj = CombineGCurDisplayWith(@FatbitsView);
+    @call viewObj::MSG_GEN_VIEW_SET_PTR_IMAGE(@PipettePointer, PIL_WINDOW);
+
+    @send IconPickColorControlBox::MSG_GEN_INTERACTION_INITIATE();
+}
+
+
+/*--------------------- MSG_ICON_PICK_COLOR_DIALOG_UPDATE_COLOR ---------------------
+ *	Purpose:	Read color from image and update dialog UI
+ *	Parameters:	x, y: image coordinates
+ *			fatbitsObj:	our fatbits object
+ *	return:		-
+ ---------------------------------------------------------------------------*/
+@method IconProcessClass, MSG_ICON_PICK_COLOR_DIALOG_UPDATE_COLOR {
+int index;
+PaletteEntry color;
+
+    color = @call fatbitsObj::MSG_FATBITS_GET_PIXEL_COLOR(x, y, &index);
+    @call PickColorCurrentColorContent::MSG_OTHER_CONTENT_SET_COLOR(color.rt, color.gn, color.bl);
+
+    if ( index == (-1) ) {
+    	@call PickColorCurrentIndex::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+    	@call PickColorCurrentIndex::MSG_GEN_VALUE_SET_INTEGER_VALUE(0, FALSE);
+    } else  {
+    	@call PickColorCurrentIndex::MSG_GEN_SET_ENABLED(VUM_NOW);
+    	@call PickColorCurrentIndex::MSG_GEN_VALUE_SET_INTEGER_VALUE(index, FALSE);
+    }
+
+    @call PickColorRValue::MSG_GEN_VALUE_SET_INTEGER_VALUE(color.rt, FALSE);
+    @call PickColorGValue::MSG_GEN_VALUE_SET_INTEGER_VALUE(color.gn, FALSE);
+    @call PickColorBValue::MSG_GEN_VALUE_SET_INTEGER_VALUE(color.bl, FALSE);
+}
+
+/*--------------------- MSG_ICON_CLOSE_PICK_COLOR_DIALOG ---------------------
+ *	Purpose:
+ *	Parameters:
+ *	return:
+ ---------------------------------------------------------------------------*/
+@method IconProcessClass, MSG_ICON_CLOSE_PICK_COLOR_DIALOG {
+optr fatbitsObj;
+
+    fatbitsObj = CombineGCurDisplayWith(@MyFatbits);
+    if ( !fatbitsObj) return;
+
+    /*
+     * re-show UI of interfering tool control boxes
+     */
+    @send PointerImagePickColorText::MSG_GEN_SET_NOT_USABLE(VUM_NOW);
+    @send PointerImageOptionsGroup::MSG_GEN_SET_USABLE(VUM_NOW);
+
+    /*
+     * Leave Pick Color mode
+     */
+    @send fatbitsObj::MSG_FATBITS_SET_FLAGS(0, FB_PICK_COLOR_IS_ACTIVE);
+    @send IconPickColorControlBox::MSG_GEN_GUP_INTERACTION_COMMAND(IC_DISMISS);
+}
+
+/*--------------------- MSG_ICON_SET_PICKED_AREA_COLOR ---------------------
+ *	Purpose:
+ *	Parameters:	-
+ ---------------------------------------------------------------------------*/
+@method IconProcessClass, MSG_ICON_SET_PICKED_AREA_COLOR {
+PaletteEntry color;
+
+    color = @call PickColorSelectedColorContent::MSG_OTHER_CONTENT_GET_COLOR();
+    @send CombineGCurDisplayWith(@MyFatbits)::MSG_GO_SET_AREA_COLOR(color.rt, color.gn, color.bl);
+}
+
+
+/*--------------------- MSG_ICON_SET_PICKED_LINE_COLOR ---------------------
+ *	Purpose:
+ *	Parameters:	-
+ ---------------------------------------------------------------------------*/
+@method IconProcessClass, MSG_ICON_SET_PICKED_LINE_COLOR {
+PaletteEntry color;
+
+    color = @call PickColorSelectedColorContent::MSG_OTHER_CONTENT_GET_COLOR();
+    @send CombineGCurDisplayWith(@MyFatbits)::MSG_GO_SET_LINE_COLOR(color.rt, color.gn, color.bl);
+}
+
+
+
+@if @DEBUG_FLAG
+
+Boolean IconTestBWT(VMFileHandle vmFile, VMBlockHandle bmp);
+
+/* -------------------- MSG_ICON_TEST ---------------------------------------
+ *
+ * --------------------------------------------------------------------------- */
+@method IconProcessClass, MSG_ICON_TEST {
+//dword time = TimerGetCount();
+optr dbViewer;
+int icon, iSet;
+VMFileHandle vmFile;
+VMBlockHandle bmp;
+int format, w, h;
+Boolean found;
+
+    dbViewer = CombineGCurDisplayWith(@DBViewerContent);
+    vmFile = @call dbViewer::MSG_DB_VIEWER_GET_DATABASE();
+    iSet = @call dbViewer::MSG_DB_VIEWER_GET_CURRENT_ISET();
+    icon = @call dbViewer::MSG_DB_VIEWER_GET_CURRENT_ICON();
+
+    bmp = IdGetEntryBitmap(vmFile, iSet, icon);
+    format = BTGetMoreBitmapInfos(vmFile, bmp, &w, &h, 0);
+    DebugInfo1("\r-->Format=%u", format & BMT_FORMAT);
+    DebugInfo2(" %ux%u", w, h);
+
+    found = IconTestBWT(vmFile, bmp);
+    if ( found ) {
+    	UserStandardSound(SST_NOTIFY);
+    	DebugInfo("\r   WHITE PIXELS");
+    } else {
+    	DebugInfo("\r   ok");
+    }
+
+//DebugInfo1("\rTest-Time=%u", TimerGetCount() - time);
+}
+
+/* -------------------- MSG_ICON_TEST2 ---------------------------------------
+ *
+ * --------------------------------------------------------------------------- */
+@method IconProcessClass, MSG_ICON_TEST2 {
+dword time = TimerGetCount();
+
+//	TimeLoop();
+//	TestRGB2HSV();
+
+
+DebugInfo1("\rTest-2-Time=%u", TimerGetCount() - time);
+
+}
+
+
+@endif
+
+/*+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+ 	IconApplicationClass code
+
+ +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++*/
+
+/*--------------------- MSG_META_KBD_CHAR ---------------------
+ *  Purpose:	See if a special key is pressed
+ *  Context:
+ *  Strategy:
+ *  Parameters: void ( word character, word flags, word state )
+ *	character:	Low byte:  ASCII code (if high byte = 0)
+ *				   Control code  (if high byte = 0xFF)
+ *	flags:		High byte: ShiftState 	SS_xxxx
+ *			Low byte: CharFlags	CF_xxxx
+ *			   e.g. CF_FIST_PRESS , CF_RELEASE
+ *	state:		High byte: Scancode
+ *			Low byte: ToggleState
+ *			   TS_CAPSLOCK | TS_NUMLOCK | TS_SCROLLLOCK
+ *	Return:         -
+ -----------------------------------------------------------------------------*/
+@method IconApplicationClass, MSG_META_KBD_CHAR {
+
+    /*
+     * see if ESC key is pressed for first time
+     */
+    do {
+      if ( character != 0xFF1b ) break;
+      if ( (flags & 0xFF) != CF_FIRST_PRESS ) break;
+      if ( (flags & 0xFF00) != 0 ) break;
+
+      @call oself::MSG_ICON_APP_CLOSE_DIALOGS();
+
+    } while (FALSE);
+
+    @callsuper();
+}
+
+/*--------------------- MSG_ICON_APP_CLOSE_DIALOGS ---------------------
+ *  Purpose:	Kill ants and close dialogs
+ *  Context:	Called when ESC key is pressed
+ *  Strategy:
+ *  Parameters:	-
+ *  Return:	-
+ ---------------------------------------------------------------------------*/
+@method IconApplicationClass, MSG_ICON_APP_CLOSE_DIALOGS {
+word attrs;
+
+    if ( global.curDisplay) @send CombineGCurDisplayWith(@MyFatbits)::MSG_FATBITS_KILL_ANTS();
+
+    /*
+     * Dialogboxes that are marked as GIT_COMMAND oder GIT_PROGRESS are usually
+     * closed automatically when ESC key is pressed.
+     * But some dialogs need an extra handling
+     */
+
+    @call ReplacedColorDialog::MSG_GEN_GUP_INTERACTION_COMMAND(IC_DISMISS);
+    @call ImportGraphicDialog::MSG_GEN_GUP_INTERACTION_COMMAND(IC_DISMISS);
+    @call GStringToBitmapDialog::MSG_GEN_GUP_INTERACTION_COMMAND(IC_DISMISS);
+
+    /*
+     * In some cases, the cancel trigger does some important things.
+     * So let it do the job.
+     *
+     */
+    @send ImpTokenCancelImportTrigger::MSG_GEN_TRIGGER_SEND_ACTION(FALSE);
+    @send ExpTokenCancelExportTrigger::MSG_GEN_TRIGGER_SEND_ACTION(FALSE);
+    @send ChangeIconCancelTrigger::MSG_GEN_TRIGGER_SEND_ACTION(FALSE);
+    @send MoveIconCancelTrigger::MSG_GEN_TRIGGER_SEND_ACTION(FALSE);
+    @send TokenDeleterCancelTrigger::MSG_GEN_TRIGGER_SEND_ACTION(FALSE);
+    @send ClosePreviewTrigger::MSG_GEN_TRIGGER_SEND_ACTION(FALSE);
+    @send TextMonikerCancelTrigger::MSG_GEN_TRIGGER_SEND_ACTION(FALSE);
+    @send CropImageCancelTrigger::MSG_GEN_TRIGGER_SEND_ACTION(FALSE);
+    @send AnimateCancelTrigger::MSG_GEN_TRIGGER_SEND_ACTION(FALSE);
+    @send ResizeCloseTrigger::MSG_GEN_TRIGGER_SEND_ACTION(FALSE);
+
+
+    /*
+     * In some cases we have to check the VA_VISIBLE bit of the dialog first
+     * or the trigger handler messes up.
+     *
+     * The SortIconsDialog and SortISetsDialog modifies the database directly. Therefore
+     * the close trigger handler must be called - but only if the dialog is open.
+     */
+    attrs = @call SortIconsDialog::MSG_VIS_GET_ATTRS();
+    if (attrs & VA_VISIBLE) {
+ 	@send SortIconsCancelTrigger::MSG_GEN_TRIGGER_SEND_ACTION(FALSE);
+    }
+
+    attrs = @call SortISetsDialog::MSG_VIS_GET_ATTRS();
+    if (attrs & VA_VISIBLE) {
+ 	@send SortISetsCancelTrigger::MSG_GEN_TRIGGER_SEND_ACTION(FALSE);
+    }
+
+    attrs = @call EditMaskControlBox::MSG_VIS_GET_ATTRS();
+    if (attrs & VA_VISIBLE) {
+ 	@send EditMaskCloseButton::MSG_GEN_TRIGGER_SEND_ACTION(FALSE);
+    }
+
+    attrs = @call IconPickColorControlBox::MSG_VIS_GET_ATTRS();
+    if (attrs & VA_VISIBLE) {
+ 	@send PickColorCloseTrigger::MSG_GEN_TRIGGER_SEND_ACTION(FALSE);
+    }
+
+
+}
+
+/*--------------------- MSG_ICON_APP_CLOSE_AND_SELECT_PENCIL ---------------------
+ *  Purpose:	Close exclusive tool dialogs and enter pencil mode
+ *  Context:
+ *  Strategy:
+ *  Parameters:	-
+ *  Return:	-
+ ---------------------------------------------------------------------------*/
+@method IconApplicationClass, MSG_ICON_APP_CLOSE_AND_SELECT_PENCIL {
+
+    if ( !global.curDisplay ) { EC(ProgError("close and selct pencil: bad display");) return; }
+
+    @send EditMaskControlBox::MSG_GEN_GUP_INTERACTION_COMMAND(IC_DISMISS);
+    @send SelectionToolControlBox::MSG_GEN_GUP_INTERACTION_COMMAND(IC_DISMISS);
+    @send process::MSG_ICON_CLOSE_PICK_COLOR_DIALOG();
+
+    @send CombineGCurDisplayWith(@MyFatbits)::MSG_FATBITS_SET_BITMAP_TOOL(BTF_PENCIL, 0, 0);
+
+}
+
+/*--------------------- MSG_ICON_APPLICATION_SET_OPTIONS ---------------------
+ *  Purpose:	Sends options to all documents.
+ *  Context:
+ *  Strategy:
+ 	- some of the options mus be handled by the document object
+ 	  send it as calssed event to the DocumentGroup
+ 	- other options sets global variables for simplification
+ *  Parameters:GEN_BOOLEAN_GROUP_APPLY_MSG
+ 		(word selectedBooleans = cx,
+	          word indeterminateBooleans = dx,
+	          word modifiedBooleans = bp);
+ *  Return:
+ ---------------------------------------------------------------------------*/
+@method IconApplicationClass, MSG_ICON_APPLICATION_SET_OPTIONS {
+EventHandle ev;
+
+    /*
+     *  Store global options. This MUST be done first!
+     */
+    global.coloredIconListView = (selectedBooleans & IO_COLORED_ICON_LIST) ? TRUE : FALSE;
+
+@if @ENABLE_BACKGROUND_PATTERN
+    global.useBackgroundPattern = (selectedBooleans & IO_BACKGROUND_PATTERN) ? TRUE : FALSE;
+@endif
+
+    /*
+    /*
+     *  Record a classed event for the options.
+     *  Send the options to each document
+     */
+    ev = @record IconDBDocumentClass::MSG_DB_DOC_SET_OPTIONS(selectedBooleans, indeterminateBooleans, modifiedBooleans);
+    @send IconDocumentGroup::MSG_GEN_SEND_TO_CHILDREN(ev);
+
+    /*
+     * if IO_ALLOW_OVERSIZED_ICONS has been activated warn the user
+     */
+    if ( (modifiedBooleans & IO_ALLOW_OVERSIZED_ICONS) && (selectedBooleans & IO_ALLOW_OVERSIZED_ICONS) ) {
+        UserStandardSound(SST_WARNING);
+    	UserDoDialog(@AllowOversizeWarningBox);
+    }
+
+}
+
+/*--------------------- MSG_META_SAVE_OPTIONS ---------------------
+ *  Purpose:	save-options handler for IconApplicationClass
+ *  Context:
+ *  Strategy:
+ 	- get options from ui
+ 	- save it to init file
+ *  Parameters:
+ *  Return:
+ ---------------------------------------------------------------------------*/
+@method IconApplicationClass, MSG_META_SAVE_OPTIONS {
+word value;
+
+     @callsuper();
+
+     value = @call OptionsBooleanGroup::MSG_GEN_BOOLEAN_GROUP_GET_SELECTED_BOOLEANS();
+     InitFileWriteInteger(IE_INI_CATEGORY, IE_INI_OPTIONS_KEY, value);
+
+     value = @call FatbitImageSizeGroup::MSG_GEN_ITEM_GROUP_GET_SELECTION();
+     InitFileWriteInteger(IE_INI_CATEGORY, IE_INI_FATBITS_KEY, value);
+
+     value = @call ViewColorGroup::MSG_GEN_ITEM_GROUP_GET_SELECTION();
+     InitFileWriteInteger(IE_INI_CATEGORY, IE_INI_VIEW_COLOR_KEY, value);
+
+}
+
+/*--------------------- MSG_META_LOAD_OPTIONS ---------------------
+ *  Purpose:	save-options handler for IconApplicationClass
+ *  Context:
+ *  Strategy:
+ *  Parameters:
+ *  Return:
+ ---------------------------------------------------------------------------*/
+@method IconApplicationClass, MSG_META_LOAD_OPTIONS {
+word	options, viewColor, pixelSize;
+
+    @callsuper();
+
+    LoadOptionsFromINI(&options, &pixelSize, &viewColor);
+
+    @call OptionsBooleanGroup::MSG_GEN_BOOLEAN_GROUP_SET_GROUP_STATE(options, FALSE);
+    @call FatbitImageSizeGroup::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(pixelSize, FALSE);
+    @call ViewColorGroup::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(viewColor, FALSE);
+
+
+}
+
+/*--------------------- LoadOptionsFromINI ---------------------
+ *  Purpose:	Load Options.
+ *  Context:
+ *  Strategy:
+ 	- load options from init file
+ 	- set default value if no entry was found
+ *  Parameters:
+ *  Return:
+ ---------------------------------------------------------------------------*/
+void LoadOptionsFromINI(word *options, word *pixelSize, word *viewColor) {
+Boolean err;
+word value;
+
+    err = InitFileReadInteger (IE_INI_CATEGORY, IE_INI_OPTIONS_KEY, &value);
+    if ( err ) value = DEFAULT_ISET_OPTIONS;
+    *options = value;
+
+    err = InitFileReadInteger (IE_INI_CATEGORY, IE_INI_FATBITS_KEY, &value);
+    if ( err ) value = DEFAULT_FATBITS_SIZE;
+    *pixelSize = value;
+
+    err = InitFileReadInteger (IE_INI_CATEGORY, IE_INI_VIEW_COLOR_KEY, &value);
+    if ( err ) value = DEFAULT_VIEW_COLOR;
+    *viewColor = value;
+
+}
+
+
+
+/*--------------------- MSG_META_SEND_CLASSED_EVENT ---------------------
+ *  Purpose:
+ *  Context:
+ *  Strategy:
+ 	We intercept this to handle our own travel option 'TO_BITMAP'
+ 	-  See if it's a TravelOption we handle.
+ 	-  If yes, send the event to appropriate object
+ 	   or destroy the event if no current bitmap exists.
+ 	-  If no let the superclass deal with it.
+ *  Parameters: void (EventHandle event,
+		  TravelOption whereTo);
+ *  Return:
+ ---------------------------------------------------------------------------*/
+@method IconApplicationClass, MSG_META_SEND_CLASSED_EVENT {
+
+    if ( whereTo == TO_BITMAP ) {
+    	if ( global.curDisplay ) {
+	    optr fatbits = CombineGCurDisplayWith(@MyFatbits);
+    	    @send, forceQueue fatbits::MSG_META_SEND_CLASSED_EVENT(event, whereTo);
+    	} else {
+	    ObjFreeMessage(event);
+    	}
+    return;
+    }
+
+    if ( whereTo == TO_DB_VIEWER ) {
+    	if ( global.curDisplay ) {
+    	    optr obj = CombineGCurDisplayWith(@DBViewerContent);
+    	    @send, forceQueue obj::MSG_META_SEND_CLASSED_EVENT(event, whereTo);
+    	} else {
+	    ObjFreeMessage(event);
+    	}
+    return;
+    }
+
+    @callsuper();
+}
+
+/*--------------------- MSG_ICON_APP_UPDATE_ADD_ISET_DIALOG_OPTIONS_UI ---------------------
+ *  Purpose:	Displays the option UI we have for the
+		selected icon type, in the add-icon-set dialog.
+ *  Context:
+ *  Strategy:	We set-not-usable all the specialized UI, then set-usable the ones we
+		want to show up.
+		If we have a colorChooser object, send out its apply message.
+ *  Parameters: GEN_ITEM_GROUP_APPLY_MSG (
+    	    	    	    	    word selection = cx,
+			    	    word numSelections = bp,
+				    GenItemGroupStateFlags stateFlags = dl);
+ *  Return:
+ ---------------------------------------------------------------------------*/
+@method IconApplicationClass, MSG_ICON_APP_UPDATE_ADD_ISET_DIALOG_OPTIONS_UI {
+optr colorChooser = 0;
+
+    /*
+     *  First set everything unusable / not enabled.
+     */
+    @send FileIconOptionsGroup::MSG_GEN_SET_NOT_USABLE(VUM_DELAYED_VIA_UI_QUEUE);
+    @send ToolIconOptionsGroup::MSG_GEN_SET_NOT_USABLE(VUM_DELAYED_VIA_UI_QUEUE);
+    @send MouseCursorOptionsGroup::MSG_GEN_SET_NOT_USABLE(VUM_DELAYED_VIA_UI_QUEUE);
+    @send CustomIconOptionsGroup::MSG_GEN_SET_NOT_USABLE(VUM_DELAYED_VIA_UI_QUEUE);
+    @send PrefModuleOptionsGroup::MSG_GEN_SET_NOT_USABLE(VUM_DELAYED_VIA_UI_QUEUE);
+
+/* flickers ...
+    @send AddISetDialog::MSG_GEN_RESET_TO_INITIAL_SIZE (VUM_DELAYED_VIA_UI_QUEUE);
+*/
+
+    /*
+     *  Set desired objects usable / enabled
+     */
+    switch (selection) {
+    case NEW_FILE_ISET:
+    	@send, forceQueue AddISetHelpText::MSG_VIS_TEXT_REPLACE_ALL_OPTR(@NewISetIconHelpText,0);
+	@send, forceQueue FileIconOptionsGroup::MSG_GEN_SET_USABLE(VUM_DELAYED_VIA_UI_QUEUE);
+	break;
+    case NEW_TOOL_ISET:
+    	@send, forceQueue AddISetHelpText::MSG_VIS_TEXT_REPLACE_ALL_OPTR(@NewISetToolHelpText,0);
+	@send, forceQueue ToolIconOptionsGroup::MSG_GEN_SET_USABLE(VUM_NOW);
+	break;
+    case NEW_PTR_ISET:
+    	@send, forceQueue AddISetHelpText::MSG_VIS_TEXT_REPLACE_ALL_OPTR(@NewISetMouseHelpText,0);
+	@send, forceQueue MouseCursorOptionsGroup::MSG_GEN_SET_USABLE(VUM_DELAYED_VIA_UI_QUEUE);
+	break;
+    case NEW_CUSTOM_ISET:
+    	@send, forceQueue AddISetHelpText::MSG_VIS_TEXT_REPLACE_ALL_OPTR(@NewISetCustomHelpText,0);
+	@send, forceQueue CustomIconOptionsGroup::MSG_GEN_SET_USABLE(VUM_DELAYED_VIA_UI_QUEUE);
+    	colorChooser = @CustomISetBitmapColorsChooser;
+	break;
+    case NEW_PREF_MODULE_ISET:
+    	@send, forceQueue AddISetHelpText::MSG_VIS_TEXT_REPLACE_ALL_OPTR(@NewISetPrefModuleHelpText,0);
+	@send, forceQueue PrefModuleOptionsGroup::MSG_GEN_SET_USABLE(VUM_DELAYED_VIA_UI_QUEUE);
+	break;
+    }
+
+    /*
+     * MousePointer Images have no DisplayClass - hide display class info text
+     */
+    if ( selection == NEW_PTR_ISET ) {
+    	@send AddISetDlgInfoText1::MSG_GEN_SET_NOT_USABLE(VUM_NOW);
+    } else {
+    	@send AddISetDlgInfoText1::MSG_GEN_SET_USABLE(VUM_NOW);
+    }
+
+
+    /*
+     *  If we have a colorChooser object, send out its apply message
+     *  so that color-related UI will be updated,
+     *	If not, hide true-color-is-big warning.
+     *
+     *  This code seems a bit clunky because there's a color chooser only
+     *  for custom iSets. Actually, it's a holdover from a different concept.
+     *  I'll leave it as is for now; maybe it'll get used again someday.
+     */
+    if (colorChooser) {
+    	@send colorChooser::MSG_GEN_ITEM_GROUP_SET_MODIFIED_STATE(TRUE);
+    	@send colorChooser::MSG_GEN_APPLY();
+    } else {
+    	@send AddISetDlgInfoText2::MSG_GEN_SET_NOT_USABLE(VUM_NOW);
+    }
+
+/**/
+}
+
+/*--------------------- MSG_ICON_APP_ADD_ISET_DIALOG_COLOR_SCHEME_CHANGED ---------------------
+ *  Purpose:	Sets up SOME ui in the add-icon-set dialog.
+ *  Context:
+ *  Strategy:
+ 	- If true color is choosen, display a warn message
+ 	- If any colored scheme is choosen, enable extra mono icon selector
+ 	  for custom icon formats
+ *  Parameters: GEN_ITEM_GROUP_APPLY_MSG (
+    	    	    	    	    word selection = cx,
+			    	    word numSelections = bp,
+				    GenItemGroupStateFlags stateFlags = dl);
+ *  Return:
+ ---------------------------------------------------------------------------*/
+@method IconApplicationClass, MSG_ICON_APP_ADD_ISET_DIALOG_COLOR_SCHEME_CHANGED {
+int type;
+
+    if (selection == BMF_24BIT ) {
+    	@send AddISetDlgInfoText2::MSG_GEN_SET_USABLE(VUM_NOW);
+    } else {
+    	@send AddISetDlgInfoText2::MSG_GEN_SET_NOT_USABLE(VUM_NOW);
+    }
+
+    /*
+     *  Depending in the actual icon set type there are additional things to do
+     */
+    type = @call AddTypeGroup::MSG_GEN_ITEM_GROUP_GET_SELECTION();
+    switch (type) {
+    case NEW_CUSTOM_ISET:
+    	if (selection == BMF_MONO ) {
+    	    @send CustomIconAddExtraMonoIcon::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+    	    @send CustomIconAddExtraMonoIcon::MSG_GEN_BOOLEAN_GROUP_SET_GROUP_STATE(0, FALSE);
+    	} else {
+    	    @send CustomIconAddExtraMonoIcon::MSG_GEN_SET_ENABLED(VUM_NOW);
+    	}
+    	break;
+    }
+}
+
+/*--------------------- MSG_ICON_APP_ADD_ISET_DIALOG_CUSTOM_TOOLS_CHANGED ---------------------
+ *  Purpose:	Enable / Disable UI for custom tool setting in add-icon-set-dialog
+ *  Context:
+ *  Strategy:
+ *  Parameters:GEN_BOOLEAN_GROUP_APPLY_MSG
+ 		(word selectedBooleans = cx,
+	          word indeterminateBooleans = dx,
+	          word modifiedBooleans = bp);
+*  Return:
+ ---------------------------------------------------------------------------*/
+@method IconApplicationClass, MSG_ICON_APP_ADD_ISET_DIALOG_CUSTOM_TOOLS_CHANGED {
+
+    /*
+     * As we have two tool format chooser, we have to merge the bist first
+     */
+    selectedBooleans |= @call ToolIconFormatChooser1::MSG_GEN_BOOLEAN_GROUP_GET_SELECTED_BOOLEANS();
+    selectedBooleans |= @call ToolIconFormatChooser2::MSG_GEN_BOOLEAN_GROUP_GET_SELECTED_BOOLEANS();
+
+    /*
+     * Enable / Disable ToolIconFeaturesGroup
+     */
+    if ( selectedBooleans & (IP_CUSTOM_COLOR_TOOL | IP_CUSTOM_MONO_TOOL) ) {
+    	@send ToolIconFeaturesGroup::MSG_GEN_SET_ENABLED(VUM_NOW);
+    } else {
+    	@send ToolIconFeaturesGroup::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+    }
+
+    /*
+     * Enable CustomToolColorChooser only if IP_CUSTOM_COLOR_TOOL is selected
+     * If not, hide true-color-is-big warning too
+     */
+    if ( selectedBooleans & (IP_CUSTOM_COLOR_TOOL) ) {
+    	@send CustomToolColorChooser::MSG_GEN_SET_ENABLED(VUM_NOW);
+    	@send CustomToolColorChooser::MSG_GEN_ITEM_GROUP_SET_MODIFIED_STATE(TRUE);
+    	@send CustomToolColorChooser::MSG_GEN_APPLY();
+    } else {
+    	@send CustomToolColorChooser::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+    	@send AddISetDlgInfoText2::MSG_GEN_SET_NOT_USABLE(VUM_NOW);
+    }
+
+}
+
+/*--------------------- MSG_ICON_APP_ADD_ICON_DIALOG_COLOR_SCHEME_CHANGED ---------------------
+ *  Purpose:	Sets up UI in the add-icon dialog.
+ *  Context:
+ *  Strategy:
+ 	- If true color is choosen, display a warn message
+ 	- If any colored scheme is choosen, enable extra mono icon selector
+ 	  for custom icon formats
+ *  Parameters: GEN_ITEM_GROUP_APPLY_MSG (
+    	    	    	word selection = cx,
+			word numSelections = bp,
+			GenItemGroupStateFlags stateFlags = dl);
+ *  Return:
+ ---------------------------------------------------------------------------*/
+@method IconApplicationClass, MSG_ICON_APP_ADD_ICON_DIALOG_COLOR_SCHEME_CHANGED {
+
+    if (selection == BMF_24BIT ) {
+    	@send AddIconDlgInfoText::MSG_GEN_SET_USABLE(VUM_NOW);
+    } else {
+    	@send AddIconDlgInfoText::MSG_GEN_SET_NOT_USABLE(VUM_NOW);
+    }
+
+    if (selection == BMF_MONO ) {
+	@send AddIconAddExtraMonoIcon::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+	@send AddIconAddExtraMonoIcon::MSG_GEN_BOOLEAN_GROUP_SET_GROUP_STATE(0, FALSE);
+    } else {
+	@send AddIconAddExtraMonoIcon::MSG_GEN_SET_ENABLED(VUM_NOW);
+    }
+}
+
+
+
+/*--------------------- MSG_ICON_APP_ADD_ICON_SET_INITIAL_VALUES ---------------------
+ *  Purpose:	Update AddIconDialog UI to new default (standard) values
+ *  Context:
+ *  Strategy:
+ 	- find out the correct values for width, height, bitmap colors, style,
+ 	  aspect ratio, display size and icon style
+ 	  Bitmap colors may be only 16 colors or monochrome here
+ 	- update the UI in the AddIconDialog
+ *  Parameters: GEN_ITEM_GROUP_APPLY_MSG (
+    	    	    	word selection = cx,	 - one of the IP_xx values
+			word numSelections = bp,
+			GenItemGroupStateFlags stateFlags = dl);
+ *  Return:
+ ---------------------------------------------------------------------------*/
+@method IconApplicationClass, MSG_ICON_APP_ADD_ICON_SET_INITIAL_VALUES {
+int width, height, aspect, style, displaySize;
+BMFormat bmpColors;
+optr defaultNameOp;
+
+    /*
+     * ToolFindBitmapAndScreenParameters() does the most part of the job
+     * Only style value (icon or tool) must be set manually
+     */
+    ToolFindBitmapAndScreenParameters(selection, &width, &height, &bmpColors, &displaySize, &aspect);
+
+    switch (selection) {
+    case IP_STANDARD_CGA_TOOL:
+    case IP_TINY_COLOR_TOOL_256:
+    case IP_TINY_COLOR_TOOL:
+    case IP_TINY_MONO_TOOL:
+    	style = VMS_TOOL;
+    	break;
+    default:
+    	style = VMS_ICON;
+    }
+
+    /*
+     * Update dialog UI to new values
+     */
+     @call CustomIconWidthValue::MSG_GEN_VALUE_SET_INTEGER_VALUE(width, FALSE);
+     @call CustomIconHeightValue::MSG_GEN_VALUE_SET_INTEGER_VALUE(height, FALSE);
+     @call AddIconStyleChooser::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(style, FALSE);
+     @call AddIconDisplaySizeChooser::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(displaySize, FALSE);
+     @call AddIconAspectChooser::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(aspect, FALSE);
+     @call AddIconBitmapColorsChooser::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(bmpColors, FALSE);
+
+     MemLock(OptrToHandle(@DefaultCustomMonikerPrefix));
+     @call AddIconNameTextField::MSG_VIS_TEXT_REPLACE_ALL_PTR(LMemDeref(@DefaultCustomMonikerPrefix), 0);
+     MemUnlock(OptrToHandle(@DefaultCustomMonikerPrefix));
+     defaultNameOp = GetEntryDefaultNameOptr(selection);
+     @call AddIconNameTextField::MSG_VIS_TEXT_APPEND_OPTR(defaultNameOp, 0);
+
+
+    /*
+     * Finally we must enable / disable the "add extra monochrome icon" switch
+     * and hide the "true color warning" text
+     * Oh what a stupid job! Let someone else do the work.
+     */
+    @send AddIconBitmapColorsChooser::MSG_GEN_ITEM_GROUP_SET_MODIFIED_STATE(TRUE);
+    @send AddIconBitmapColorsChooser::MSG_GEN_APPLY();
+}
+
+/*--------------------- AppMarkBusy ---------------------
+ *	Pupose:	Enter Busy state
+ ---------------------------------------------------------------------------*/
+void AppMarkBusy(void) {
+    	@call application::MSG_GEN_APPLICATION_MARK_BUSY();
+    	@call application::MSG_GEN_APPLICATION_IGNORE_INPUT();
+}
+
+/*--------------------- AppMarkNotBusy ---------------------
+ *	Pupose:	Leave Busy state
+ ---------------------------------------------------------------------------*/
+void AppMarkNotBusy(void) {
+    	@call application::MSG_GEN_APPLICATION_MARK_NOT_BUSY();
+    	@call application::MSG_GEN_APPLICATION_ACCEPT_INPUT();
+}
+
+
+
+/*--------------------- ConfirmOnDeleteBox ---------------------
+ *  Purpose:	Ask user if he wants to delete something
+ *  Context:
+ *  Strategy:
+ 	- See if "confirm on delete" option is active
+ 		if set, ask user
+ 		if not set, return IC_YES
+ *  Parameters:	txt: optr of text to display to the user
+ *  Return:	-
+ ---------------------------------------------------------------------------*/
+int ConfirmOnDeleteBox(optr txt) {
+word options;
+int retVal;
+
+    options = @call OptionsBooleanGroup::MSG_GEN_BOOLEAN_GROUP_GET_SELECTED_BOOLEANS();
+    if ( options & IO_CONFIRM_DELETE ) {
+    	retVal = QuestionBoxOptr(txt);
+    } else {
+    	retVal = IC_YES;
+    }
+    return retVal;
+}
+
+
+/***********************************************************************
+ *  Progress box support
+ ************************************************************************/
+
+/*--------------------- ProgressOpenProgressBox ---------------------
+ *  Task:       Show progress box
+ *  Context:
+ *  Strategy:
+ *  Parameters: clearText: clear display text
+ *  Return:
+ ---------------------------------------------------------------------------*/
+void ProgressOpenProgressBox(Boolean clearText) {
+     if (clearText) @call IconProgressText::MSG_VIS_TEXT_DELETE_ALL();
+     @call IconProgressBox::MSG_GEN_INTERACTION_INITIATE();
+     }
+
+/*--------------------- ProgressCloseProgressBox ---------------------
+ *  Task:       Close progress box
+ *  Context:
+ *  Strategy:
+ *  Parameters: delay: waiting time (ticks) before closing, to possibly
+ *              give the user a chance to take another look.
+ *  Return:
+ ---------------------------------------------------------------------------*/
+void ProgressCloseProgressBox(int delay) {
+
+    if (delay) TimerSleep(delay);
+    @send IconProgressBox::MSG_GEN_GUP_INTERACTION_COMMAND(IC_DISMISS);
+}
+
+/*--------------------- ProgressDisplayText ---------------------
+ *  Task:       Display text in progress box
+ *  Context:
+ *  Strategy:
+ *  Parameters: append: TRUE: append text
+ *              	FALSE: replace text
+ *  Return:
+ ---------------------------------------------------------------------------*/
+void ProgressDisplayText(char * txt, Boolean replace) {
+
+    if (replace) {
+        @call IconProgressText::MSG_VIS_TEXT_REPLACE_ALL_PTR(txt, 0);
+     } else {
+        @call IconProgressText::MSG_VIS_TEXT_APPEND_PTR(txt, 0);
+     }
+}
+
+/*--------------------- ProgressDisplayTextOptr ---------------------
+ *  Task:       Display text in progress box
+ *  Context:
+ *  Strategy:
+ *  Parameters: txt: 	optr to the text (may be unlocked)
+ *              append: TRUE: append text
+ *              	FALSE: replace text
+ *  Return:
+ ---------------------------------------------------------------------------*/
+void ProgressDisplayTextOptr(optr txt, Boolean replace) {
+
+    if (replace) {
+        @call IconProgressText::MSG_VIS_TEXT_REPLACE_ALL_OPTR(txt, 0);
+     } else {
+        @call IconProgressText::MSG_VIS_TEXT_APPEND_OPTR(txt, 0);
+     }
+}
+
+/*--------------------- ProgressDisplaySpace ---------------------
+ *  Task:       Append a space to progress box txt
+ ---------------------------------------------------------------------------*/
+void ProgressDisplaySpace() {
+ProgressDisplayTextOptr(@ProgressSpace,FALSE);
+}
+
+/*--------------------- ProgressDisplayCR ---------------------
+ *  Task:       Append a space to progress box txt
+ ---------------------------------------------------------------------------*/
+void ProgressDisplayCR() {
+ProgressDisplayTextOptr(@ProgressCR,FALSE);
+}
+
+
+/*---------------------  ---------------------
+ *  Purpose:
+ *  Context:
+ *  Strategy:
+ *  Parameters:
+ *  Return:
+ ---------------------------------------------------------------------------*/
+
+/* *********** End of file PROCESS.GOC ********************/
+
+

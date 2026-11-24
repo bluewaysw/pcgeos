@@ -343,6 +343,8 @@ Type	    type_NPtr, type_FPtr, type_SPtr, type_LPtr, type_HPtr, type_OPtr,
  */
 #define RETURN_TYPE(t) {TypeToken _tt; _tt.file = (VMHandle)0; TypeInt(_tt) = (t); return TypeCast(_tt); }
 
+static Type TypeResolveTypedefs(Type type);
+
 
 /***********************************************************************
  *				TypeValid
@@ -2209,6 +2211,13 @@ Type_FindFieldData(Type	type,	    	/* Struct/Union type */
     Buffer  	    	retval;
     Sym	    	    	sym;
 
+    /*
+     * See through any typedef, so that structs/unions/records that only
+     * have a name on their typedef (common in modules built from C) don't
+     * fall into the assert below.
+     */
+    type = TypeResolveTypedefs(type);
+
     MAKE_TYPE(type, t, sym);
 
     retval = Buf_Init(0);
@@ -2404,6 +2413,12 @@ Type_ForEachField(Type	    type,    	/* Type through which to iterate */
     register FieldPtr	f;
     register int	i;
     Sym	    	    	sym;
+
+    /*
+     * See through any typedef first: Sym_ForEach only accepts scope
+     * symbols (struct/union/record/etype...), and asserts on a typedef.
+     */
+    type = TypeResolveTypedefs(type);
 
     MAKE_TYPE(type, t, sym);
 

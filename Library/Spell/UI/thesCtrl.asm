@@ -620,13 +620,15 @@ grammarLookupTable	word	\
 	offset	adjectiveString,	
 	offset	nounString,
 	offset	adverbString,
-	offset	verbString	
+	offset	verbString,
+	offset	unknownGrammarString	; optional POS in open linguistic data
 
 ThesStrings	segment	lmem	LMEM_TYPE_GENERAL
 LocalDefString	adjectiveString 	<'(adj) ',0>
 LocalDefString	nounString		<'(n) ',0>
 LocalDefString	adverbString		<'(adv) ',0>
 LocalDefString	verbString		<'(v) ',0>
+LocalDefString	unknownGrammarString	<'(?) ',0>
 ThesStrings	ends
 
 
@@ -971,6 +973,13 @@ exit:
 	ret
 
 notFound:
+	; This temporary result was never installed in the controller.
+	tst	bx
+	jz	resultReleased
+	push	ax
+	call	MemFree
+	pop	ax
+resultReleased:
 	push	ds
 	GetResourceSegmentNS 	idata, ds, <TRASH_BX>
 	mov	cx, ds
@@ -1060,7 +1069,7 @@ ThesControlLookup	endm
 ThesStrings	segment	lmem	LMEM_TYPE_GENERAL
 LocalDefString lookingUpString		<'Looking up...',0>
 LocalDefString wordNotFoundString 	<'The word was not found. Check for misspellings.',0>
-LocalDefString lookupErrorString	<'An error occurred while looking for synonyms. The file ""COM_THES.DIS"" may be missing or contain errors. You may need to reinstall the software.\\\r\\\rError Code: TH-02',0>
+LocalDefString lookupErrorString	<'An error occurred while looking for synonyms. The selected .THS file in DICTS may be missing or contain errors. You may need to reinstall the software.\\\r\\\rError Code: TH-02',0>
 ThesStrings	ends
 
 
@@ -1349,7 +1358,17 @@ endif	;DEFINITIONLESS_THESAURUS
 	segmov	ds, es, si			; ds:si -> last word looked up
 	lea	si, es:[di].TCI_lastWord	
 	call	ThesaurusGetSynonyms		; ^ldx:si=chunk array; ax=size
-	
+
+	; An empty/error result is not retained in TCI_synonyms.
+	tst	ax
+	jg	synonymResultReady
+	tst	dx
+	jz	synonymResultReady
+	push	ax, bx
+	mov	bx, dx
+	call	MemFree
+	pop	ax, bx
+synonymResultReady:
 	cmp	ax, 0				; if error, don't continue
 	jl	error		
 	tst	ax				; if not found, exit
@@ -2286,7 +2305,7 @@ LONG	jz	emptyWord		; if all spaces, string is empty
 
 	call	ThesControlGetStringToken
 	tst	bx				
-	jnz	getOneWord			; punctuation is found
+LONG	jnz	getOneWord			; punctuation is found
 
 	mov	bx, cx 
 	neg	bx	

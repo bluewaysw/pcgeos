@@ -64,7 +64,7 @@ MAKESTUB:	.USE
 
 
 minimal		: minimalLoader minimalLibrary minimalDriver minimalAppl \
-		  otherEnsemble minimalStub
+		  otherEnsemble minimalStub gsetup
 
 minimalLoader	: textLoader VGALoader
 
@@ -102,12 +102,13 @@ minimalLibrary	: kernel swap sound net ui isui motif spool text mailbox \
 
 prefLibs	: prefvid prefts preftd \
 		  prefsnd prefos prefmous preflo preflf prefkbd \
-		  prefintl prefcomp prefbg prefpntc preffont configui
+		  prefintl prefcomp prefbg prefpntc preffont configui \
+		  prefappl
 
 # prefs not used preflvl prefuic prefui prefts prefspui prefsock preflink preflang
 
 # Geos impex libraries
-impex_libs	: dib bmp clp ico pcx tif \
+impex_libs	: dib bmp clp ico pcx tif svg webp \
 		  dbase3 dbase4 htmlimpx vcimpex
 #lot123 msmword msword wordperf5
 
@@ -129,9 +130,9 @@ minimalAppl	: minimalGame minimalUtils minimalTools minimalSavers \
 		  launcher webmagick idialup \
 		  charm wordmat banner \
 		  bbxchat bbxmail \
-		  newsread geozip sclock trayapps\
+		  newsread geozip sclock trayapps firstrun \
  	  	  hmbase pdfvu bnkr30 ftpc \
- 	  	  instc instf grafcalc
+ 	  	  instc instf grafcalc iconed
 
 minimalUtils	: prefmgr
 
@@ -169,7 +170,8 @@ otherEnsemble	: conview reader term tedit geofile dirls  \
 #		  nimbus vidmem logibus logiser msbus msser \
 #		  disk xms emm nonts epson9 epson24 sound_std
 
-minimalDriver	: nimbus ms4 ntfat os2 cdrom stream dri gdi keyboard modem gdipointer \
+minimalDriver	: nimbus ms4 ntfat os2 cdrom megafile hostfs \
+		  stream dri gdi keyboard modem gdipointer \
 		  standard winnt parallel serial disk vidmem svga \
 		  vga vga8 vga15 vga16 vga24 ega cga mcga hgc att6300 dscga \
 		  printerDriver ctm ctmabs imps2 \
@@ -188,6 +190,9 @@ printerDriver	: deskjet dj500c lbp mercury pcl4 quietjet canon48 \
 #escp2 remove from above since it doesn't compile
 
 #faxDriver	: class1in class1out class2in class2out
+
+gsetup	:	Tools/build/product/bbxensem/gsetup
+Tools/build/product/bbxensem/gsetup	:	MAKETOOL
 
 textLoader	:	Installed/Loader/Text
 Installed/Loader/Text	:	MAKETOOL
@@ -278,6 +283,12 @@ Installed/Library/Hash:	kernel MAKELIB
 pnglib	: Installed/Library/PngLib
 Installed/Library/PngLib:	ansic zlib MAKELIB
 
+webplib	: Installed/Library/WebpLib
+Installed/Library/WebpLib:	ansic MAKELIB
+
+svglib	: Installed/Library/SvgLib
+Installed/Library/SvgLib:	ansic MAKELIB
+
 impex	: Installed/Library/Impex
 Installed/Library/Impex: 	ui MAKELIB
 
@@ -307,6 +318,12 @@ Installed/Library/Breadbox/Impex/PNG: ui impex extgraph pnglib MAKELIB
 
 wmf : Installed/Library/Trans/Graphics/Vector/Wmf
 Installed/Library/Trans/Graphics/Vector/Wmf: ui impex ansic MAKELIB
+
+webp : Installed/Library/Trans/Graphics/Bitmap/Webp
+Installed/Library/Trans/Graphics/Bitmap/Webp: impex webplib MAKELIB
+
+svg : Installed/Library/Trans/Graphics/Vector/Svg
+Installed/Library/Trans/Graphics/Vector/Svg: impex svglib MAKELIB
 
 ascii	: Installed/Library/Trans/Text/Ascii
 Installed/Library/Trans/Text/Ascii: 	ui text MAKELIB
@@ -569,6 +586,10 @@ Installed/Library/Pref/Prefts:		ui config MAKELIB
 prefvid	: Installed/Library/Pref/Prefvid
 Installed/Library/Pref/Prefvid:		ui config MAKELIB
 
+prefappl : Installed/Library/Pref/PrefAppl
+Installed/Library/Pref/PrefAppl:	ui config ansic MAKELIB
+
+
 prefpntc	: Installed/Library/Pref/PrefPntC
 Installed/Library/Pref/PrefPntC:	ui config parentc MAKELIB
 
@@ -588,7 +609,7 @@ ms4	: Installed/Driver/IFS/DOS/MS4
 Installed/Driver/IFS/DOS/MS4:		kernel MAKEDRV
 
 os2	: Installed/Driver/IFS/DOS/OS2
-Installed/Driver/IFS/DOS/OS2:		kernel MAKEDRV
+Installed/Driver/IFS/DOS/OS2:		kernel hostif MAKEDRV
 
 ntfat	: Installed/Driver/IFS/DOS/NTFat
 Installed/Driver/IFS/DOS/NTFat:		kernel MAKEDRV
@@ -601,6 +622,12 @@ Installed/Driver/IFS/DOS/MSLF:		kernel MAKEDRV
 
 cdrom     : Installed/Driver/IFS/DOS/CDROM
 Installed/Driver/IFS/DOS/CDROM:		kernel MAKEDRV
+
+megafile : Installed/Driver/IFS/GEOS/MegaFile
+Installed/Driver/IFS/GEOS/MegaFile:	kernel MAKEDRV
+
+hostfs	: Installed/Driver/IFS/HostFS
+Installed/Driver/IFS/HostFS:		kernel hostif MAKEDRV
 
 gdi	: Installed/Driver/Keyboard/GDI
 Installed/Driver/Keyboard/GDI:		kernel genpc MAKEDRV
@@ -963,6 +990,10 @@ Installed/Appl/SysTray/SClock:		ui MAKEAPPL
 trayapps: Installed/Appl/SysTray/TrayApps
 Installed/Appl/SysTray/TrayApps:	ui ansic MAKEAPPL
 
+firstrun: Installed/Appl/FirstRun
+Installed/Appl/FirstRun:	ui ansic MAKEAPPL
+
+
 linktool: Installed/Library/FMTools/Linktool
 Installed/Library/FMTools/Linktool:	ui shell MAKEAPPL
 
@@ -977,6 +1008,9 @@ Installed/Library/FMTools/CvtTool:	ui convert MAKELIB
 
 grafcalc: Installed/Appl/GrafCalc
 Installed/Appl/GrafCalc:	ui ansic cell parse color math MAKEAPPL
+
+iconed: Installed/Appl/IconEd
+Installed/Appl/IconEd:		ui ansic impex grobj bitmap bmptools rsftool icmtool MAKEAPPL
 
 homebase:
 #	No need to do this because this is sync'ed by morning make script.
@@ -1433,7 +1467,7 @@ Installed/Library/SSL:				ansic socket mapheap hostif MAKELIB
 
 # product-specific dependency on fjpeg
 impgraph	: Installed/Library/Breadbox/ImpGraph
-Installed/Library/Breadbox/ImpGraph:		ansic ijgjpeg pnglib fjpeg MAKELIB
+Installed/Library/Breadbox/ImpGraph:		ansic ijgjpeg pnglib fjpeg svglib webplib MAKELIB
 
 ijgjpeg	: 	Installed/Library/Breadbox/Ijgjpeg
 Installed/Library/Breadbox/Ijgjpeg:		ui ansic MAKELIB
@@ -1576,7 +1610,7 @@ Installed/Appl/Breadbox/BBGrmt:			ui ansic spool text MAKEAPPL
 
 graphvwr : Installed/Appl/Breadbox/Graphvwr
 Installed/Appl/Breadbox/Graphvwr:	ui ansic extui giflib thumbdb ijgjpeg pnglib \
-					MAKEAPPL
+					svglib webplib MAKEAPPL
 
 macror	: Installed/Appl/Breadbox/MacroR
 Installed/Appl/Breadbox/MacroR:		ui ansic MAKEAPPL

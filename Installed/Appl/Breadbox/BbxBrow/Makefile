@@ -15,7 +15,7 @@ URLDOC          = LOCALPAG.goc URLDOC.goc
 URLDOCCT        = URLDOCCT.goc
 URLFETCH        = URLFETCH.goc
 URLFRAME        = FRFETCH.goc URLFRAME.goc
-URLTEXT         = URLTEXT.goc URLTEXT2.goc
+URLTEXT         = URLTEXT.goc URLTEXT2.goc URLTEXTP.goc
 UI_TO_RDFS      =
 OBJS            = AWATCHER.obj GLBANIM.obj HTMLVIEW.obj ImportG.obj\
                   LoadURL.obj OpenClos.obj scrapbk.obj StatText.obj\
@@ -23,7 +23,7 @@ OBJS            = AWATCHER.obj GLBANIM.obj HTMLVIEW.obj ImportG.obj\
                   BOOKMARK.obj FAVORCLS.obj FAVORITE.obj NAVCACHE.obj\
                   NAVIGATE.obj LOCALPAG.obj URLDOC.obj URLDOCCT.obj\
                   URLFETCH.obj FRFETCH.obj URLFRAME.obj URLTEXT.obj\
-                  URLTEXT2.obj
+                  URLTEXT2.obj URLTEXTP.obj
 COMMON          = bookclas.goh bookmark.goh favorcls.goh favorite.goh\
                   glbanim.goh htmlview.goh htmlv_ui.goh importg.goh\
                   javascr.h options.goh prodbbx.goh prodgpc.goh prodndo.goh\
@@ -35,7 +35,7 @@ SRCS            = $(ASMTOOLS) $(HTMLVIEW) $(INIT) $(NAVIGATE) $(URLDOC)\
                   $(URLDOCCT) $(URLFETCH) $(URLFRAME) $(URLTEXT) $(COMMON)
 LOBJS           =
 
-PRODUCTS        = AB 
+PRODUCTS        = AB ABDBCS DBCS 
 
 SYSMAKEFILE     = geode.mk
 
@@ -54,4 +54,12 @@ SYSMAKEFILE     = geode.mk
 
 #if exists(AB/$(DEPFILE))
 #include "AB/$(DEPFILE)"
+#endif
+
+#if exists(ABDBCS/$(DEPFILE))
+#include "ABDBCS/$(DEPFILE)"
+#endif
+
+#if exists(DBCS/$(DEPFILE))
+#include "DBCS/$(DEPFILE)"
 #endif

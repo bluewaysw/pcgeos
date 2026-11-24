@@ -84,7 +84,7 @@ void _pascal TrueType_Gen_Chars(
         TransformMatrix*       transformMatrix;
         TT_Raster_Map          rasterMap;
         TT_BBox                glyphBBox;
-        TT_Outline             outline;
+        TT_Outline*            outline;
         void*                  charData;
         sword                  width, height, size;
 
@@ -120,12 +120,12 @@ EC(     ECCheckBounds( (void*)transformMatrix ) );
 
         /* load glyph and load glyphs outline */
         TT_Load_Glyph( INSTANCE, GLYPH, charIndex, TTLOAD_DEFAULT );
-        TT_Get_Glyph_Outline( GLYPH, &outline );
+        outline = TT_Get_Glyph_Outline( GLYPH );
 
-        TT_Transform_Outline( &outline, &transformMatrix->TM_matrix );
+        TT_Transform_Outline( outline, &transformMatrix->TM_matrix );
 
         /* get glyphs boundig box */
-        TT_Get_Outline_BBox( &outline, &glyphBBox );
+        TT_Get_Outline_BBox( outline, &glyphBBox );
 
         /* Grid-fit it */
         glyphBBox.xMin &= -64;
@@ -156,9 +156,9 @@ EC(             ECCheckBounds( (void*)charData ) );
                 rasterMap.bitmap = ((byte*)charData) + SIZE_REGION_HEADER;
 
                 /* translate outline and render it */
-                TT_Transform_Outline( &outline, &flipmatrix );
-                TT_Translate_Outline( &outline, -glyphBBox.xMin, glyphBBox.yMax );
-                TT_Get_Outline_Region( &outline, &rasterMap );
+                TT_Transform_Outline( outline, &flipmatrix );
+                TT_Translate_Outline( outline, -glyphBBox.xMin, glyphBBox.yMax );
+                TT_Get_Outline_Region( outline, &rasterMap );
 
 EC_ERROR_IF(    size < rasterMap.size, ERROR_BITMAP_BUFFER_OVERFLOW );
 
@@ -187,6 +187,9 @@ EC_ERROR_IF(    size < rasterMap.size, ERROR_BITMAP_BUFFER_OVERFLOW );
                 charData = EnsureBitmapBlock( bitmapHandle, size );
 EC(             ECCheckBounds( (void*)charData ) );
 
+                /* rasterizer ORs pixels into the bitmap, so it must be cleared */
+                memset( charData, 0, size );
+
                 /* init rasterMap */
                 rasterMap.rows   = height;
                 rasterMap.width  = width;
@@ -195,8 +198,8 @@ EC(             ECCheckBounds( (void*)charData ) );
                 rasterMap.bitmap = ((byte*)charData) + SIZE_CHAR_HEADER;
 
                 /* translate outline and render it */
-                TT_Translate_Outline( &outline, -glyphBBox.xMin, -glyphBBox.yMin );
-                TT_Get_Outline_Bitmap( &outline, &rasterMap );
+                TT_Translate_Outline( outline, -glyphBBox.xMin, -glyphBBox.yMin );
+                TT_Get_Outline_Bitmap( outline, &rasterMap );
 
 EC_ERROR_IF(    size < rasterMap.size, ERROR_BITMAP_BUFFER_OVERFLOW );
 
@@ -548,14 +551,17 @@ static void* EnsureBitmapBlock( MemHandle bitmapHandle, word size )
     else
         allocSize = (size + 255) & 0xFF00;
 
-    bitmapData  = MemLock( bitmapHandle );
-    currentSize = (bitmapData == NULL) ? 0 : MemGetInfo( bitmapHandle, MGIT_SIZE );
-        
-    if ( currentSize != allocSize )
+    /* Avoid locking the block before a resize. */
+    currentSize = MemGetInfo( bitmapHandle, MGIT_SIZE );
+
+    if ( currentSize == allocSize )
     {
-        MemReAlloc( bitmapHandle, allocSize, HAF_NO_ERR | HAF_LOCK );
-        bitmapData = MemDeref( bitmapHandle );
+        bitmapData = MemLock( bitmapHandle );
+        if ( bitmapData != NULL )
+            return bitmapData;
     }
-        
-    return memset( bitmapData, 0, size );
+
+    /* Also restores a discarded bitmap block (MemLock returned NULL). */
+    MemReAlloc( bitmapHandle, allocSize, HAF_NO_ERR | HAF_LOCK );
+    return MemDeref( bitmapHandle );
 }

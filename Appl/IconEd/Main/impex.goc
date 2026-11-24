@@ -1,0 +1,1719 @@
+/**************************************************************************
+ *
+ * PROJECT:	Icon Editor	(GOC Version)
+ * FILE:	impex.goc
+ *
+ *		This project is inspired by the Icon Editor by Steve Yegge, 1992 - 1994
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	RainerB 10/20/2025	Initial revision
+ *
+ *
+ * DESCRIPTION:	This file deal with import/export and the clipboard
+ *
+ **************************************************************************/
+
+/*  Standard include files */
+@include <stdapp.goh>
+@include <Ansi/stdlib.h>
+@include <Ansi/stdio.h>
+@include <Ansi/string.h>
+
+@include "iconed.goh"
+@include "UI/appui.goh"
+@include "rsftool.goh"
+@include "initfile.h"
+@include "math.h"
+
+/*---------------------------------------------------------------------------
+	Global Variables and local headers
+ ---------------------------------------------------------------------------*/
+GlobalStruct global;
+
+
+/***********************************************************************
+ *  Clipboard Monitoring: Detect when something important
+ *                 has happened in the clipboard.
+ *                 Note for text objects: see below.
+ *  Overridden message for "normal" clipboard transfer:
+ *      MSG_META_CLIPBOARD_NOTIFY_NORMAL_TRANSFER_ITEM_CHANGED
+ *  Tool routines:
+ *      ToolTestClipboardItem() checks whether a certain type of
+ *          data is present in the clipboard.
+ *  The following messages can be handled if needed (see documentation):
+ *      MSG_META_CLIPBOARD_NOTIFY_TRANSFER_ITEM_FREED
+ *      MSG_META_CLIPBOARD_NOTIFY_QUICK_TRANSFER_CONCLUDED
+ *      MSG_META_CLIPBOARD_NOTIFY_QUICK_TRANSFER_FEEDBACK
+ ***********************************************************************/
+
+
+/*--------------------- ToolTestClipboardItem ---------------------
+ * Purpose: 	Test whether a specific format is present in the clipboard
+ * Parameters:  manufID:    Manufacturer ID of the format (0 == GEOWORKS)
+ *    format:	Format type (e.g., CIF_BITMAP)
+ *      flag:	Query normal or quick-transfer item:
+ *              CIF_QUICK or TIF_NORMAL
+ * Return:  TRUE if present, FALSE if not
+ * Source:  Rabe-Soft BitmapTool Library
+ ---------------------------------------------------------------------------*/
+Boolean ToolTestClipboardItem(word manufID, word format, ClipboardItemFlags flag) {
+dword formatID = FormatIDFromManufacturerAndType(manufID, format);
+ClipboardQueryArgs	query;	    	    	/* Ergebnis der Abfrage */
+Boolean		found = FALSE;
+
+    /* query Clipboard Infos */
+    ClipboardQueryItem(flag, &query);
+
+     /* search for the format. */
+    if ( query.CQA_numFormats )
+      found = ClipboardTestItemFormat(query.CQA_header, formatID );
+
+    ClipboardDoneWithItem(query.CQA_header);
+
+    return found;
+    }
+
+
+/*------------- MSG_META_CLIPBOARD_NOTIFY_NORMAL_TRANSFER_ITEM_CHANGED --------
+ *  Purpose:    The clipboard content has changed. Check if there is
+ *          	anything useful for me.
+ *  Parameters: void (ManufacturerID manufID, word changeID)
+ *  Strategy:	MSG_DB_VIEWER_UPDATE_EDIT_MENU does the job
+ *  Return:
+ ---------------------------------------------------------------------------*/
+@extern method IconProcessClass, MSG_META_CLIPBOARD_NOTIFY_NORMAL_TRANSFER_ITEM_CHANGED
+{
+optr dbViewer;
+
+    /*
+     * We have to find out the optr of DBViewerContent of the current document.
+     * The DBViewerContent is stored in the same resource as
+     * the fatbits object, which is stored in a global variable.
+     * If the global.curDisplay handle is zero, there is no document open.
+     */
+    if (global.curDisplay ) {
+    	dbViewer = CombineGCurDisplayWith(@DBViewerContent);
+    	@call dbViewer::MSG_DB_VIEWER_UPDATE_EDIT_MENU();
+    }
+
+
+}
+
+/*--------------------- MSG_DB_VIEWER_UPDATE_EDIT_MENU ---------------------
+ *  Purpose:	To all the things to hold the edit menu triggers up to date
+ *		Do not deal with the undo triggers, use MSG_FATBITS_UPDATE_UNDO_TRIGGERS for that
+ *  Context:
+ *  Strategy:	We have two sets of triggers, one for the Icons (graphics)
+ *		and one for the icon sets.
+ *		Undo/Redo is not handled here
+ *  Parameters:
+ *  Return:
+ ---------------------------------------------------------------------------*/
+@extern method IconDBViewerClass, MSG_DB_VIEWER_UPDATE_EDIT_MENU {
+Boolean pasteable, copyable;
+word	enableTriggers = 0, disableTriggers = 0;
+
+    /*
+     * The first triggers deals with the graphics of the icons.
+     * We can paste a graphic if there is one in the Clipboard.
+     * We can copy a graphic, if there is an icon.
+     * We cannot select all or delete icons from edit menu
+     */
+    pasteable = ToolTestClipboardItem( 0, CIF_BITMAP, TIF_NORMAL);
+    pasteable |= ToolTestClipboardItem( 0, CIF_GRAPHICS_STRING, TIF_NORMAL);
+    if ( pasteable ) {
+    	@send IconPasteIconTrigger::MSG_GEN_SET_ENABLED(VUM_NOW);
+    	enableTriggers |= ETF_TRIG_PASTE;
+    } else {
+    	@send IconPasteIconTrigger::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+    	disableTriggers |= ETF_TRIG_PASTE;
+    }
+
+    /*
+     * There are two possible reasons why there is no icon graphic to copy:
+     * either we have no
+     * document open, or the document does not contain any icon sets.
+     * In these cases pself->DBVI_currentIcon is set to NO_CURRENT_ICON.
+     */
+    copyable = (pself->DBVI_currentIcon == NO_CURRENT_ICON) ? FALSE : TRUE;
+    if ( copyable ) {
+    	@send IconCopyIconTigger::MSG_GEN_SET_ENABLED(VUM_NOW);
+        enableTriggers |= ETF_TRIG_COPY;
+    } else {
+    	@send IconCopyIconTigger::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+    	disableTriggers |= ETF_TRIG_COPY;
+    }
+
+    /*
+     * Update tool triggers
+     */
+    @send ToolOnlyEditControl::MSG_TOC_ENABLE_EDIT_TOOL_TRIGGERS(enableTriggers, disableTriggers);
+
+
+    /*
+     * Now check if there is an icon-set available in the clipboard
+     * and if there are icon sets are selected
+     */
+    pasteable = ToolTestClipboardItem( 0, CIF_ICON_LIST, TIF_NORMAL);
+    pasteable |= ToolTestClipboardItem( 0, CIF_EXT_ICON_LIST, TIF_NORMAL);
+    if ( pasteable ) {
+    	@send IconPasteISetTrigger::MSG_GEN_SET_ENABLED(VUM_NOW);
+    } else {
+    	@send IconPasteISetTrigger::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+    }
+
+    copyable = (pself->DBVI_numSelected) ? TRUE : FALSE;
+    if ( copyable ) {
+    	@send IconCopyISetTrigger::MSG_GEN_SET_ENABLED(VUM_NOW);
+    } else {
+    	@send IconCopyISetTrigger::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+    }
+
+    /*
+     * The "select all sets" trigger can be enabled if at least one icon set exists
+     */
+    if ( IdGetISetCount(pself->DBVI_vmFile) ) {
+    	@send IconSelectAllISetTrigger::MSG_GEN_SET_ENABLED(VUM_NOW);
+    } else {
+    	@send IconSelectAllISetTrigger::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+    }
+
+}
+
+/*--------------------- ToolUpdateImportGraphicSizeText ---------------------
+ *  Purpose:	Pass size and color depth of the bitmap to our text object
+ *  Context:
+ *  Strategy:
+ *  Parameters:
+ *  Return:
+ ---------------------------------------------------------------------------*/
+void ToolUpdateImportGraphicSizeText(VMFileHandle vmFile, VMBlockHandle bmp) {
+int format, width, height;
+dword bitmapSize;
+char buf[30];
+
+    format = BTGetMoreBitmapInfos(vmFile, bmp, &width, &height, NULL);
+    sprintf(buf, "%ux%u, ", width, height);
+    MemLock(OptrToHandle(@IconInfoMonoText));
+    switch (format & BMT_FORMAT) {
+	case BMF_MONO:
+	    strcat(buf, LMemDeref(@IconInfoMonoText));
+	    break;
+    	case BMF_4BIT:
+	    strcat(buf, LMemDeref(@IconInfo16ColorsText));
+	    break;
+        case BMF_8BIT:
+	    strcat(buf, LMemDeref(@IconInfo256ColorsText));
+	    break;
+    	default: 	// 24 Bit
+	    strcat(buf, LMemDeref(@IconInfoTCText));
+	}
+    MemUnlock(OptrToHandle(@IconInfoMonoText));
+    @call ImportGraphicSizeText::MSG_VIS_TEXT_REPLACE_ALL_PTR(buf, 0);
+
+    bitmapSize = ToolCalcBitmapSize(width, height, format);
+    MemLock(HandleOf(@ImageSizeText));
+    strcpy(buf, "\r");
+    sprintf(&buf[1], LMemDeref(@ImageSizeText), bitmapSize);
+    MemUnlock(HandleOf(@ImageSizeText));
+    @call ImportGraphicSizeText::MSG_VIS_TEXT_APPEND_PTR(buf, 0);
+
+}
+
+
+/*--------------------- ToolUpdateImportIconName ---------------------
+ *  Purpose:	Set ImportGraphicDlgNameText according to bitmap format
+ *		and settings in the ImportGraphicDialog
+ *  Context:
+ *  Strategy:
+ *	Create a moniker like CustomStandardVGAFileMoniker or CustomLargeVGAToolMoniker
+ *	With the execption of "Custom" the text is not localizable yet.
+ *  Parameters:
+ *  Return:
+ ---------------------------------------------------------------------------*/
+void ToolUpdateImportIconName(void) {
+int selection;
+char name[MAX_ICON_NAME_LENGTH + 10];
+optr dbViewer;
+
+    // Prefix: "Custom" (localizable)
+    MemLock(HandleOf(@DefaultCustomMonikerPrefix));
+    strcpy(name, LMemDeref(@DefaultCustomMonikerPrefix));
+    MemUnlock(HandleOf(@DefaultCustomMonikerPrefix));
+
+    /*
+     * "pointer-images" have no attributes like DisplayClass etc.
+     * If we the have "Create a new Icon" selected, we use a common default name.
+     */
+    dbViewer = CombineGCurDisplayWith(@DBViewerContent);
+    if ( @call dbViewer::MSG_DB_VIEWER_TEST_IF_PTR_IMAGE() ) {
+	selection = @call ImportDestinationGroup::MSG_GEN_ITEM_GROUP_GET_SELECTION();
+	if ( selection == IMPORT_TO_NEW_ICON) {
+	    MemLock(HandleOf(@DefaultNameMousePointer));
+	    strcat(name, LMemDeref(@DefaultNameMousePointer));
+	    MemUnlock(HandleOf(@DefaultNameMousePointer));
+	    goto sendNameToText;
+	}
+    }
+
+    /*
+     * In all other cases, construct the name from icon attributes
+     */
+
+    // DisplayClass
+    selection = @call ImportGraphicDisplaySizeChooser::MSG_GEN_ITEM_GROUP_GET_SELECTION();
+    switch (selection) {
+    case DS_HUGE: strcat(name, "Huge"); break;
+    case DS_LARGE: strcat(name, "Large"); break;
+    case DS_STANDARD: strcat(name, "Standard"); break;
+    case DS_TINY: strcat(name, "Tiny"); break;
+    }
+
+    // Aspect ratio
+    selection = @call ImportGraphicAspectChooser::MSG_GEN_ITEM_GROUP_GET_SELECTION();
+    switch (selection) {
+    case DAR_NORMAL: strcat(name, "VGA"); break;
+    case DAR_VERY_SQUISHED: strcat(name, "CGA"); break;
+    }
+
+    // Style
+    selection = @call ImportGraphicStyleChooser::MSG_GEN_ITEM_GROUP_GET_SELECTION();
+    switch (selection) {
+    case VMS_ICON: strcat(name, "File"); break;
+    case VMS_TOOL: strcat(name, "Tool"); break;
+    }
+
+    // Add "Moniker"
+    strcat(name, "Moniker");
+
+sendNameToText:
+    // Send name to ImportGraphicDlgNameText object
+    name[MAX_ICON_NAME_LENGTH] = 0;
+    @call ImportGraphicDlgNameText::MSG_VIS_TEXT_REPLACE_ALL_PTR(name, 0);
+
+}
+
+/*--------------------- IconDrawGStringToBitmap ---------------------
+ *  Purpose:	Draw a gstring to a masked bitmap. Use a work around
+ 		for drawing the gstring to the mask plane.
+ *  Context:
+ *  Strategy:	see code
+ *  Parameters:
+ *  Return:
+ ---------------------------------------------------------------------------*/
+void IconDrawGStringToBitmap(VMFileHandle vmFile, VMBlockHandle bmp,
+        int xPos, int yPos, Handle gstr) {
+GStateHandle gs;
+VMBlockHandle maskBmp;
+int x0, y0;
+Rectangle bounds;
+
+word elem;  /* BUG!!! GStringElement is defined as byte,
+                 * but GrLoadGString() writes a word ->
+                 * GrDrawGString() may do so too (I'm not sure),
+                 * so declaring 'elem' as GStringElement may cause data
+                 * to be overwritten! */
+
+    /*
+     * Draw the GString to the Bitmap
+    /* Because a GString may not be placed in the upper left corner of a
+     * Window, we have to use its bounds.
+     */
+    gs = GrEditBitmap(vmFile, bmp, NULL);
+
+    GrGetGStringBounds(gstr,0,0,&bounds);
+    x0 = xPos - bounds.R_left;
+    y0 = yPos - bounds.R_top;
+
+    GrDrawGString(gs, gstr, x0, y0, 0, &elem);
+    GrDestroyState(gs);
+
+    /*
+     * Draw mask. Because there is a bug in older systems (GEOS 4.x) when
+     * dealing with 24 bit bimtmap mask, we use a work around.
+     */
+    maskBmp = BTExtractTransparencyMask(vmFile, bmp, global.tempFile, 0);
+    gs = GrEditBitmap(global.tempFile, maskBmp, NULL);
+
+
+    /*
+     * In order to avoid dithering the mask, we have to set the MixMode to MM_SET.
+     * A GString may contain commands to modify the MixMode.
+     * Therefore, we have to filter it out while drawing to the mask.
+     */
+    GrSetMixMode(gs,MM_SET);
+    do {
+	int retVal;
+	elem = 0;
+	retVal = GrDrawGString(gs, gstr, x0, y0, GSC_ATTR,&elem);
+	if ( retVal == GSRT_COMPLETE) break;
+	if ( elem == GR_SET_MIX_MODE ) {
+	    GrSetGStringPos(gstr, GSSPT_SKIP_1, 0);
+	    }
+	} while ( elem != GR_END_GSTRING );
+
+    /*
+     * Re-Assign transparency mask and destroy mask bitmap
+     */
+    GrDestroyState(gs);
+    BTApplyTransparencyMask(vmFile, bmp, 0, global.tempFile, maskBmp, 0);
+    HugeArrayDestroy(global.tempFile, maskBmp);
+
+
+}
+
+/*--------------------- DealWithImportedGString ---------------------
+ *  Purpose:	Convert a passed GString into a bitmap
+ *  Context:	Import from Clipboard or via impex library
+ *  Strategy:
+ *	- Ask the user for color depth of the destination bitmap
+ *	- Fetch GString size and create a bitmap (with a mask)
+ *	- Draw the GString into the bitmap
+ *	- Destroy passed GString and return the bitmap handle
+ *  Parameters:
+ *		graphic	Handle to the GString
+ *			The gstring si stored in the global.tempFile
+ *  Return: VMBlockHandle of the new Bitmap
+ ---------------------------------------------------------------------------*/
+VMBlockHandle DealWithImportedGString(VMBlockHandle graphic) {
+VMBlockHandle  bmpHandle;
+Handle gstr;
+int xSize, ySize;
+int cmd, color, options;
+Rectangle bounds;
+GStateHandle bmgs;
+
+    	/*
+    	 * We need a bitmap to work. A GString must be coverted first.
+    	 */
+	cmd = UserDoDialog(@GStringToBitmapDialog);
+	if (cmd != IC_OK ) {
+	    VMFreeVMChain(global.tempFile, graphic);	/* A GString is a VMChain internally */
+	    return NullHandle;
+	}
+
+    	/*
+    	 * Read desired color depth from dialog box.
+    	 * We always need a masked bitmap.
+    	 */
+	color = @call GSTBColorSelector::MSG_GEN_ITEM_GROUP_GET_SELECTION();
+	color |= BMT_MASK;
+
+	/*
+	 * Draw GString to a Bitmap
+	 * - find out gstring bounds, fix potential bounds issue
+	 * - create bitmap
+	 * - draw bitmap with BTDrawGString to handle mask properly
+	 */
+	gstr = GrLoadGString(global.tempFile, GST_VMEM, graphic);
+	GrGetGStringBounds(gstr, 0, 0, &bounds);
+	xSize = bounds.R_right - bounds.R_left;
+	ySize = bounds.R_bottom - bounds.R_top;
+
+	/*
+	 * For GString objects with frames (e.g., rectangles), the right and
+	 * bottom borders may lie outside of the bounds. Therefore we allow
+	 * the user to add an extra pixel in both directions to be save.
+	 */
+	options = @call GSTBOptionGroup::MSG_GEN_BOOLEAN_GROUP_GET_SELECTED_BOOLEANS();
+	if ( options & GSTB_OPTION_EXTRA_PIXEL ) {
+	    xSize++; ySize++;
+	}
+
+	/*
+	 * Now create bitmap and draw GString to the bitmap.
+	 * BTDrawGString prevents mask from dithering
+	 */
+	bmpHandle = BTCreateOffscreenBitmap( global.tempFile, color, xSize,  ySize, NULL);
+	bmgs = GrEditBitmap(global.tempFile, bmpHandle, NULL);
+	IconDrawGStringToBitmap(global.tempFile, bmpHandle, 0, 0, gstr);
+
+	/*
+	 * Clean up. Destroy the GStrings. Leave bitmap data!
+	 */
+	GrDestroyGString(gstr,NULL,GSKT_KILL_DATA);
+	GrDestroyBitmap(bmgs, BMD_LEAVE_DATA);
+
+    return bmpHandle;
+}
+
+/*-------------------- ImpexCheckNewIconForPtrImageAllowed ---------------------
+ *  Purpose:	When the current iSet is a "pointer-image" set, the imported
+ *		bitmap can only be used for a new icon, if it is a 16-color
+ *		bitmap and it has the right size.
+ *  Context:
+ *  Strategy:	Standard mouse pointer have a size of 16x16 pixels
+ *		We are also prepared for bigger pointers, see definition of
+ *		ALLOW_POINTER_DEF_32_AND_64 for more information
+ *  Parameters:	bmp: bitmap, stored in gloabl.tempFile
+ *		isPtrImage: return TRUE, if the current iSet is a "pointer-image" set
+ *  Return:	TRUE: a new icon can be created from the passed bitmap
+ *		FALSE: the bitmap cannot be used for a new icon.
+ ---------------------------------------------------------------------------*/
+Boolean ImpexCheckNewIconForPtrImageAllowed(VMBlockHandle bmp, Boolean *isPtrImage) {
+int format, width, height;
+optr dbViewer;
+Boolean isPImg;
+
+    /*
+     * If the current iSet is not a "pointer-image" set,
+     * use the bitmap for new icons are allways allowed.
+     */
+    dbViewer = CombineGCurDisplayWith(@DBViewerContent);
+    isPImg = @call dbViewer::MSG_DB_VIEWER_TEST_IF_PTR_IMAGE();
+    if ( !isPImg ) {
+	*isPtrImage = FALSE;
+    	return TRUE;
+    }
+
+    *isPtrImage = TRUE;
+    /*
+     * Now we need a 16 color bitmap of 16x16 (or 32x32 resp. 64x64) pixel
+     */
+    format = BTGetMoreBitmapInfos(global.tempFile, bmp, &width, &height, 0);
+    if ( (format & BMT_FORMAT) != BMF_4BIT ) return FALSE;
+
+    if ( (width == 16) && (height == 16) ) return TRUE;
+@if @ALLOW_POINTER_DEF_32_AND_64
+    if ( (width == 32) && (height == 32) ) return TRUE;
+    if ( (width == 64) && (height == 64) ) return TRUE;
+@endif
+    return FALSE;
+}
+
+/*--------------------- IconProcessDealWithImportedBitmap ---------------------
+ *  Purpose:	Let the user select some poroperties of the icon to create
+ *		Additionally, the user may crop the bitmap first
+ *  Context:	The routine may be called only from process thread!
+ *  Strategy:
+ *	- Fetch the number of existing icon sets.
+ *	  Update the UI of ImportGraphicDialog accordung to this number
+ *	- Update ImportGraphicSizeText to reflect bitmap dimensions and size
+ *	- Execute ImportGraphicDialog. The user can select displayClass,
+ *	  icon style and aspect ratio here.
+ *      - The user may also decide to crop the bitmap first.
+ *	  If so, execute cropping, destroy the old bitmap
+ *	  and restart dialog.
+ *	- return the handle of the actual bitmap.
+ *  Parameters:
+ *		bmp	Handle to the Bitmap
+ *			The bitmap is stored in the global.tempFile and
+ *			is ready to use (has a mask and is uncompressed)
+ *  Return:	VMBlockHandle of the (probabely edited) bitmap
+ *			If the handle (i.e. the bitmap) has been changed,
+ *			the old bitmap is destroyed already
+ ---------------------------------------------------------------------------*/
+VMBlockHandle IconProcessDealWithImportedBitmap(VMBlockHandle bmp, optr dbViewer) {
+int count, cmd, sel;
+CBitmap *header;
+MemHandle mh;
+VMBlockHandle croppedBmp;
+Boolean	isPtrImage;
+
+    /*
+     * Prepare ImportGraphicDialog
+     *
+     * The user must select some options to create the new icon properly.
+     * This can be done in the ImportGraphicDialog.
+     * Asked the dbViewer object if there is an icon set availabe. If not,
+     * we have to disable some UI in the dialog.
+     */
+    @send NotForPointerImageText::MSG_GEN_SET_NOT_USABLE(VUM_NOW);
+
+updateGraphicDialog:
+    count = @call dbViewer::MSG_DB_VIEWER_GET_ISET_COUNT();
+    if ( count ) {
+    	// enable UI
+    	if ( ImpexCheckNewIconForPtrImageAllowed(bmp, &isPtrImage) ) {
+    	    @call ImpDestNewIcon::MSG_GEN_SET_ENABLED(VUM_NOW);
+    	    @send NotForPointerImageText::MSG_GEN_SET_NOT_USABLE(VUM_NOW);
+    	} else {
+    	    /*
+    	     * Disable (and deselect) "New Icon" option
+    	     */
+    	    @call ImpDestNewIcon::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+    	    sel = @call ImportDestinationGroup::MSG_GEN_ITEM_GROUP_GET_SELECTION();
+    	    if ( sel == IMPORT_TO_NEW_ICON )
+    	    		@call ImportDestinationGroup::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(IMPORT_TO_NEW_ISET, FALSE);
+
+	    if ( isPtrImage ) {
+	    	@send NotForPointerImageText::MSG_GEN_SET_USABLE(VUM_NOW);
+	    } else {
+	    	@send NotForPointerImageText::MSG_GEN_SET_NOT_USABLE(VUM_NOW);
+	    }
+
+    	}
+	@call ImpDestDraw::MSG_GEN_SET_ENABLED(VUM_NOW);
+
+
+
+    } else {
+    	// disable UI and set correct selection
+	@call ImpDestNewIcon::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+	@call ImpDestDraw::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+	@call ImportDestinationGroup::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(IMPORT_TO_NEW_ISET, FALSE);
+    }
+    // disable / enable other UI
+    @call ImportDestinationGroup::MSG_GEN_ITEM_GROUP_SET_MODIFIED_STATE(TRUE);
+    @call ImportDestinationGroup::MSG_GEN_APPLY();
+
+    // Update bitmap size text and set initial IconName
+    ToolUpdateImportGraphicSizeText(global.tempFile, bmp);
+    ToolUpdateImportIconName();
+
+    // Set graphic to display and open dialogbox
+    // remove graphic afterwards
+    @call ImportGraphicContent::MSG_OTHER_CONTENT_USE_IMAGE(bmp);
+    cmd = UserDoDialog(@ImportGraphicDialog);
+    @call ImportGraphicContent::MSG_OTHER_CONTENT_USE_IMAGE(0);
+
+    switch (cmd) {
+	case IC_OK:  break;
+
+	case IC_IMPORT_CROP_IMAGE:
+	    /*
+	     * Because this routine is called from IconProcessClass, we can
+	     * happily call the process :-)
+	     * Ensure "Crop Target" group to be invisible
+	     */
+	    @send CropTargetGroup::MSG_GEN_SET_NOT_USABLE(VUM_NOW);
+	    croppedBmp = @call process::MSG_ICON_DO_CROP_IMAGE_DIALOG(global.tempFile, bmp, global.tempFile, FALSE, NULL);
+	    if (croppedBmp) {
+	    	/*
+	    	 * The user choosen to crop the image.
+	    	 * Free the old bitmap and use the new one.
+	    	 */
+	    	HugeArrayDestroy(global.tempFile, bmp);
+	    	bmp = croppedBmp;
+	    	}
+	    /* else: still use the old bitmap */
+	    goto updateGraphicDialog;
+
+	default:
+	    HugeArrayDestroy(global.tempFile, bmp);
+	    return NullHandle;
+	}
+
+    /*
+     * ensure 72 dpi resolution
+     */
+    header = BTBitmapToolLockHeader(global.tempFile, bmp, &mh);
+    header->CB_xres = 72;
+    header->CB_yres = 72;
+    VMDirty(mh);
+    VMUnlock(mh);
+
+    /*
+     * Ensure that all transparent pixels are set to white. This is required
+     * for compatibility with the older version of the icon editor. Even though
+     * the old icon editor can't handle palettes, we do the job as good as possible.
+     */
+    IconSetHiddenPixelsToWhite(global.tempFile, bmp);
+
+    return bmp;
+}
+
+/*--------------------- MSG_ICON_IMPORT_GRAPHIC_WITH_DIALOGS ---------------------
+ *  Purpose:	Handling import graphic from clipboard or from import control
+ *  Context:
+ *  Strategy:
+ 	- ensure that we have a bitmap
+ 	- execute ImportGraphicDialog so that the user can make the necessary settings.
+ 	  this includes destinaetion (new iSet, nes icon, darw intoo current icon)
+ 	- if destination is not IMPORT_DRAW_TO_ICON: chekc bitmap size
+ 	  and prompt user if the bitmap is too large
+ 	- let MSG_DB_VIEWER_DEAL_WITH_IMPORTED_BITMAP do the rest of the job
+ *  Parameters:	graphic: VMBlockHandle of the bitmap graphic or the GString
+ *			The image is stored in the file global.tempFile
+ *		isGString: TRUE if graphic is a GString
+ *			   FALSE if graphic is a bitmap
+ *  Return:	-
+ ---------------------------------------------------------------------------*/
+@extern method IconProcessClass, MSG_ICON_IMPORT_GRAPHIC_WITH_DIALOGS {
+optr dbViewer;
+int format, compressed;
+int width, height;
+VMBlockHandle newBmp;
+int destination;
+
+
+    if (isGString) {
+    	/*
+    	 * We need a bitmap to work. A GString must be coverted first.
+    	 * The GString will be destroyed by the routine.
+    	 */
+	graphic = DealWithImportedGString(graphic);
+	if (!graphic) return;
+
+    }
+
+    /*
+     * Ensure that the Bitmap has a transparency mask and is not compressed
+     */
+    format = BTGetMoreBitmapInfos(global.tempFile, graphic, NULL, NULL, &compressed);
+    if ( ((format & BMT_MASK) == 0) || compressed ) {
+        newBmp = BTCopyToBitmapWithMask(global.tempFile, graphic, global.tempFile, NULL);
+        HugeArrayDestroy(global.tempFile, graphic);
+        graphic = newBmp;
+    }
+
+    /*
+     * Find out the current Database Viewer object.
+     * If we have a document open (as we have at this point) global.curDisplay
+     * can be used to construct the optr of the document's DBViewer object.
+     */
+    if (!global.curDisplay) return;	// Savety only, should never happen
+    dbViewer = CombineGCurDisplayWith(@DBViewerContent);
+
+    /*
+     * Deal with the bitmap (if appropriate) and let the user select some
+     * properties of the icon to create. This is done using the ImportGraphicDialog
+     * The bitmap handle may change during this process.
+     */
+    graphic = IconProcessDealWithImportedBitmap(graphic, dbViewer);
+    if (!graphic) return;
+
+    /*
+     * Check Icon memory size. If to large, return
+     */
+    destination = @call ImportDestinationGroup::MSG_GEN_ITEM_GROUP_GET_SELECTION();
+    if ( destination != IMPORT_DRAW_TO_ICON ) {
+        format = BTGetMoreBitmapInfos(global.tempFile, graphic, &width, &height, NULL);
+    	if (CheckIconTooLargeAndDealWithIt(width, height, format) ) return;
+    }
+
+
+    /*
+     * Let the DBViewer object do the create-the-icon job
+     * This message queries the ImportGraphicDialog dialog objects
+     * for the user settings.
+     */
+    @send dbViewer::MSG_DB_VIEWER_DEAL_WITH_IMPORTED_BITMAP(graphic);
+
+}
+
+/*--------------------- InitializeIconFromImport ---------------------
+ *  Purpose:	Setup up icon from a bitmap that has been imported
+ *		The bitmap already exists in the database file
+ *  Context:	Create a new icon for a set
+ *  Strategy:
+ *  Parameters:	vmFile:	database file
+ *		iSet:	which icon set
+ *		icon:	which icon for that icon set
+ *		bmp:	Handle of the icon graphic bitmap (already
+ *			stored in the database file)
+ *		displayClass: pass a DC_xx value
+ *			      pass (-1) to calculate the suggested displayClass
+ *		stlye:	pass VMS_TOOL | VMS_ICON
+ *		displaySize:	pass DS_TINY, DS_STANDARD, DS_LARGE ( or DS_HUGE )
+ *		aspect:		pass DAR_NORMAL or DAR_VERY_SQUISHED
+ *		name:		new name for the icon
+ *				pass zero to use the name from ImportGraphicDialog UI
+ *				(call ImportGraphicDlgNameText for name)
+ *  Return:
+ ---------------------------------------------------------------------------*/
+void InitializeIconFromImport(VMFileHandle vmFile, int iSet, int icon, VMBlockHandle bmp,
+				int displayClass, int style, int displaySize, int aspect, char *name) {
+char nameBuffer[MAX_ICON_NAME_LENGTH + 10];
+
+    /*
+     * Create an empty icon
+     */
+    IdCreateEntries(vmFile, iSet, 1);
+    IdSetEntryCount(vmFile, iSet, icon + 1);
+
+    /*
+     * set up IE_type value ( a VisMonikerListEntryType record)
+     * and simply copy the bitmap
+     */
+
+    /*
+     * If no displayClass has been passed,
+     * get suggested display class from bitmap properties
+     */
+    if ( displayClass == (-1) ) displayClass = FindSuggestedDisplayClass(vmFile, bmp);
+
+    /*
+     * Initialize icon entry
+     */
+    InternalInitializeIconEntryType(vmFile, iSet, icon, style, displayClass, displaySize, aspect);
+    if (name) {
+    	strcpy(nameBuffer, name);
+    } else {
+    	@call ImportGraphicDlgNameText::MSG_VIS_TEXT_GET_ALL_PTR(nameBuffer);
+    }
+    IdSetEntryName(vmFile, iSet, icon, nameBuffer);
+
+    /*
+     * Assign bitmap to icon. If the iSet is a "poiner-image" set,
+     * ensure that there are only allowed colors in the image.
+     */
+    if ( IdGetFlags(vmFile, iSet) & IF_PTR_IMAGE) {
+    	PointerImageToolEnsureOnlyAllowedColors(vmFile, bmp);
+    }
+
+    IdSetEntryBitmapNoCopy(vmFile, iSet, icon, bmp);
+
+}
+
+/*--------------------- CreateNewISetFromImport ---------------------
+ *  Purpose:	Setup up a new, empty icon set and create the first
+ *		icon acording to passed paramters;
+ *		The bitmap already exists in the database file
+ *  Context:	Create a new icon for a set
+ *  Strategy:
+ *  Parameters:	dbViewer: The current database viewer object
+ *		bmp:	Handle of the icon graphic bitmap (already
+ *			stored in the database file)
+ *		stlye:	pass VMS_TOOL | VMS_ICON
+ *		displaySize:	pass DS_TINY, DS_STANDARD, DS_LARGE ( or DS_HUGE )
+ *		aspect:		pass DAR_NORMAL or DAR_VERY_SQUISHED
+ *		name:		new name for the first icon
+ *				pass zero to use the default name
+ *  Return:
+ ---------------------------------------------------------------------------*/
+void CreateNewISetFromImport(optr dbViewer, VMBlockHandle bmp,
+			int style, int displaySize, int aspect, char *name) {
+IconDBViewerInstance *pself;
+VMFileHandle vmFile;
+int iSet;
+
+    pself = ObjDerefVis(dbViewer);
+    vmFile = pself->DBVI_vmFile;
+
+    /*
+     * Setup an empty (!) icon set
+     */
+    iSet = IdAddISet(vmFile, 0);
+    IdSetEntryCount(vmFile, iSet , 0);
+
+
+    MemLock(HandleOf(@UntitledISetString));
+    FinishInitializingISet(pself->DBVI_vmFile, iSet, LMemDeref(@UntitledISetString));
+    MemUnlock(HandleOf(@UntitledISetString));
+
+    /*
+     * Initialze the first Icon for that set. Calculate displayClass from properties
+     */
+    InitializeIconFromImport(vmFile, iSet, 0, bmp, (-1), style, displaySize, aspect, name);
+
+    /*
+     * Tell ourself that we have a an new icon set.
+     * Create a VisISet object for it and make it to the current set
+     */
+    @call dbViewer::MSG_DB_VIEWER_ISET_ADDED(iSet);
+
+}
+
+
+/*--------------------- MSG_ICON_APP_IMPORT_DESTINATION_CHANGED ---------------------
+ *  Purpose:	Update UI in ImportGraphicDialog
+ *  Context:	This message is send from four different ojects,
+ *  Strategy:
+ *  Parameters: GEN_ITEM_GROUP_APPLY_MSG (
+    	    	    	word selection = cx,
+			word numSelections = bp,
+			GenItemGroupStateFlags stateFlags = dl);
+ *  Return:
+ ---------------------------------------------------------------------------*/
+@extern method IconApplicationClass, MSG_ICON_APP_IMPORT_DESTINATION_CHANGED {
+optr dbViewer;
+Boolean disable;
+
+    selection = @call ImportDestinationGroup::MSG_GEN_ITEM_GROUP_GET_SELECTION();
+    if ( selection == IMPORT_DRAW_TO_ICON) {
+    	@send ImportPropertiesGroup::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+    	@call ImportGraphicDlgNameText::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+    	@send ImportDrawPositionGroup::MSG_GEN_SET_ENABLED(VUM_NOW);
+    	@send ImportSelectionOptionsGroup::MSG_GEN_SET_ENABLED(VUM_NOW);
+    } else {
+    	@call ImportGraphicDlgNameText::MSG_GEN_SET_ENABLED(VUM_NOW);
+    	@send ImportDrawPositionGroup::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+    	@send ImportSelectionOptionsGroup::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+
+        dbViewer = CombineGCurDisplayWith(@DBViewerContent);
+        disable = @call dbViewer::MSG_DB_VIEWER_TEST_IF_PTR_IMAGE();
+        if ( selection == IMPORT_TO_NEW_ISET) disable = FALSE;
+        if ( disable ) {
+            @send ImportPropertiesGroup::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+        } else {
+            @send ImportPropertiesGroup::MSG_GEN_SET_ENABLED(VUM_NOW);
+        }
+
+    }
+
+    ToolUpdateImportIconName();
+
+}
+
+
+/*--------------------- MSG_DB_VIEWER_DEAL_WITH_IMPORTED_BITMAP ---------------------
+ *  Purpose:	An bitmap has been imported via impex library or the clipboard
+ *		The bitmap has already been prepared to have a mask and is not compressed.
+ *		This routine must free the passed bitmap.
+ *  Context:
+ *  Strategy:
+        - copy bitmap to database file
+	- Read the UI from ImportGraphicDialog
+	- Create a new icon depending on the user's selection
+ *  Parameters:	bmp: handle of the bitmap, stored in global.tempFile
+ *  Return:	-
+ ---------------------------------------------------------------------------*/
+// swat stop in IconDBViewerDB_VIEWER_DEAL_WITH_IMPORTED_BITMAP
+@extern method IconDBViewerClass, MSG_DB_VIEWER_DEAL_WITH_IMPORTED_BITMAP {
+int operation, iSet, count;
+VMBlockHandle newBmp;
+word dispSize, style, aspect, drawPos;
+StandardDrawingPostion pos;
+
+    AppMarkBusy();
+
+    /*
+     * Do things that not depend on the operation to perform finally:
+     * - copy bitmap to database
+     * - free passed bitmap
+     * - collect information from ImportGraphic dialog
+     */
+    newBmp = BTCopyBitmap(global.tempFile, pself->DBVI_vmFile, bmp);
+    HugeArrayDestroy(global.tempFile, bmp);
+
+    dispSize = @call ImportGraphicDisplaySizeChooser::MSG_GEN_ITEM_GROUP_GET_SELECTION();
+    style = @call ImportGraphicStyleChooser::MSG_GEN_ITEM_GROUP_GET_SELECTION();
+    aspect = @call ImportGraphicAspectChooser::MSG_GEN_ITEM_GROUP_GET_SELECTION();
+    drawPos = @call ImportDrawPositionGroup::MSG_GEN_ITEM_GROUP_GET_SELECTION();
+    operation = @call ImportDestinationGroup::MSG_GEN_ITEM_GROUP_GET_SELECTION();
+
+    /*
+     * Ensure that the currently edited icon has been saved.
+     * But if the operation is IMPORT_DRAW_TO_ICON, the edited icon
+     * does not change and therefore it must not be saved.
+     */
+    switch (operation ) {
+    case IMPORT_DRAW_TO_ICON: break;
+    default:
+    	if ( CheckIconDirtyAndDealWithIt(oself, TRUE) ) goto done;
+    }
+
+    /*
+     * Get the current icon-set and the number of current icons
+     */
+    iSet = pself->DBVI_currentISet;
+    count = IdGetEntryCount(pself->DBVI_vmFile, iSet);
+
+    /*
+     * Depending on the requested operation we have to do different things
+     */
+    switch ( operation) {
+
+    case IMPORT_TO_NEW_ICON:
+	/*
+	 * We can have max. MAX_ICONS icons.
+	 */
+	if (count >= MAX_ICONS) {
+    	    ErrorBoxOptr(@TooManyIconsText);
+    	    goto done;
+    	}
+	/*
+	 * Remember that the number of existing icons (stored in 'count') is equal to
+	 * the index of the first new icon, since the counting starts at zero.
+	 * Calculate displayClass from properties
+	 */
+    	InitializeIconFromImport(pself->DBVI_vmFile,
+    			iSet, count, newBmp, (-1), style, dispSize, aspect, NULL);
+    	/*
+    	 * Update icon list and edit the new icon
+    	 */
+    	@call oself::MSG_DB_VIEWER_ICON_ADDED(count);
+    	break;
+
+    case IMPORT_TO_NEW_ISET:
+    	CreateNewISetFromImport(oself, newBmp, style, dispSize, aspect, NULL);
+    	break;
+
+    case IMPORT_DRAW_TO_ICON:
+	/*
+	 * Store undo information
+	 */
+	@call ConstructOptr(OptrToHandle(oself), OptrToChunk(@MyFatbits))::MSG_FATBITS_UNDO_SAVE_ICON_STATE(UNDO_DRAW_BITMAP);
+
+	/*
+	 * Draw bitmap into existing fatbit's bitmap
+	 * This also redraws fatbits as well as live preview, but does not
+	 * set the icon dirty. We must do this manually.
+	 *
+	 */
+	pos = @call ImportDrawPositionGroup::MSG_GEN_ITEM_GROUP_GET_SELECTION();
+	@call ConstructOptr(OptrToHandle(oself), OptrToChunk(@MyFatbits))::
+			MSG_FATBITS_DRAW_BITMAP_INTO_CURRENT(pself->DBVI_vmFile, newBmp, pos);
+	SetIconDirtyState(pself, TRUE);
+
+	/*
+	 * The bitmap has been drwan. It is not longer needed.
+	 */
+	HugeArrayDestroy(pself->DBVI_vmFile, newBmp);
+
+    	break;
+    }
+
+
+
+done:
+    AppMarkNotBusy();
+}
+
+
+/*--------------------- CalculateDrawPositionSimple ---------------------
+ * Purpose:	Calculate the drawing position relative to the fatbits image
+ * Parameters:	pos: where to draw
+ *		w1, h1 refers to fatbit's bitmap, w2, h2 refers to bitmap to draw
+ * Return:	drawing position
+ ---------------------------------------------------------------------------*/
+Point CalculateDrawPositionSimple(StandardDrawingPostion pos, int w1, int h1, int w2, int h2) {
+int 	x0, y0;
+Point 	retVal;
+
+   switch (pos) {
+   case DRAW_AT_TOP_LEFT:
+   	x0 = 0;	   		y0 = 0;	break;
+
+   case DRAW_AT_TOP_MIDDLE:
+   	x0 = (w1 - w2)/2;   	y0 = 0;	break;
+
+   case DRAW_AT_TOP_RIGHT:
+   	x0 = w1 - w2;   	y0 = 0;	break;
+
+   case DRAW_AT_MIDDLE_LEFT:
+   	x0 = 0;		   	y0 = (h1 - h2)/2;	break;
+
+   case DRAW_AT_CENTER:
+   	x0 = (w1 - w2)/2;   	y0 = (h1 - h2)/2;	break;
+
+   case DRAW_AT_MIDDLE_RIGHT:
+   	x0 = w1 - w2;   	y0 = (h1 - h2)/2;	break;
+
+   case DRAW_AT_BOTTOM_LEFT:
+   	x0 = 0;		   	y0 = h1 - h2;		break;
+
+   case DRAW_AT_BOTTOM_MIDDLE:
+   	x0 = (w1-w2)/2;   	y0 = h1 - h2;   	break;
+
+   case DRAW_AT_BOTTOM_RIGHT:
+   	x0 = w1 - w2;	   	y0 = h1 - h2;   	break;
+
+   EC( default: )
+   EC( ProgError("Invalid darwing position in CalculateDrawPositionSimple"); )
+   }
+
+   retVal.P_x = x0;
+   retVal.P_y = y0;
+
+   return retVal;
+}
+
+/*--------------------- CalculateDrawPositionRelativeToSel ---------------------
+ * Purpose:	Calculate the drawing position relative to selected area
+ * Parameters:	pself:	fatbits instance data pointer
+ *		pos: where to draw
+ *		w1, h1 refers to fatbit's bitmap, w2, h2 refers to bitmap to draw
+ * Return:	drawing position
+ ---------------------------------------------------------------------------*/
+Point CalculateDrawPositionRelativeToSel(FatbitsInstance *pself, StandardDrawingPostion pos, int w1, int h1, int w2, int h2) {
+int 	x0, y0, x1, y1, dx, dy;
+Point 	retVal;
+
+   x0 = pself->FBI_drag.x0;
+   y0 = pself->FBI_drag.y0;
+   x1 = pself->FBI_drag.x1 + 1;
+   y1 = pself->FBI_drag.y1 + 1;
+   dx = x1 - x0;
+   dy = y1 - y0;
+
+   switch (pos) {
+   case DRAW_AT_TOP_LEFT:	break;
+
+   case DRAW_AT_TOP_MIDDLE:
+   	x0 = x0 + (dx - w2)/2;  break;
+
+   case DRAW_AT_TOP_RIGHT:
+   	x0 = x1 - w2;   	break;
+
+   case DRAW_AT_MIDDLE_LEFT:
+   				y0 = y0 + (dy - h2)/2;	break;
+
+   case DRAW_AT_CENTER:
+   	x0 = x0 + (dx - w2)/2;	y0 = y0 + (dy - h2)/2;	break;
+
+   case DRAW_AT_MIDDLE_RIGHT:
+   	x0 = x1 - w2;   	y0 = y0 + (dy - h2)/2;	break;
+
+   case DRAW_AT_BOTTOM_LEFT:
+   				y0 = y1 - h2;		break;
+
+   case DRAW_AT_BOTTOM_MIDDLE:
+   	x0 = x0 + (dx - w2)/2;	y0 = y1 - h2;   	break;
+
+   case DRAW_AT_BOTTOM_RIGHT:
+   	x0 = x1 - w2;   	y0 = y1 - h2;   	break;
+
+   EC( default: )
+   EC( ProgError("Invalid darwing position in CalculateDrawPositionRelativeToSel"); )
+   }
+
+   retVal.P_x = x0;
+   retVal.P_y = y0;
+
+   return retVal;
+}
+
+/*--------------------- ClipBitmapFoDrawXY ---------------------
+ * Purpose:	Clip the bitmap so that it fits into the selected area.
+ * Parameters:	vmFile, bmp:	bitmap to draw
+ *		pself:		fatbits instance data pointer
+ *		x0, y0:		position of the bitmap
+ *		w, h:		dimensions of the bitmap
+ *		clippedBmpPtr	return: clipped bitmap
+ *				zero if bitmap an seletec area does not overlap
+ * Return:	new drawing position
+ ---------------------------------------------------------------------------*/
+Point ClipBitmapFoDrawXY(VMFileHandle vmFile, VMBlockHandle bmp, FatbitsInstance *pself,
+				int x0, int y0, int w, int h, VMBlockHandle *clippedBmpPtr) {
+int clipX0, clipY0, clipX1, clipY1;
+VMBlockHandle clippedBmp = 0;
+Point 	p0 = { 0, 0 };
+
+    clipX0 = pself->FBI_drag.x0 - x0;
+    clipY0 = pself->FBI_drag.y0 - y0;
+    clipX1 = pself->FBI_drag.x1 - x0;
+    clipY1 = pself->FBI_drag.y1 - y0;
+
+    /*
+     * BTClipBitmap() handles invaild paramters properly.
+     */
+    clippedBmp = BTClipBitmap(vmFile, bmp, global.tempFile, clipX0, clipY0, clipX1, clipY1);
+    *clippedBmpPtr = clippedBmp;
+    if (!clippedBmp) return p0;
+
+    p0.P_x = (x0 < pself->FBI_drag.x0) ? pself->FBI_drag.x0 : x0;
+    p0.P_y = (y0 < pself->FBI_drag.y0) ? pself->FBI_drag.y0 : y0;
+
+    return p0;
+}
+
+
+/*--------------------- MSG_FATBITS_DRAW_BITMAP_INTO_CURRENT ---------------------
+ *  Purpose:	Draw an bitmap into the currently edited bitmap
+ *  Context:	This method is called when an image is about to be imported
+ *  Strategy:
+ *	- get the dimensions of both bitmaps
+ *	- calculate the drawing coordinates depending on the requested drawing position value
+ *	- use MSG_FATBITS_DRAW_BITMAP_AT_XY for drawing the bitmap
+ *  Parameters:	void  (VMFileHandle vmFile, VMBlockHandle newBmp, StandardDrawingPostion pos);
+ *  Return:
+ ---------------------------------------------------------------------------*/
+@extern method FatbitsClass, MSG_FATBITS_DRAW_BITMAP_INTO_CURRENT {
+int w1, h1, w2, h2, x0, y0;
+Point	p0;
+word 	options;
+VMBlockHandle clippedBmp = 0;
+
+
+   /*
+    * Get bitmap sizes.
+    * w1, h1 refers to fatbit's bitmap, w2, h2 refers to bitmap to draw
+    */
+   BTGetMoreBitmapInfos(global.tempFile, pself->FBI_bitmap, &w1, &h1, NULL);
+   BTGetMoreBitmapInfos(vmFile, newBmp, &w2, &h2, NULL);
+
+   /*
+    * Calculate coordiantes to draw
+    * The options "relative to selection" and "limit to selection" are active
+    * only if there is an area selected ... then we have running ants
+    */
+   if ( pself->FBI_ants.antState == ANT_STATE_NO_ANTS ) {
+      p0 = CalculateDrawPositionSimple(pos, w1, h1, w2, h2);
+   } else {
+   	options = @call ImportSelectionOptions::MSG_GEN_BOOLEAN_GROUP_GET_SELECTED_BOOLEANS();
+   	switch (options) {
+   	case 0:
+   	    p0 = CalculateDrawPositionSimple(pos, w1, h1, w2, h2);
+   	    break;
+
+   	case DRAW_RELATIVE_TO_SELECTION:
+   	    p0 = CalculateDrawPositionRelativeToSel(pself, pos, w1, h1, w2, h2);
+   	    break;
+
+   	case DRAW_LIMITED_TO_SELECTION:
+   	    p0 = CalculateDrawPositionSimple(pos, w1, h1, w2, h2);
+   	    p0 = ClipBitmapFoDrawXY(vmFile, newBmp, pself, p0.P_x, p0.P_y, w2, h2, &clippedBmp);
+   	    if (!clippedBmp) {
+   	    	UserStandardSound(SST_NO_INPUT);
+   	    	MessageBoxOptr(@NoOverlappingArea);
+   	    	return;
+   	    }
+   	    break;
+
+   	case DRAW_RELATIVE_TO_SELECTION + DRAW_LIMITED_TO_SELECTION:
+   	    p0 = CalculateDrawPositionRelativeToSel(pself, pos, w1, h1, w2, h2);
+   	    p0 = ClipBitmapFoDrawXY(vmFile, newBmp, pself, p0.P_x, p0.P_y, w2, h2, &clippedBmp);
+   	    if (!clippedBmp) UserStandardSound(SST_NO_INPUT);
+   	    break;
+   	}
+   	@call oself::MSG_FATBITS_KILL_ANTS();
+   }
+
+   x0 = p0.P_x;
+   y0 = p0.P_y;
+
+   /*
+    * Draw bitmap bmp into our own bitmap. This also redraws the affected objects.
+    */
+   if ( clippedBmp ) {
+   	@call oself::MSG_FATBITS_DRAW_BITMAP_AT_XY(global.tempFile, clippedBmp, x0, y0);
+   	HugeArrayDestroy(global.tempFile, clippedBmp);
+   } else {
+   	@call oself::MSG_FATBITS_DRAW_BITMAP_AT_XY(vmFile, newBmp, x0, y0);
+   }
+
+   /*
+    * Correct colors, if we are a "pointer-image" set
+    * Redraw images in this case.
+    */
+   if ( @call oself::MSG_FATBITS_TEST_IF_PTR_IMAGE() ) {
+   	PointerImageToolEnsureOnlyAllowedColors(global.tempFile, pself->FBI_bitmap);
+   	@send CombineOselfWith(@FatbitsView)::MSG_GEN_VIEW_REDRAW_CONTENT();
+   	@call CombineOselfWith(@LivePreviewView)::MSG_GEN_VIEW_REDRAW_CONTENT();
+   }
+
+}
+
+/*--------------------- MSG_FATBITS_DRAW_BITMAP_AT_XY ---------------------
+ *  Purpose:	Draw an bitmap into the currently edited bitmap at a given position
+ *		Redraw fatbits and live preview
+ *  Context:
+ *		Note that this method does not set the dirty state of the icon/icon-set
+ *  Strategy:
+ *	- let IconToolDrawOneBitmapToAnother() do the job
+ *	- Update copy of the mask
+ *	- then redraw affected objects
+ *  Parameters:	vmFile, newBmp:	bitmap to draw
+ *		x0, y0:		draw position
+ *  Return:
+ ---------------------------------------------------------------------------*/
+@extern method FatbitsClass, MSG_FATBITS_DRAW_BITMAP_AT_XY {
+
+    IconToolDrawOneBitmapToAnother(vmFile, newBmp, global.tempFile, pself->FBI_bitmap, x0, y0, 0, global.tempFile);
+    @call oself::MSG_FATBITS_UPDATE_MASK_BMP();
+
+    /*
+     * Readraw fatbits and preview object
+     */
+    @call oself::MSG_VIS_REDRAW_ENTIRE_OBJECT();
+    EC( if( 0==pself->FBI_imageObj) {ProgError("FATBITS_DRAW_BITMAP_INTO_CURRENT: no image object"); return; } )
+    @call pself->FBI_imageObj::MSG_VIS_REDRAW_ENTIRE_OBJECT();
+
+}
+
+
+/***********************************************************************
+ *	Handling the Edit-Controller Messages
+ *
+ *	- MSG_META_CLIPBOARD_COPY is handled by the fatbits object
+ *	- We have our own undo handling, implemented in undo.goc
+ *
+ ***********************************************************************/
+
+
+/*--------------------- MSG_META_CLIPBOARD_PASTE ---------------------
+ *	Purpose:	Get graphic from clipboard
+ *	Strategy:
+ *		- test clipboard for bitmap
+ *		- if no bitmap available, test for GString
+ *			this sould not fail, because MSG_META_CLIPBOARD_PASTE is
+ *			only called if there is a graphic in the clipboard
+ *		- let MSG_ICON_IMPORT_GRAPHIC_WITH_DIALOGS do the interaction with the user
+ *	Parameters:	void(void)
+ ---------------------------------------------------------------------------*/
+@extern method IconDBViewerClass, MSG_META_CLIPBOARD_PASTE {
+int found, isGString;
+VMBlockHandle graphic;
+
+    found = ToolTestClipboardItem( 0, CIF_BITMAP, TIF_NORMAL);
+    if (found )	{
+    	isGString = FALSE;
+    	graphic = BTGetClipboardItem(0, CIF_BITMAP, global.tempFile);
+    } else {
+    	found = ToolTestClipboardItem( 0, CIF_GRAPHICS_STRING, TIF_NORMAL);
+    	if (!found ) { MessageBox("Error: No graphic found."); return; }
+    	isGString = TRUE;
+    	graphic = BTGetClipboardItem(0, CIF_GRAPHICS_STRING, global.tempFile);
+    }
+
+    @send process::MSG_ICON_IMPORT_GRAPHIC_WITH_DIALOGS(graphic, isGString);
+}
+
+/*--------------------- MSG_META_SELECT_ALL ---------------------
+ *	Purpose:
+ *	Parameters:	void(void)
+ ---------------------------------------------------------------------------* /
+currently unused
+@extern method IconDBViewerClass, MSG_META_SELECT_ALL {
+	MessageBox("SELECT_ALL");
+}
+
+/*--------------------- MSG_META_DELETE ---------------------
+ *	Purpose:
+ *	Parameters:	void(void)
+ ---------------------------------------------------------------------------* /
+currently unused
+@extern method IconDBViewerClass, MSG_META_DELETE {
+	MessageBox("DELETE");
+}
+
+
+/***********************************************************************
+ *	Behandlung der Import-Export-Controller Messages
+ ***********************************************************************/
+/*--------------------- MSG_DB_VIEWER_IMPORT_GRAPHIC_FILE ---------------------
+ *  Purpose:	Initiate Import via impex library
+ *  Context:
+ *  Strategy:
+ *  Parameters:	void (void);
+ *  Return:
+ ---------------------------------------------------------------------------*/
+@extern method IconDBViewerClass,MSG_DB_VIEWER_IMPORT_GRAPHIC_FILE {
+
+    if ( CheckIconDirtyAndDealWithIt(oself, TRUE) ) return;
+    @send IconImportControl::MSG_GEN_INTERACTION_INITIATE();
+}
+
+/*--------------------- MSG_DB_VIEWER_PREPARE_FOR_IMPORT ---------------------
+ * Purpose:	Copy imported meta-data (standard GEOS format) for our own use.
+ * Context:	Part of the GEOS import handling
+ * Strategy:	- copy data for our own use.
+ *		- call ImpexImportExportCompleted()
+ *		  That's all.
+ * Parameters:	void (ImpexTranslationParams impexParams);
+ ---------------------------------------------------------------------------*/
+@extern method IconDBViewerClass, MSG_DB_VIEWER_PREPARE_FOR_IMPORT {
+VMBlockHandle	graphic;
+Boolean 	isGString;
+
+  do {		// ensure ImpexImportExportCompleted(&impexParams);
+
+
+/*
+DBVI_importCreateNewISet entfernen
+Triggerr auslichten
+
+*/
+    /*
+     * Get gstring or bitmap from impexParams
+     */
+    isGString = TRUE;
+    switch ( impexParams.ITP_clipboardFormat) {
+      case CIF_BITMAP:
+      	isGString = FALSE;
+      case CIF_GRAPHICS_STRING:
+	  {
+	  VMChain	newChain;
+	  newChain = VMCopyVMChain(impexParams.ITP_transferVMFile,
+			impexParams.ITP_transferVMChain,
+			global.tempFile);
+	  graphic = newChain >> 16;
+	  }
+	  break;
+
+      default:
+	  ErrorBoxOptr(@InvalidClipboardFormat);
+	  break;
+	  }
+
+      } while (0);
+
+  /* Tell the system that we are done. */
+  ImpexImportExportCompleted(&impexParams);
+
+  @send process::MSG_ICON_IMPORT_GRAPHIC_WITH_DIALOGS(graphic, isGString);
+
+}
+
+/*--------------------- MSG_DB_VIEWER_EXPORT_ICON_TO_GRAPHIC_FILE ---------------------
+ *  Purpose:	Initia export icon graphic to file via impex library
+ *  Context:
+ *  Strategy:
+ *  Parameters:
+ *  Return:
+ ---------------------------------------------------------------------------*/
+@extern method IconDBViewerClass, MSG_DB_VIEWER_EXPORT_ICON_TO_GRAPHIC_FILE {
+
+    if ( CheckIconDirtyAndDealWithIt(oself, TRUE) ) return;
+    @send IconExportControl::MSG_GEN_INTERACTION_INITIATE();
+}
+
+/*--------------------- MSG_DB_VIEWER_PREPARE_FOR_EXPORT ---------------------
+ * Purpose: 	Prepare data for the export library
+ * Context:	Part of the Import handling of the GEOS system
+ * Strategy:	- set up a gstring that hold the icon's image
+ *		- draw image to the gstring
+ *		- call ImpexImportExportCompleted()
+ *		  That's all.
+ * Parameters:	void (ImpexTranslationParams impexParams);
+ ---------------------------------------------------------------------------*/
+@extern method IconDBViewerClass, MSG_DB_VIEWER_PREPARE_FOR_EXPORT {
+GStateHandle 	gstate;
+VMBlockHandle	gString;
+VMBlockHandle iconBmp;
+
+  AppMarkBusy();
+
+  do {
+     impexParams.ITP_transferVMChain = 0;	// worst case
+     impexParams.ITP_manufacturerID = 0;	// GeoWorks
+     impexParams.ITP_clipboardFormat = CIF_GRAPHICS_STRING;
+
+     /*
+      * Create GString
+      * get image of the current icon and draw it
+      * clean up
+      */
+     gstate =  GrCreateGString(impexParams.ITP_transferVMFile,GST_VMEM,&gString);
+     if ( !gstate ) break;
+
+     iconBmp = IdGetEntryBitmap(pself->DBVI_vmFile, pself->DBVI_currentISet, pself->DBVI_currentIcon);
+     GrDrawHugeBitmap(gstate, 0, 0, pself->DBVI_vmFile, iconBmp);
+     GrEndGString(gstate);
+
+     GrDestroyGString(gstate,0,GSKT_LEAVE_DATA);
+
+     impexParams.ITP_transferVMChain = gString;
+     impexParams.ITP_transferVMChain <<= 16;
+
+     } while (0);
+
+  /* Tell the system that we are done. */
+  ImpexImportExportCompleted(&impexParams);
+
+  AppMarkNotBusy();
+
+}
+
+/*--------------------- ToolUpdateWTFPath ---------------------
+ *  Purpose:	Update WTFPathText to reflect the actual path
+ *  Context:
+ *  Strategy:
+ 	- Read path from WriteToVMFileDialog object
+ 	- if not found, use SP_DOCUMENT
+ *  Parameters:
+ *  Return:
+ ---------------------------------------------------------------------------*/
+void ToolUpdateWTFPath(void) {
+GenFilePath *gfp = 0;
+char *fpp, *fullPath = 0;
+Boolean found;
+
+    /*
+     * Last used path is stored in ATTR_GEN_PATH_DATA of the dialog object
+     */
+    gfp = malloc(sizeof(GenFilePath));
+    fullPath = malloc(IE_FULL_PATH_BUFFER_SIZE);
+
+    found = @call WriteToVMFileDialog::MSG_META_GET_VAR_DATA(ATTR_GEN_PATH_DATA, sizeof(GenFilePath), gfp);
+    if (found == (-1)) {
+        FilePushDir();
+    	WriteSourceWTFEnterDefaultPath(@IniVMPathKey);
+        gfp->GFP_disk = FileGetCurrentPath (gfp->GFP_path, sizeof(PathName));
+        FilePopDir();
+    }
+
+    fpp = fullPath;
+    FileConstructFullPath (&fpp, IE_FULL_PATH_BUFFER_SIZE, gfp->GFP_disk, gfp->GFP_path, TRUE);
+    @call WTFPathText::MSG_VIS_TEXT_REPLACE_ALL_PTR(fullPath, 0);
+
+    free(gfp);
+    free(fullPath);
+}
+
+
+
+/*--------------------- MSG_DB_VIEWER_INITIALIZE_WRITE_TO_VM_FILE_DIALOG ---------------------
+ *  Purpose:	Sii if token is dirty and set up WriteToVMFileDialog UI
+ *  Return:	TRUE, if canceled by user or no icon set available
+ *		FALSE if dialog box can opned (even if not ready for export)
+ ---------------------------------------------------------------------------*/
+@extern method IconDBViewerClass, MSG_DB_VIEWER_INITIALIZE_WRITE_TO_VM_FILE_DIALOG {
+
+    if ( pself->DBVI_currentISet == NO_CURRENT_ISET ) return TRUE;
+    if ( CheckIconDirtyAndDealWithIt(oself, TRUE) ) return TRUE;
+
+    ToolUpdateWTFPath();
+    return FALSE;
+}
+
+
+/*--------------------- MSG_ICON_DO_WRITE_TO_VM_FILE_DIALOG ---------------------
+ *  Purpose:	Execute WriteToVMFileDialog - let the user select options to
+ *		write an icons image to a vm file.
+ *  Context:
+ *  Strategy:
+ *	- open WriteToVMFileDialog and let the user do some choices
+ *	- if IC_SELECT_PATH is returned, open a "select path" dialog box
+ *	   + Last used path is stored in ATTR_GEN_PATH_DATA of WriteToVMFileDialog object
+ *	   + Store the new path in ATTR_GEN_PATH_DATA of WriteToVMFileDialog object
+ *	- let DBViewerContent do the save-to-file job
+ *  Parameters:
+ *  Return:
+ ---------------------------------------------------------------------------*/
+@extern method IconProcessClass, MSG_ICON_DO_WRITE_TO_VM_FILE_DIALOG {
+int cmd, cmd2, err;
+GenFilePath *gfp = 0;
+Boolean found;
+
+
+    AppMarkBusy();
+    err = @call CombineGCurDisplayWith(@DBViewerContent)::MSG_DB_VIEWER_INITIALIZE_WRITE_TO_VM_FILE_DIALOG();
+    AppMarkNotBusy();
+    if (err) return;
+
+    /*
+     * exexute WriteToVMFileDialog and fetch setting from the dialog
+     */
+doDialog:
+    cmd = UserDoDialog(@WriteToVMFileDialog);
+
+    /*
+     * if cmd == IC_SELECT_PATH: select path to vm file
+     */
+    if (cmd == IC_SELECT_PATH) {
+
+	/*
+	 * Set path. Last used path is stored in ATTR_GEN_PATH_DATA of
+	 * the dialog object (see below)
+	 */
+        FilePushDir();
+	if (!gfp) gfp = malloc(sizeof(GenFilePath));
+	found = @call WriteToVMFileDialog::MSG_META_GET_VAR_DATA(ATTR_GEN_PATH_DATA, sizeof(GenFilePath), gfp);
+
+	if (found != (-1)) {
+	    FileSetCurrentPath(gfp->GFP_disk, gfp->GFP_path);
+	} else {
+	    WriteSourceWTFEnterDefaultPath(@IniVMPathKey);
+	}
+
+        /*
+         * Request Path.
+         */
+        MemLock(OptrToHandle(@WTFPathTitle));
+	cmd2 = FileToolRequestChangeDir(@WTFPathInfoText, LMemDeref(@WTFPathTitle), NULL, TRUE);
+        MemUnlock(OptrToHandle(@WTFPathTitle));
+
+    	if ( cmd2 == IC_OK) {
+	    /*
+	     * Store current path in ATTR_GEN_PATH_DATA of the dialog object
+	     * Update UI
+	     */
+	    gfp->GFP_disk = FileGetCurrentPath (gfp->GFP_path, sizeof(PathName));
+	    @call WriteToVMFileDialog::MSG_META_ADD_VAR_DATA(ATTR_GEN_PATH_DATA, sizeof(GenFilePath), gfp);
+	    ToolUpdateWTFPath();
+    	}
+
+	/* Restart dialog */
+	FilePopDir();
+        goto doDialog;
+    }		// end of select geode
+
+
+    /*
+     * free path buffer
+     */
+    if(gfp) free(gfp);
+
+    if ( cmd != IC_WRITE_TO_VM_FILE ) return;
+
+    /*
+     * Write icon image to vmFile
+     */
+    err = @call CombineGCurDisplayWith(@DBViewerContent)::MSG_DB_VIEWER_EXPORT_ICON_TO_VM_FILE();
+    if (err) goto doDialog;
+
+}
+
+/*--------------------- WTFEnterPath ---------------------
+ *  Purpose:	Set path for write. Last used path is stored in ATTR_GEN_PATH_DATA of
+	 	the WriteToVMFileDialog dialog object
+ ---------------------------------------------------------------------------*/
+void WTFEnterPath(void) {
+GenFilePath *gfp;
+Boolean found;
+
+    gfp = malloc(sizeof(GenFilePath));
+    found = @call WriteToVMFileDialog::MSG_META_GET_VAR_DATA(ATTR_GEN_PATH_DATA, sizeof(GenFilePath), gfp);
+
+    if (found != (-1)) {
+	FileSetCurrentPath(gfp->GFP_disk, gfp->GFP_path);
+    } else {
+	WriteSourceWTFEnterDefaultPath(@IniVMPathKey);
+    }
+
+    free(gfp);
+}
+
+/*--------------------- MSG_DB_VIEWER_EXPORT_ICON_TO_VM_FILE ---------------------
+ *  Purpose:	Write the current icon to a vm file
+ *  Context:
+ *  Strategy:	see code
+ *  Parameters:	-
+ *  Return:	TRUE in case of any error
+ *		FALSE: ok
+ ---------------------------------------------------------------------------*/
+@extern method IconDBViewerClass, MSG_DB_VIEWER_EXPORT_ICON_TO_VM_FILE {
+int 		cmd;
+FileLongName 	fileName;
+VMFileHandle	dataFile, bmpFile;
+VMBlockHandle	imgBmp, bmpToUse, mapBlock;
+VMChain	nChain, oChain;
+Boolean	err = TRUE;
+Boolean	freeBmp = FALSE;
+word	options;
+int 	idx, redOrIndex, green, blue;
+GenFilePath *gfp;
+char *fpp, *fullPath = 0;
+
+    @call WriteToFileNameText::MSG_VIS_TEXT_GET_ALL_PTR(fileName);
+
+    /*
+     * Enter folder, create file and set
+     * the bitmap as Map block of the file
+     */
+    FilePushDir();
+    WTFEnterPath();
+
+    do {
+
+    	/*
+    	 * See if the file already exists. Ask the user for overwrite.
+    	 */
+    	if (FileToolExistFile(fileName) ) {
+    	    MemLock(OptrToHandle(@WSQuestionOverwriteFile));
+    	    cmd = UserStandardDialog ( (char *)0,(char *)0,(char *)0,
+    			fileName,LMemDeref(@WSQuestionOverwriteFile), \
+			(( CDT_QUESTION << CDBF_DIALOG_TYPE_OFFSET) | \
+			 ( GIT_AFFIRMATION << CDBF_INTERACTION_TYPE_OFFSET)) );
+    	    MemUnlock(OptrToHandle(@WSQuestionOverwriteFile));
+
+	    if (cmd != IC_YES) break;
+    	}
+
+    	/*
+    	 * Open file and handle errors
+    	 * break: leave the do-while-loop (do not write to file)
+    	 */
+    	dataFile = VMOpen(fileName, VMAF_FORCE_READ_WRITE | VMAF_FORCE_DENY_WRITE , VMO_CREATE_TRUNCATE, 0);
+	if (!dataFile) {
+	    err = ThreadGetError();
+	    switch (err) {
+		case VM_SHARING_DENIED:
+		case VM_OPEN_INVALID_VM_FILE:
+		case VM_TRUNCATE_FAILED:
+		case VM_WRITE_PROTECTED:
+		case VM_CANNOT_OPEN_SHARED_MULTIPLE:
+		    ErrorBoxOptrString(@WSErrorAccessDenied, fileName);
+		    break;
+		case ERROR_INVALID_LONGNAME:
+		    ErrorBoxOptrString(@WSErrorInvalidName, fileName);
+		    break;
+		default:
+		    ErrorBoxOptrString(@WSErrorCommon, fileName);
+	    }
+	    break;
+       	}
+
+	/*
+	 * store path in the geos.ini for later use
+	 */
+	gfp = malloc(sizeof(GenFilePath));
+	fullPath = malloc(IE_FULL_PATH_BUFFER_SIZE);
+
+	gfp->GFP_disk = FileGetCurrentPath (gfp->GFP_path, sizeof(PathName));
+	fpp = fullPath;
+	FileConstructFullPath (&fpp, IE_FULL_PATH_BUFFER_SIZE, gfp->GFP_disk, gfp->GFP_path, TRUE);
+	MemLock(OptrToHandle(@IniVMPathKey));
+	InitFileWriteString(IE_INI_CATEGORY, LMemDeref(@IniVMPathKey), fullPath);
+	MemUnlock(OptrToHandle(@IniVMPathKey));
+
+	free(fullPath);
+	free(gfp);
+
+    	/*
+    	 * Get Bitmap from current icon
+    	 * Get options and create a proper bitmap
+    	 * Set up bmpFile and bmpToUse properly
+     	 */
+    	imgBmp = IdGetEntryBitmap(pself->DBVI_vmFile, pself->DBVI_currentISet, pself->DBVI_currentIcon);
+	options = @call WTFOptionsGroup::MSG_GEN_BOOLEAN_GROUP_GET_SELECTED_BOOLEANS();
+
+	bmpFile = pself->DBVI_vmFile;
+	bmpToUse = imgBmp;
+
+    	/*
+    	 * if appropriate, remove mask
+     	 */
+	if ( (options & WTFO_WRITE_MASK) == 0 ) {
+	    /* get RGB values for a white background */
+	    idx = IconGetWhiteColor(pself->DBVI_vmFile, imgBmp, &redOrIndex, &green, &blue);
+	    bmpFile = global.tempFile;
+	    bmpToUse = BTCopyBitmapAndRemoveMask(pself->DBVI_vmFile, imgBmp,
+			global.tempFile, redOrIndex, green, blue, 0);
+	    freeBmp = TRUE;
+
+	}
+
+    	/*
+    	 * if appropriate, compact bitmap
+     	 */
+	if ( options & WTFO_COMPACT_BITMAP ) {
+	    VMBlockHandle newBlock;
+
+	    newBlock = GrCompactBitmap(bmpFile, bmpToUse, global.tempFile);
+	    if (freeBmp) {
+	    	// We had already a copy: free it
+	    	HugeArrayDestroy(bmpFile, bmpToUse);
+	    }
+	    bmpFile = global.tempFile;
+	    bmpToUse = newBlock;
+	    freeBmp = TRUE;
+	}
+
+	/*
+	 * Now copy the bitmap to the data file
+	 */
+	oChain = bmpToUse;	// 16 to 32 Bit
+	nChain = VMCopyVMChain(bmpFile,( oChain << 16 ), dataFile);
+	mapBlock = (VMBlockHandle)(nChain >> 16);
+
+	VMSetMapBlock(dataFile, mapBlock);
+    	VMClose(dataFile, FALSE);
+
+	if ( freeBmp ) HugeArrayDestroy(bmpFile, bmpToUse);
+	err = FALSE;
+    	MessageBoxOptr(@WriteToFileSuccessText);
+
+    } while(FALSE);
+
+    FilePopDir();
+    return err;
+}
+
+
+
+/*--------------------  ---------------------
+ *  Purpose:
+ *  Context:
+ *  Strategy:
+ *  Parameters:
+ *  Return:
+ ---------------------------------------------------------------------------*/
+
+/* *********** End of file impex.goc ********************/
+

@@ -9,19 +9,22 @@ if "%1"=="-n" (
 ) ELSE (
    set TYPE=ec
 )
-IF NOT EXIST %LOCAL_ROOT%\.bbxxip\.bbxxip.nt.%TYPE% (
+IF NOT DEFINED TARGET (SET TARGET=nt)
+IF NOT EXIST %LOCAL_ROOT%\.bbxxip\.bbxxip.%TARGET%.%TYPE% (
    echo *** Target type "%TYPE%" not built.
    GOTO :EOF
 )
-for /f "delims=" %%a in (%LOCAL_ROOT%\.bbxxip\.bbxxip.nt.%TYPE%) do set %%a
+for /f "delims=" %%a in (%LOCAL_ROOT%\.bbxxip\.bbxxip.%TARGET%.%TYPE%) do set %%a
 IF NOT EXIST %destdir%\localpc\ensemble\ensemble.bat (
-   echo *** Target at "%destdir%" not usable.
-   GOTO :EOF
+   IF NOT EXIST %destdir%\localpc\ensemble\setup.bat (
+      echo *** Target at "%destdir%" not usable.
+      GOTO :EOF
+   )
 )
 IF NOT DEFINED BASEBOX (SET BASEBOX=dosbox)
 set OLD_PATH=%cd%
-cd /D %destdir%\localpc 
-del /F "%destdir%\localpc\IPX_STAT.txt"
+cd /D %destdir%\localpc
+del /F "%destdir%\localpc\IPX_STAT.TXT"
 del /F ensemble\init.bat
 IF DEFINED GEOS_CENTRAL_STORAGE (
    echo mount s: %GEOS_CENTRAL_STORAGE% >> ensemble\init.bat
@@ -40,13 +43,13 @@ start /B %BASEBOX% -conf %ROOT_DIR%\bin\basebox.conf -conf %LOCAL_ROOT%\basebox_
 cd %OLD_PATH%
 @cls
 :waitForFile
-@IF EXIST %destdir%\localpc\IPX_STAT.txt GOTO foundFile
+@IF EXIST %destdir%\localpc\IPX_STAT.TXT GOTO foundFile
 @sleep 1s
 @echo|set /p="."
 @GOTO waitForFile
 :foundFile
-FINDSTR /r /c:"127.0.0.1 from port" %destdir%\localpc\IPX_STAT.txt | perl -e "my $status = <>; $status =~  m/(\d+)$/; printf('%%04X', $1);" > %destdir%\localpc\IPX_PORT.txt
-set /p IPX_PORT=<%destdir%\localpc\IPX_PORT.txt
+FINDSTR /r /c:"127.0.0.1 from port" %destdir%\localpc\IPX_STAT.TXT | perl -e "my $status = <>; $status =~  m/(\d+)$/; printf('%%04X', $1);" > %destdir%\localpc\IPX_PORT.TXT
+set /p IPX_PORT=<%destdir%\localpc\IPX_PORT.TXT
 cls
 rem mode 120,50
 IF EXIST "%USERPROFILE%\swat.rc" (

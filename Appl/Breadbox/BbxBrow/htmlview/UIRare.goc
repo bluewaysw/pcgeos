@@ -62,6 +62,7 @@
 
 @extern object CurrentURLText ;
 @extern object HTMLSettingsBoolGroup ;
+@extern object ignoreNoScript;
 @extern object SimpleURLToolbar ;
 @extern object StatusBar ;
 @extern object HTMLVApp ;
@@ -169,6 +170,16 @@ void UpdateTitleAndURL(NameToken title, NameToken url)
     {                                   /* load them in the current document */
         evt = @record URLDocumentClass::MSG_URL_DOCUMENT_LOAD_GRAPHICS();
         @call application::MSG_META_SEND_CLASSED_EVENT(evt, TO_APP_MODEL);
+    }
+}
+
+@extern method HTMLVProcessClass, MSG_HMLVP_FIT_TO_WINDOW_CHANGED
+{
+    EventHandle evt;
+
+    if (modifiedBooleans) {
+        evt = @record URLDocumentClass::MSG_URL_DOCUMENT_RELOAD();
+        @send application::MSG_META_SEND_CLASSED_EVENT(evt, TO_APP_MODEL);
     }
 }
 
@@ -387,22 +398,25 @@ extern MemHandle jsErrorString;
 @endif
 
 
-@if defined(JAVASCRIPT_SUPPORT) || defined(COMPILE_OPTION_AUTO_BROWSE)
 @extern method HTMLVProcessClass, MSG_HMLVP_HTML_OPTIONS_CHANGED
 {
     EventHandle evt;
 
-    /* if JavaScript changed, reload */
-    if (modifiedBooleans & HTML_JAVASCRIPT) {
-@ifdef JAVASCRIPT_SUPPORT
-        evt = @record URLDocumentClass::MSG_URL_DOCUMENT_CLEAR_OBJ_CACHE();
-        @send application::MSG_META_SEND_CLASSED_EVENT(evt, TO_APP_MODEL);
+@if !defined(JAVASCRIPT_SUPPORT) && !defined(COMPILE_OPTION_AUTO_BROWSE)
+    /* A saved script-processing bit has no effect in these builds. */
+    selectedBooleans &= ~HTML_JAVASCRIPT;
 @endif
+    if(selectedBooleans & HTML_JAVASCRIPT)
+        @call ignoreNoScript::MSG_GEN_SET_NOT_USABLE(VUM_DELAYED_VIA_APP_QUEUE);
+    else
+        @call ignoreNoScript::MSG_GEN_SET_USABLE(VUM_DELAYED_VIA_APP_QUEUE);
+
+    if(modifiedBooleans & (HTML_JAVASCRIPT | HTML_IGNORE_NOSCRIPT)) {
+        ObjCacheClear();
         evt = @record URLDocumentClass::MSG_URL_DOCUMENT_RELOAD();
         @send application::MSG_META_SEND_CLASSED_EVENT(evt, TO_APP_MODEL);
     }
 }
-@endif
 
 @ifdef DO_DBCS
 @extern method HTMLVProcessClass, MSG_HMLVP_CHANGE_ENCODING

@@ -1,0 +1,356 @@
+/* Meta-compatible GString renderer used by the SVG importer. */
+
+@include <stdapp.goh>
+
+#include <graphics.h>
+
+#include "Import/svg.h"
+
+static sword
+SvgRendererCoordinate(SvgImportContext *contextP, sword value,
+                      sword worldMinimum, sword worldMaximum)
+{
+    return SvgRendererCoreCoordinate(&contextP->renderer, value,
+                                     worldMinimum, worldMaximum);
+}
+
+static Boolean
+SvgRendererColorEquals(ColorQuad *colorP, ColorFlag flag,
+                       word redOrIndex, word green, word blue)
+{
+    return (Boolean)(colorP->CQ_info == flag &&
+        colorP->CQ_redOrIndex == (byte)redOrIndex &&
+        (flag != CF_RGB ||
+         (colorP->CQ_green == (byte)green &&
+          colorP->CQ_blue == (byte)blue)));
+}
+
+static void
+SvgRendererUpdateEnvironment(SvgImportContext *contextP)
+{
+    if (!contextP->rendererScaleDirty) return;
+    GrApplyScale(contextP->gstate,
+                 MakeWWFixed(contextP->renderer.coordinateDivisor),
+                 MakeWWFixed(contextP->renderer.coordinateDivisor));
+    contextP->rendererScaleDirty = FALSE;
+}
+
+static void
+SvgRendererUpdateLine(SvgImportContext *contextP)
+{
+    ColorQuad *colorP;
+
+    if (contextP->renderer.pathDepth != 0) return;
+    if (contextP->rendererLineColorDirty)
+    {
+        colorP = &contextP->rendererLineColor;
+        GrSetLineColor(contextP->gstate, colorP->CQ_info,
+                       colorP->CQ_redOrIndex, colorP->CQ_green,
+                       colorP->CQ_blue);
+        contextP->rendererLineColorDirty = FALSE;
+    }
+    if (contextP->rendererLineWidthDirty)
+    {
+        GrSetLineWidth(contextP->gstate, contextP->rendererLineWidth);
+        contextP->rendererLineWidthDirty = FALSE;
+    }
+}
+
+static void
+SvgRendererUpdateArea(SvgImportContext *contextP)
+{
+    ColorQuad *colorP;
+
+    if (contextP->renderer.pathDepth != 0) return;
+    if (contextP->rendererAreaColorDirty)
+    {
+        colorP = &contextP->rendererAreaColor;
+        GrSetAreaColor(contextP->gstate, colorP->CQ_info,
+                       colorP->CQ_redOrIndex, colorP->CQ_green,
+                       colorP->CQ_blue);
+        contextP->rendererAreaColorDirty = FALSE;
+    }
+}
+
+static void
+SvgRendererDrawLineGeometry(SvgImportContext *contextP, sword x1, sword y1,
+                            sword x2, sword y2)
+{
+    GrMoveTo(contextP->gstate, x1, y1);
+    if (contextP->renderer.pathDepth != 0)
+    {
+        GrDrawLineTo(contextP->gstate, x2, y2);
+    }
+    else if (x1 == x2)
+    {
+        GrDrawVLineTo(contextP->gstate, y2);
+    }
+    else if (y1 == y2)
+    {
+        GrDrawHLineTo(contextP->gstate, x2);
+    }
+    else
+    {
+        GrDrawLineTo(contextP->gstate, x2, y2);
+    }
+}
+
+void
+SvgRendererInit(SvgImportContext *contextP, GStateHandle gstate)
+{
+    contextP->gstate = gstate;
+    SvgRendererCoreInit(&contextP->renderer, ODD_EVEN);
+    contextP->rendererLineColorDirty = TRUE;
+    contextP->rendererAreaColorDirty = TRUE;
+    contextP->rendererLineWidthDirty = TRUE;
+    contextP->rendererScaleDirty = FALSE;
+    SvgRendererSetLineColor(contextP, CF_INDEX, 0, 0, 0);
+    SvgRendererSetAreaColor(contextP, CF_INDEX, 0, 0, 0);
+    SvgRendererSetLineWidth(contextP, MakeWWFixed(1));
+    SvgRendererSetMiterLimit(contextP, MakeWWFixed(4));
+    GrSetMixMode(gstate, MM_COPY);
+    GrSetLineColorMap(gstate, CMT_DITHER);
+    GrSetAreaColorMap(gstate, CMT_DITHER);
+    GrSetLineJoin(gstate, LJ_ROUND);
+    GrSetLineEnd(gstate, LE_ROUNDCAP);
+}
+
+void
+SvgRendererInitViewport(SvgImportContext *contextP, sword width, sword height)
+{
+    contextP->renderer.worldMinX = 0;
+    contextP->renderer.worldMinY = 0;
+    contextP->renderer.worldMaxX = width;
+    contextP->renderer.worldMaxY = height;
+    contextP->renderer.coordinateDivisor =
+        SvgRendererCoreChooseDivisor(width, height);
+    contextP->rendererScaleDirty = TRUE;
+}
+
+word
+SvgRendererCompactPoints(SvgImportContext *contextP, Point *pointsP,
+                         word count)
+{
+    return SvgRendererCoreCompact((SvgRendererPoint *)pointsP, count,
+                                  &contextP->renderer);
+}
+
+void
+SvgRendererSetLineColor(SvgImportContext *contextP, ColorFlag flag,
+                        word redOrIndex, word green, word blue)
+{
+    if (!SvgRendererColorEquals(&contextP->rendererLineColor, flag,
+                                redOrIndex, green, blue))
+    {
+        contextP->rendererLineColorDirty = TRUE;
+    }
+    contextP->rendererLineColor.CQ_info = flag;
+    contextP->rendererLineColor.CQ_redOrIndex = (byte)redOrIndex;
+    contextP->rendererLineColor.CQ_green = (byte)green;
+    contextP->rendererLineColor.CQ_blue = (byte)blue;
+}
+
+void
+SvgRendererSetAreaColor(SvgImportContext *contextP, ColorFlag flag,
+                        word redOrIndex, word green, word blue)
+{
+    if (!SvgRendererColorEquals(&contextP->rendererAreaColor, flag,
+                                redOrIndex, green, blue))
+    {
+        contextP->rendererAreaColorDirty = TRUE;
+    }
+    contextP->rendererAreaColor.CQ_info = flag;
+    contextP->rendererAreaColor.CQ_redOrIndex = (byte)redOrIndex;
+    contextP->rendererAreaColor.CQ_green = (byte)green;
+    contextP->rendererAreaColor.CQ_blue = (byte)blue;
+}
+
+void
+SvgRendererSetFillRule(SvgImportContext *contextP,
+                       RegionFillRule fillRule)
+{
+    SvgRendererCoreSetFillRule(&contextP->renderer, fillRule);
+}
+
+void
+SvgRendererSetLineWidth(SvgImportContext *contextP, WWFixedAsDWord width)
+{
+    if (contextP->rendererLineWidth != width)
+    {
+        contextP->rendererLineWidthDirty = TRUE;
+    }
+    contextP->rendererLineWidth = width;
+}
+
+void
+SvgRendererSetLineJoin(SvgImportContext *contextP, LineJoin join)
+{
+    GrSetLineJoin(contextP->gstate, join);
+}
+
+void
+SvgRendererSetLineEnd(SvgImportContext *contextP, LineEnd end)
+{
+    GrSetLineEnd(contextP->gstate, end);
+}
+
+void
+SvgRendererSetMiterLimit(SvgImportContext *contextP,
+                         WWFixedAsDWord limit)
+{
+    if ((sdword)limit < 0)
+    {
+        limit = (WWFixedAsDWord)(-(sdword)limit);
+    }
+    GrSetMiterLimit(contextP->gstate, limit);
+}
+
+void
+SvgRendererLine(SvgImportContext *contextP, sword x1, sword y1,
+                sword x2, sword y2)
+{
+    x1 = SvgRendererCoordinate(contextP, x1,
+                               contextP->renderer.worldMinX,
+                               contextP->renderer.worldMaxX);
+    y1 = SvgRendererCoordinate(contextP, y1,
+                               contextP->renderer.worldMinY,
+                               contextP->renderer.worldMaxY);
+    x2 = SvgRendererCoordinate(contextP, x2,
+                               contextP->renderer.worldMinX,
+                               contextP->renderer.worldMaxX);
+    y2 = SvgRendererCoordinate(contextP, y2,
+                               contextP->renderer.worldMinY,
+                               contextP->renderer.worldMaxY);
+    SvgRendererUpdateEnvironment(contextP);
+    SvgRendererUpdateLine(contextP);
+    SvgRendererDrawLineGeometry(contextP, x1, y1, x2, y2);
+}
+
+void
+SvgRendererPolyline(SvgImportContext *contextP, Point *pointsP, word count)
+{
+    count = SvgRendererCompactPoints(contextP, pointsP, count);
+    if (count < 2) return;
+
+    SvgRendererUpdateEnvironment(contextP);
+    SvgRendererUpdateLine(contextP);
+    if (count == 2)
+    {
+        SvgRendererDrawLineGeometry(contextP,
+                                    pointsP[0].P_x, pointsP[0].P_y,
+                                    pointsP[1].P_x, pointsP[1].P_y);
+    }
+    else
+    {
+        /* GEOS path stroking needs the native polyline subpath opcode. */
+        GrDrawPolyline(contextP->gstate, pointsP, count);
+    }
+}
+
+void
+SvgRendererPolygon(SvgImportContext *contextP, Point *pointsP, word count,
+                   Boolean fill, Boolean stroke)
+{
+    count = SvgRendererCompactPoints(contextP, pointsP, count);
+    if (count < 2 || (!fill && !stroke)) return;
+    SvgRendererUpdateEnvironment(contextP);
+    if (count == 2)
+    {
+        if (stroke)
+        {
+            SvgRendererUpdateLine(contextP);
+            SvgRendererDrawLineGeometry(contextP,
+                                        pointsP[0].P_x, pointsP[0].P_y,
+                                        pointsP[1].P_x, pointsP[1].P_y);
+        }
+        return;
+    }
+
+    if (contextP->renderer.pathDepth != 0)
+    {
+        /* Native polygons retain GEOS's close and fill-path semantics. */
+        GrDrawPolygon(contextP->gstate, pointsP, count);
+    }
+    else if (stroke && !fill)
+    {
+        SvgRendererUpdateLine(contextP);
+        GrDrawPolygon(contextP->gstate, pointsP, count);
+    }
+    else
+    {
+        SvgRendererBeginPath(contextP);
+        GrDrawPolygon(contextP->gstate, pointsP, count);
+        SvgRendererEndPath(contextP, fill, stroke);
+    }
+}
+
+void
+SvgRendererEllipse(SvgImportContext *contextP, sword cx, sword cy,
+                   sword rx, sword ry, Boolean fill, Boolean stroke)
+{
+    sword left;
+    sword top;
+    sword right;
+    sword bottom;
+
+    if (!fill && !stroke) return;
+    left = SvgRendererCoordinate(contextP, (sword)(cx - rx),
+                                 contextP->renderer.worldMinX,
+                                 contextP->renderer.worldMaxX);
+    top = SvgRendererCoordinate(contextP, (sword)(cy - ry),
+                                contextP->renderer.worldMinY,
+                                contextP->renderer.worldMaxY);
+    right = SvgRendererCoordinate(contextP, (sword)(cx + rx),
+                                  contextP->renderer.worldMinX,
+                                  contextP->renderer.worldMaxX);
+    bottom = SvgRendererCoordinate(contextP, (sword)(cy + ry),
+                                   contextP->renderer.worldMinY,
+                                   contextP->renderer.worldMaxY);
+
+    SvgRendererUpdateEnvironment(contextP);
+    if (fill && !stroke)
+    {
+        SvgRendererUpdateArea(contextP);
+        GrFillEllipse(contextP->gstate, left, top, right, bottom);
+    }
+    else if (stroke && !fill)
+    {
+        SvgRendererUpdateLine(contextP);
+        GrDrawEllipse(contextP->gstate, left, top, right, bottom);
+    }
+    else
+    {
+        SvgRendererBeginPath(contextP);
+        GrDrawEllipse(contextP->gstate, left, top, right, bottom);
+        SvgRendererEndPath(contextP, TRUE, TRUE);
+    }
+}
+
+void
+SvgRendererBeginPath(SvgImportContext *contextP)
+{
+    if (SvgRendererCoreBeginPath(&contextP->renderer))
+    {
+        SvgRendererUpdateEnvironment(contextP);
+        GrBeginPath(contextP->gstate, PCT_REPLACE);
+    }
+}
+
+void
+SvgRendererEndPath(SvgImportContext *contextP, Boolean fill, Boolean stroke)
+{
+    if (!SvgRendererCoreEndPath(&contextP->renderer)) return;
+
+    GrEndPath(contextP->gstate);
+    if (fill)
+    {
+        SvgRendererUpdateArea(contextP);
+        GrFillPath(contextP->gstate,
+                   (RegionFillRule)contextP->renderer.fillRule);
+    }
+    if (stroke)
+    {
+        SvgRendererUpdateLine(contextP);
+        GrDrawPath(contextP->gstate);
+    }
+}

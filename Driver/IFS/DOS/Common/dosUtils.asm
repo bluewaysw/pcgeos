@@ -1237,12 +1237,20 @@ endif
 	;
 	; And perform the change.
 	; 
-if _MSLF
+if _LFN
 		mov	ax, MSDOS7F_SET_CURRENT_DIR
 else
 		mov	ah, MSDOS_SET_CURRENT_DIR
 endif
+if HOST_FS_FASTPATH
+	;
+	; Through DOSUtilInt21, so the BASEBOX host can execute the long
+	; file name call (or os2Lfn.asm emulates it).
+	;
+		call	DOSUtilInt21
+else
 		call	FileInt21
+endif
 		.leave
 		ret
 DOSInternalSetDir endp
@@ -1528,7 +1536,7 @@ DOSUtilOpen	endp
 
 if not DBCS_PCGEOS
 
-if _MSLF
+if _LFN
 
 
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -1558,6 +1566,21 @@ REVISION HISTORY:
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 DOSUtilGeosToDosCharNoUpcase	proc	far
 
+if HOST_FS_FASTPATH
+	;
+	; With long file names from the BASEBOX host, long names travel in
+	; the GEOS character set (the host maps them to Unicode): no code page
+	; conversion.
+	;
+	push	ds
+	segmov	ds, dgroup
+	tst	ds:[lfnAvail]
+	pop	ds
+	jz	convert
+	clc
+	ret
+convert:
+endif
 	cmp	al, 'z'
 	ja	passOn
 	cmp	al, 'a'
@@ -1571,7 +1594,7 @@ passOn:
 
 DOSUtilGeosToDosCharNoUpcase	endp
 
-endif	; _MSLF
+endif	; _LFN
 
 
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -1797,6 +1820,30 @@ endif
 		mov	ds:[dosLastCritical], 0
 		pop	ds
 
+if HOST_FS_FASTPATH
+	;
+	; Under pcgeos-basebox, let the host execute the call directly (no
+	; INT 21h dispatch, no DPMI reflection or transfer buffer). ZF set
+	; means it did: CF and registers are as DOS returns them, and on
+	; error ax already holds the extended error code. SysUnlockBIOS at
+	; "done" preserves the carry.
+	;
+		call	DOSHostFsInt21
+		jz	done
+if _LFN
+	;
+	; A long file name call the host didn't execute (no BASEBOX, or long
+	; names off): emulate it with 8.3 names. ZF set means done; else ax
+	; is now the classic call to make.
+	;
+		cmp	ah, 71h
+		jne	notLfn
+		call	DOSLfnEmulate
+		jz	done
+notLfn:
+endif
+endif
+
 	;
 	; See if the call returns the carry flag + error
 	; 
@@ -1990,7 +2037,7 @@ endif		;GSDOS
 
 Resident	ends
 
-if _MSLF
+if _LFN
 
 PathOps		segment	resource
 
@@ -2037,4 +2084,4 @@ DOSUtilCopyFilenameFFDToFindData	endp
 
 PathOps		ends
 
-endif	; _MSLF
+endif	; _LFN

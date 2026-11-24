@@ -62,15 +62,9 @@ extern TEngine_Instance engineInstance;
  ******************************************************************/
 
   LOCAL_FUNC
-  TT_Error  Done_Context( PExecution_Context  exec )
+  void  Done_Context( )
   {
-    if ( exec != engineInstance.exec )
-        return TT_Err_Invalid_Argument;
-
-    exec->face     = NULL;
     engineInstance.exec_in_use = FALSE;
-
-    return TT_Err_Ok;
   }
 
 
@@ -343,13 +337,12 @@ extern TEngine_Instance engineInstance;
 
   LOCAL_FUNC
   TT_Error Context_Load( PExecution_Context  exec,
-                         PFace               face,
                          PInstance           ins )
   {
+    PFace         face = exec->face;
     TMaxProfile*  maxp;
     TT_Error      error;
 
-    exec->face     = face;
     maxp           = &face->maxProfile;
 
     if ( ins )
@@ -533,29 +526,16 @@ extern TEngine_Instance engineInstance;
     PInstance  ins = (PInstance)_instance;
 
 
-    if ( !_instance )
-      return;
-
     FREE( ins->cvt );
-    ins->cvtSize = 0;
 
     /* free storage area */
     FREE( ins->storage );
-    ins->storeSize = 0;
 
     /* twilight zone */
     Done_Glyph_Zone( &ins->twilight );
 
     FREE( ins->FDefs );
     FREE( ins->IDefs );
-    ins->numFDefs = 0;
-    ins->numIDefs = 0;
-    ins->maxFDefs = 0;
-    ins->maxIDefs = 0;
-    ins->maxFunc  = -1;
-
-    ins->owner = NULL;
-    ins->valid = FALSE;
   }
 
 
@@ -621,7 +601,6 @@ extern TEngine_Instance engineInstance;
     return TT_Err_Ok;
 
   Fail_Memory:
-    Instance_Destroy( ins );
     return error;
   }
 
@@ -657,7 +636,7 @@ EC( ECCheckBounds( exec ) );
     ins->numIDefs = 0;
     ins->maxFunc  = -1;
 
-    Context_Load( exec, face, ins );
+    Context_Load( exec, ins );
 
     exec->callTop   = 0;
     exec->top       = 0;
@@ -674,7 +653,6 @@ EC( ECCheckBounds( exec ) );
       metrics->pointSize    = 0;
       metrics->scale1       = 0;
       metrics->scale2       = 1;
-      metrics->ratio        = 1L << 16;
     }
 
 #ifdef DEBUG_INTERPRETER
@@ -702,7 +680,7 @@ EC( ECCheckBounds( exec ) );
 
   Fin:
     Context_Save( exec, ins );
-    Done_Context( exec );
+    Done_Context( );
     ins->valid = FALSE;
 
     return error;
@@ -759,7 +737,7 @@ EC( ECCheckBounds( ins ) );
     if ( !exec )
       return TT_Err_Could_Not_Find_Context;
 
-    Context_Load( exec, face, ins );
+    Context_Load( exec, ins );
 
 #ifdef DEBUG_INTERPRETER
     exec->instruction_trap = FALSE;
@@ -784,7 +762,7 @@ EC( ECCheckBounds( ins ) );
 
   Fin:
     Context_Save( exec, ins );
-    Done_Context( exec );
+    Done_Context( );
 
     if ( !error )
       ins->valid = TRUE;
@@ -832,7 +810,9 @@ EC( ECCheckBounds( ins ) );
 
     if ( face->glyph )
     {
+#ifndef __GEOS__
       Glyph_Destroy( face->glyph );
+#endif
       FREE( face->glyph );
       face->glyph = NULL;
     }
@@ -924,8 +904,6 @@ EC( ECCheckBounds( ins ) );
 
 
     face->stream   = input->stream;
-    face->instance = NULL;
-    face->glyph    = NULL;
 
     /* Load collection directory if present, then font directory */
 
@@ -979,6 +957,7 @@ EC( ECCheckBounds( ins ) );
 
 #undef LOAD_
 
+#ifndef __GEOS__
 #pragma code_seg(ttapi_TEXT)
 
 /*******************************************************************
@@ -1001,45 +980,14 @@ EC( ECCheckBounds( ins ) );
 
     if ( !glyph )
       return;
-
+#ifndef __GEOS__
     glyph->outline.owner = TRUE;
     TT_Done_Outline( &glyph->outline );
-  }
-
-
-/*******************************************************************
- *
- *  Function    :  Glyph_Create
- *
- *  Description :  The glyph object constructor.
- *
- *  Input  :  _glyph   glyph record to build.
- *            _face    the glyph's parent face.
- *
- *  Output :  Error code.
- *
- ******************************************************************/
-
-  LOCAL_FUNC
-  TT_Error  Glyph_Create( void*  _glyph,
-                          void*  _face )
-  {
-    PFace     face  = (PFace)_face;
-    PGlyph    glyph = (PGlyph)_glyph;
-
-
-EC( ECCheckBounds( face ) );
-EC( ECCheckBounds( glyph ) );
-
-    glyph->face = face;
-
-    /* XXX: Don't forget the space for the 2 phantom points */
-    return TT_New_Outline( glyph->face->maxPoints + 2,
-                           glyph->face->maxContours,
-                           &glyph->outline );
+#endif
   }
 
 #pragma code_seg()
+#endif
 
 /*******************************************************************
  *

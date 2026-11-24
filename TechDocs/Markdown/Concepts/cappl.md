@@ -1467,26 +1467,74 @@ string section in the buffer. **InitFileReadStringSectionBlock()** allocates a
 new block on the heap and returns the string section in it. You should use this 
 routine if you don't know the approximate size of the string section.
 
-**InitFileEnumStringSection()** enumerates the specified blob, executing a 
+**InitFileEnumStringSection()** enumerates the specified blob, executing a
 specified callback routine on each string section within the blob.
+
+When the kernel is built with `INI_STRING_SECTION_TOMBSTONES` and a lower INI
+file is present, string-section reads and enumeration merge layered INI files.
+Entries from lower-priority INI files are combined with local entries, exact
+duplicates are removed, and entries listed in the primary file sidecar key
+`key.disabled` are suppressed. The sidecar key lives in the same category as the
+original key and stores exact factory string-section entries. Kernels built with
+`INI_STRING_SECTION_TOMBSTONES=FALSE`, and runtimes with only one INI file, use
+the legacy string-section read behavior.
 
 #### 6.3.2.5 Deleting Items from the INI File
 
 InitFileDeleteEntry(), InitFileDeleteCategory(), 
 InitFileDeleteStringSection()
 
-Besides reading and writing data, you can delete categories and keys that 
-were previously entered. **InitFileDeleteEntry()** takes pointers to both the 
-null-terminated category name and the null-terminated key name and 
-deletes the entry. **InitFileDeleteCategory()** takes only a pointer to the 
-null-terminated category name and deletes the entire category, including all 
-the keys stored under it.
+InitFileDeleteEntry deletes a key from the primary INI file. The primary file
+is the first file in the search order. A lower INI file is a file that GEOS
+searches after it, such as net.ini in a split setup.
 
-In addition, you can delete a single string section from a specified blob. 
-**InitFileDeleteStringSection()** takes the category and key names of the 
-blob as well as the index of the string section, and it deletes the string section. 
-If the string section does not exist or if either the key or category can not be 
-found, the routine will return an error flag.
+If a lower file supplies a value for the key, the kernel writes key = @deleted
+in the primary file. This marker is called a tombstone. Reads report the key
+as missing and stop the search. The application can use its normal default.
+A missing key does not mean false, zero, or an empty string.
+
+If no lower value is available, the kernel removes the primary entry. It does
+not create a marker for a key that a future factory update might add. An
+existing marker stays in place, even if an update removes the lower key.
+A normal write replaces the marker. To use a lower value again, remove the
+primary entry by hand. This operation differs from deleting the key through
+the API.
+
+The exact lowercase value @deleted outside a blob is reserved. Spaces and tabs
+can surround it. A semicolon can start a comment after it. Empty strings and
+blob contents remain data. String writes protect a literal "@deleted"
+automatically. Both kernel reads and loader reads apply the marker rule.
+The rule does not depend on INI_STRING_SECTION_TOMBSTONES.
+
+InitFileDeleteStringSection deletes one indexed item from a string-section
+list. With INI_STRING_SECTION_TOMBSTONES enabled and a lower file loaded, the
+kernel stores a deleted factory item in key.disabled in the same category.
+This item list keeps its existing format and rules. With the feature disabled
+or only one file loaded, item deletion changes only the primary file.
+A marker for the whole key blocks the complete list. A later list write clears
+that marker before the kernel applies the existing item rules. A full factory-list reset may also
+require removal of the local list and its key.disabled entry.
+
+After each list write, the kernel stores the current exclusions in key.disabled.
+Reads see that list before commit. The pending snapshot remains available for
+further factory-item matches. Item deletion finishes the pending rewrite before
+resolving the item index. Save, commit, entry deletion, and category deletion
+also finish pending list work. A category is physically removed after that work,
+so a later commit cannot recreate it from an old snapshot.
+
+InitFileSave backs up the primary buffer, including its current list exclusions.
+InitFileRevert first reads and checks that backup in a separate block. A failed
+restore keeps the active buffer and pending rewrite. A successful restore
+replaces the primary buffer, discards old pending state, and refreshes cached
+positions and the optional hash table. Lower files stay in place.
+
+InitFileDeleteCategory still removes only the primary category and its keys.
+It does not write markers for the keys in that category. Lower values can
+therefore become available again. Callers and public APIs are unchanged.
+
+See [Deleted Keys in Layered INI Files](../Tools/tini.md#911-deleted-keys-in-layered-ini-files)
+for INI examples. See [InitFileDeleteEntry](../Routines/rrouth_l.md#initfiledeleteentry)
+for the read flags, marker syntax, and API limits.
 
 ## 6.4 General System Utilities
 

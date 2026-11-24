@@ -335,32 +335,6 @@
 #endif
 
 
-  LOCAL_FUNC
-  UShort  CharMap_Index( PCMapTable  cmap,
-                         UShort      charcode )
-  {
-    switch ( cmap->format )
-    {
-#ifdef TT_CONFIG_OPTION_SUPPORT_CMAP0
-      case 0:
-        return code_to_index0( charcode, &cmap->c.cmap0 );
-#endif
-#ifdef TT_CONFIG_OPTION_SUPPORT_CMAP2
-      case 2:
-        return code_to_index2( charcode, &cmap->c.cmap2 );
-#endif
-      case 4:
-        return code_to_index4( charcode, &cmap->c.cmap4 );
-#ifdef TT_CONFIG_OPTION_SUPPORT_CMAP6
-      case 6:
-        return code_to_index6( charcode, &cmap->c.cmap6 );
-#endif
-      default:
-        return 0;
-    }
-  }
-
-
 #ifdef TT_CONFIG_OPTION_SUPPORT_CMAP0
 /*******************************************************************
  *

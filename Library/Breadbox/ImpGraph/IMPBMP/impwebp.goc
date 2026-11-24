@@ -1,0 +1,129 @@
+#ifndef WEBP_HOST_TEST
+@include <stdapp.goh>
+#include "IMPBMP/impwebp.h"
+#endif
+
+static ImpBmpStatus _pascal
+WebPMapResult(WebPResult result)
+{
+    switch (result) {
+    case WEBP_ERROR_WRONG_FORMAT:
+        return IBS_UNKNOWN_FORMAT;
+    case WEBP_ERROR_OUT_OF_MEMORY:
+        return IBS_NO_MEMORY;
+    case WEBP_ERROR_BAD_STATE:
+        return IBS_SYS_ERROR;
+    case WEBP_ERROR_CORRUPT:
+    case WEBP_ERROR_UNSUPPORTED:
+    case WEBP_ERROR_READ:
+    case WEBP_ERROR_IMAGE_TOO_LARGE:
+        return IBS_WRONG_FILE;
+    default:
+        return IBS_SYS_ERROR;
+    }
+}
+
+#if PROGRESS_DISPLAY
+ImpBmpStatus _pascal
+ImpWebP(TCHAR *file, VMFileHandle vmf, ImageAdditionalData *iad,
+        AllocWatcherHandle watcher, dword *usedMem, ImpBmpParams *params,
+        Boolean *isCompacted, VMBlockHandle *bitmap,
+        ImportProgressData *importProgressDataP, MimeStatus *mimeStatus)
+#else
+ImpBmpStatus _pascal
+ImpWebP(TCHAR *file, VMFileHandle vmf, ImageAdditionalData *iad,
+        AllocWatcherHandle watcher, dword *usedMem, ImpBmpParams *params,
+        Boolean *isCompacted, VMBlockHandle *bitmap, MimeStatus *mimeStatus)
+#endif
+{
+    FileHandle source;
+    WebPImportHandle decoder;
+    WebPImageInfo info;
+    WebPResult result;
+    ImpBmpStatus status;
+    VMBlockHandle localBitmap;
+    dword requiredMemory;
+    word firstLine;
+    word lineCount;
+    Boolean reserved;
+
+    source = NullHandle;
+    decoder = NullHandle;
+    localBitmap = NullHandle;
+    requiredMemory = 0;
+    reserved = FALSE;
+    *bitmap = NullHandle;
+    *usedMem = 0;
+    *isCompacted = FALSE;
+    iad->IAD_completeGraphic = FALSE;
+    params->IBP_bitmap = NullHandle;
+
+    source = FileOpen(file, FILE_ACCESS_R | FILE_DENY_W);
+    if (source == NullHandle) {
+        return IBS_WRONG_FILE;
+    }
+    result = WebPImportBegin(source, vmf, &decoder, &localBitmap, &info);
+    if (result != WEBP_RESULT_OK) {
+        status = WebPMapResult(result);
+        goto cleanup;
+    }
+    *isCompacted = TRUE;
+
+    iad->IAD_size.XYS_width = info.width;
+    iad->IAD_size.XYS_height = info.height;
+    requiredMemory = (dword)info.width * info.height * 3;
+    reserved = AllocWatcherAllocate(watcher, requiredMemory);
+    if (!reserved) {
+        status = IBS_NO_MEMORY;
+        goto cleanup;
+    }
+
+    status = IBS_NO_ERROR;
+    for (;;) {
+        if (mimeStatus->MS_mimeFlags & MIME_STATUS_ABORT) {
+            status = IBS_IMPORT_STOPPED;
+            break;
+        }
+        result = WebPImportNext(decoder, &firstLine, &lineCount);
+        if (mimeStatus->MS_mimeFlags & MIME_STATUS_ABORT) {
+            status = IBS_IMPORT_STOPPED;
+            break;
+        }
+        if (result == WEBP_RESULT_DONE) {
+            iad->IAD_completeGraphic = TRUE;
+            break;
+        }
+        if (result != WEBP_RESULT_OK) {
+            status = WebPMapResult(result);
+            break;
+        }
+
+    }
+
+cleanup:
+    WebPImportDestroy(decoder);
+    if (source != NullHandle) {
+        FileClose(source, TRUE);
+    }
+
+    if (status == IBS_NO_ERROR) {
+#if PROGRESS_DISPLAY
+        /* No partial publication; replace every line in the final update. */
+        if (importProgressDataP != (void *)0) {
+            importProgressDataP->IPD_callback = (void *)0;
+        }
+#endif
+        *bitmap = localBitmap;
+        params->IBP_bitmap = localBitmap;
+        *usedMem = requiredMemory;
+    } else {
+        if (localBitmap != NullHandle) {
+            VMFreeVMChain(vmf,
+                VMCHAIN_MAKE_FROM_VM_BLOCK(localBitmap));
+        }
+        if (reserved) {
+            AllocWatcherFree(watcher, requiredMemory);
+        }
+    }
+    return status;
+}

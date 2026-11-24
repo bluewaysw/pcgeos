@@ -349,19 +349,21 @@
   {
   #ifdef TT_CONFIG_OPTION_USE_ASSEMBLER_IMPLEMENTATION
     __asm {
-        mov     eax, x           ; Load pointer to x into eax
-        mov     edx, y           ; Load pointer to y into edx
-        mov     ecx, z           ; Load pointer to z into ecx
-
-        ; Add lower 32 bits
-        mov     ebx, [eax]       ; Load x->lo into ebx
-        add     ebx, [edx]       ; Add y->lo to ebx
-        mov     [ecx], ebx       ; Store result in z->lo
-
-        ; Add upper 32 bits with carry
-        mov     ebx, [eax + 4]   ; Load x->hi into ebx
-        adc     ebx, [edx + 4]   ; Add y->hi to ebx with carry
-        mov     [ecx + 4], ebx   ; Store result in z->hi
+        ; TT_Int64 pointers are 16:16 far pointers in PC/GEOS.
+        ; Access them through the segment register, not [EAX]/[EDX].
+        push    es
+        push    bx
+        les     bx, x
+        mov     eax, dword ptr es:[bx]
+        mov     edx, dword ptr es:[bx+4]
+        les     bx, y
+        add     eax, dword ptr es:[bx]
+        adc     edx, dword ptr es:[bx+4]
+        les     bx, z
+        mov     dword ptr es:[bx], eax
+        mov     dword ptr es:[bx+4], edx
+        pop     bx
+        pop     es
     }
   #else
     register TT_Word32  lo, hi;
@@ -381,12 +383,15 @@
   {
   #ifdef TT_CONFIG_OPTION_USE_ASSEMBLER_IMPLEMENTATION
     __asm {
-        mov     eax, x           ; Load x into eax
-        imul    y                ; Signed multiply eax by y
-
-        mov     ecx, z           ; Load address of z into esi
-        mov     [ecx], eax       ; Store low 32 bits (eax) into z->lo
-        mov     [ecx + 4], edx   ; Store high 32 bits (edx) into z->hi
+        mov     eax, x           ; Signed 32x32 -> EDX:EAX
+        imul    y
+        push    es
+        push    bx
+        les     bx, z            ; ES:BX is the 16:16 destination pointer
+        mov     dword ptr es:[bx], eax
+        mov     dword ptr es:[bx+4], edx
+        pop     bx
+        pop     es
     }
   #else
     TT_Int32   s;
@@ -437,26 +442,31 @@
   {
   #ifdef TT_CONFIG_OPTION_USE_ASSEMBLER_IMPLEMENTATION
     __asm {
-        mov     ecx, y                ; load divisor
-        test    ecx, ecx              ; check for zero
-        jz      overflow
+        ; x is a 16:16 far pointer in PC/GEOS real mode.
+        ; Read the 64-bit dividend via ES:SI, not [ESI].
+        push    es
+        push    si
+        les     si, x
+        mov     eax, dword ptr es:[si]    ; low 32 bits
+        mov     edx, dword ptr es:[si+4]  ; high 32 bits
 
-        mov     esi, x                ; pointer to x
-        mov     eax, [esi]            ; low 32 bits
-        mov     edx, [esi+4]          ; high 32 bits
-        
-        idiv    ecx                   ; result in EAX
+        mov     ecx, y
+        test    ecx, ecx
+        jz      overflow
+        idiv    ecx
         jmp     done
 
     overflow:
-        mov     eax, [esi+4]          ; sign of dividend
-        sar     eax, 31               ; 0xFFFFFFFF if neg, 0 if pos
-        mov     edx, eax              ; temp storage
-        xor     eax, 0x7FFFFFFF       ; flip bits: 0x7FFFFFFF (pos) or 0x80000000 (neg)
+        ; Keep existing saturating division-by-zero behavior.
+        mov     eax, edx
+        sar     eax, 31
+        xor     eax, 0x7FFFFFFF
 
     done:
-        mov     edx, eax              ; store result in dx:ax
+        mov     edx, eax              ; return Long in DX:AX
         shr     edx, 16
+        pop     si
+        pop     es
     }
   #else
     TT_Int32   s;
@@ -499,10 +509,12 @@
   #endif
   }
 
-  LOCAL_FUNC
-  TT_Int32  Sqrt64( TT_Int64*  l )
-  {
-  #ifdef TT_CONFIG_OPTION_USE_ASSEMBLER_IMPLEMENTATION
+
+LOCAL_FUNC
+TT_Int32  Sqrt64( TT_Int64*  l )
+{
+#ifdef TT_CONFIG_OPTION_USE_ASSEMBLER_IMPLEMENTATION
+
     __asm {
         push    es
 
@@ -510,15 +522,18 @@
         mov     eax, dword ptr es:[si]    ; edx:eax = l
         mov     edx, dword ptr es:[si+4]
 
-        test    edx, edx                  ; handle 0 and 1
+        ; handle 0 and 1.
+        test    edx, edx
         jnz     sqrt_start
+
         test    eax, eax
         jz      sqrt_done
+
         cmp     eax, 1
         je      sqrt_done
 
-  sqrt_start:
-        ; determine floor(log2(l))
+sqrt_start:
+        ; determine floor(log2(l)).
         test    edx, edx
         jnz     sqrt_guess_hi
 
@@ -530,9 +545,24 @@ sqrt_guess_hi:
         add     ecx, 32
 
 sqrt_set_guess:
+        ; initial approximation:
         shr     ecx, 1
         inc     ecx
 
+        cmp     ecx, 32
+        jne     sqrt_normal_guess
+
+        cmp     edx, 0FFFFFFFFh
+        jne     sqrt_max_guess
+
+        mov     eax, 0FFFFFFFFh
+        jmp     sqrt_done
+
+sqrt_max_guess:
+        mov     ebx, 0FFFFFFFFh
+        jmp     sqrt_loop
+
+sqrt_normal_guess:
         mov     ebx, 1
         shl     ebx, cl
 
@@ -546,8 +576,10 @@ sqrt_loop:
         add     eax, ebx
         rcr     eax, 1
 
+        ; newton iteration converged when the next value
         cmp     eax, ebx
         jae     sqrt_finished
+
         mov     ebx, eax
         jmp     sqrt_loop
 
@@ -557,9 +589,11 @@ sqrt_finished:
 sqrt_done:
         pop     es
 
-        mov     edx, eax      ; store result in dx:ax
+        ; return result in DX:AX.
+        mov     edx, eax
         shr     edx, 16
     }
+
 #else
 	  long  x = l->hi ? l->hi >> 1 : l->lo >> 1;
 	

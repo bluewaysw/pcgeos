@@ -118,6 +118,8 @@ publish TOOLSENDALLPTREVENTS
 publish TOOLRELEASEMOUSE
 #publish TOOLCALLBITMAP NOT SUPPORTED
 publish DRAWBITMAPTOGSTATE
+
+incminor BitmapFormatPicker
 #
 # XIP-enabled
 #
