@@ -172,6 +172,24 @@ endif
 notNT:
 
 	;
+	; DOSEMU 1 and 2 have the same BIOS signature at F000:FFE0.
+	; Check all eight bytes before the DOSBox opcode probe.
+	;
+		mov	ax, 0f000h
+		mov	es, ax
+		cmp	{word}es:[0ffe0h], 4424h	; "$D"
+		jne	notDOSEMU
+		cmp	{word}es:[0ffe2h], 534fh	; "OS"
+		jne	notDOSEMU
+		cmp	{word}es:[0ffe4h], 4d45h	; "EM"
+		jne	notDOSEMU
+		cmp	{word}es:[0ffe6h], 2455h	; "U$"
+		jne	notDOSEMU
+		mov	ds:[isDOSEMU], BB_TRUE
+		jmp	notDOSBox
+notDOSEMU:
+
+	;
 	; See if we're running under DOSBox.  FE /7 is DOSBox's private
 	; callback opcode.  On a real 80186+ CPU, it traps through INT 06h.
 	;
@@ -376,6 +394,8 @@ endif	; PRIMARY_FSD_FOUND_IN_INTIFILE
 		mov	si, offset os2Name
 		tst	ds:[isDOSBox]
 		jnz	loadDriver
+		tst	ds:[isDOSEMU]
+		jnz	loadDriver
 
 		mov	si, offset drdosName
 		tst	ds:[isDRDOS]
@@ -397,16 +417,16 @@ endif	; PRIMARY_FSD_FOUND_IN_INTIFILE
 		ERROR_B	UNSUPPORTED_DOS_VERSION
 		mov	ds:exitFlags, 0
 
+	;
+	; Select OS/2 for DOS versions outside this table in all builds.
+	; The system::fs list is then loaded at loadIniDrivers, whether
+	; the primary driver load succeeds or fails.
+	;
 		cmp	bx, length fsDrivers
-ifdef GPC_ONLY
-		jae	loadIniDrivers		; assume primary defined in
-						;  .ini file instead.
-else
 		jb	checkTable
-		mov	si, offset dos4Name	;si <- default to ms4.geo
+		mov	si, offset os2Name	; default to os2.geo
 		jmp	loadDriver
 checkTable:
-endif
 
 	;
 	; Load the appropriate driver, passing PSP in CX to DR_INIT
