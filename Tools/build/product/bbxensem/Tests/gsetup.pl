@@ -410,7 +410,7 @@ my @cases = (
     ['NOFREE', 'E', 'direct -', 'Cannot map a free setup drive', '', 1, 'D'],
     ['NOOP', 'E', 'direct -', 'Startup check complete.', '', 0, 'D'],
     ['ARGS', 'E', 'activate extra', 'Invalid arguments.', '', 1, 'D'],
-    ['NOGFS', 'E', '', 'Cannot generate GFS.INI.', 'EE', 1, 'D'],
+    ['READONLY', 'E', '', 'Install complete.', 'EE', 0, 'D'],
     ['REAL', 'E', '', 'Install complete.', '', 0, 'D'],
 );
 my $runner = "\@echo off\nc:\\probe.exe >c:\\NATIVE.LOG\n" .
@@ -423,9 +423,9 @@ for my $case (@cases) {
     write_file("$name/geos.ini", "test\n")
         if $name =~ /^(UPDATE|EXPLICIT|NOOP)$/;
     write_file("$name/gfs.ini", "test\n") if $name eq 'NOOP';
-    write_file("$name/GFS.INI", "ORIGINAL") if $name eq 'NOGFS';
+    write_file("$name/GFS.INI", "ORIGINAL") if $name eq 'READONLY';
     $runner .= "cd \\$name\n";
-    $runner .= "c:\\probe.exe readonly\n" if $name eq 'NOGFS';
+    $runner .= "c:\\probe.exe readonly\n" if $name eq 'READONLY';
     $runner .= "z:\\subst D: C:\\EMPTY\n" if $name =~ /^(NEXT|BUSY)$/;
     my $distribution = $name eq 'REAL' ? 'real' : 'dist';
     $runner .= $invocation =~ /^direct (.+)$/
@@ -444,10 +444,17 @@ my @paths = (
      'c:\\limit\\aaaaaaaa\\bbbbbbbb\\cccccccc\\dddddddd\\eeeeeeee',
      'NET.INI', 'AAAAAAAA\\BBBBBBBB\\CCCCCCCC\\DDDDDDDD\\EEEEEEEE\\BOOT'],
 );
+# Installations with the BASEBOX host file system driver next to MegaFile:
+# GFS.INI then lists it after MegaFile (EC and non-EC name).
+my %hostfs = (DOTS => 'HOSTFSEC.GEO', LIMIT => 'HOSTFS.GEO');
 for my $case (@paths) {
     my ($local, $source, $dos, $ini) = @$case;
     make_path("$tmp/$local");
     distribution($source, 1);
+    if ($hostfs{$local}) {
+        make_path("$tmp/$source/BOOT/SYSTEM/FS");
+        write_file("$source/BOOT/SYSTEM/FS/$hostfs{$local}", "test\r\n");
+    }
     $runner .= "cd \\$local\n";
     $runner .= "z:\\subst E: C:\\\n" if $local eq 'OTHER';
     $runner .= "$dos\\gsetup.exe /WRITEGFS $ini >RESULT.LOG\n";
@@ -495,14 +502,11 @@ for my $case (@cases) {
     read_file("$name/STATUS.LOG") =~ /^$occupied\s*$/
         or die "$name: wrong drive state\n";
     my $copies = -e "$tmp/$name/COPY.LOG" ? read_file("$name/COPY.LOG") : '';
-    my $expected = $message =~ /complete\./ && $name ne 'NOOP' || $name =~ /^(POST|NOGFS)$/
+    my $expected = $message =~ /complete\./ && $name ne 'NOOP' || $name =~ /^POST$/
         ? ($name =~ /^(UPDATE|EXPLICIT)$/ ? '' : "INSTALL $drive:\r\n") . "ACTIVATE $drive:\r\n"
         : '';
     $copies eq $expected or die "$name: wrong copy phases: $copies\n";
-    if ($name eq 'NOGFS') {
-        read_file("$name/GFS.INI") eq 'ORIGINAL'
-            or die "Writer failure replaced the old GFS.INI\n";
-    } elsif ($message =~ /complete\./ && $name ne 'NOOP') {
+    if ($message =~ /complete\./ && $name ne 'NOOP') {
         my $gfs = read_file("$name/GFS.INI");
         my $image = $name eq 'REAL' ? 'BOOT\\GFS.IMG' : 'C:\\DIST\\BOOT\\GFS.IMG';
         index($gfs, "file = $image\r\n") >= 0
@@ -515,7 +519,13 @@ for my $case (@paths, ['ROOT', 'DIST', 'c:\\dist', 'NET.INI', 'DIST\\BOOT']) {
     my ($local, $source, $dos, $ini, $boot) = @$case;
     my $folder = $local eq 'ROOT' ? '' : ($local eq 'SAME' ? 'MOVED/' : "$local/");
     my $gfs = read_file("${folder}GFS.INI");
-    for my $entry ("fs = MEGAFILE.GEO", "top = $boot GFS:\\FG",
+    index($gfs, "; Do not change this file by hand.\r\n" .
+                "; An update will overwrite changes.\r\n\r\n") == 0
+        or die "$local: missing GFS.INI warning\n";
+    my $fs = $hostfs{$local}
+        ? "fs = {\r\nMEGAFILE.GEO\r\n$hostfs{$local}\r\n}"
+        : "fs = MEGAFILE.GEO";
+    for my $entry ($fs, "top = $boot GFS:\\FG",
                    "ini = $boot\\$ini", "file = $boot\\GFS.IMG",
                    "bootstrapPath = $boot") {
         index($gfs, "$entry\r\n") >= 0 or die "$local: wrong GFS.INI: $gfs\n";
@@ -523,7 +533,8 @@ for my $case (@paths, ['ROOT', 'DIST', 'c:\\dist', 'NET.INI', 'DIST\\BOOT']) {
     for my $line ($gfs =~ /^(?:fs|top|ini|file|bootstrapPath) = (.*)/mg) {
         $line eq uc($line) or die "$local: lowercase path: $line\n";
     }
-    print "PASS: $local uppercase paths ($ini)\n";
+    print "PASS: $local uppercase paths ($ini" .
+        ($hostfs{$local} ? ", with $hostfs{$local}" : '') . ")\n";
 }
 read_file('MOVED/MOVE.LOG') =~ /Startup check complete/
     or die "Moved installation did not keep its normal startup path\n";
