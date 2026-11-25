@@ -14,9 +14,10 @@ BINS = Tools/esp Tools/uicpp Tools/goc Tools/grev Tools/loc Tools/nmkmf Tools/pm
 		Tools/glue Tools/uic Tools/pmake/findlbdr \
 		Tools/geodump Tools/sym2dis Tools/ldf2sls Tools/swat Tools/misc/cvtpcx \
 		Tools/mkext \
-		Tools/gfs
+		Tools/gfs Tools/img86box
 LIBS =  Tools/utils Tools/compat Tools/winutil Tools/swat/tcl \
-	Tools/swat/ntcurses Tools/swat/curses Tools/swat/termcap
+	Tools/swat/ntcurses Tools/swat/curses Tools/swat/termcap \
+	Tools/fatfs
 
 install		: $(LIBS) $(BINS)
 

@@ -48,7 +48,9 @@ static char *rcsid =
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <sys/ioctl.h>
+#include <sys/time.h>
 #include <netinet/in.h>
+#include <unistd.h>
 #endif
 #ifdef _WIN32
 #include <compat/windows.h>       /* for communications stuff */
@@ -866,38 +868,93 @@ void Ipx_Init(char *addr) {
 	    }
     }
     else {
-	/* open the socket here */
-	if(cmdLineSocket != INVALID_SOCKET) {
-	Message("Error: command line socket already open\n");
-	}
-	cmdLineSocket = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);    
-
-	/* try connectiokn now */
-	if(cmdLineSocket != INVALID_SOCKET) {
-	    
+	/*
+	 * Serial line tunneled over TCP: DOSBox nullmodem, or 86Box with
+	 * its serial port pty forwarded by socat. SWAT_SERIAL_TCP may give
+	 * "port" or "host:port" (default 127.0.0.1:8079). The emulator may
+	 * still be starting, so retry for SWAT_SERIAL_TCP_WAIT seconds
+	 * (default 60).
+	 */
 	struct sockaddr_in connectAddress;
-	int result;
+	char	    host[64];
+	int	    port = UDP_SERVER_PORT;
+	int	    waitSecs = 60;
+	int	    tries;
+	int	    result = -1;
+	const char  *spec = getenv("SWAT_SERIAL_TCP");
+	const char  *waitSpec = getenv("SWAT_SERIAL_TCP_WAIT");
 
+	strcpy(host, "127.0.0.1");
+	if (spec != NULL && spec[0] != '\0') {
+	    const char *colon = strrchr(spec, ':');
+
+	    if (colon != NULL) {
+		size_t len = colon - spec;
+
+		if (len > 0 && len < sizeof(host)) {
+		    memcpy(host, spec, len);
+		    host[len] = '\0';
+		}
+		port = atoi(colon + 1);
+	    } else {
+		port = atoi(spec);
+	    }
+	    if (port <= 0 || port > 65535) {
+		port = UDP_SERVER_PORT;
+	    }
+	}
+	if (waitSpec != NULL && atoi(waitSpec) >= 0) {
+	    waitSecs = atoi(waitSpec);
+	}
+
+	if(cmdLineSocket != INVALID_SOCKET) {
+	    Message("Error: command line socket already open\n");
+	}
 	memset(&connectAddress, 0, sizeof(connectAddress));
-
 	connectAddress.sin_family = AF_INET;
-	connectAddress.sin_port = htons(UDP_SERVER_PORT);
-	connectAddress.sin_addr.s_addr = inet_addr("127.0.0.1");
+	connectAddress.sin_port = htons(port);
+	connectAddress.sin_addr.s_addr = inet_addr(host);
 
-	result =  connect(cmdLineSocket,
-	              (struct sockaddr *) &connectAddress, 
-	              sizeof(connectAddress));
-	if(result == 0) {
-		Message("connect success\n");
-		send(cmdLineSocket, "abcd", 4, 0);
+	Message("Connecting to %s:%d", host, port);
+	for (tries = 0; tries <= waitSecs * 2; tries++) {
+	    cmdLineSocket = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+	    if (cmdLineSocket == INVALID_SOCKET) {
+		break;
+	    }
+	    result = connect(cmdLineSocket,
+			     (struct sockaddr *) &connectAddress,
+			     sizeof(connectAddress));
+	    if (result == 0) {
+		break;
+	    }
+#if defined(_WIN32)
+	    closesocket(cmdLineSocket);
+#else
+	    close(cmdLineSocket);
+#endif
+	    cmdLineSocket = INVALID_SOCKET;
+	    if (tries < waitSecs * 2) {
+		if ((tries % 2) == 0) {
+		    Message(".");
+		}
+#if defined(_WIN32)
+		Sleep(500);
+#else
+		{
+		    struct timeval tv;
+
+		    tv.tv_sec = 0;
+		    tv.tv_usec = 500000;
+		    select(0, NULL, NULL, NULL, &tv);
+		}
+#endif
+	    }
+	}
+	if (result == 0) {
+	    Message(" connected\n");
+	    send(cmdLineSocket, "abcd", 4, 0);
 	} else {
-		Message("connect failed\n");
-		
-	}
-	}
-	else {
-	    
-	Message("Error: socket connection failed\n");
+	    Message(" connect failed\n");
 	}
     }
 }

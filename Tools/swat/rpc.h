@@ -133,7 +133,10 @@ typedef byte		Rpc_Stat;   	/* Call status */
 #define CM_SERIAL    	1
 #define CM_NETWARE   	2
 #define CM_NPIPE     	3
-#define CM_SERIAL_TCP   4
+#define CM_SERIAL_TCP   4	/* serial line tunneled over TCP (Linux: 86Box
+				 * pty forwarded by socat, DOSBox nullmodem) */
+#define CM_SERIAL_PIPE  5	/* serial line over a byte mode named pipe
+				 * (Windows: 86Box "Named Pipe" serial device) */
 
 /*
  * Function definitions for Swat

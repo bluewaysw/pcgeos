@@ -85,6 +85,30 @@ If you want to customize the target environment settings only for yourself, you 
   - cycles=55000
 
 
+## Run the target in 86Box
+Instead of DOSBox/basebox, the target can run on an emulated PC in [86Box](https://86box.net) (version 6.0 or newer). The target is put on a bootable FreeDOS hard disk image and swat connects over the emulated serial port, using the serial Swat stub.
+
+Preconditions:
+- 86Box 6.0+ with its [ROM set](https://github.com/86Box/roms). Set `BOX86_ROMS` to the ROM directory if 86Box does not find it on its own.
+- Linux: `socat` (86Box forwards the serial port pseudo terminal to a local TCP port with it).
+- The tools and the serial stub are built (`pmake install` in `Tools`, `pmake` in `Installed`).
+- FreeDOS: set `FREEDOS_IMG` to a bootable FreeDOS hard disk image, e.g. `FD14LITE.IMG` from FreeDOS 1.4 LiteUSB. Without it, `bin/box86.pl` downloads the files listed in `bin/86box/freedos.manifest` (FreeDOS 1.4 LiteUSB, the 8086 FreeDOS kernel and FreeCOM) and checks their SHA-256 before use.
+
+Use:
+- Set `USE_86BOX` to the absolute path of the 86Box executable, like `BASEBOX` for basebox (e.g. `set USE_86BOX=C:\86Box\86Box.exe`; `USE_86BOX=1` uses 86Box from the path), and build the target as usual (`buildbbx`): the build also creates or updates the disk image `%LOCAL_ROOT%/86box/<platform>.<ec|nec>/geos.img`.
+- `target` (or `target -n`) syncs the image, starts 86Box and swat.
+- `TARGET_PLATFORM` selects the emulated machine (default `pm32`):
+  - `pm32`: Pentium 100, 32 MB, S3 Trio64 PCI, PS/2 mouse, serial link at 115200 baud
+  - `pm16`, `rm16`: 286 at 12.5 MHz, Cirrus Logic GD5428 ISA, serial mouse on COM2, serial link at 57600 baud. These need a FreeDOS image whose MBR and boot code run on a 286 (FAT16 partition, MBR from FreeDOS FDISK); the downloaded kernel is the 8086 build.
+- The image is updated in place: new and changed files of the target are copied, files removed from the target are deleted in `ENSEMBLE/SYSTEM`, `ENSEMBLE/WORLD` and `ENSEMBLE/FREEGEOS` only, so data written inside the emulator is kept. `perl %ROOT_DIR%/bin/box86.pl image --fresh` recreates it.
+- `GEOS_CDROM_DRIVE` may name an ISO image, which is attached as CD-ROM (drive `R:` if the FreeDOS image contains the CD-ROM drivers). `GEOS_CENTRAL_STORAGE` is only supported with basebox.
+
+First start of a new machine:
+- `pm32`: the BIOS reports a CMOS checksum error once; press F1. 86Box keeps the settings.
+- `pm16`, `rm16`: the Award 286 BIOS cannot detect hard disks. Enter setup with Ctrl-Alt-Esc, set Disk 1 to type 49 with the cylinders printed by `target`, 16 heads and 63 sectors, then save with F10 and F5.
+
+The machine configuration is generated from `bin/86box/*.cfg` on every start. Personal changes go to `%LOCAL_ROOT%/86box_user.cfg` (all platforms) or `%LOCAL_ROOT%/86box_user.<platform>.cfg`, in 86Box's configuration file format; the `[img86box]` section of these files changes the disk image settings (see `bin/86box/base.cfg`).
+
 # How to develop?
 
 PC/GEOS comes with extensive technical documentation that describes tools, programming languages and API calls from the perspective of an SDK user. This documentation can be found in the `TechDocs` folder and is available in Markdown format.

@@ -178,6 +178,28 @@ int
 NPipe_ClientInit(char *name, HANDLE *pipe, LPOVERLAPPED ovlpR, 
 		 LPOVERLAPPED ovlpW)
 {
+    return NPipe_ClientInitEx(name, pipe, ovlpR, ovlpW, FALSE);
+}
+
+/***********************************************************************
+ *				NPipe_ClientInitEx
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    Connect to a named pipe, in message or byte mode
+ * CALLED BY:	    NPipe_ClientInit, Rpc_Init (serial pipe)
+ * RETURN:	    TRUE - no errors, FALSE - problems encountered
+ * SIDE EFFECTS:    none
+ *
+ * STRATEGY:	    Byte mode is used for pipes that carry a raw serial
+ *		    line (e.g. 86Box's named pipe serial device); such
+ *		    pipes are created as byte pipes and can't be read in
+ *		    message mode.
+ *
+ ***********************************************************************/
+int
+NPipe_ClientInitEx(char *name, HANDLE *pipe, LPOVERLAPPED ovlpR, 
+		   LPOVERLAPPED ovlpW, BOOL byteMode)
+{
     DWORD newPipeMode;
     BOOL returnCode;
     char * pipeName;
@@ -205,7 +227,8 @@ NPipe_ClientInit(char *name, HANDLE *pipe, LPOVERLAPPED ovlpR,
 	return FALSE;
     }
 
-    newPipeMode = PIPE_READMODE_MESSAGE | PIPE_WAIT;
+    newPipeMode = (byteMode ? PIPE_READMODE_BYTE : PIPE_READMODE_MESSAGE) |
+	PIPE_WAIT;
     
     returnCode = SetNamedPipeHandleState(*pipe, &newPipeMode, NULL, NULL);
 

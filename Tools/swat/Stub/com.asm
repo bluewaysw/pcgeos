@@ -167,6 +167,8 @@ endif ;not PENELOPE	; -----------------------
 
 comdAvail	byte
 comThre		byte
+comFifoOn	byte	0		; non-zero if ComInitPC enabled the
+					;  16550 FIFO
 comRecvEnable	byte
 comTransEnable	byte
 comIrq		word
@@ -354,11 +356,18 @@ SDB_haveBaud:
 ifndef ZOOMER
 		xchg	ax, dx	; ax <- baud
 
-	irp	baud, <300,1200,2400,4800,9600,19200,38400>
+	irp	baud, <300,1200,2400,4800,9600,19200,38400,57600>
 		mov	dx, BAUD_&baud
 		cmp	ax, baud
 		je	SDB_done	; (carry clear if branch taken)
 	endm
+	;
+	; 115200 does not fit in 16 bits; the parse loop above keeps the
+	; low word, so "115200" arrives as 115200 - 65536 = 49664.
+	;
+		mov	dx, BAUD_115200
+		cmp	ax, 49664
+		je	SDB_done	; (carry clear if branch taken)
 else
 		call	Com_GetHardwareType
 		cmp	ax, HT_PC
@@ -673,6 +682,10 @@ ComFetchPCBaudArg	proc	near
 		cmp	ah, '9'		; check for 9600 as value
 		je	setNewBaud
 
+		mov	al, BAUD_57600	; check for 57600 baud (/b:57)
+		cmp	ah, '5'
+		je	setNewBaud
+
 		mov	al, BAUD_38400	; check for 38400 baud
 		cmp	ah, '3'
 		je	setNewBaud
@@ -690,6 +703,9 @@ ComFetchPCBaudArg	proc	near
 		jne	use19_2		; no, use 19200 baud
 		cmp	es:[baudrate][1], '2'	; check for 1200, vs. 19200
 		je	setNewBaud	;  yes, use 1200
+		mov	al, BAUD_115200	; check for 115200 (/b:115)
+		cmp	es:[baudrate][1], '1'
+		je	setNewBaud
 use19_2:
 		mov	al, BAUD_19200	; if no match, use 19200
 setNewBaud:
@@ -1143,6 +1159,32 @@ endif	; DOVE
 		and	dx, bx
 		mov	al, 3
 		out	dx, al
+
+		;
+		; Use the receive FIFO of a 16550A (and compatibles) so no
+		; characters are lost at 57600/115200 baud while the stub is
+		; busy. The trigger level is one character, so the interrupt
+		; behaviour is the same as without FIFO: the UART interrupts
+		; again as long as characters are waiting. The FIFO is only
+		; kept if the chip reports a working one (IIR bits 6-7 set);
+		; 8250/16450 and the buggy 16550 run as before.
+		;
+		mov	ds:[comFifoOn], 0
+		mov	dx, COMFIFOPORT
+		and	dx, bx
+		mov	al, COMFIFOINIT
+		out	dx, al
+		jmp	$+2		; I/O delay...
+		in	al, dx		; read back IIR
+		and	al, COMFIFOPRESENT
+		cmp	al, COMFIFOPRESENT
+		je	fifoOn
+		clr	al
+		out	dx, al		; no (working) FIFO: disable
+		jmp	fifoDone
+fifoOn:
+		mov	ds:[comFifoOn], 1
+fifoDone:
 
 		;
 		; Turn on DTR, RTS and OUT2. The first 2 are on because that's
@@ -1949,6 +1991,15 @@ else
 		mov	dx, ds:[comCurIENPort]
 		clr	al
 		out	dx, al
+	;
+	; Leave the UART in 8250 mode, as we found it.
+	;
+		tst	ds:[comFifoOn]
+		jz	fifoOff
+		mov	dx, ds:[comCurIRQPort]	; FCR is at the IIR address
+		out	dx, al			; al = 0: FIFO off
+		mov	ds:[comFifoOn], 0
+fifoOff:
 endif
 
 		mov	ax, ds:[comIntVecNum]

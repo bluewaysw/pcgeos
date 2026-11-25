@@ -5831,6 +5831,52 @@ sleep(unsigned long naptime)
 
 #endif
 
+/*********************************************************************
+ *			IbmPingPCWait
+ *********************************************************************
+ * SYNOPSIS:	Ibm_PingPC for the start of swat. With a serial line to an
+ *		emulated PC (86Box: named pipe or TCP), swat is started
+ *		together with the emulator, while the PC still boots DOS
+ *		and the stub is not running yet. In these modes keep trying
+ *		for SWAT_ATTACH_WAIT seconds (default 180).
+ * CALLED BY:	Ibm_Init
+ * RETURN:	TRUE if the PC answered
+ *********************************************************************/
+static Boolean
+IbmPingPCWait(void)
+{
+    extern int	commMode;	/* from rpc.c */
+    const char	*waitSpec;
+    long    	waitSecs = 180;
+    time_t  	start, now;
+    Boolean 	told = FALSE;
+
+    if (Ibm_PingPC(FALSE)) {
+	return TRUE;
+    }
+    if ((commMode != CM_SERIAL_TCP) && (commMode != CM_SERIAL_PIPE)) {
+	return FALSE;
+    }
+    waitSpec = getenv("SWAT_ATTACH_WAIT");
+    if ((waitSpec != NULL) && (atol(waitSpec) >= 0)) {
+	waitSecs = atol(waitSpec);
+    }
+    time(&start);
+    for (;;) {
+	time(&now);
+	if ((long)(now - start) >= waitSecs) {
+	    return FALSE;
+	}
+	if (!told) {
+	    MessageFlush("Waiting for GEOS (stub) on the PC to start...\n");
+	    told = TRUE;
+	}
+	if (Ibm_PingPC(FALSE)) {
+	    return TRUE;
+	}
+    }
+}
+
 #if defined(_MSDOS)
 # define Rpc_Rss    Serial_Rss
 # define Rpc_Rssn   Serial_Rssn
@@ -6069,7 +6115,7 @@ Ibm_Init(char 	*file,	    /* File containing kernel */
      * See if the PC is there and set up variables and handles for the loader
      * appropriately
      */
-    if (!Ibm_PingPC(FALSE)) {
+    if (!IbmPingPCWait()) {
 #if defined(_WIN32)
 	if (MessageFlush != NULL) {
 	    MessageFlush((char *)interp->result);

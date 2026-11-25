@@ -30,6 +30,8 @@ extern int NPipe_ServerConnect(HANDLE pipe, int *madeConnection,
 			       LPOVERLAPPED ovlp);
 extern int NPipe_ClientInit(char *addr, HANDLE *pipe, LPOVERLAPPED ovlpR,
 			    LPOVERLAPPED ovlpW);
+extern int NPipe_ClientInitEx(char *addr, HANDLE *pipe, LPOVERLAPPED ovlpR,
+			      LPOVERLAPPED ovlpW, BOOL byteMode);
 extern int NPipe_Read(HANDLE pipe, void *buf, int bufSize, 
 		      LPOVERLAPPED ovlp, BOOL block);
 extern int NPipe_PrimeForWait(HANDLE pipe, LPOVERLAPPED ovlp);

@@ -565,6 +565,12 @@ if ( $GbuildResult != 0 ) {
     GenerateFreeGEOSSetupCopyScripts();
     FreeGEOSCopyImageToEnsemble();
 
+    #
+    # With USE_86BOX set, wrap the target up in the bootable 86Box disk
+    # image (created or updated in place).
+    #
+    Box86UpdateImage();
+
     print "\nbuildbbx completed!\n";
 }
 
@@ -1555,6 +1561,40 @@ sub FreeGEOSCopyImageToEnsemble {
 	copy( $sourceImage, $targetImage ) ||
 	    die "\nERROR: Cannot copy FreeGEOS GFS image file:\n" .
 		"$sourceImage -> $targetImage\n";
+    }
+}
+
+##############################################################################
+#       Box86UpdateImage
+##############################################################################
+#
+# SYNOPSIS:     Create or update the 86Box disk image of the target
+# PASS:         $RealInfo{destdir} = gbuild destination tree
+#               $RealInfo{ec}      = EC build (y/n)
+# CALLED BY:    Main, only if USE_86BOX is set
+# RETURN:       nothing; a failure is reported but does not fail the build
+#
+# The image is $LOCAL_ROOT/86box/$TARGET_PLATFORM.<ec|nec>/geos.img, see
+# bin/box86.pl and Tools/img86box.
+#
+##############################################################################
+sub Box86UpdateImage {
+    local( $ec, $arg, $cmd );
+
+    if ( ! $ENV{USE_86BOX} || $opt_debug || $opt_template ) {
+	return;
+    }
+
+    $ec = ( $RealInfo{ec} eq "y" );
+    foreach $arg ( @ARGV ) {
+	$ec = ( $1 eq "true" ) if ( $arg =~ /^ec=(true|false)$/ );
+    }
+
+    $cmd = "perl \"$TopDir/bin/box86.pl\" image" . ( $ec ? "" : " -n" ) .
+	" --destdir \"$RealInfo{destdir}\"";
+    print "+ $cmd\n";
+    if ( system( $cmd ) != 0 ) {
+	print "\nWARNING: 86Box disk image not updated (see above).\n";
     }
 }
 

@@ -10,6 +10,22 @@ if "%1"=="-n" (
    set TYPE=ec
 )
 IF NOT DEFINED TARGET (SET TARGET=nt)
+rem USE_86BOX=<86Box executable>: run the target in 86Box (bootable disk
+rem image, swat over the emulated serial port) instead of basebox.
+rem See bin\box86.pl.
+IF DEFINED USE_86BOX (
+   IF EXIST "%USERPROFILE%\swat.rc" (
+      set CUSTOM_TCL_LOCATION=%USERPROFILE%\swat.rc
+   ) ELSE IF EXIST "%cd%\swat.rc" (
+      set CUSTOM_TCL_LOCATION=%cd%\swat.rc
+   )
+   IF "%TYPE%"=="nec" (
+      perl "%ROOT_DIR%\bin\box86.pl" run -n
+   ) ELSE (
+      perl "%ROOT_DIR%\bin\box86.pl" run
+   )
+   GOTO :EOF
+)
 IF NOT EXIST %LOCAL_ROOT%\.bbxxip\.bbxxip.%TARGET%.%TYPE% (
    echo *** Target type "%TYPE%" not built.
    GOTO :EOF

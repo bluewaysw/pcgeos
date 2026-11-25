@@ -458,6 +458,7 @@ OVERLAPPED overlapRead, overlapWrite;
 HANDLE wevent = NULL;
 
 static char npipeName[256];
+#define SERIAL_PIPE_WAIT    60	  /* seconds to wait for a serial pipe */
 static char ttysetting[25];
 
 static BOOL incomingRead = FALSE;   	  /* incoming data has been read */
@@ -466,6 +467,164 @@ static int  incomingLen = 0;
 static BOOL outstandingRead = FALSE;	  /* a read attempt for incoming
 					   * data read has occurred, but
 					   * not completed */
+
+/*
+ * Serial pipe (CM_SERIAL_PIPE): a byte mode named pipe that carries the
+ * raw serial line of an emulated PC, e.g. the "Named Pipe" serial device
+ * of 86Box. The data is framed exactly like on a serial cable. Reads are
+ * done overlapped into spBuf so RpcWait can block on the pipe together
+ * with the console.
+ */
+static BYTE  spBuf[4096];
+static DWORD spLen = 0;			  /* bytes in spBuf */
+static DWORD spPos = 0;			  /* next byte to hand out */
+static BOOL  spPending = FALSE;		  /* overlapped read outstanding */
+
+static void
+RpcSerialPipeError(const char *what)
+{
+    DWORD lastError = GetLastError();
+
+    if (win32dbg == TRUE) {
+	char buf[1000];
+
+	WinUtil_SprintError(buf, (char *)what);
+	MessageFlush(buf);
+    }
+    if ((lastError == ERROR_BROKEN_PIPE) ||
+	(lastError == ERROR_PIPE_NOT_CONNECTED) ||
+	(lastError == ERROR_INVALID_HANDLE))
+    {
+	Ibm_LostContact();
+    }
+}
+
+/*
+ * Make sure data is buffered or a read is outstanding.
+ * Returns 1 if data is available, 0 if not (yet), -1 on error.
+ */
+static int
+RpcSerialPipeStartRead(void)
+{
+    DWORD n;
+
+    if (spPos < spLen) {
+	return 1;
+    }
+    if (spPending) {
+	return 0;
+    }
+    spLen = spPos = 0;
+    if (ReadFile(hCommunication, spBuf, sizeof(spBuf), &n, &overlapRead)) {
+	spLen = n;
+	return n > 0 ? 1 : 0;
+    }
+    if (GetLastError() == ERROR_IO_PENDING) {
+	spPending = TRUE;
+	return 0;
+    }
+    RpcSerialPipeError("ReadFile(serial pipe)");
+    return -1;
+}
+
+/*
+ * Collect the result of an outstanding read.
+ * Returns 1 if data is available, 0 if not (yet), -1 on error.
+ */
+static int
+RpcSerialPipeComplete(BOOL wait)
+{
+    DWORD n;
+
+    if (!spPending) {
+	return spPos < spLen ? 1 : 0;
+    }
+    if (!GetOverlappedResult(hCommunication, &overlapRead, &n, wait)) {
+	if (GetLastError() == ERROR_IO_INCOMPLETE) {
+	    return 0;
+	}
+	spPending = FALSE;
+	RpcSerialPipeError("GetOverlappedResult(serial pipe)");
+	return -1;
+    }
+    spPending = FALSE;
+    spLen = n;
+    spPos = 0;
+    return n > 0 ? 1 : 0;
+}
+
+/*
+ * Blocking read of up to len bytes.
+ */
+static int
+RpcSerialPipeRead(byte *bp, int len)
+{
+    int n;
+
+    while (spPos >= spLen) {
+	n = RpcSerialPipeStartRead();
+	if (n < 0) {
+	    return -1;
+	}
+	if (n == 0) {
+	    if (spPending) {
+		if (RpcSerialPipeComplete(TRUE) < 0) {
+		    return -1;
+		}
+	    } else {
+		Sleep(1);
+	    }
+	}
+    }
+    n = (int)(spLen - spPos);
+    if (n > len) {
+	n = len;
+    }
+    bcopy(spBuf + spPos, bp, n);
+    spPos += n;
+    return n;
+}
+
+static int
+RpcSerialPipeWriteV(struct iovec *iov, int iov_len)
+{
+    int	    i, total = 0;
+    DWORD   n;
+
+    for (i = 0; i < iov_len; i++) {
+	if (iov[i].iov_len == 0) {
+	    continue;
+	}
+	if (!WriteFile(hCommunication, iov[i].iov_base, iov[i].iov_len, &n,
+		       &overlapWrite))
+	{
+	    if ((GetLastError() != ERROR_IO_PENDING) ||
+		!GetOverlappedResult(hCommunication, &overlapWrite, &n, TRUE))
+	    {
+		RpcSerialPipeError("WriteFile(serial pipe)");
+		return -1;
+	    }
+	}
+	total += n;
+    }
+    return total;
+}
+#endif
+
+#if defined(unix) || defined(_LINUX) || defined(_WIN32)
+/*
+ * Write a framed (serial protocol) message to the link.
+ */
+static int
+RpcLinkWriteV(int fd, struct iovec *iov, int iov_len)
+{
+# if defined(_WIN32)
+    if (commMode == CM_SERIAL_PIPE) {
+	return RpcSerialPipeWriteV(iov, iov_len);
+    }
+# endif
+    return NetWare_WriteV(fd, iov, iov_len);
+}
 #endif
 
 
@@ -689,7 +848,7 @@ RpcSendV(int    	fd,
 
 #if defined(unix) || defined(_LINUX) || defined(_WIN32)
 	    //i = writev(fd, tiov, tiovlen);
-	    i = NetWare_WriteV(fd, tiov, tiovlen);
+	    i = RpcLinkWriteV(fd, tiov, tiovlen);
 #elif defined(_MSDOS)
 	    i = Serial_WriteV(tiov, tiovlen);
 //#elif defined(_WIN32)
@@ -715,7 +874,7 @@ RpcSendV(int    	fd,
 
 #if defined(unix) || defined(_LINUX) || defined(_WIN32)
 	//i = writev(fd, newiov, curiov+1);
-	i = NetWare_WriteV(fd, newiov, curiov+1);
+	i = RpcLinkWriteV(fd, newiov, curiov+1);
 #elif defined(_MSDOS)
 	i = Serial_WriteV(newiov, curiov+1);
 /*#else defined(_WIN32)
@@ -1497,10 +1656,16 @@ RpcHandleStream(int	    stream, /* Stream that's ready */
     /*case CM_NETWARE:*/
     case CM_SERIAL_TCP:
     case CM_SERIAL:
+    case CM_SERIAL_PIPE:
     {
 
 #if defined(unix) || defined(_LINUX) || defined(_WIN32)
 	//bytesRead = read(stream, bp, 1);
+# if defined(_WIN32)
+	if (commMode == CM_SERIAL_PIPE) {
+	    bytesRead = RpcSerialPipeRead(bp, 1);
+	} else
+# endif
 	bytesRead = NetWare_Read(stream, bp,
 				 1);
 
@@ -2322,7 +2487,21 @@ RpcWait(int poll)
 	/*
 	 * check if we should wait on the communications method, eg. npipe
 	 */
-	if ((geosFD >= 0) && (FD_ISSET(geosFD, &rpc_readMask)))
+	if ((geosFD >= 0) && (FD_ISSET(geosFD, &rpc_readMask))
+	    && (commMode == CM_SERIAL_PIPE))
+	{
+	    int ready = RpcSerialPipeStartRead();
+
+	    if (ready > 0) {
+		nstreams += 1;
+		FD_SET(geosFD, &readMask);
+	    } else if (ready < 0) {
+		goto afterRpcLoop;
+	    } else if (spPending) {
+		hwaits[nwaits++] = overlapRead.hEvent;
+	    }
+	}
+	else if ((geosFD >= 0) && (FD_ISSET(geosFD, &rpc_readMask)))
 	{
 		/*
 			* set the wait handle to the overlapped io event
@@ -2504,6 +2683,18 @@ RpcWait(int poll)
 		}
 	    }
 
+	    else if ((commMode == CM_SERIAL_PIPE) &&
+		     (hwaits[dWaitResult - WAIT_OBJECT_0] == overlapRead.hEvent))
+	    {
+		int ready = RpcSerialPipeComplete(FALSE);
+
+		if (ready > 0) {
+		    nstreams += 1;
+		    FD_SET(geosFD, &readMask);
+		} else if (ready < 0) {
+		    goto afterRpcLoop;
+		}
+	    }
 	    else if ( hwaits[dWaitResult - WAIT_OBJECT_0] == overlapRead.hEvent )
 	    {
 		/*
@@ -4772,6 +4963,18 @@ Rpc_Init(int		*argcPtr,
 		*argcPtr -= 1;
 	    }
 	}
+	else if (strcmp(*av, "-serialpipe") == 0) { /* serial line pipe */
+	    if (ac > 1) {
+		npipe = av[1];
+		commMode = CM_SERIAL_PIPE;
+		av++, ac--;
+		*argcPtr -= 2;
+	    } else {
+		MessageFlush("-serialpipe needs an argument in form "
+			     "\\\\.\\pipe\\<name>\n");
+		exit(1);
+	    }
+	}
 #endif   /* !_WIN32 */
 	else {
 	    /*
@@ -5041,6 +5244,40 @@ geosFD = 1;		/* Fake descriptor number that won't interfere
 	break;
     case CM_SERIAL_TCP:
     	geosFD = NetWare_Init(getenv("SWAT_NET"), TRUE);
+	break;
+    case CM_SERIAL_PIPE:
+	/*
+	 * The emulator creates the pipe when the machine starts, which may
+	 * take a while, so keep trying for SERIAL_PIPE_WAIT seconds.
+	 */
+	if ((strncmp(npipe, "\\\\", 2) != 0) &&
+	    (strlen(npipe) + 10 < sizeof(npipeName)))
+	{
+	    sprintf(npipeName, "\\\\.\\pipe\\%s", npipe);
+	} else {
+	    strncpy(npipeName, npipe, sizeof(npipeName) - 1);
+	}
+	Message("Connecting to %s", npipeName);
+	for (npipeTries = 0; npipeTries < SERIAL_PIPE_WAIT * 4; npipeTries++) {
+	    returnCode = NPipe_ClientInitEx(npipeName, &hCommunication,
+					    &overlapRead, &overlapWrite, TRUE);
+	    if (returnCode == TRUE) {
+		break;
+	    }
+	    if ((npipeTries % 4) == 0) {
+		Message(".");
+	    }
+	    Sleep(250);
+	}
+	if (returnCode != TRUE) {
+	    MessageFlush("\nCan't connect to serial pipe %s\n", npipeName);
+	    Swat_Death();
+	}
+	MessageFlush(" connected.\n");
+	spLen = spPos = 0;
+	spPending = FALSE;
+	geosFD = 1;    /* Fake descriptor number that won't interfere
+			* with anything... in theory. */
 	break;
     default:
 	MessageFlush("No communications mode was specified, "
