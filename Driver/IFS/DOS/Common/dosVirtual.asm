@@ -1485,6 +1485,43 @@ asciiToBin:
 endif
 DOSVirtMapCheckComponentIsValidDosLongName	endp
 
+if HOST_FS_FASTPATH
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		DOSVirtMapCheckComponentForNative
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	See if a component can be a native DOS name: a DOS long name
+		when long file names are really available, else only an 8.3
+		name (OS2 driver).
+
+CALLED BY:	DOSVirtMapCheckDosName, DOSVirtMapPathWithDosAFAP
+PASS/RETURN:	as DOSVirtMapCheckComponentIsValidDosLongName
+DESTROYED:	cx, ax, si
+
+PSEUDO CODE/STRATEGY:
+	Without long names from the BASEBOX host or from DOS, os2Lfn.asm
+	emulates the LFN calls with 8.3 names, and DOS doesn't keep the
+	case of what it creates. A name like "Extras", a valid DOS long
+	name, would be created as the folder EXTRAS and come back - and be
+	stored as its GEOS name - as "EXTRAS". So then only real 8.3
+	names are native, as in the classic driver; anything else gets the
+	virtual mapping, with the GEOS name in the file header or in
+	the directory name file.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+DOSVirtMapCheckComponentForNative proc	near
+		push	ds
+		segmov	ds, dgroup, cx
+		mov	cl, ds:[lfnAvail]
+		or	cl, ds:[lfnDos]
+		pop	ds
+		jz	shortOnly
+		GOTO	DOSVirtMapCheckComponentIsValidDosLongName
+shortOnly:
+		GOTO	DOSVirtMapCheckComponentIsValidDosName
+DOSVirtMapCheckComponentForNative endp
+endif	; HOST_FS_FASTPATH
+
 endif	; _LFN
 
 
@@ -1551,7 +1588,11 @@ if _LFN
 		assume	es:dgroup
 			.assert segment dos7FindData eq udata
 
+if HOST_FS_FASTPATH
+		call	DOSVirtMapCheckComponentForNative
+else
 		call	DOSVirtMapCheckComponentIsValidDosLongName
+endif
 
 		pop	si		; ds:si = start of component
 
@@ -2512,7 +2553,11 @@ DBCS <		mov	ax, DOS_DOT_FILE_NAME_LENGTH			>
 		
 		xchg	dx, si		; ds:si <- start, ds:dx <- end
 if _LFN
+if HOST_FS_FASTPATH
+		call	DOSVirtMapCheckComponentForNative
+else
 		call	DOSVirtMapCheckComponentIsValidDosLongName
+endif
 else
 		call	DOSVirtMapCheckComponentIsValidDosName
 endif
