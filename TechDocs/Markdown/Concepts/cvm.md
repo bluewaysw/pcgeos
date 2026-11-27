@@ -463,6 +463,13 @@ If this is passed, the file will be created if it does not already
 exist; otherwise, it will be opened and truncated (all data 
 blocks will be freed).
 
+In a standard path made of several directories, VMO_CREATE_ONLY and 
+VMO_CREATE_TRUNCATE look for an existing file only in the directory in 
+which the new file would be created (normally the local one); a file of the 
+same name in a later, e.g. read-only, directory is ignored and hidden by the 
+new file. VMO_CREATE opens an existing file in any of the directories. See 
+["Standard Paths"](cfile.md#1741-standard-paths).
+
 VMO_OPEN  
 Open an existing file. If the file does not exist, return an error 
 condition.

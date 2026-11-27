@@ -323,6 +323,14 @@ PASS:
 				file, but create it if it doesn't exist
 	     		FILE_CREATE_ONLY to fail if file of same name exists,
 	     			but create it if it doesn't exist
+
+			In a standard path made of several directories,
+			FILE_CREATE_ONLY and FILE_CREATE_TRUNCATE look for an
+			existing file only in the first directory in which
+			the path exists (where the file would be created);
+			a file of the same name in a later directory is
+			ignored. FILE_CREATE_NO_TRUNCATE opens an existing
+			file in any of the directories.
 	al - modes (FileAccessFlags). Must at least request write access
 	     (FileAccessFlags <FE_NONE,FA_WRITE_ONLY>) if not read/write
 	     access.
@@ -392,22 +400,63 @@ EC <	ERROR_E	CREATE_BAD_FLAGS					>
 	mov	cx, bx
 	push	di
 
-	; Don't bother opening if this is a CREATE_ONLY.
+	;
+	; FILE_CREATE_TRUNCATE and FILE_CREATE_ONLY: try to create the file
+	; first. FileAllocOpOnPath walks the physical directories of a
+	; standard path in order, skipping those where the path does not
+	; exist (ERROR_PATH_NOT_FOUND), and the FSD fails FSAOF_CREATE with
+	; ERROR_FILE_EXISTS if the file exists in that directory. So the
+	; file is created in, and existence is checked only in, the first
+	; directory in which the path exists. A file of the same name in a
+	; later (e.g. shared, read-only) directory is ignored.
+	;
+	; FILE_CREATE_NO_TRUNCATE ("open or create") keeps the old,
+	; merged-view behaviour, so existing files in any directory of the
+	; standard path are still found and opened.
 	;
 	mov	bx, ax				; bx <- flags and access
 	andnf	bh, mask FCF_MODE		; bh <- mode
-	cmp	bh, FILE_CREATE_ONLY		
-	mov	bx, ERROR_FILE_NOT_FOUND	
-	xchg	bx, ax			; bx <- flags, ax <- False error
-	je	tryCreate
-	xchg	bx, ax			; put them back...	
-		
+	cmp	bh, FILE_CREATE_NO_TRUNCATE
+	mov	bx, ax				; bx <- flags and access (ax
+					;  must stay intact for openExisting)
+	je	openExisting
+
+	push	bx				; save flags and access
+	mov	ch, bh				; ch <- FileCreateFlags
+	mov	al, bl				; al <- access flags
+	mov	ah, FSAOF_CREATE
+	call	FileCreateCommon		; ax <- handle or error
+	pop	bx				; bx <- flags and access
+	jnc	done				; => created
+	cmp	ax, ERROR_FILE_EXISTS
+	jne	error				; => other error, return it
+
+	mov	ch, bh				; (ch is destroyed anyway; keep
+	andnf	ch, mask FCF_MODE		;  ax = ERROR_FILE_EXISTS)
+	cmp	ch, FILE_CREATE_ONLY
+	je	error				; => ax = ERROR_FILE_EXISTS
+	;
+	; FILE_CREATE_TRUNCATE and the file exists in the first directory
+	; in which the path exists. FileOpen walks the same directories in
+	; the same order, skipping the same ones, so it opens that very
+	; file. It is truncated below.
+	;
+	mov	ax, bx
+	push	ax
+	clr	ah
+	call	FileOpen
+	pop	bx
+	jc	error
+	jmp	verifyFormat
+
+openExisting:
 	push	ax			;save flags and access bits
 	clr	ah			;mask out flag
 	call	FileOpen
 	pop	bx			; recover flags and access bits
 	jc	tryCreate
 	
+verifyFormat:
 	call	FileCreateVerifyFileFormat
 	jc	closeOnError
 

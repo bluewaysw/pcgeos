@@ -351,7 +351,11 @@ RETURN:
 	carry - set if error
 	ax - error code
 		ERROR_FILE_NOT_FOUND
+		ERROR_PATH_NOT_FOUND
 		ERROR_ACCESS_DENIED
+		ERROR_WRITE_PROTECTED (write-protected volume, or file
+			exists in a read-only directory of a standard path;
+			never returned for a file that does not exist)
 		ERROR_FILE_IN_USE
 
 DESTROYED:
@@ -390,8 +394,36 @@ FileDelete	endp
 
 endif
 FileDeleteReal	proc	far
+	;
+	; In a standard path made of several directories, FileWPathOpOnPath
+	; checks each directory's disk for writability *before* asking the
+	; FSD. A read-only directory later in the path therefore yields
+	; ERROR_WRITE_PROTECTED even if the file does not exist at all.
+	; Probe for the file in that case (as FileCreateDir does), so callers
+	; get ERROR_FILE_NOT_FOUND / ERROR_PATH_NOT_FOUND when appropriate,
+	; and ERROR_WRITE_PROTECTED only if the file really exists in a
+	; read-only directory.
+	;
+	push	ds, dx				; save path for probing
 	mov	ah,FSPOF_DELETE_FILE
 	call	FileWPathOpOnPath
+	pop	ds, dx
+	jnc	done				; deleted
+	cmp	ax, ERROR_WRITE_PROTECTED
+	jne	error				; other errors unchanged
+	push	cx
+	call	FileGetAttributes		; does the file exist anywhere?
+	pop	cx
+	jnc	writeProtected			; yes -> in read-only directory
+	cmp	ax, ERROR_FILE_NOT_FOUND
+	je	error				; really not there
+	cmp	ax, ERROR_PATH_NOT_FOUND
+	je	error
+writeProtected:
+	mov	ax, ERROR_WRITE_PROTECTED
+error:
+	stc
+done:
 	ret
 FileDeleteReal	endp
 

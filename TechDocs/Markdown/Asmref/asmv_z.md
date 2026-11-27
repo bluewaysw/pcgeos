@@ -515,7 +515,10 @@ Nothing.
 ### VMOpen
 Opens (or creates) a VM file, returning the handle of the opened file. 
 **VMOpen** looks for the file in the thread's current working directory (unless 
-creating a temporary file). 
+creating a temporary file). In a standard path made of several directories, 
+VMO_CREATE_ONLY and VMO_CREATE_TRUNCATE look for an existing file only 
+in the directory in which the new file would be created (normally the local 
+one); see ["Standard Paths"](../Concepts/cfile.md#1741-standard-paths). 
 
 **Pass:**  
 ah - **VMOpenType**.  
