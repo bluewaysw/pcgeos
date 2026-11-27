@@ -739,73 +739,21 @@ SAVisSetSize	method dynamic SaverApplicationClass, MSG_VIS_SET_SIZE
 		tst	ds:[di].SAI_curWindow
 		jz	noWin
 
+	;
+	; A host field size change is user activity. Stop synchronously, as
+	; the IM deactivation message only queues MSG_SAVER_APP_STOP to us.
+	;
 		push	si
-		push	di
-		mov	si,mask WPF_ABS			  ;resize absolute (i.e. move)
-		push	si
-		clr	si
-		clr	bp
-
-		mov	ax, ds:[di].SAI_bounds.R_left
-		mov	bx, ds:[di].SAI_bounds.R_top
-		mov	cx, ds:[di].SAI_bounds.R_right 
-		mov	dx, ds:[di].SAI_bounds.R_bottom
-
-		mov	di, ds:[di].SAI_curWindow
-
-		call	WinResize
-		pop	di
+		call	ImInfoInputProcess
+		mov	ax, MSG_IM_DEACTIVATE_SCREEN_SAVER
+		mov	di, mask MF_CALL or mask MF_FIXUP_DS
+		call	ObjMessage
 		pop	si
 
-		push	di
-	;
-	; Set up RectDWord for setting document bounds of the view.
-	; 
 		mov	di, ds:[si]
 		add	di, ds:[di].SaverApplication_offset
-		mov	ax, ds:[di].SAI_bounds.R_bottom
-		cwd
-		pushdw	dxax
-
-		mov	ax, ds:[di].SAI_bounds.R_right
-		cwd
-		pushdw	dxax
-
-		mov	ax, ds:[di].SAI_bounds.R_top
-		cwd
-		pushdw	dxax
-
-		mov	ax, ds:[di].SAI_bounds.R_left
-		cwd
-		pushdw	dxax
-	;
-	; Now set those bounds. This should cause the view (which is marked
-	; as scale to fit) to scale things appropriately for our drawing
-	; pleasure.
-	; 
-		test	ds:[di].SAI_state, mask SSF_SCREEN_LOCKED
-		jz	notLocked
-
-		mov	bp, sp
-		mov	dx, size RectDWord
-		mov	bx, ds:[di].SAI_passwordBlock
-		mov	si, offset PasswordView
-		mov	ax, MSG_GEN_VIEW_SET_DOC_BOUNDS
-		mov	di, mask MF_CALL or mask MF_FIXUP_DS or mask MF_STACK
-		call	ObjMessage
-		add	sp, size RectDWord
-notLocked:
-		pop	di
-
-		push	di
-		mov	dx, ds:[di].SAI_curWindow
-		mov	ax, MSG_SAVER_APP_UNSET_WIN
-		call	UserCallApplication
-		pop	di
-
-		clr	ds:[di].SAI_curWindow
-		mov	ax, MSG_SAVER_APP_SET_WIN
-		call	UserCallApplication
+		mov	ax, MSG_SAVER_APP_STOP
+		call	ObjCallInstanceNoLock
 noWin:
 		.leave
 		ret
