@@ -900,6 +900,43 @@ standard path are read-only. When you create a file directly in a standard
 path (as opposed to in a subdirectory of a standard path), the file system will 
 write it to the directory on the disk containing the geos.ini file.
 
+**Standard paths made of several directories**
+
+If a standard path is made up of several directories (for example, a local 
+directory in front of a shared, read-only one), the file system treats the 
+directories as layers and works through them in order, the local one first:
+
+- Opening a file, reading its attributes and other read operations act on 
+the first directory in which the file is found.
+- Creating a file or a directory acts on the first directory in which the path 
+up to the new name exists. The file system first makes sure that the 
+standard path's own directory exists locally, so anything created directly in 
+a standard path goes into the local directory. A subdirectory that exists 
+only in a later directory is not created locally; a file created in it goes 
+into that later directory.
+- When creating, the file system checks for an existing file or directory 
+only in the directory it creates in. A file of the same name in a later 
+directory is ignored, and the new file hides it. This applies to 
+**FileCreate()** with FILE_CREATE_ONLY or FILE_CREATE_TRUNCATE (which 
+truncates only a file in that directory), to **FileCreateDir()**, and to 
+**VMOpen()** with VMO_CREATE_ONLY or VMO_CREATE_TRUNCATE. 
+**FileCreate()** with FILE_CREATE_NO_TRUNCATE and **VMOpen()** with 
+VMO_CREATE still open an existing file in any of the directories, and create 
+a new one only if none exists.
+- **FileDelete()** deletes the file in the first directory in which it is found. 
+If that directory is read-only, it returns ERROR_WRITE_PROTECTED. To 
+replace such a file, create the new file with FILE_CREATE_ONLY or 
+FILE_CREATE_TRUNCATE instead of deleting the old one; the new file goes 
+into the local directory and hides the read-only one. If the file does not 
+exist in any of the directories, **FileDelete()** returns 
+ERROR_FILE_NOT_FOUND (or ERROR_PATH_NOT_FOUND).
+
+Older kernels behave differently in two points: **FileCreate()** with 
+FILE_CREATE_TRUNCATE truncates an existing file in whichever directory it 
+is found first (failing if that directory is read-only), and **FileDelete()** may 
+return ERROR_WRITE_PROTECTED for a file that does not exist at all if a 
+read-only directory is part of the standard path.
+
 The standard paths have a default hierarchy. For example, the standard path 
 SP_VIDEO_DRIVERS usually refers to a directory named VIDEO which 
 belongs to the standard path SP_SYSTEM. However, the user is allowed to 
@@ -1779,7 +1816,13 @@ An invalid path string was passed.
 
 ERROR_ACCESS_DENIED  
 You do not have permission to delete that file, or it exists on a 
-read-only volume.
+read-only volume or directory that is not marked as write-protected 
+(for example, a read-only network or host directory).
+
+ERROR_WRITE_PROTECTED  
+The file exists on a write-protected volume, or in a read-only 
+directory of a standard path (see 
+["Standard Paths"](#1741-standard-paths)).
 
 ERROR_FILE_IN_USE  
 Some geode has that file open.
@@ -2246,14 +2289,19 @@ exists. The following flags are available:
 
 FILE_CREATE_TRUNCATE  
 If a file with the given name exists, it should be opened and 
-truncated; that is, all data should be deleted.
+truncated; that is, all data should be deleted. In a standard path 
+made of several directories, only a file in the directory in which 
+the new file would be created counts (see 
+["Standard Paths"](#1741-standard-paths)).
 
 FILE_CREATE_NO_TRUNCATE  
 If the file exists, it should be opened without being truncated.
 
 FILE_CREATE_ONLY  
 If the file exists, the routine should fail and set the thread's 
-error value to ERROR_FILE_EXISTS.
+error value to ERROR_FILE_EXISTS. In a standard path made of 
+several directories, only a file in the directory in which the new 
+file would be created counts.
 
 FCF_NATIVE  
 This flag is combined with one of the above flags if the file 

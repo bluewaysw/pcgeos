@@ -932,6 +932,11 @@ FILE_CREATE_TRUNCATE to truncate an existing file.
 FILE_CREATE_NO_TRUNCATE to create a new file or to abort.
 FILE_CREATE_ONLY to create a new file or fail if a file of the 
 same name already exists.  
+In a standard path made of several directories, FILE_CREATE_ONLY 
+and FILE_CREATE_TRUNCATE look for an existing file only in the 
+directory in which the new file would be created (normally the 
+local one); FILE_CREATE_NO_TRUNCATE opens an existing file in any 
+of the directories. See ["Standard Paths"](../Concepts/cfile.md#1741-standard-paths).  
 al - Record of **FileAccessFlags** requesting at least write access.  
 cx - Record of **FileAttrs** for the new file if it is created anew.  
 ds:dx - Address of the null-terminated file name.
@@ -998,7 +1003,10 @@ ds:dx - Address of null-terminated file name.
 CF - Set if error, clear otherwise.  
 ax - Error code if CF set:  
 ERROR_FILE_NOT_FOUND  
+ERROR_PATH_NOT_FOUND  
 ERROR_ACCESS_DENIED  
+ERROR_WRITE_PROTECTED (also: file is in a read-only directory of a 
+standard path made of several directories; see ["Standard Paths"](../Concepts/cfile.md#1741-standard-paths))  
 ERROR_FILE_IN_USE
 
 **Destroyed:**  

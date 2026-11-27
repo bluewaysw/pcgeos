@@ -1047,6 +1047,14 @@ condition ERROR_FILE_FORMAT_MISMATCH. Similarly, if the
 flag isn't set and a non-GEOS file with this name exists, 
 **FileCreate()** will fail and return this error.
 
+If the file is in a standard path made of several directories, 
+FILE_CREATE_ONLY and FILE_CREATE_TRUNCATE look for an existing 
+file only in the directory in which the new file would be created 
+(normally the local one). A file of the same name in a later, e.g. 
+read-only, directory is ignored and hidden by the new file. 
+FILE_CREATE_NO_TRUNCATE opens an existing file in any of the 
+directories. See ["Standard Paths"](../Concepts/cfile.md#1741-standard-paths).
+
 The third parameter, *attributes*, describes the **FileAttrs** record to be set for 
 the new file.
 
@@ -1172,7 +1180,11 @@ ERROR_FILE_NOT_FOUND
 No such file exists in the specified directory.
 
 ERROR_WRITE_PROTECTED  
-The volume is write-protected.
+The volume is write-protected. In a standard path made of several 
+directories, the file exists in a read-only directory; to replace it, 
+create a new file with FILE_CREATE_ONLY or FILE_CREATE_TRUNCATE, 
+which goes into the local directory and hides the read-only one. See 
+["Standard Paths"](../Concepts/cfile.md#1741-standard-paths).
 
 ERROR_PATH_NOT_FOUND  
 An invalid path string was passed.

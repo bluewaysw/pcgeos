@@ -378,8 +378,15 @@ GREVFLAGS	+= -B $(BRANCH)
 _REL2	!=	$(GREV) neweng $(REVFILE) $(GREVFLAGS) -R
 _PROTO	!=	$(GREV) getproto $(REVFILE) $(GREVFLAGS) -P
 
-#if defined(GEOS_BUILD_NUMBER)
-_REL    = $(_REL2:S/.1$/.$(GEOS_BUILD_NUMBER)/)
+#
+# If GEOS_BUILD_NUMBER is set (environment or pmake command line), it
+# replaces the engineering (last) component of the release number,
+# whatever value grev computed for it: 6.0.1.3 -> 6.0.1.$(GEOS_BUILD_NUMBER).
+# :R strips everything from the last '.', leaving major.minor.change.
+# The engineering number is a word, so the build number must be 0..65535.
+#
+#if defined(GEOS_BUILD_NUMBER) && !empty(GEOS_BUILD_NUMBER)
+_REL    = $(_REL2:R).$(GEOS_BUILD_NUMBER)
 #else
 _REL	= $(_REL2)
 #endif
