@@ -594,6 +594,7 @@ TermSerialInitForIncoming	proc	far
 							; ax <- accpnt ID
 							; carry set if err
 		pop	bp
+		LONG jc	done
 	;
 	; we ASSUME that the data we need from the incoming access point
 	; is all the item groups and nothing but the item groups
